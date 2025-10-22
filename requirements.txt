@@ -1,0 +1,22 @@
+# TRACE Data Pipeline - Python Requirements
+# Stage 0: Daily TRACE Processing
+
+# Core data processing
+pandas>=2.2.3
+numpy>=2.2.5
+pyarrow>=20.0.0
+
+# WRDS database access
+wrds>=3.3.0
+
+# Market calendars
+pandas-market-calendars>=5.1.1
+
+# Progress bars
+tqdm
+
+# Plotting (optional, only needed for report generation)
+matplotlib>=3.8.0
+
+# Note: All other dependencies are from Python standard library
+# (logging, time, gc, functools, typing, pathlib, sys, os, datetime)
