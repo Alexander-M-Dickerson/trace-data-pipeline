@@ -188,7 +188,7 @@ python -m pip install --user pandas numpy wrds pandas-market-calendars pyarrow t
 
 ### 1. Install required Python packages
 
-SSH into the WRDS cloud and install required Python packages. The essential packages are `pyarrow`, `pandas_market_calendars`, `wrds`, and `tqdm`. The rest should come as standard with Python on WRDS.
+SSH into the WRDS cloud and install required Python packages. The essential packages are `pyarrow`, `pandas_market_calendars`, `wrds`, and `tqdm`. The rest should come as standard with Python on WRDS. Extract the GitHub repo.
 
 ### 2. Navigate to the repository and configure settings
 
@@ -201,6 +201,15 @@ cd ~/proj/stage0
 ```python
 WRDS_USERNAME = os.getenv("WRDS_USERNAME", "your_wrds_username_here")
 ```
+
+To easily change this via command line by opening `nano`, follow these instructions:
+
+```bash
+nano _trace_settings.py
+```
+Change your username at the top, e.g., `wrds_user1` (set this to *your* username).
+Save and exit `nano`, press Ctrl + O, then Enter to save. Press Ctrl + X to exit `nano`.
+You can confirm the change was actioned by executing `grep WRDS_USERNAME _trace_settings.py`.
 
 The WRDS password should be handled by the `.pgpass` file which you should have set up following the WRDS documentation.
 
