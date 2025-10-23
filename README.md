@@ -5,12 +5,14 @@ It is apart of the [Open Bond Asset Pricing project](https://openbondassetpricin
 This pipeline implements cleaning procedures and error-correction algorithms to produce *high-quality, reproducible* daily and monthly corporate bond panels from raw TRACE transaction data.
 The companion repository is [PyBondLab](https://github.com/GiulioRossetti94/PyBondLab/tree/main/examples) which can be used to form corporate bond asset pricing factors.
 
+[![Website](https://img.shields.io/badge/Website-Visit-blue?logo=google-chrome&logoColor=white)](https://openbondassetpricing.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Stage 0](https://img.shields.io/badge/Stage%200-Public%20Beta-green)](stage0/)
 [![Stage 1](https://img.shields.io/badge/Stage%201-November%202025-orange)](stage1/)
 [![Stage 2](https://img.shields.io/badge/Stage%202-November%202025-orange)](stage2/)
 
+[📄 Link to paper](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4575879)
 ---
 
 ## Overview
