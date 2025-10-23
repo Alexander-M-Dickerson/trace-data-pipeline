@@ -26,8 +26,8 @@ DATA_TYPES     = ['enhanced','standard', '144a']
 
 # Can leave these blank for execution directory, e.g., ""
 # Or, put your path, e.g., for Windows: C:\Users\proj\
-IN_DIR         = "" #Path(r"C:\Users\ASUS\Dropbox\01_trace\data\stage0\2025_20_10")
-OUT_DIR        = "" #Path(r"C:\Users\ASUS\Dropbox\01_trace\data\stage0\2025_20_10")
+IN_DIR         = "" #Path(r"C:\Users\01_trace\")
+OUT_DIR        = "" #Path(r"C:\Users\01_trace\")
 
 SUBPLOT_DIM    = (4, 2)# Leave this alone
 USE_LATEX_FONTS= False # Change to True, but your plots will take ages to render
