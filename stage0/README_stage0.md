@@ -1,6 +1,6 @@
 # Stage 0 - TRACE Daily Processing (Enhanced, Standard, 144A)
 
-This stage fetches and cleans TRACE data (Enhanced, Standard, and Rule 144A) on the WRDS Cloud and aggregates to daily panels. Jobs are submitted to Sun Grid Engine (SGE) from a PuTTY session (Windows users); files can be moved to/from WRDS with WinSCP (Windows users). Mac users can simply use their terminal once connected to the WRDS Cloud. 
+This stage fetches and cleans TRACE data (Enhanced, Standard, and Rule 144A) on the WRDS Cloud and aggregates to daily panels. Jobs are submitted to Sun Grid Engine (SGE) from a PuTTY session (Windows users); files can be moved to/from WRDS with WinSCP (Windows users). Mac users can simply use their terminal once connected to the WRDS Cloud. Mac users might find [ForkLift](https://binarynights.com/GUI-based) useful -- allows uploads, edits, and the ability to manage WRDS Cloud files through a UI. 
 
 The code also generates highly detailed TRACE data reports which document the effect of the filters at the transaction level. It produces (potentially) hundreds of time-series plots of every bond `cusip_id` that is impacted by the decimal shift and bounce-back correctors of Dickerson, Rossetti and Robotti (2025). 
 
