@@ -15,6 +15,10 @@ from pathlib import Path
 # ---------------------------
 # Editable defaults 
 # ---------------------------
+# If cfg["date"] is "", we inherit EDT/SDT RUN_STAMP in main().
+# Only when user passes --date should it override RUN_STAMP.
+# You can leave this blank.
+
 DATE           = "" # Date of the data run
 output_figures = True # Set to True for all the error plots #
 # Either only e.g., 'enhanced', or list of the databases, e.g. ['enhanced','144a']
@@ -254,6 +258,9 @@ def _resolve_args() -> dict:
             cfg["data_types"] = chosen
 
     # ---- Robust path resolution ----
+    # If cfg["date"] is "", we inherit EDT/SDT RUN_STAMP in main().
+    # Only when user passes --date should it override RUN_STAMP.
+
     in_dir_base  = _as_path_or_cwd(cfg["in_dir"])
     out_dir_base = _as_path_or_cwd(cfg["out_dir"])
 
@@ -261,10 +268,13 @@ def _resolve_args() -> dict:
     report_dir = (out_dir_base / "data_reports")
     report_dir.mkdir(parents=True, exist_ok=True)
 
-    cfg["date"]      = cfg["date"] or datetime.now().strftime("%Y%m%d")
+    # IMPORTANT: do NOT auto-fill today if user left DATE blank.
+    # Keep it empty so main() can inherit EDT/SDT RUN_STAMP.
+    cfg["date"]      = (cfg["date"] or "").strip()
     cfg["in_dir"]    = in_dir_base
     cfg["out_dir"]   = report_dir
     return cfg
+
 
 
 # ---------------------------
