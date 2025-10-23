@@ -77,7 +77,7 @@ PLOT_STYLE = HLP.PlotParams(
 import argparse
 import sys
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Sequence
 
 import numpy as np
@@ -205,6 +205,67 @@ def _bootstrap_auditors(dtype: str):
         if not hasattr(SDT, "ct_audit_records"):
             SDT.ct_audit_records = []
 
+def _shift_date(tag: str, delta_days: int) -> str:
+    # tag must be YYYYMMDD
+    d = datetime.strptime(tag, "%Y%m%d").date()
+    return (d + timedelta(days=delta_days)).strftime("%Y%m%d")
+
+def _choose_existing_date_tag(base_tag: str, in_dir_t: Path, dtype: str) -> tuple[str, int]:
+    """
+    Return (date_tag, delta_days). delta_days in {0, -1, +1} if found,
+    or (base_tag, 9999) if none exist.
+    We require that all three parquet files exist for the chosen tag:
+      - fisd_filters_{dtype}_{tag}.parquet
+      - dick_nielsen_filters_audit_{dtype}_{tag}.parquet
+      - drr_filters_audit_{dtype}_{tag}.parquet
+    """
+    def _paths(tag: str):
+        return (
+            in_dir_t / f"fisd_filters_{dtype}_{tag}.parquet",
+            in_dir_t / f"dick_nielsen_filters_audit_{dtype}_{tag}.parquet",
+            in_dir_t / f"drr_filters_audit_{dtype}_{tag}.parquet",
+        )
+    def _all_exist(tag: str) -> bool:
+        return all(p.exists() for p in _paths(tag))
+
+    # try exact
+    if _all_exist(base_tag):
+        return base_tag, 0
+
+    # then -1 day, +1 day
+    for delta in (-1, 1):
+        cand = _shift_date(base_tag, delta)
+        if _all_exist(cand):
+            return cand, delta
+
+    # none found
+    return base_tag, 9999
+
+def _choose_existing_date_tag_for_figs(base_tag: str, in_dir_t: Path, dtype: str) -> tuple[str, int]:
+    """
+    Return (date_tag, delta_days). delta_days in {0, -1, +1} if found,
+    or (base_tag, 9999) if none exist.
+    We require BOTH CUSIP files to exist for the chosen tag:
+      - bounce_back_cusips_{dtype}_{tag}.parquet
+      - decimal_shift_cusips_{dtype}_{tag}.parquet
+    """
+    def _paths(tag: str):
+        return (
+            in_dir_t / f"bounce_back_cusips_{dtype}_{tag}.parquet",
+            in_dir_t / f"decimal_shift_cusips_{dtype}_{tag}.parquet",
+        )
+    def _all_exist(tag: str) -> bool:
+        return all(p.exists() for p in _paths(tag))
+
+    if _all_exist(base_tag):
+        return base_tag, 0
+
+    for delta in (-1, 1):
+        cand = _shift_date(base_tag, delta)
+        if _all_exist(cand):
+            return cand, delta
+
+    return base_tag, 9999
 
 # ---------------------------
 # Argument resolution
@@ -293,9 +354,6 @@ def main():
     date_disp = date_override if date_override else "(auto: RUN_STAMP)"
     logging.info("Resolved inputs -> date=%s | in_dir=%s | report_root=%s | types=%s",
                  date_disp, in_dir, base_out, ",".join(data_types))
-
-
-
     db = None
     try:
         for dtype in data_types:
@@ -340,10 +398,30 @@ def main():
             bb_df      = HLP._dict_to_df(bb_params, key_header="Bounce-Back Parameter",   val_header="Value")
 
             # Audit / FISD filter tables (must exist from Stage-0)
-            fn_fisd = in_dir_t / f"fisd_filters_{dtype}_{eff_date_tag}.parquet"
-            fn_dn   = in_dir_t / f"dick_nielsen_filters_audit_{dtype}_{eff_date_tag}.parquet"
-            fn_dr   = in_dir_t / f"drr_filters_audit_{dtype}_{eff_date_tag}.parquet"
-
+            date_tag_eff, delta = _choose_existing_date_tag(eff_date_tag, in_dir_t, dtype)
+            if delta == 9999:
+                # Keep original eff_date_tag in filenames so the error is explicit & traceable
+                logging.error(
+                    "[%s] Expected date %s not found; also not found at -1d/+1d under %s. "
+                    "Will proceed and let the file-not-found error show exact missing path.",
+                    dtype, eff_date_tag, in_dir_t
+                )
+                use_tag = eff_date_tag
+            else:
+                use_tag = date_tag_eff
+                if delta != 0:
+                    logging.warning(
+                        "[%s] Falling back from %s to nearby date %s (%+dd).",
+                        dtype, eff_date_tag, use_tag, delta
+                    )
+                logging.info("[%s] Using effective date tag: %s", dtype, use_tag)
+                # Keep eff_date_tag synchronized so later figure/CUSIP filenames line up
+                eff_date_tag = use_tag
+            
+            fn_fisd = in_dir_t / f"fisd_filters_{dtype}_{use_tag}.parquet"
+            fn_dn   = in_dir_t / f"dick_nielsen_filters_audit_{dtype}_{use_tag}.parquet"
+            fn_dr   = in_dir_t / f"drr_filters_audit_{dtype}_{use_tag}.parquet"
+            
             logging.info("Loading audit tables for %s .", dtype)
             dn = pd.read_parquet(fn_dn)
             dr = pd.read_parquet(fn_dr)
@@ -360,141 +438,169 @@ def main():
             # Optional figure build
             pages_made_ds = []
             pages_made_bb = []
-
+            ###################################################################                        
             if output_figures:
-                # Check that required CUSIP files exist
-                fn_bb = in_dir_t / f"bounce_back_cusips_{dtype}_{eff_date_tag}.parquet"
-                fn_ds = in_dir_t / f"decimal_shift_cusips_{dtype}_{eff_date_tag}.parquet"
+                # Try eff_date_tag first, then -1d, then +1d (figures may lag/lead the audit tag)
+                def _shift_tag(tag: str, days: int) -> str:
+                    d = datetime.strptime(tag, "%Y%m%d").date()
+                    return (d + timedelta(days=days)).strftime("%Y%m%d")
 
-                missing_files = []
-                if not fn_bb.exists():
-                    missing_files.append(str(fn_bb))
-                if not fn_ds.exists():
-                    missing_files.append(str(fn_ds))
+                candidates = [
+                    (0,   eff_date_tag),
+                    (-1,  _shift_tag(eff_date_tag, -1)),
+                    (1,   _shift_tag(eff_date_tag, 1)),
+                ]
 
-                if missing_files:
-                    error_msg = (
-                        f"[{dtype}] Cannot generate figures: required CUSIP files are missing.\n"
-                        f"Missing files:\n  " + "\n  ".join(missing_files) + "\n"
-                        f"These files must exist when output_figures=True.\n"
-                        f"Please run the data processing step that generates these CUSIP files first."
-                    )
+                checked = []
+                chosen = None
+                for delta, tag in candidates:
+                    c_bb = in_dir_t / f"bounce_back_cusips_{dtype}_{tag}.parquet"
+                    c_ds = in_dir_t / f"decimal_shift_cusips_{dtype}_{tag}.parquet"
+                    ok = c_bb.exists() and c_ds.exists()
+                    checked.append((tag, c_bb, ok, c_ds))
+                    if ok:
+                        chosen = (delta, tag, c_bb, c_ds)
+                        break
+
+                if chosen is None:
+                    # Build a single explicit error
+                    lines = [
+                        f"[{dtype}] Cannot generate figures: required CUSIP files not found for any nearby date tag.",
+                        "Checked (tag | bb_exists | ds_exists | directory):",
+                    ]
+                    for tag, pbb, ok_both, pds in checked:
+                        lines.append(f"  {tag} | bb={pbb.exists()} | ds={pds.exists()} | dir={in_dir_t}")
+                        if not pbb.exists():
+                            lines.append(f"    missing: {pbb}")
+                        if not pds.exists():
+                            lines.append(f"    missing: {pds}")
+                    lines.append("These files must exist when output_figures=True.")
+                    error_msg = "\n".join(lines)
                     logging.error(error_msg)
                     raise FileNotFoundError(error_msg)
+
+                delta, fig_tag, fn_bb, fn_ds = chosen
+                if delta == 0:
+                    logging.info("[%s] Figure inputs using date tag: %s", dtype, fig_tag)
                 else:
-                    logging.info("[%s] Loading CUSIP lists: %s, %s", dtype, fn_bb.name, fn_ds.name)
-                    bb = _load_cusip_list(fn_bb)
-                    ds = _load_cusip_list(fn_ds)
-                    cusips_union = pd.Index(sorted(pd.Index(bb).union(ds)))
-                    logging.info("[%s] Unique CUSIPs in union: %s", dtype, f"{len(cusips_union):,}")
+                    logging.warning(
+                        "[%s] Figure inputs falling back from %s to %s (%+dd).",
+                        dtype, eff_date_tag, fig_tag, delta
+                    )
 
-                    if len(cusips_union) == 0:
-                        logging.warning("[%s] No CUSIPs in union. Skipping figure build.", dtype)
+                logging.info("[%s] Loading CUSIP lists: %s, %s", dtype, fn_bb.name, fn_ds.name)
+                bb = _load_cusip_list(fn_bb)
+                ds = _load_cusip_list(fn_ds)
+                cusips_union = pd.Index(sorted(pd.Index(bb).union(ds)))
+                logging.info("[%s] Unique CUSIPs in union: %s", dtype, f"{len(cusips_union):,}")
+
+                # If no CUSIPs, skip figure build for this dtype
+                if len(cusips_union) == 0:
+                    logging.warning("[%s] No CUSIPs in union. Skipping figure build.", dtype)
+                else:
+                    chunk_size   = int(cfg.get("chunk_size", 250))
+                    cusip_chunks = _split_into_chunks(cusips_union, n=chunk_size)
+
+                    # For Enhanced - avoid loading too much data
+                    if len(cusip_chunks) > 10:
+                        new_chunk_size = max(1, chunk_size // 4)
+                        if new_chunk_size != chunk_size:
+                            logging.info(
+                                "[%s] Too many chunks (%s). Halving chunk_size %s -> %s and re-partitioning.",
+                                dtype, f"{len(cusip_chunks):,}", chunk_size, new_chunk_size
+                            )
+                            chunk_size   = new_chunk_size
+                            cusip_chunks = _split_into_chunks(cusips_union, n=chunk_size)
+
+                    logging.info("[%s] Prepared %s chunk(s) using chunk_size=%s",
+                                 dtype, f"{len(cusip_chunks):,}", chunk_size)
+
+                    # WRDS connection (lazy)
+                    if db is None:
+                        logging.info("Connecting to WRDS as '%s' ...", wrds_user_eff)
+                        db = wrds.Connection(wrds_username=wrds_user_eff) if wrds_user_eff else wrds.Connection()
+                        logging.info("WRDS connection established.")
+
+                    filters = dict(cfg.get("filters", {})) or {}
+                    ds_params_uncleaned = {**cfg.get("ds_params", {}), "output_type": "uncleaned"}
+                    gc.collect()
+                    logging.info("[%s] Starting clean_trace_data() on restricted CUSIP universe .", dtype)
+                    if dtype == 'enhanced':
+                        dfds, dfbb, bb_cusips_all, dec_shift_cusips_all = EDT.error_checks(
+                            db=db,
+                            cusip_chunks=cusip_chunks,
+                            clean_agency=cfg.get("clean_agency"),
+                            volume_filter=cfg.get("volume_filter", ("par", 10000)),
+                            trade_times=cfg.get("trade_times", ["00:00:00", "23:59:59"]),
+                            calendar_name=cfg.get("calendar_name", "NYSE"),
+                            ds_params=ds_params_uncleaned,
+                            bb_params=cfg.get("bb_params", {}),
+                            filters=filters,
+                        )
                     else:
-                        chunk_size   = int(cfg.get("chunk_size", 250))
-                        cusip_chunks = _split_into_chunks(cusips_union, n=chunk_size)
-                        
-                        # For Enhanced - this helps us not read-in too much data
-                        if len(cusip_chunks) > 10:
-                            new_chunk_size = max(1, chunk_size // 4)
-                            if new_chunk_size != chunk_size:
-                                logging.info(
-                                    "[%s] Too many chunks (%s). Halving chunk_size %s -> %s and re-partitioning.",
-                                    dtype, f"{len(cusip_chunks):,}", chunk_size, new_chunk_size
-                                )
-                                chunk_size   = new_chunk_size
-                                cusip_chunks = _split_into_chunks(cusips_union, n=chunk_size)
-                        
-                        logging.info("[%s] Prepared %s chunk(s) using chunk_size=%s",
-                                     dtype, f"{len(cusip_chunks):,}", chunk_size)
-                                            
-                        # WRDS connection (lazy)
-                        if db is None:
-                            logging.info("Connecting to WRDS as '%s' ...", wrds_user_eff)
-                            db = wrds.Connection(wrds_username=wrds_user_eff) if wrds_user_eff else wrds.Connection()
-                            logging.info("WRDS connection established.")
+                        dfds, dfbb, bb_cusips_all, dec_shift_cusips_all = SDT.error_checks(
+                            db=db,
+                            cusip_chunks=cusip_chunks,
+                            data_type=dtype,
+                            start_date=cfg.get("start_date"),
+                            volume_filter=cfg.get("volume_filter", ("par", 10000)),
+                            trade_times=cfg.get("trade_times", ["00:00:00", "23:59:59"]),
+                            calendar_name=cfg.get("calendar_name", "NYSE"),
+                            ds_params=ds_params_uncleaned,
+                            bb_params=cfg.get("bb_params", {}),
+                            filters=filters,
+                        )
+                    gc.collect()
 
-                        filters = dict(cfg.get("filters", {})) or {}
-                        ds_params_uncleaned = {**cfg.get("ds_params", {}), "output_type": "uncleaned"}
-                        gc.collect()
-                        logging.info("[%s] Starting clean_trace_data() on restricted CUSIP universe .", dtype)
-                        if dtype == 'enhanced':
-                            dfds, dfbb, bb_cusips_all, dec_shift_cusips_all = EDT.error_checks(
-                                db=db,
-                                cusip_chunks=cusip_chunks,
-                                clean_agency=cfg.get("clean_agency"),
-                                volume_filter=cfg.get("volume_filter", ("par", 10000)),
-                                trade_times=cfg.get("trade_times", ["00:00:00", "23:59:59"]),
-                                calendar_name=cfg.get("calendar_name", "NYSE"),
-                                ds_params=ds_params_uncleaned,
-                                bb_params=cfg.get("bb_params", {}),
-                                filters=filters,
-                            )
-                        else:
-                            dfds, dfbb, bb_cusips_all, dec_shift_cusips_all = SDT.error_checks(
-                                db=db,
-                                cusip_chunks=cusip_chunks,
-                                data_type=dtype,
-                                start_date=cfg.get("start_date"),
-                                volume_filter=cfg.get("volume_filter", ("par", 10000)),
-                                trade_times=cfg.get("trade_times", ["00:00:00", "23:59:59"]),
-                                calendar_name=cfg.get("calendar_name", "NYSE"),
-                                ds_params=ds_params_uncleaned,
-                                bb_params=cfg.get("bb_params", {}),
-                                filters=filters,
-                            )
-                        gc.collect()                                                   
-                        # --- dtype normalization + pre-sort for plotting speed ---
-                        for name, _df in (("dfds", dfds), ("dfbb", dfbb)):
-                            if not pd.api.types.is_datetime64_any_dtype(_df["trd_exctn_dt"]):
-                                _df["trd_exctn_dt"] = pd.to_datetime(_df["trd_exctn_dt"], errors="coerce")
-                            # Ensure stable within-CUSIP chronological order (so panels don't sort)
-                            _df.sort_values(["cusip_id", "trd_exctn_dt"], inplace=True, kind="mergesort")
-                        
-                        # Build fast index maps once per table
-                        idx_map_ds = dfds.groupby("cusip_id", sort=False).indices
-                        idx_map_bb = dfbb.groupby("cusip_id", sort=False).indices
+                    # --- dtype normalization + pre-sort for plotting speed ---
+                    for name, _df in (("dfds", dfds), ("dfbb", dfbb)):
+                        if not pd.api.types.is_datetime64_any_dtype(_df["trd_exctn_dt"]):
+                            _df["trd_exctn_dt"] = pd.to_datetime(_df["trd_exctn_dt"], errors="coerce")
+                        # Ensure stable within-CUSIP chronological order (so panels don't sort)
+                        _df.sort_values(["cusip_id", "trd_exctn_dt"], inplace=True, kind="mergesort")
 
-                                                                        
-                        # Plot pages
-                        def batched(seq: Sequence[str], n: int):
-                            for i in range(0, len(seq), n):
-                                yield seq[i:i+n], (i//n + 1)
+                    # Build fast index maps once per table
+                    idx_map_ds = dfds.groupby("cusip_id", sort=False).indices
+                    idx_map_bb = dfbb.groupby("cusip_id", sort=False).indices
 
-                        rows, cols = SUBPLOT_DIM
-                        per_page = rows * cols
-                        
-                        
-                        for chunk, page_idx in batched(dec_shift_cusips_all, per_page):
-                            stub = f"{dtype}_fig_page_{page_idx:03d}"
-                            png_path = HLP.make_panel(
-                                df_out=dfds,
-                                error_cusips=chunk,
-                                subplot_dim=SUBPLOT_DIM,
-                                export_dir=out_dir,
-                                filename_stub=stub,
-                                params=PLOT_STYLE,
-                                idx_map=idx_map_ds,    
-                                error_type="decimal_shift",
-                            )
-                            pages_made_ds.append(png_path.name)
-                            logging.info("[%s] Saved DS page %03d: %s", dtype, page_idx, png_path.name)
+                    # Plot pages
+                    def batched(seq: Sequence[str], n: int):
+                        for i in range(0, len(seq), n):
+                            yield seq[i:i+n], (i//n + 1)
 
-                        for chunk, page_idx in batched(bb_cusips_all, per_page):
-                            stub = f"{dtype}_fig_page_{page_idx:03d}"
-                            png_path = HLP.make_panel(
-                                df_out=dfbb,
-                                error_cusips=chunk,
-                                subplot_dim=SUBPLOT_DIM,
-                                export_dir=out_dir,
-                                filename_stub=stub,
-                                params=PLOT_STYLE,
-                                error_type="bounce_back",
-                                idx_map=idx_map_bb,         
-                            )
-                            pages_made_bb.append(png_path.name)
-                            logging.info("[%s] Saved BB page %03d: %s", dtype, page_idx, png_path.name)
+                    rows, cols = SUBPLOT_DIM
+                    per_page = rows * cols
 
+                    for chunk, page_idx in batched(dec_shift_cusips_all, per_page):
+                        stub = f"{dtype}_fig_page_{page_idx:03d}"
+                        png_path = HLP.make_panel(
+                            df_out=dfds,
+                            error_cusips=chunk,
+                            subplot_dim=SUBPLOT_DIM,
+                            export_dir=out_dir,
+                            filename_stub=stub,
+                            params=PLOT_STYLE,
+                            idx_map=idx_map_ds,
+                            error_type="decimal_shift",
+                        )
+                        pages_made_ds.append(png_path.name)
+                        logging.info("[%s] Saved DS page %03d: %s", dtype, page_idx, png_path.name)
+
+                    for chunk, page_idx in batched(bb_cusips_all, per_page):
+                        stub = f"{dtype}_fig_page_{page_idx:03d}"
+                        png_path = HLP.make_panel(
+                            df_out=dfbb,
+                            error_cusips=chunk,
+                            subplot_dim=SUBPLOT_DIM,
+                            export_dir=out_dir,
+                            filename_stub=stub,
+                            params=PLOT_STYLE,
+                            error_type="bounce_back",
+                            idx_map=idx_map_bb,
+                        )
+                        pages_made_bb.append(png_path.name)
+                        logging.info("[%s] Saved BB page %03d: %s", dtype, page_idx, png_path.name)
+            ###################################################################
             # Build LaTeX report #
             kwargs = dict(
                 out_dir=out_dir,

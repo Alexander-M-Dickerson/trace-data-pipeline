@@ -571,7 +571,7 @@ When you run `./run_all_trace.sh`, reports are automatically generated for all t
 Edit the top of `_build_error_files.py`:
 
 ```python
-DATE           = "20251020"  # Date of your data run (YYYYMMDD)
+DATE           = ""          # Leave this BLANK -- date is inherited [NB]
 output_figures = True        # Set to False for tables only (faster)
 DATA_TYPES     = ['enhanced', 'standard', '144a']  # Which datasets to process
 IN_DIR         = ""          # Leave blank for current directory
