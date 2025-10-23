@@ -1,4 +1,4 @@
-```markdown
+
 # Quick Start (Stage 0) — WRDS Cloud
 
 ## Prerequisites
@@ -6,8 +6,6 @@
 - WRDS account with TRACE access
 - Python ≥ 3.10
 - `.pgpass` for passwordless DB auth:
-````
-
 
 ---
 
