@@ -443,7 +443,7 @@ The algorithm distinguishes errors from genuine moves by requiring:
 
 ## References
 
-**Dickerson, A., Mueller, P., Robotti, C., & Rossetti, G. (2024)**. "Common pitfalls in the evaluation of corporate bond strategies." Working Paper.
+**Dickerson, A., Robotti, C., & Rossetti, G. (2024)**. "Common pitfalls in the evaluation of corporate bond strategies." Working Paper.
 
 ---
 

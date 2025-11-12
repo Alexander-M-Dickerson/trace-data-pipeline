@@ -82,7 +82,7 @@ Once a candidate is opened at row $i$, scan forward up to $L$ rows (default $L =
 
 Find the first row $j > i$ such that:
 $$
-\text{sign}(\Delta P_j) = -\text{sign}(\Delta P_i) \quad \text{AND} \quad |\Delta P_j| \geq \tau - \delta_{\mathrm{slack}}
+\operatorname{sign}(\Delta P_j) = -\operatorname{sign}(\Delta P_i) \quad \text{AND} \quad |\Delta P_j| \geq \tau - \delta_{\mathrm{slack}}
 $$
 
 **Path B: Return to anchor**
@@ -122,12 +122,12 @@ Flag the identified error row (either $i$ or $i-1$).
 
 **Step 3: Extend Plateau Flags**
 
-Flag additional rows in the range $[\text{flag\_start}+1, \min(j_{\mathrm{stop}}, \text{flag\_start} + S)]$ if they remain **displaced from baseline**:
+Flag additional rows in the range $[i_{\mathrm{start}}+1, \min(j_{\mathrm{stop}}, i_{\mathrm{start}} + S)]$ if they remain **displaced from baseline**:
 
 For each row $k$ in this range:
 
 - **If par-spike**: Flag if $|P_k - P_{\mathrm{par}}| \leq \epsilon_{\mathrm{par}}$
-- **If non-par**: Flag if $|P_k - B_{\mathrm{flag\_start}}| \geq \alpha \cdot \tau$; stop at first row that fails this test
+- **If non-par**: Flag if $|P_k - B_{i_{\mathrm{start}}}| \geq \alpha \cdot \tau$; stop at first row that fails this test
 
 Where $S$ = max span (default: 5).
 
@@ -239,86 +239,86 @@ For each bond group (`id_col`), iterate through rows $i = 0, 1, \ldots, n-1$:
 ```
 INITIALIZE:
   filtered = zeros array of length n
-  par_cooldown_until = -1  (local index)
+  par\_cooldown\_until = -1  (local index)
 
 FOR i = 0 to n-1:
 
   # Check cooldown (skip non-par flags if within cooldown)
-  IF (i <= par_cooldown_until) AND (P[i] is not at par):
+  IF (i <= par\_cooldown\_until) AND (P[i] is not at par):
       CONTINUE to next i
 
   # Candidate opening conditions
-  cond_jump     = |ΔP[i]| >= τ - δ_slack
-  cond_far_prev = |P[i] - B[i]| >= τ - δ_slack
-  cond_par      = (|P[i] - P_par| <= ε_par) AND (|P[i] - B[i]| >= α·τ)
+  cond\_jump     = |ΔP[i]| >= τ - δ\_slack
+  cond\_far\_prev = |P[i] - B[i]| >= τ - δ\_slack
+  cond\_par      = (|P[i] - P\_par| <= ε\_par) AND (|P[i] - B[i]| >= α·τ)
 
-  par_only = cond_par AND NOT cond_jump
+  par\_only = cond\_par AND NOT cond\_jump
 
-  IF (cond_jump OR cond_far_prev OR cond_par):
+  IF (cond\_jump OR cond\_far\_prev OR cond\_par):
 
       # Lookahead scan for bounce-back
-      j_match  = NULL  (opposite big move)
-      k_return = NULL  (return to anchor)
+      j\_match  = NULL  (opposite big move)
+      k\_return = NULL  (return to anchor)
 
-      IF NOT par_only:
+      IF NOT par\_only:
           FOR j = i+1 to min(i+L, n-1):
               # Path A: Opposite-signed large move
-              IF sign(ΔP[j]) == -sign(ΔP[i]) AND |ΔP[j]| >= τ - δ_slack:
-                  j_match = j
+              IF sign(ΔP[j]) == -sign(ΔP[i]) AND |ΔP[j]| >= τ - δ\_slack:
+                  j\_match = j
                   BREAK
 
               # Path B: Return to anchor
               IF |P[j] - B[i]| <= α·τ:
-                  k_return = j
+                  k\_return = j
                   BREAK
 
       # Resolution check
-      IF (j_match OR k_return):
-          j_stop = j_match if j_match else k_return
-          flag_start = i
+      IF (j\_match OR k\_return):
+          j\_stop = j\_match if j\_match else k\_return
+          flag\_start = i
 
           # Blame reassignment
           IF i-1 >= 0:
-              dev_prev = |P[i-1] - B[i-1]|
-              dev_curr = |P[i] - B[i]|
-              IF (dev_prev - dev_curr >= δ_reassign) AND (dev_prev >= α·τ):
-                  flag_start = i-1
+              dev\_prev = |P[i-1] - B[i-1]|
+              dev\_curr = |P[i] - B[i]|
+              IF (dev\_prev - dev\_curr >= δ\_reassign) AND (dev\_prev >= α·τ):
+                  flag\_start = i-1
 
           # Flag the start row
-          IF (NOT par_start) OR (P[flag_start] is at par):
-              filtered[flag_start] = 1
+          IF (NOT par\_start) OR (P[flag\_start] is at par):
+              filtered[flag\_start] = 1
 
           # Extend plateau flags
-          span_end = min(j_stop, flag_start + S)
-          FOR k = flag_start+1 to span_end:
-              IF par_start:
+          span\_end = min(j\_stop, flag\_start + S)
+          FOR k = flag\_start+1 to span\_end:
+              IF par\_start:
                   IF P[k] is at par:
                       filtered[k] = 1
               ELSE:
-                  IF |P[k] - B[flag_start]| >= α·τ:
+                  IF |P[k] - B[flag\_start]| >= α·τ:
                       filtered[k] = 1
                   ELSE:
                       BREAK
 
           # Par cooldown
-          IF par_start:
-              par_cooldown_until = max(par_cooldown_until, j_stop + C)
+          IF par\_start:
+              par\_cooldown\_until = max(par\_cooldown\_until, j\_stop + C)
 
-          i = j_stop + 1
+          i = j\_stop + 1
           CONTINUE
 
       # Persistent par block (no quick-correction found)
-      IF par_start:
-          run_end = i
-          WHILE (run_end+1 < n) AND (P[run_end+1] is at par):
-              run_end += 1
-          run_len = run_end - i + 1
+      IF par\_start:
+          run\_end = i
+          WHILE (run\_end+1 < n) AND (P[run\_end+1] is at par):
+              run\_end += 1
+          run\_len = run\_end - i + 1
 
-          IF run_len >= ℓ_min:
-              FOR k = i to run_end:
+          IF run\_len >= ℓ\_min:
+              FOR k = i to run\_end:
                   filtered[k] = 1
-              par_cooldown_until = max(par_cooldown_until, run_end + C)
-              i = run_end + 1
+              par\_cooldown\_until = max(par\_cooldown\_until, run\_end + C)
+              i = run\_end + 1
               CONTINUE
 
   i += 1  (advance to next row)
@@ -625,7 +625,7 @@ After flagging a par block, the baseline may be shifted by the flagged rows. Coo
 
 ## References
 
-**Dickerson, A., Mueller, P., Robotti, C., & Rossetti, G. (2024)**. "Common pitfalls in the evaluation of corporate bond strategies." Working Paper.
+**Dickerson, A., Robotti, C., & Rossetti, G. (2024)**. "Common pitfalls in the evaluation of corporate bond strategies." Working Paper.
 
 ---
 
