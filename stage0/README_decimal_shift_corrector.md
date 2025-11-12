@@ -42,7 +42,7 @@ $$
 Define the **raw relative error** (before correction):
 
 $$
-\epsilon_{\text{raw}}(i) = \frac{|P_i - A_i|}{A_i}
+\epsilon_{\mathrm{raw}}(i) = \frac{|P_i - A_i|}{A_i}
 $$
 
 For each candidate factor $f \in \mathcal{F}$, compute the **corrected price** and its **relative error**:
@@ -52,7 +52,7 @@ $$
 $$
 
 $$
-\epsilon_{\text{corr}}(i, f) = \frac{|\tilde{P}_i(f) - A_i|}{A_i}
+\epsilon_{\mathrm{corr}}(i, f) = \frac{|\tilde{P}_i(f) - A_i|}{A_i}
 $$
 
 #### 3. Acceptance Criteria
@@ -61,41 +61,41 @@ A correction with factor $f$ is accepted if **all five conditions** hold:
 
 **Condition 1: Raw error is large (error present)**
 $$
-\epsilon_{\text{raw}}(i) > \tau_{\text{bad}} \quad \text{(default: } \tau_{\text{bad}} = 0.05 = 5\%)
+\epsilon_{\mathrm{raw}}(i) > \tau_{\mathrm{bad}} \quad \text{(default: } \tau_{\mathrm{bad}} = 0.05 = 5\%)
 $$
 
 **Condition 2a: Corrected relative error is small (primary gate)**
 $$
-\epsilon_{\text{corr}}(i, f) \leq \tau_{\text{pct}} \quad \text{(default: } \tau_{\text{pct}} = 0.02 = 2\%)
+\epsilon_{\mathrm{corr}}(i, f) \leq \tau_{\mathrm{pct}} \quad \text{(default: } \tau_{\mathrm{pct}} = 0.02 = 2\%)
 $$
 
 **Condition 2b: OR corrected absolute error is small (alternative gate)**
 $$
-|\tilde{P}_i(f) - A_i| \leq \tau_{\text{abs}} \quad \text{(default: } \tau_{\text{abs}} = 8.0 \text{ price points)}
+|\tilde{P}_i(f) - A_i| \leq \tau_{\mathrm{abs}} \quad \text{(default: } \tau_{\mathrm{abs}} = 8.0 \text{ price points)}
 $$
 
 **Condition 2c: OR par-proximity rule (relaxed gate for near-par bonds)**
 
-If both $|A_i - 100| \leq \delta_{\text{par}}$ and $|\tilde{P}_i(f) - 100| \leq \delta_{\text{par}}$:
+If both $|A_i - 100| \leq \delta_{\mathrm{par}}$ and $|\tilde{P}_i(f) - 100| \leq \delta_{\mathrm{par}}$:
 $$
-\text{Accept correction} \quad \text{(default: } \delta_{\text{par}} = 15.0)
+\text{Accept correction} \quad \text{(default: } \delta_{\mathrm{par}} = 15.0)
 $$
 
 **Condition 3: Corrected error is substantially better than raw error (improvement gate)**
 $$
-\epsilon_{\text{corr}}(i, f) \leq \gamma \cdot \epsilon_{\text{raw}}(i) \quad \text{(default: } \gamma = 0.2 = 20\%)
+\epsilon_{\mathrm{corr}}(i, f) \leq \gamma \cdot \epsilon_{\mathrm{raw}}(i) \quad \text{(default: } \gamma = 0.2 = 20\%)
 $$
 
 **Condition 4: Corrected price is plausible (sanity check)**
 $$
-P_{\text{low}} \leq \tilde{P}_i(f) \leq P_{\text{high}} \quad \text{(default: } P_{\text{low}} = 5.0, P_{\text{high}} = 300.0)
+P_{\mathrm{low}} \leq \tilde{P}_i(f) \leq P_{\mathrm{high}} \quad \text{(default: } P_{\mathrm{low}} = 5.0, P_{\mathrm{high}} = 300.0)
 $$
 
 **Condition 5: Best factor among all candidates (optimality)**
 
-Among all factors satisfying Conditions 1-4, choose the factor $f^*$ that minimizes $\epsilon_{\text{corr}}(i, f)$:
+Among all factors satisfying Conditions 1-4, choose the factor $f^*$ that minimizes $\epsilon_{\mathrm{corr}}(i, f)$:
 $$
-f^* = \arg\min_{f \in \mathcal{F}} \epsilon_{\text{corr}}(i, f)
+f^* = \arg\min_{f \in \mathcal{F}} \epsilon_{\mathrm{corr}}(i, f)
 $$
 
 ---
@@ -144,16 +144,16 @@ def decimal_shift_corrector(
 | Parameter | Type | Default | Mathematical Notation | Description |
 |-----------|------|---------|----------------------|-------------|
 | `factors` | `tuple[float]` | `(0.1, 0.01, 10.0, 100.0)` | $\mathcal{F}$ | Candidate multiplicative factors to test |
-| `tol_pct_good` | `float` | `0.02` | $\tau_{\text{pct}}$ | Relative error threshold for accepting correction (2% default) |
-| `tol_abs_good` | `float` | `8.0` | $\tau_{\text{abs}}$ | Absolute distance threshold in price points (alternative acceptance gate) |
-| `tol_pct_bad` | `float` | `0.05` | $\tau_{\text{bad}}$ | Minimum raw relative error to consider a candidate for correction (5% default) |
-| `low_pr` | `float` | `5.0` | $P_{\text{low}}$ | Lower bound for plausible corrected prices |
-| `high_pr` | `float` | `300.0` | $P_{\text{high}}$ | Upper bound for plausible corrected prices |
+| `tol_pct_good` | `float` | `0.02` | $\tau_{\mathrm{pct}}$ | Relative error threshold for accepting correction (2% default) |
+| `tol_abs_good` | `float` | `8.0` | $\tau_{\mathrm{abs}}$ | Absolute distance threshold in price points (alternative acceptance gate) |
+| `tol_pct_bad` | `float` | `0.05` | $\tau_{\mathrm{bad}}$ | Minimum raw relative error to consider a candidate for correction (5% default) |
+| `low_pr` | `float` | `5.0` | $P_{\mathrm{low}}$ | Lower bound for plausible corrected prices |
+| `high_pr` | `float` | `300.0` | $P_{\mathrm{high}}$ | Upper bound for plausible corrected prices |
 | `anchor` | `str` | `"rolling"` | — | Anchor type; currently only `"rolling"` is supported |
 | `window` | `int` | `5` | $w$ | Half-window size for rolling anchor (effective window = $2w+1 = 11$ observations) |
-| `improvement_frac` | `float` | `0.2` | $\gamma$ | Required proportional improvement vs raw error (20% means corrected error must be ≤ 20% of raw error) |
+| `improvement_frac` | `float` | `0.2` | $\gamma$ | Required proportional improvement vs raw error (20% means corrected error must be $\leq$ 20% of raw error) |
 | `par_snap` | `bool` | `True` | — | Enable relaxed acceptance for observations near par ($P = 100$) |
-| `par_band` | `float` | `15.0` | $\delta_{\text{par}}$ | Par-proximity band; if both anchor and corrected price are within $\pm 15$ of par, accept |
+| `par_band` | `float` | `15.0` | $\delta_{\mathrm{par}}$ | Par-proximity band; if both anchor and corrected price are within $\pm 15$ of par, accept |
 | `output_type` | `str` | `"uncleaned"` | — | Output format: `"uncleaned"` (add diagnostic columns) or `"cleaned"` (apply corrections) |
 
 ---
@@ -179,9 +179,9 @@ For each bond (`id_col` group):
 For each row $i$ and each factor $f \in \mathcal{F}$:
 
 1. Compute candidate price: $\tilde{P}_i(f) = P_i \times f$
-2. Check plausibility: $P_{\text{low}} \leq \tilde{P}_i(f) \leq P_{\text{high}}$
-3. Compute relative error: $\epsilon_{\text{corr}}(i, f) = |\tilde{P}_i(f) - A_i| / A_i$
-4. Track best factor: If $\epsilon_{\text{corr}}(i, f) < \epsilon_{\text{best}}$, update best factor
+2. Check plausibility: $P_{\mathrm{low}} \leq \tilde{P}_i(f) \leq P_{\mathrm{high}}$
+3. Compute relative error: $\epsilon_{\mathrm{corr}}(i, f) = |\tilde{P}_i(f) - A_i| / A_i$
+4. Track best factor: If $\epsilon_{\mathrm{corr}}(i, f) < \epsilon_{\mathrm{best}}$, update best factor
 
 ### Step 4: Acceptance Gates
 For the best factor $f^*$ at row $i$:
@@ -249,23 +249,23 @@ ELSE:
 
 **Algorithm Execution**:
 
-1. **Anchor Construction** (Row 3, window = 5):
-   - Unique values in window: `{98.5, 99.0, 985.0, 98.8, 99.2}`
+1. **Anchor Construction** (Row 3, $w = 5$):
+   - Unique values in window: $\{98.5, 99.0, 985.0, 98.8, 99.2\}$
    - Centered median (unique): $A_3 = 99.0$
 
 2. **Error Detection**:
-   - Raw relative error: $\epsilon_{\text{raw}}(3) = |985.0 - 99.0| / 99.0 = 8.949 = 894.9\%$ ✓ (exceeds 5% threshold)
+   - Raw relative error: $\epsilon_{\mathrm{raw}}(3) = |985.0 - 99.0| / 99.0 = 8.949 = 894.9\%$ ✓ (exceeds 5% threshold)
 
 3. **Candidate Testing**:
 
-   | Factor $f$ | Candidate $\tilde{P}_3(f)$ | Plausible? | $\epsilon_{\text{corr}}(3, f)$ |
+   | Factor $f$ | Candidate $\tilde{P}_3(f)$ | Plausible? | $\epsilon_{\mathrm{corr}}(3, f)$ |
    |-----------|---------------------------|-----------|-------------------------------|
    | 0.1 | 98.5 | ✓ | $\|98.5 - 99.0\| / 99.0 = 0.0051 = 0.51\%$ |
    | 0.01 | 9.85 | ✗ (below 5.0) | — |
    | 10.0 | 9850.0 | ✗ (above 300.0) | — |
    | 100.0 | 98500.0 | ✗ (above 300.0) | — |
 
-   - **Best factor**: $f^* = 0.1$ with $\epsilon_{\text{corr}} = 0.51\%$
+   - **Best factor**: $f^* = 0.1$ with $\epsilon_{\mathrm{corr}} = 0.51\%$
 
 4. **Acceptance Gates**:
    - Gate 1 (raw error large): $894.9\% > 5\%$ ✓
@@ -298,7 +298,7 @@ ELSE:
 
 1. **Anchor**: $A_3 = \text{median}(\{95.0, 94.5, 85.0, 84.8, 85.5\}) = 85.5$
 
-2. **Raw Error**: $\epsilon_{\text{raw}}(3) = |85.0 - 85.5| / 85.5 = 0.0058 = 0.58\%$
+2. **Raw Error**: $\epsilon_{\mathrm{raw}}(3) = |85.0 - 85.5| / 85.5 = 0.0058 = 0.58\%$
 
 3. **Gate 1 Check**: $0.58\% \not> 5\%$ → **REJECT** (raw error too small; not a decimal shift)
 
@@ -321,11 +321,11 @@ ELSE:
 
 1. **Anchor**: $A_3 = 100.0$
 
-2. **Raw Error**: $\epsilon_{\text{raw}}(3) = |1000.0 - 100.0| / 100.0 = 9.0 = 900\%$ ✓
+2. **Raw Error**: $\epsilon_{\mathrm{raw}}(3) = |1000.0 - 100.0| / 100.0 = 9.0 = 900\%$ ✓
 
 3. **Best Factor**: $f^* = 0.1$ gives $\tilde{P}_3(0.1) = 100.0$
 
-4. **Corrected Error**: $\epsilon_{\text{corr}}(3, 0.1) = |100.0 - 100.0| / 100.0 = 0.0\%$
+4. **Corrected Error**: $\epsilon_{\mathrm{corr}}(3, 0.1) = |100.0 - 100.0| / 100.0 = 0.0\%$
 
 5. **Acceptance Gates**:
    - Gate 2a: $0.0\% \leq 2\%$ ✓
@@ -349,11 +349,11 @@ ELSE:
 
 **Algorithm Execution** (Row 4):
 
-1. **Raw Error**: $\epsilon_{\text{raw}}(4) = |115.0 - 100.0| / 100.0 = 0.15 = 15\%$ ✓ (exceeds 5%)
+1. **Raw Error**: $\epsilon_{\mathrm{raw}}(4) = |115.0 - 100.0| / 100.0 = 0.15 = 15\%$ ✓ (exceeds 5%)
 
 2. **Best Factor**: $f^* = 0.1$ gives $\tilde{P}_4(0.1) = 11.5$
-   - But this is below $P_{\text{low}} = 5.0$... actually 11.5 > 5.0, so it's plausible
-   - $\epsilon_{\text{corr}}(4, 0.1) = |11.5 - 100.0| / 100.0 = 0.885 = 88.5\%$
+   - Plausibility check: $11.5 > 5.0$ ✓
+   - $\epsilon_{\mathrm{corr}}(4, 0.1) = |11.5 - 100.0| / 100.0 = 0.885 = 88.5\%$
 
 3. **Improvement Gate**: $88.5\% \not\leq 0.2 \times 15\% = 3\%$ → **FAIL**
 
@@ -410,21 +410,6 @@ print(f"Corrected {n_corrected:,} transactions across {len(affected_cusips):,} b
 
 ---
 
-## Performance Characteristics
-
-### Computational Complexity
-- **Time**: $O(n \cdot w \cdot |\mathcal{F}|)$ where $n$ = number of rows, $w$ = window size, $|\mathcal{F}|$ = number of factors
-  - For typical Enhanced TRACE (~30M rows, $w=5$, $|\mathcal{F}|=4$): ~2-3 minutes on WRDS Cloud
-- **Memory**: $O(n)$ for DataFrame operations (requires ~2-3 copies of input data)
-
-### Correction Statistics (Enhanced TRACE, 2002-2024)
-- **Corrections applied**: ~0.04% of all transactions
-- **Most common factor**: 0.1 (>70% of corrections; price reported 10x too high)
-- **Affected bonds**: ~2-3% of all CUSIPs
-- **False positive rate**: <0.01% (validated via manual audit of 1,000 random corrections)
-
----
-
 ## Design Rationale
 
 ### Why Rolling Unique-Median Anchor?
@@ -456,31 +441,9 @@ The algorithm distinguishes errors from genuine moves by requiring:
 
 ---
 
-## Limitations and Edge Cases
-
-### Edge Case 1: Bonds with Few Transactions
-- If a bond has < $(w+1) = 6$ transactions, the anchor uses a smaller window or falls back to global median
-- May reduce detection power for illiquid bonds
-
-### Edge Case 2: Multiple Consecutive Errors
-- If several consecutive prices are all shifted (e.g., systemic error in a trading day), the anchor may itself be shifted
-- Mitigated by using unique values and requiring large raw error
-
-### Edge Case 3: Volatile Bonds Near Distress
-- High-yield bonds trading at <5.0 may have genuine prices rejected by plausibility bounds
-- Consider adjusting `low_pr` for distressed debt analysis
-
-### Edge Case 4: Factors of 1000
-- Current factors are {0.1, 0.01, 10, 100}
-- Errors of 1000x are **not detected** (rare; <10 cases in entire TRACE history)
-
----
-
 ## References
 
-1. **Dick-Nielsen, J. (2009)**. "Liquidity Biases in TRACE." *Journal of Fixed Income*, 19(2), 43-55.
-2. **Dick-Nielsen, J. (2014)**. "How to Clean Enhanced TRACE Data." Working Paper, Copenhagen Business School.
-3. **Dickerson, A., Robotti, C., & Rossetti, G. (2025)**. "Open Bond Asset Pricing." Working Paper.
+**Dickerson, A., Mueller, P., Robotti, C., & Rossetti, G. (2024)**. "Common pitfalls in the evaluation of corporate bond strategies." Working Paper.
 
 ---
 
