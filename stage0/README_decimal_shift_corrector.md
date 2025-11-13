@@ -79,11 +79,13 @@ $$
 
 **Condition 2c: OR par-proximity rule (relaxed gate for near-par bonds)**
 
-If both $|A_i - 100| \leq \delta_{\mathrm{par}}$ and $|\tilde{P}_i(f) - 100| \leq \delta_{\mathrm{par}}$:
+If both $|A_i - 100| \leq \delta_{\mathrm{par}}$ and the corrected price is within par band:
 
 $$
-\text{Accept correction} \quad \text{(default: } \delta_{\mathrm{par}} = 15.0)
+|\tilde{P}_i(f) - 100| \leq \delta_{\mathrm{par}} \quad \text{(default: } \delta_{\mathrm{par}} = 15.0)
 $$
+
+Then accept correction.
 
 **Condition 3: Corrected error is substantially better than raw error (improvement gate)**
 
@@ -186,7 +188,7 @@ For each bond (`id_col` group):
 For each row $i$ and each factor $f \in \mathcal{F}$:
 
 1. Compute candidate price: $\tilde{P}_i(f) = P_i \times f$
-2. Check plausibility: $P_{\mathrm{low}} \leq \tilde{P}_i(f) \leq P_{\mathrm{high}}$
+2. Check plausibility: Candidate must satisfy $P_{\mathrm{low}} \leq \tilde{P}_i(f) \leq P_{\mathrm{high}}$
 3. Compute relative error: $\epsilon_{\mathrm{corr}}(i, f) = |\tilde{P}_i(f) - A_i| / A_i$
 4. Track best factor: If $\epsilon_{\mathrm{corr}}(i, f) < \epsilon_{\mathrm{best}}$, update best factor
 
