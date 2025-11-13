@@ -86,7 +86,7 @@ Once a candidate is opened at row $i$, scan forward up to $L$ rows (default $L =
 Find the first row $j > i$ such that:
 
 $$
-\operatorname{sign}(\Delta P_j) = -\operatorname{sign}(\Delta P_i) \quad \text{AND} \quad |\Delta P_j| \geq \tau - \delta_{\mathrm{slack}}
+\mathrm{sign}(\Delta P_j) = -\mathrm{sign}(\Delta P_i) \quad \text{AND} \quad |\Delta P_j| \geq \tau - \delta_{\mathrm{slack}}
 $$
 
 **Path B: Return to anchor**
