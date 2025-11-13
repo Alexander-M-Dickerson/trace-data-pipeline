@@ -56,11 +56,13 @@ $$
 A row $i$ becomes a **candidate for flagging** if **any** of the following conditions hold:
 
 **Condition 1: Large jump relative to previous trade**
+
 $$
 |\Delta P_i| \geq \tau - \delta_{\mathrm{slack}} \quad \text{(default: } \tau = 35.0, \delta_{\mathrm{slack}} = 1.0)
 $$
 
 **Condition 2: Large displacement from baseline**
+
 $$
 |d_i| = |P_i - B_i| \geq \tau - \delta_{\mathrm{slack}}
 $$
@@ -68,6 +70,7 @@ $$
 **Condition 3: Par-spike heuristic (if enabled)**
 
 If $|P_i - P_{\mathrm{par}}| \leq \epsilon_{\mathrm{par}}$ (price is at par, default $P_{\mathrm{par}} = 100.0$, $\epsilon_{\mathrm{par}} = 10^{-8}$):
+
 $$
 |P_i - B_i| \geq \alpha \cdot \tau \quad \text{(default: } \alpha = 0.25)
 $$
@@ -81,6 +84,7 @@ Once a candidate is opened at row $i$, scan forward up to $L$ rows (default $L =
 **Path A: Opposite-signed large move**
 
 Find the first row $j > i$ such that:
+
 $$
 \operatorname{sign}(\Delta P_j) = -\operatorname{sign}(\Delta P_i) \quad \text{AND} \quad |\Delta P_j| \geq \tau - \delta_{\mathrm{slack}}
 $$
@@ -88,6 +92,7 @@ $$
 **Path B: Return to anchor**
 
 Find the first row $k > i$ such that:
+
 $$
 |P_k - B_i| \leq \alpha \cdot \tau
 $$
@@ -473,7 +478,7 @@ FOR i = 0 to n-1:
    - Flag rows 2, 3, 4
    - Row 5 is not at par → not flagged
 
-4. **Cooldown**: $\text{par\_cooldown\_until} = 5 + 2 = 7$ (suppress non-par flags for next 2 rows)
+4. **Cooldown**: Suppress non-par flags until row $5 + 2 = 7$ (next 2 rows after bounce-back)
 
 **Output**:
 
