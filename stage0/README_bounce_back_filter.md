@@ -2,17 +2,17 @@
 
 ## Overview
 
-The **bounce-back filter** (formally: `flag_price_change_errors`) is a sophisticated algorithm designed to detect transient price-entry errors in corporate bond transaction data. These errors manifest as **large price spikes that quickly revert** to a trailing baseline, indicating data entry mistakes rather than genuine market movements.
+The **bounce-back filter** (formally: `flag_price_change_errors`) is an algorithm designed to detect transient price-entry errors in corporate bond transaction data. These errors manifest as **large price spikes that quickly revert** to a trailing baseline, indicating data entry mistakes rather than genuine market movements.
 
-The algorithm uses backward-looking anchors, lookahead windows, and par-specific heuristics to identify erroneous transactions while preserving genuine volatility such as credit events, liquidity shocks, and market dislocations.
+The algorithm uses backward-looking anchors, lookahead windows, and par-specific heuristics to identify error candidates.
 
 ---
 
-## Mathematical Framework
+## Framework
 
 ### Problem Statement
 
-Given a time-ordered sequence of transaction prices $\{P_1, P_2, \ldots, P_n\}$ for a bond, identify observations $P_i$ that represent **transient errors** characterized by:
+Given a time-ordered sequence of transaction prices $\{P_1, P_2, \ldots, P_n\}$ for a bond, identify observations $P_i$ that represent **candidate errors** characterized by:
 
 1. **Large jump**: $|\Delta P_i| = |P_i - P_{i-1}| \geq \tau$ (price change exceeds threshold $\tau$)
 2. **Quick reversion**: Within a lookahead window of $L$ trades, price returns partially toward a backward-looking anchor
@@ -604,7 +604,6 @@ print(f"Flagged {n_flagged:,} transactions across {affected_cusips:,} bonds")
 ### Why Par-Specific Logic?
 
 Newly-issued bonds often trade tightly around par ($P = 100.0$) with occasional prints at exactly par:
-- These can appear as "spikes" relative to bid-ask spread ($\pm 0.5$)
 - But they are **not errors** if isolated
 - The algorithm requires **persistent par runs** ($\geq 3$ consecutive) + displacement from baseline to flag
 

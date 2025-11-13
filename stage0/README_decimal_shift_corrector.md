@@ -2,13 +2,13 @@
 
 ## Overview
 
-The **decimal shift corrector** is a statistical algorithm designed to detect and correct multiplicative price errors in corporate bond transaction data. These errors occur when prices are recorded with incorrect decimal placement (e.g., 10.5 recorded as 105.0 or 1050.0), typically due to data entry mistakes or system conversion errors.
+The **decimal shift corrector** is an algorithm designed to detect and correct multiplicative price errors in corporate bond transaction data. These errors occur when prices are recorded with incorrect decimal placement (e.g., 10.5 recorded as 105.0 or 1050.0), typically due to data entry mistakes or system conversion errors.
 
 The algorithm tests candidate multiplicative factors against a robust rolling anchor price, accepting corrections only when they demonstrably improve alignment with the bond's recent price history while passing strict acceptance gates.
 
 ---
 
-## Mathematical Framework
+## Framework
 
 ### Problem Statement
 
