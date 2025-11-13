@@ -60,16 +60,19 @@ $$
 A correction with factor $f$ is accepted if **all five conditions** hold:
 
 **Condition 1: Raw error is large (error present)**
+
 $$
 \epsilon_{\mathrm{raw}}(i) > \tau_{\mathrm{bad}} \quad \text{(default: } \tau_{\mathrm{bad}} = 0.05 = 5\%)
 $$
 
 **Condition 2a: Corrected relative error is small (primary gate)**
+
 $$
 \epsilon_{\mathrm{corr}}(i, f) \leq \tau_{\mathrm{pct}} \quad \text{(default: } \tau_{\mathrm{pct}} = 0.02 = 2\%)
 $$
 
 **Condition 2b: OR corrected absolute error is small (alternative gate)**
+
 $$
 |\tilde{P}_i(f) - A_i| \leq \tau_{\mathrm{abs}} \quad \text{(default: } \tau_{\mathrm{abs}} = 8.0 \text{ price points)}
 $$
@@ -77,16 +80,19 @@ $$
 **Condition 2c: OR par-proximity rule (relaxed gate for near-par bonds)**
 
 If both $|A_i - 100| \leq \delta_{\mathrm{par}}$ and $|\tilde{P}_i(f) - 100| \leq \delta_{\mathrm{par}}$:
+
 $$
 \text{Accept correction} \quad \text{(default: } \delta_{\mathrm{par}} = 15.0)
 $$
 
 **Condition 3: Corrected error is substantially better than raw error (improvement gate)**
+
 $$
 \epsilon_{\mathrm{corr}}(i, f) \leq \gamma \cdot \epsilon_{\mathrm{raw}}(i) \quad \text{(default: } \gamma = 0.2 = 20\%)
 $$
 
 **Condition 4: Corrected price is plausible (sanity check)**
+
 $$
 P_{\mathrm{low}} \leq \tilde{P}_i(f) \leq P_{\mathrm{high}} \quad \text{(default: } P_{\mathrm{low}} = 5.0, P_{\mathrm{high}} = 300.0)
 $$
@@ -94,6 +100,7 @@ $$
 **Condition 5: Best factor among all candidates (optimality)**
 
 Among all factors satisfying Conditions 1-4, choose the factor $f^*$ that minimizes $\epsilon_{\mathrm{corr}}(i, f)$:
+
 $$
 f^* = \arg\min_{f \in \mathcal{F}} \epsilon_{\mathrm{corr}}(i, f)
 $$
@@ -412,12 +419,6 @@ print(f"Corrected {n_corrected:,} transactions across {len(affected_cusips):,} b
 
 ## Design Rationale
 
-### Why Rolling Unique-Median Anchor?
-
-1. **Robustness to outliers**: Median is less sensitive than mean to extreme values
-2. **Handles repeated prints**: Using unique values prevents bias from high-frequency trades at the same price
-3. **Adaptive to local volatility**: Rolling window adapts to changing price levels (e.g., bond approaching maturity)
-
 ### Why Five Acceptance Gates?
 
 1. **Gate 1** (raw error large): Prevents correcting already-good prices
@@ -427,12 +428,6 @@ print(f"Corrected {n_corrected:,} transactions across {len(affected_cusips):,} b
 5. **Gate 4** (plausibility): Sanity check to avoid absurd corrected prices
 
 ### Why Not Just Flag All Large Jumps?
-
-Large price changes can be **genuine** due to:
-- Credit rating downgrades
-- Earnings surprises
-- Macroeconomic shocks
-- Maturity approaching (bonds converge to par)
 
 The algorithm distinguishes errors from genuine moves by requiring:
 1. A multiplicative relationship with a standard factor (10x, 100x, etc.)
