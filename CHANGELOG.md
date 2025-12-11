@@ -8,13 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Coming Soon
-- **Stage 1**: Daily bond metrics module (November 2025)
-  - Accrued interest calculations
-  - Daily credit spreads
-  - Duration and convexity measures
-  - Yield-to-maturity calculations
-  - Additional bond characteristics (rating, amount outstanding)
-- **Stage 2**: Monthly panel with factor signals (November 2025)
+- **Stage 2**: Monthly panel with factor signals (Coming soon)
   - 50+ bond characteristic signals
   - Credit risk factors
   - Liquidity measures
@@ -24,7 +18,186 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.0.0] - 2025-01-20
+## [2.0.0] - 2025-12-11
+
+### Added - Stage 1 Release (Bond Analytics & Enrichment)
+
+#### Core Features
+- **Complete bond analytics pipeline** enriching Stage 0 daily data with comprehensive metrics
+- **Automated orchestration** via `run_pipeline.sh` (handles both Stage 0 and Stage 1)
+- **Research-ready output** with ~50+ variables per bond-day observation
+
+#### Bond Characteristics Integration (FISD)
+- **Comprehensive bond attributes** from Mergent FISD
+  - Coupon rates and payment frequencies
+  - Maturity dates and bond tenors
+  - Offering amounts and amounts outstanding
+  - Callable and puttable features
+  - Security types and bond classifications
+  - Issuer identifiers and names
+- **Automated FISD filtering**
+  - USD-only bonds
+  - Fixed-rate securities
+  - Tenor constraints (minimum/maximum)
+  - Valid maturity dates
+  - Currency and interest type validation
+
+#### Bond Analytics via QuantLib
+- **Yield-to-maturity (YTM)** calculations using QuantLib bond pricing engine
+- **Macaulay duration** and **modified duration** (interest rate sensitivity)
+- **Convexity** (second-order price sensitivity)
+- **Option-adjusted spreads (OAS)** relative to treasury curve
+- **Credit spreads** computed against Liu-Wu zero-coupon treasury yields
+- **Robust error handling** for bonds with missing or invalid parameters
+- **Efficient multi-core processing** with joblib parallelization
+
+#### Credit Ratings Integration
+- **S&P ratings** from WRDS CompuStat Ratings Monthly
+  - Numeric ratings (1-22 scale)
+  - NAIC designations
+  - Historical rating changes tracking
+- **Moody's ratings** from WRDS Mergent FISD
+  - Numeric ratings (1-22 scale)
+  - Composite rating methodology
+- **Automatic rating alignment** with bond-month observations
+
+#### Equity Identifiers (OSBAP Linker)
+- **CRSP identifiers**: PERMNO and PERMCO
+- **Compustat identifier**: GVKEY
+- **Enables cross-asset research** linking bonds to equities
+
+#### Industry Classifications
+- **Fama-French 17 industry classification**
+- **Fama-French 30 industry classification**
+- **SIC code mapping** from CRSP via PERMNO linkage
+- **Automatic monthly assignment** based on equity identifiers
+
+#### Ultra-Distressed Bond Filters
+- **Advanced price anomaly detection** to identify suspicious observations
+- **Five-stage filtering methodology**:
+  1. **Anomalous price detection**: Ultra-low prices with normal price context
+  2. **Upward spike detection**: High prices inconsistent with recent trading
+  3. **Plateau sequence detection**: Sustained ultra-low price sequences
+  4. **Intraday inconsistency**: Wide intraday ranges at distressed prices
+  5. **Round number detection**: Suspicious exact prices (0.01, 0.10, etc.)
+- **Refined composite flag** (`flag_refined_any`) combining all detection methods
+- **CUSIP-level export** tracking all flagged bonds with detailed statistics
+  - Export file: `stage1/data/ultra_distressed_cusips_{date}.csv`
+  - Includes flag counts, percentages, and date ranges
+  - Enables quality control and manual review workflows
+
+#### Treasury Yield Integration
+- **Liu-Wu zero-coupon treasury yields** (1961-present)
+  - Downloaded automatically from public source
+  - Monthly interpolated yields (1-30 years maturity)
+  - Used for credit spread calculations
+- **FRED treasury yields** (alternative source, configurable)
+
+#### Configuration & Settings
+- **Harmonized configuration system** with single source of truth
+  - `config.py`: Shared settings across all stages
+  - `TRACE_MEMBERS`: Dataset selection (enhanced, standard, 144a)
+  - `STAGE0_OUTPUT_FIGURES`: Control Stage 0 error plots (slow)
+  - Stage 1 always generates comprehensive reports (no toggle)
+- **Auto-detection features**:
+  - Stage 0 date stamp from parquet files
+  - CPU core count optimization
+  - Root path detection
+- **Minimal user configuration** required (just WRDS username)
+
+#### Performance Optimizations
+- **Memory efficiency**:
+  - CUSIP columns use category dtype (~75% memory savings)
+  - Optimized groupby operations for 30M+ row datasets
+  - Efficient parquet compression
+  - Strategic garbage collection
+- **Processing speed**:
+  - Multi-core parallelization for bond analytics
+  - Chunked processing for large datasets
+  - Vectorized operations throughout pipeline
+- **WRDS quota monitoring**:
+  - Pre-flight disk space check before pipeline execution
+  - Parses WRDS quota (not filesystem) for accurate warnings
+  - Warns if < 4 GB available (prevents job failures)
+  - `FORCE_RUN=1` override for advanced users
+
+#### Output Files & Reports
+- **Comprehensive daily bond dataset** (`stage1_YYYYMMDD.parquet`)
+  - All Stage 0 price/volume metrics
+  - FISD bond characteristics
+  - QuantLib analytics (duration, convexity, YTM, OAS, spreads)
+  - Credit ratings (S&P and Moody's)
+  - Equity identifiers (PERMNO, PERMCO, GVKEY)
+  - Industry classifications (FF17, FF30)
+  - Ultra-distressed filter flags
+- **LaTeX data quality reports** (always generated)
+  - 8 comprehensive tables analyzing data quality
+  - Time-series visualization plots
+  - Filter effect summaries
+  - Organized output structure
+- **Flagged CUSIP export** for quality control
+  - CSV file with all ultra-distressed flagged bonds
+  - Statistics per CUSIP (total obs, flagged obs, percentages)
+  - Breakdown by flag type
+  - Date range for each flagged bond
+
+#### Documentation
+- **Comprehensive Stage 1 documentation**:
+  - `stage1/README_stage1.md`: Full technical documentation
+  - `stage1/QUICKSTART_stage1.md`: Quick start guide
+  - `stage1/README_distressed_filter.md`: Ultra-distressed filter methodology
+- **Updated FAQ** with Stage 1-specific sections
+  - Configuration guidance
+  - Output file descriptions
+  - Troubleshooting disk space warnings
+  - Performance optimization tips
+- **Updated main README** reflecting Stage 1 availability
+
+#### Infrastructure & Automation
+- **Unified pipeline orchestrator** (`run_pipeline.sh`)
+  - Pre-stage: Download required data files (Liu-Wu yields, OSBAP linker, FF classifications)
+  - Stage 0: Parallel TRACE extraction (Enhanced, Standard, 144A)
+  - Stage 0: Report generation after extraction
+  - Stage 1: Bond analytics after Stage 0 completion
+  - Automatic job dependency management with SGE `-hold_jid`
+- **Disk space validation**:
+  - Checks WRDS user quota before execution
+  - Prevents pipeline failures from insufficient space
+  - Clear warnings with remediation steps
+- **Automatic data downloads** on login node (WRDS compute nodes have no internet)
+  - Liu-Wu treasury yields
+  - OSBAP linker file (ISIN/FIGI/Bloomberg identifiers)
+  - Fama-French industry classifications (FF17, FF30)
+
+#### Runtime Performance
+- **Stage 1 processing time**: ~2 hours (WRDS Cloud, 2-4 cores)
+- **Complete pipeline (Stage 0 + Stage 1)**: ~7 hours total
+  - Stage 0 (Enhanced): ~4 hours
+  - Stage 0 (Standard): ~30-60 minutes
+  - Stage 0 (144A): ~30-60 minutes
+  - Stage 0 (Reports): ~30-60 minutes
+  - Stage 1: ~2 hours
+
+### Changed
+- **Configuration structure** now harmonized across all stages
+  - `config.py` is single source of truth for shared settings
+  - Removed redundant `TRACE_MEMBERS` from `stage1/_stage1_settings.py`
+  - Removed unused `GENERATE_REPORTS` and `OUTPUT_FIGURES` from Stage 1
+  - Stage 0 figure generation controlled via `STAGE0_OUTPUT_FIGURES` in `config.py`
+
+### Fixed
+- **Disk space check** now uses WRDS quota instead of filesystem space
+  - Previous version showed 8TB+ available (filesystem) when user had <2GB (quota)
+  - Now correctly parses `quota` command output
+  - Accurate warnings prevent job failures from disk space exhaustion
+- **CUSIP export performance** optimized for 30M+ row datasets
+  - Replaced O(n*m) loop-based approach with O(n) vectorized groupby
+  - ~1000-5000x faster for typical datasets
+  - Completes in seconds instead of hours
+
+---
+
+## [1.0.0] - 2025-11-01
 
 ### Added - Initial Public Beta Release
 
@@ -234,8 +407,3 @@ This pipeline implements and extends methods from:
 - Dick-Nielsen, J. (2009). Liquidity biases in TRACE. *The Journal of Fixed Income*, 19(2), 43-55.
 - Dick-Nielsen, J. (2014). How to clean enhanced TRACE data. Working Paper.
 - van Binsbergen, J. H., Nozawa, Y., & Schwert, M. (2025). Duration-based valuation of corporate bonds. *The Review of Financial Studies*, 38(1), 158-191.
-
----
-
-[Unreleased]: https://github.com/Alexander-M-Dickerson/trace-data-pipeline/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/Alexander-M-Dickerson/trace-data-pipeline/releases/tag/v1.0.0

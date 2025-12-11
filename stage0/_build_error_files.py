@@ -11,18 +11,22 @@ Created: 2025-10-20
 from __future__ import annotations
 import _error_plot_helpers as HLP
 from pathlib import Path
+import sys
+
+# Import shared configuration from root-level config.py
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from config import TRACE_MEMBERS, STAGE0_OUTPUT_FIGURES, AUTHOR
 
 # ---------------------------
-# Editable defaults 
+# Editable defaults
 # ---------------------------
 # If cfg["date"] is "", we inherit EDT/SDT RUN_STAMP in main().
 # Only when user passes --date should it override RUN_STAMP.
 # You can leave this blank.
 
 DATE           = "" # Date of the data run
-output_figures = True # Set to True for all the error plots #
-# Either only e.g., 'enhanced', or list of the databases, e.g. ['enhanced','144a']
-DATA_TYPES     = ['enhanced','standard', '144a'] 
+# NOTE: output_figures moved to config.py as STAGE0_OUTPUT_FIGURES
+# NOTE: DATA_TYPES moved to config.py as TRACE_MEMBERS 
 
 # Can leave these blank for execution directory, e.g., ""
 # Or, put your path, e.g., for Windows: C:\Users\proj\
@@ -86,8 +90,62 @@ import wrds
 import gc
 
 from _trace_settings import get_config
-import create_daily_enhanced_trace as EDT 
-import create_daily_standard_trace as SDT 
+import create_daily_enhanced_trace as EDT
+import create_daily_standard_trace as SDT
+
+# ---------------------------
+# Memory Tracking Utilities
+# ---------------------------
+def log_memory_usage(location_name: str) -> dict | None:
+    """
+    Get current memory usage in GB (cross-platform).
+
+    Parameters
+    ----------
+    location_name : str
+        Descriptive name for this measurement point
+
+    Returns
+    -------
+    dict or None
+        Dictionary with 'gb' and 'location' keys if successful, None otherwise
+    """
+    try:
+        import psutil
+        process = psutil.Process()
+        mem_gb = process.memory_info().rss / (1024**3)
+        return {'gb': mem_gb, 'location': location_name}
+    except ImportError:
+        return None
+    except Exception:
+        return None
+
+
+def log_memory_delta(start_mem: dict | None, end_mem: dict | None, func_name: str) -> None:
+    """
+    Log memory change between two measurement points (print + log).
+
+    Parameters
+    ----------
+    start_mem : dict or None
+        Memory measurement from log_memory_usage() at function start
+    end_mem : dict or None
+        Memory measurement from log_memory_usage() at function end
+    func_name : str
+        Name of the function being tracked
+    """
+    if start_mem is None or end_mem is None:
+        msg = f"[MEMORY] {func_name}: Tracking unavailable (install psutil)"
+        logging.warning(msg)
+        return
+
+    start_gb = start_mem['gb']
+    end_gb = end_mem['gb']
+    delta_gb = end_gb - start_gb
+
+    msg = f"[MEMORY] {func_name}: START {start_gb:.2f}GB | END {end_gb:.2f}GB | DELTA {delta_gb:+.2f}GB"
+    logging.info(msg)
+
 
 # ---------------------------
 # Logging
@@ -199,11 +257,15 @@ def _bootstrap_auditors(dtype: str):
             EDT.audit_records = []
         if not hasattr(EDT, "ct_audit_records"):
             EDT.ct_audit_records = []
+        if not hasattr(EDT, "fisd_audit_records"):
+            EDT.fisd_audit_records = []
     else:
         if not hasattr(SDT, "audit_records"):
             SDT.audit_records = []
         if not hasattr(SDT, "ct_audit_records"):
             SDT.ct_audit_records = []
+        if not hasattr(SDT, "fisd_audit_records"):
+            SDT.fisd_audit_records = []
 
 def _shift_date(tag: str, delta_days: int) -> str:
     # tag must be YYYYMMDD
@@ -245,9 +307,10 @@ def _choose_existing_date_tag_for_figs(base_tag: str, in_dir_t: Path, dtype: str
     """
     Return (date_tag, delta_days). delta_days in {0, -1, +1} if found,
     or (base_tag, 9999) if none exist.
-    We require BOTH CUSIP files to exist for the chosen tag:
+    We require the CUSIP files to exist for the chosen tag:
       - bounce_back_cusips_{dtype}_{tag}.parquet
       - decimal_shift_cusips_{dtype}_{tag}.parquet
+      - init_price_cusips_{dtype}_{tag}.parquet (optional, for newer runs)
     """
     def _paths(tag: str):
         return (
@@ -289,7 +352,7 @@ def _resolve_args() -> dict:
         date = str(DATE).strip() if DATE else "",
         in_dir = IN_DIR,
         out_dir = OUT_DIR,
-        data_types = list(DATA_TYPES),  # default from top-of-file
+        data_types = list(TRACE_MEMBERS),  # imported from config.py
     )
 
     if getattr(ns, "date", None):
@@ -391,11 +454,13 @@ def main():
             filters_dict = dict(cfg.get("filters", {})) or {}
             ds_params    = dict(cfg.get("ds_params", {}))  or {}
             bb_params    = dict(cfg.get("bb_params", {}))  or {}
+            init_error_params = dict(cfg.get("init_error_params", {})) or {}
             fisd_params  = dict(cfg.get("fisd_params", {})) or {}
 
             filters_df = HLP._filters_to_df(filters_dict)
             ds_df      = HLP._dict_to_df(ds_params, key_header="Decimal-Shift Parameter", val_header="Value")
             bb_df      = HLP._dict_to_df(bb_params, key_header="Bounce-Back Parameter",   val_header="Value")
+            ie_df      = HLP._dict_to_df(init_error_params, key_header="Initial-Error Parameter", val_header="Value")
 
             # Audit / FISD filter tables (must exist from Stage-0)
             date_tag_eff, delta = _choose_existing_date_tag(eff_date_tag, in_dir_t, dtype)
@@ -438,8 +503,9 @@ def main():
             # Optional figure build
             pages_made_ds = []
             pages_made_bb = []
-            ###################################################################                        
-            if output_figures:
+            pages_made_ie = []
+            ###################################################################
+            if STAGE0_OUTPUT_FIGURES:
                 # Try eff_date_tag first, then -1d, then +1d (figures may lag/lead the audit tag)
                 def _shift_tag(tag: str, days: int) -> str:
                     d = datetime.strptime(tag, "%Y%m%d").date()
@@ -456,10 +522,11 @@ def main():
                 for delta, tag in candidates:
                     c_bb = in_dir_t / f"bounce_back_cusips_{dtype}_{tag}.parquet"
                     c_ds = in_dir_t / f"decimal_shift_cusips_{dtype}_{tag}.parquet"
+                    c_ie = in_dir_t / f"init_price_cusips_{dtype}_{tag}.parquet"
                     ok = c_bb.exists() and c_ds.exists()
-                    checked.append((tag, c_bb, ok, c_ds))
+                    checked.append((tag, c_bb, ok, c_ds, c_ie))
                     if ok:
-                        chosen = (delta, tag, c_bb, c_ds)
+                        chosen = (delta, tag, c_bb, c_ds, c_ie)
                         break
 
                 if chosen is None:
@@ -468,7 +535,7 @@ def main():
                         f"[{dtype}] Cannot generate figures: required CUSIP files not found for any nearby date tag.",
                         "Checked (tag | bb_exists | ds_exists | directory):",
                     ]
-                    for tag, pbb, ok_both, pds in checked:
+                    for tag, pbb, ok_both, pds, pie in checked:
                         lines.append(f"  {tag} | bb={pbb.exists()} | ds={pds.exists()} | dir={in_dir_t}")
                         if not pbb.exists():
                             lines.append(f"    missing: {pbb}")
@@ -479,7 +546,7 @@ def main():
                     logging.error(error_msg)
                     raise FileNotFoundError(error_msg)
 
-                delta, fig_tag, fn_bb, fn_ds = chosen
+                delta, fig_tag, fn_bb, fn_ds, fn_ie = chosen
                 if delta == 0:
                     logging.info("[%s] Figure inputs using date tag: %s", dtype, fig_tag)
                 else:
@@ -488,10 +555,11 @@ def main():
                         dtype, eff_date_tag, fig_tag, delta
                     )
 
-                logging.info("[%s] Loading CUSIP lists: %s, %s", dtype, fn_bb.name, fn_ds.name)
+                logging.info("[%s] Loading CUSIP lists: %s, %s, %s", dtype, fn_bb.name, fn_ds.name, fn_ie.name if fn_ie.exists() else "(no init_price file)")
                 bb = _load_cusip_list(fn_bb)
                 ds = _load_cusip_list(fn_ds)
-                cusips_union = pd.Index(sorted(pd.Index(bb).union(ds)))
+                ie = _load_cusip_list(fn_ie) if fn_ie.exists() else pd.Index([], dtype="object")
+                cusips_union = pd.Index(sorted(pd.Index(bb).union(ds).union(ie)))
                 logging.info("[%s] Unique CUSIPs in union: %s", dtype, f"{len(cusips_union):,}")
 
                 # If no CUSIPs, skip figure build for this dtype
@@ -515,7 +583,25 @@ def main():
                     logging.info("[%s] Prepared %s chunk(s) using chunk_size=%s",
                                  dtype, f"{len(cusip_chunks):,}", chunk_size)
 
-                    # WRDS connection (lazy)
+                    # Load FISD data from saved parquet file (always in enhanced folder)
+                    fisd_parquet_path = in_dir / "enhanced" / f"trace_enhanced_fisd_{eff_date_tag}.parquet"
+
+                    if not fisd_parquet_path.exists():
+                        raise FileNotFoundError(
+                            f"[{dtype}] FISD parquet file not found: {fisd_parquet_path}. "
+                            f"Run the main pipeline first to generate this file."
+                        )
+
+                    logging.info("[%s] Loading FISD from %s ...", dtype, fisd_parquet_path.name)
+                    fisd_df = pd.read_parquet(fisd_parquet_path)
+                    # Extract only the columns needed for filters 9 and 10
+                    fisd_off = fisd_df[["complete_cusip", "offering_amt", "maturity"]].copy()
+                    fisd_off.rename(columns={"complete_cusip": "cusip_id"}, inplace=True)
+                    logging.info("[%s] FISD loaded: %s CUSIPs", dtype, f"{len(fisd_off):,}")
+                    del fisd_df
+                    gc.collect()
+
+                    # WRDS connection (lazy - only if needed by error_checks)
                     if db is None:
                         logging.info("Connecting to WRDS as '%s' ...", wrds_user_eff)
                         db = wrds.Connection(wrds_username=wrds_user_eff) if wrds_user_eff else wrds.Connection()
@@ -524,23 +610,30 @@ def main():
                     filters = dict(cfg.get("filters", {})) or {}
                     ds_params_uncleaned = {**cfg.get("ds_params", {}), "output_type": "uncleaned"}
                     gc.collect()
+
+                    # Memory tracking: before error_checks
+                    mem_before_error_checks = log_memory_usage(f"{dtype}_before_error_checks")
+
                     logging.info("[%s] Starting clean_trace_data() on restricted CUSIP universe .", dtype)
                     if dtype == 'enhanced':
-                        dfds, dfbb, bb_cusips_all, dec_shift_cusips_all = EDT.error_checks(
+                        dfds, dfbb, dfie, bb_cusips_all, dec_shift_cusips_all, init_price_cusips_all = EDT.error_checks(
                             db=db,
                             cusip_chunks=cusip_chunks,
+                            fisd_off=fisd_off,
                             clean_agency=cfg.get("clean_agency"),
                             volume_filter=cfg.get("volume_filter", ("par", 10000)),
                             trade_times=cfg.get("trade_times", ["00:00:00", "23:59:59"]),
                             calendar_name=cfg.get("calendar_name", "NYSE"),
                             ds_params=ds_params_uncleaned,
                             bb_params=cfg.get("bb_params", {}),
+                            init_error_params=cfg.get("init_error_params", {}),
                             filters=filters,
                         )
                     else:
-                        dfds, dfbb, bb_cusips_all, dec_shift_cusips_all = SDT.error_checks(
+                        dfds, dfbb, dfie, bb_cusips_all, dec_shift_cusips_all, init_price_cusips_all = SDT.error_checks(
                             db=db,
                             cusip_chunks=cusip_chunks,
+                            fisd_off=fisd_off,
                             data_type=dtype,
                             start_date=cfg.get("start_date"),
                             volume_filter=cfg.get("volume_filter", ("par", 10000)),
@@ -548,12 +641,17 @@ def main():
                             calendar_name=cfg.get("calendar_name", "NYSE"),
                             ds_params=ds_params_uncleaned,
                             bb_params=cfg.get("bb_params", {}),
+                            init_error_params=cfg.get("init_error_params", {}),
                             filters=filters,
                         )
                     gc.collect()
 
+                    # Memory tracking: after error_checks
+                    mem_after_error_checks = log_memory_usage(f"{dtype}_after_error_checks")
+                    log_memory_delta(mem_before_error_checks, mem_after_error_checks, f"{dtype}_error_checks")
+
                     # --- dtype normalization + pre-sort for plotting speed ---
-                    for name, _df in (("dfds", dfds), ("dfbb", dfbb)):
+                    for name, _df in (("dfds", dfds), ("dfbb", dfbb), ("dfie", dfie)):
                         if not pd.api.types.is_datetime64_any_dtype(_df["trd_exctn_dt"]):
                             _df["trd_exctn_dt"] = pd.to_datetime(_df["trd_exctn_dt"], errors="coerce")
                         # Ensure stable within-CUSIP chronological order (so panels don't sort)
@@ -562,6 +660,7 @@ def main():
                     # Build fast index maps once per table
                     idx_map_ds = dfds.groupby("cusip_id", sort=False).indices
                     idx_map_bb = dfbb.groupby("cusip_id", sort=False).indices
+                    idx_map_ie = dfie.groupby("cusip_id", sort=False).indices
 
                     # Plot pages
                     def batched(seq: Sequence[str], n: int):
@@ -585,6 +684,9 @@ def main():
                         )
                         pages_made_ds.append(png_path.name)
                         logging.info("[%s] Saved DS page %03d: %s", dtype, page_idx, png_path.name)
+                        # Memory cleanup every 20 pages
+                        if page_idx % 20 == 0:
+                            gc.collect()
 
                     for chunk, page_idx in batched(bb_cusips_all, per_page):
                         stub = f"{dtype}_fig_page_{page_idx:03d}"
@@ -600,6 +702,33 @@ def main():
                         )
                         pages_made_bb.append(png_path.name)
                         logging.info("[%s] Saved BB page %03d: %s", dtype, page_idx, png_path.name)
+                        # Memory cleanup every 20 pages
+                        if page_idx % 20 == 0:
+                            gc.collect()
+
+                    # Init price error figures (uses dfie with initial_error_flag column)
+                    for chunk, page_idx in batched(init_price_cusips_all, per_page):
+                        stub = f"{dtype}_ie_fig_page_{page_idx:03d}"
+                        png_path = HLP.make_panel(
+                            df_out=dfie,
+                            error_cusips=chunk,
+                            subplot_dim=SUBPLOT_DIM,
+                            export_dir=out_dir,
+                            filename_stub=stub,
+                            params=PLOT_STYLE,
+                            error_type="init_price",  # uses initial_error_flag column
+                            idx_map=idx_map_ie,
+                        )
+                        pages_made_ie.append(png_path.name)
+                        logging.info("[%s] Saved IE page %03d: %s", dtype, page_idx, png_path.name)
+                        # Memory cleanup every 20 pages
+                        if page_idx % 20 == 0:
+                            gc.collect()
+
+                    # Memory tracking: after all plotting
+                    mem_after_plots = log_memory_usage(f"{dtype}_after_plots")
+                    log_memory_delta(mem_after_error_checks, mem_after_plots, f"{dtype}_plotting")
+
             ###################################################################
             # Build LaTeX report #
             kwargs = dict(
@@ -608,15 +737,18 @@ def main():
                 filters_df=filters_df,
                 ds_df=ds_df,
                 bb_df=bb_df,
+                ie_df=ie_df,
                 fisd_params=fisd_params,
                 filters_table_dr=filters_table_dr,
                 filters_table_dn=filters_table_dn,
                 filters_table_fi=filters_table_fi,
-                output_figures=output_figures,
+                output_figures=STAGE0_OUTPUT_FIGURES,
+                author=AUTHOR,
             )
-            if output_figures:
+            if STAGE0_OUTPUT_FIGURES:
                 kwargs["pages_made_ds"] = pages_made_ds
                 kwargs["pages_made_bb"] = pages_made_bb
+                kwargs["pages_made_ie"] = pages_made_ie
 
             HLP.build_data_report_tex(**kwargs)
             logging.info("========== Finished data_type = %s ==========", dtype)

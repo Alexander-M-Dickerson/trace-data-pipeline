@@ -54,7 +54,7 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 3. Install dependencies:
 ```bash
-pip install -r requirements.txt
+python -m pip install --user -r requirements.txt
 ```
 
 4. Create a branch for your changes:

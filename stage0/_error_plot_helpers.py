@@ -141,9 +141,10 @@ def _plot_panel(ax,
           - Common: 'trd_exctn_dt', 'rptd_pr'
           - For bounce_back: 'filtered_error' (0 kept, 1 eliminated)
           - For decimal_shift: 'dec_shift_flag' (0/1), 'suggested_price'
+          - For init_price: 'initial_error_flag' (0 kept, 1 eliminated)
     cusip : str
     p : PlotParams
-    error_type : {'bounce_back','decimal_shift'}
+    error_type : {'bounce_back','decimal_shift','init_price'}
         Controls which columns are used for the "Filtered" series and flags.
     """
     
@@ -206,6 +207,38 @@ def _plot_panel(ax,
 
 
         legend_flag_label = "Corrected"
+
+    elif error_type == "init_price":
+        # "Filtered" line is the kept trades (initial_error_flag == 0)
+        # Flags show eliminated trades where initial_error_flag == 1
+        if "initial_error_flag" not in d.columns:
+            ax.text(0.5, 0.5,
+                    f"Missing initial_error_flag for init_price\n{cusip}",
+                    ha="center", va="center")
+            ax.axis("off")
+            return
+
+        kept_mask = d["initial_error_flag"].fillna(0).astype(int) == 0
+        kept = d.loc[kept_mask]
+        y_filtered = kept["rptd_pr"].astype(float)
+
+        flagged_mask = d["initial_error_flag"].fillna(0).astype(int) == 1
+        flagged = d.loc[flagged_mask]
+        y_flagged = flagged["rptd_pr"].astype(float)
+
+        if p.x_spacing == "rank":
+            pos = np.arange(len(d))
+            km  = kept_mask.to_numpy()
+            fm  = flagged_mask.to_numpy()
+            x_all  = pos
+            x_filt = pos[km]
+            x_flag = pos[fm]
+        else:
+            x_all  = dates
+            x_filt = kept["trd_exctn_dt"]
+            x_flag = flagged["trd_exctn_dt"]
+
+        legend_flag_label = "Eliminated"
 
     else:
         ax.text(0.5, 0.5, f"Unknown error_type: {error_type}", ha="center", va="center")
@@ -284,13 +317,15 @@ def make_panel(df_out: pd.DataFrame,
           ['cusip_id','trd_exctn_dt','rptd_pr','filtered_error'].
         For error_type='decimal_shift', must contain:
           ['cusip_id','trd_exctn_dt','rptd_pr','dec_shift_flag','suggested_price'].
+        For error_type='init_price', must contain:
+          ['cusip_id','trd_exctn_dt','rptd_pr','initial_error_flag'].
     error_cusips : list[str]
     subplot_dim : (rows, cols)
     export_dir : path-like
     filename_stub : optional custom filename root (suffix is auto-appended)
     params : PlotParams
-    error_type : {'bounce_back','decimal_shift'}
-        Controls plotting logic and filename suffix ('_bb' or '_ds').
+    error_type : {'bounce_back','decimal_shift','init_price'}
+        Controls plotting logic and filename suffix ('_bb', '_ds', or '_ie').
 
     Returns
     -------
@@ -320,6 +355,8 @@ def make_panel(df_out: pd.DataFrame,
         needed = ["cusip_id", "trd_exctn_dt", "rptd_pr", "filtered_error"]
     elif error_type == "decimal_shift":
         needed = ["cusip_id", "trd_exctn_dt", "rptd_pr", "dec_shift_flag", "suggested_price"]
+    elif error_type == "init_price":
+        needed = ["cusip_id", "trd_exctn_dt", "rptd_pr", "initial_error_flag"]
     else:
         raise ValueError(f"Unknown error_type: {error_type}")
 
@@ -383,7 +420,8 @@ def make_panel(df_out: pd.DataFrame,
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     rows_cols = f"{rows}x{cols}"
     stub_base = filename_stub or f"prices_{rows_cols}_{ts}"
-    suffix = "_bb" if error_type == "bounce_back" else "_ds"
+    suffix_map = {"bounce_back": "_bb", "decimal_shift": "_ds", "init_price": "_ie"}
+    suffix = suffix_map.get(error_type, "_bb")
     stub = f"{stub_base}{suffix}"
 
     # ----- choose format + build path -----
@@ -685,15 +723,17 @@ def make_parameters_table(
     filters_df,
     ds_df,
     bb_df,
+    ie_df=None,
     caption="Error-Correction Filters and Module Parameters",
     label="tab:parameters",
-    note=( 
+    note=(
         "This table provides user-defined inputs related to the error correction "
         "functionality designed by \\citet*{DickersonRobottiRossetti_2024}. "
         "Panel A lists overall options for correcting the TRACE transaction data for "
         "potential errors, "
-        "Panel B lists decimal-shift corrector settings and Panel C the bounce-back filter settings, "
-        "both described in \\citet*{DickersonRobottiRossetti_2024}. "
+        "Panel B lists decimal-shift corrector settings, Panel C the bounce-back filter settings, "
+        "and Panel D the initial price error filter settings, "
+        "all described in \\citet*{DickersonRobottiRossetti_2024}. "
         "Additional information can be found on the "
         "\\href{https://github.com/Alexander-M-Dickerson/trace-data-pipeline/tree/main/stage0}{\\texttt{trace-data-pipeline}} GitHub repository."
     ),
@@ -702,6 +742,16 @@ def make_parameters_table(
     panel_a = _rows_to_latex(filters_df)
     panel_b = _rows_to_latex(ds_df)
     panel_c = _rows_to_latex(bb_df)
+    panel_d = _rows_to_latex(ie_df) if ie_df is not None and len(ie_df) > 0 else ""
+
+    # Build Panel D section if we have init_error params
+    panel_d_section = ""
+    if panel_d:
+        panel_d_section = r"""
+            \midrule
+            \multicolumn{2}{c}{\textbf{Panel D: Initial Price Error Parameters}} \\
+            \midrule
+            """ + panel_d
 
     latex = r"""
             \begin{table}[!ht]
@@ -713,17 +763,17 @@ def make_parameters_table(
             \midrule
             Parameter & Value \\
             \midrule
-            \multicolumn{2}{c}{\textbf{Panel A: Error-Correction and Filtering Toggles}} \\ 
+            \multicolumn{2}{c}{\textbf{Panel A: Error-Correction and Filtering Toggles}} \\
             \midrule
             """ + panel_a + r"""
             \midrule
-            \multicolumn{2}{c}{\textbf{Panel B: Decimal-Shift Parameters}} \\ 
+            \multicolumn{2}{c}{\textbf{Panel B: Decimal-Shift Parameters}} \\
             \midrule
             """ + panel_b + r"""
             \midrule
-            \multicolumn{2}{c}{\textbf{Panel C: Bounce-Back Parameters}} \\ 
+            \multicolumn{2}{c}{\textbf{Panel C: Bounce-Back Parameters}} \\
             \midrule
-            """ + panel_c + r"""
+            """ + panel_c + panel_d_section + r"""
             \bottomrule
             \end{tabular}
             \end{center}
@@ -974,6 +1024,17 @@ def default_references_bib() -> str:
                   note={Working Paper},
                   year={2014}
                 }
+
+                @article{rossi2014realized,
+                  title={Realized volatility, liquidity, and corporate yield spreads},
+                  author={Rossi, Marco},
+                  journal={The Quarterly Journal of Finance},
+                  volume={4},
+                  number={01},
+                  pages={1450004},
+                  year={2014},
+                  publisher={World Scientific}
+                }
 """.strip()
 
 
@@ -1001,6 +1062,7 @@ def build_data_report_tex(
     filters_df,
     ds_df,
     bb_df,
+    ie_df=None,
     fisd_params: dict,
     filters_table_dr,
     filters_table_dn,
@@ -1008,10 +1070,12 @@ def build_data_report_tex(
     output_figures: bool = False,
     pages_made_ds: Optional[Iterable[Union[str, Path]]] = None,
     pages_made_bb: Optional[Iterable[Union[str, Path]]] = None,
+    pages_made_ie: Optional[Iterable[Union[str, Path]]] = None,
+    author: str = None,
 ) -> Path:
     """
     Assemble and write data_report.tex in out_dir, including natbib + apalike bibliography.
-    If output_figures=True, figures are included from pages_made_ds / pages_made_bb (if provided).
+    If output_figures=True, figures are included from pages_made_ds / pages_made_bb / pages_made_ie (if provided).
     """
     # Enforce pages lists only when figures are requested
     if output_figures and (pages_made_ds is None or pages_made_bb is None):
@@ -1025,6 +1089,9 @@ def build_data_report_tex(
     _title_map = {"standard": "Standard", "enhanced": "Enhanced", "144a": "144A"}
     dtype_title = _title_map.get(str(data_type).lower().strip(), str(data_type))
 
+    # Build author line if provided
+    author_line = rf"\author{{{author}}}" if author else ""
+
     tex_lines = []
     tex_lines.append(r"\documentclass[11pt]{article}")
     tex_lines.append(r"\usepackage{graphicx,booktabs,geometry,ragged2e,setspace}")
@@ -1032,13 +1099,32 @@ def build_data_report_tex(
     tex_lines.append(r"\usepackage[round,authoryear]{natbib}")
     tex_lines.append(r"\usepackage{hyperref}")
     tex_lines.append(r"\geometry{margin=1in}")
-    tex_lines.append(rf"\title{{Data Report for {dtype_title} TRACE}}")
+    tex_lines.append(rf"\title{{Stage 0 {dtype_title} TRACE Daily Data Report}}")
+    if author_line:
+        tex_lines.append(author_line)
     tex_lines.append(rf"\date{{{datetime.now().strftime('%Y-%m-%d')}}}")
-    tex_lines.append(r"\begin{document}\maketitle")
+    tex_lines.append(r"\begin{document}")
+    tex_lines.append(r"\maketitle")
+    tex_lines.append(r"""
+\begin{abstract}
+This document presents the data processing pipeline for """ + dtype_title + r""" Trade Reporting
+and Compliance Engine (TRACE) data, converting intraday transaction-level data to a daily format.
+We apply new error filters by \citet{DickersonRobottiRossetti_2024} which are more
+conservative than \citet{rossi2014realized}. The new filters first attempt to correct for decimal
+shift errors and then apply a rules-based approach to eliminate data entry errors. As a result,
+less data is discarded, and the potential for false-positive data entry errors is
+reduced. In addition, for each and every bond \texttt{cusip\_id} that is impacted
+by \textit{any} of the \citet{DickersonRobottiRossetti_2024} filters, the time-series of its
+transaction-level price series is plotted and retained in this report. The data processing
+pipeline is part of the \href{https://openbondassetpricing.com/}{Open Source Bond Asset Pricing}
+initiative \citep{DickersonRobottiRossetti_2024}, which aims to provide transparent and
+reproducible methods for corporate bond research.
+\end{abstract}
+""")
     tex_lines.append(r"\section{Configured Filters and Parameters}")
 
     # Table 1
-    tex_lines.append(make_parameters_table(filters_df, ds_df, bb_df))
+    tex_lines.append(make_parameters_table(filters_df, ds_df, bb_df, ie_df=ie_df))
 
     # Table 2
     fi_df = _dict_to_df(fisd_params, key_header="FISD Parameters", val_header="Value")
@@ -1056,8 +1142,9 @@ def build_data_report_tex(
     if output_figures:
         ds_list = list(pages_made_ds or [])
         bb_list = list(pages_made_bb or [])
+        ie_list = list(pages_made_ie or [])
 
-        if not ds_list and not bb_list:
+        if not ds_list and not bb_list and not ie_list:
             logging.warning("output_figures=True but no figure pages provided.")
 
         if ds_list:
@@ -1075,6 +1162,17 @@ def build_data_report_tex(
             tex_lines.append(r"\clearpage")
             tex_lines.append(r"\section{Bounce Back Corrections}")
             for png_name in bb_list:
+                tex_lines.append(r"\begin{figure}[h!]\centering")
+                tex_lines.append(
+                    rf"\includegraphics[width=\textwidth,height=\textheight,keepaspectratio]{{{png_name}}}"
+                )
+                tex_lines.append(r"\end{figure}")
+                tex_lines.append(r"\clearpage")
+
+        if ie_list:
+            tex_lines.append(r"\clearpage")
+            tex_lines.append(r"\section{Initial Price Error Corrections}")
+            for png_name in ie_list:
                 tex_lines.append(r"\begin{figure}[h!]\centering")
                 tex_lines.append(
                     rf"\includegraphics[width=\textwidth,height=\textheight,keepaspectratio]{{{png_name}}}"

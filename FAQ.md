@@ -14,25 +14,32 @@
 ## Getting Started
 
 ### Do I need a WRDS subscription?
-Yes, Stage 0 requires WRDS access with TRACE Enhanced, Standard, or 144A entitlements. You can check your entitlements by logging into WRDS and viewing your subscriptions.
+Yes, the pipeline requires WRDS access with TRACE Enhanced, Standard, or 144A entitlements, plus FISD and ratings data for Stage 1. You can check your entitlements by logging into WRDS and viewing your subscriptions.
 
 ### Can I run this on my local machine?
-Stage 0 is specifically designed for the WRDS Cloud environment due to database access requirements. Stages 1 and 2 (coming November 2025) will run on your local machine with WRDS connection.
+Both Stage 0 and Stage 1 are designed for WRDS Cloud due to database access requirements, though technically they can run locally with proper WRDS connectivity. WRDS Cloud is recommended for optimal performance.
 
 ### How long does processing take?
-Using `./run_all_trace.sh` (complete automated pipeline):
-- **Enhanced TRACE**: ~4 hours
-- **Standard TRACE**: ~30-60 minutes
-- **Rule 144A**: ~30-60 minutes
-- **Report generation**: ~30-60 minutes
-- **Total**: ~5 hours for everything
+Using `./run_pipeline.sh` (complete automated pipeline):
+- **Pre-stage (data downloads)**: ~5 minutes
+- **Stage 0 (Enhanced TRACE)**: ~4 hours
+- **Stage 0 (Standard TRACE)**: ~30-60 minutes
+- **Stage 0 (Rule 144A)**: ~30-60 minutes
+- **Stage 0 (Report generation)**: ~30-60 minutes
+- **Stage 1 (Bond analytics)**: ~2 hours
+- **Total**: ~7 hours for complete pipeline
 
 ### What if I only want Enhanced TRACE?
-You can run individual datasets:
+You can customize which datasets to process in `config.py` (applies to all stages):
+```python
+TRACE_MEMBERS = ["enhanced"]  # Process only Enhanced TRACE
+```
+
+Or run Stage 0 jobs individually:
 ```bash
-./run_enhanced_trace.sh    # Enhanced only
-./run_standard_trace.sh    # Standard only
-./run_144a_trace.sh        # 144A only
+qsub stage0/run_enhanced_trace.sh    # Enhanced only
+qsub stage0/run_standard_trace.sh    # Standard only
+qsub stage0/run_144a_trace.sh        # 144A only
 ```
 
 ### What Python version do I need?
@@ -52,46 +59,112 @@ For Stage 0, you need:
 
 ## Configuration
 
-### How do I change the date range?
-Edit `_trace_settings.py` and modify the `PER_DATASET` dictionary:
+### Where do I configure settings?
+Settings are organized hierarchically:
 
+1. **Shared settings** (`config.py` in root):
+   - `WRDS_USERNAME`: Your WRDS username
+   - `OUTPUT_FORMAT`: Output file format (parquet/csv)
+   - `AUTHOR`: Your name
+   - `TRACE_MEMBERS`: Which datasets to process (enhanced, standard, 144a) - **shared across all stages**
+   - `STAGE0_OUTPUT_FIGURES`: Control Stage 0 error plot generation (can be slow)
+
+2. **Stage 0 settings** (`stage0/_trace_settings.py`):
+   - Filter switches, FISD parameters, chunk sizes
+   - Decimal-shift and bounce-back parameters
+
+3. **Stage 1 settings** (`stage1/_stage1_settings.py`):
+   - Date cutoffs, performance tuning (cores, chunks)
+   - Ultra-distressed filter configuration
+   - **Note:** Stage 1 always generates reports and figures (no toggle)
+
+### Do I need to configure anything to get started?
+**Minimal configuration:** Just set your WRDS username in `config.py`:
+```python
+WRDS_USERNAME = os.getenv("WRDS_USERNAME", "your_wrds_id")
+```
+
+Most other settings are **auto-detected**:
+- ✅ `ROOT_PATH`: Auto-detected from working directory
+- ✅ `STAGE0_DATE_STAMP`: Auto-detected from Stage 0 output files
+- ✅ `N_CORES`: Auto-detected from available CPUs
+
+### How do I change the date range?
+
+**Stage 0:** Edit `stage0/_trace_settings.py` and modify `PER_DATASET`:
 ```python
 PER_DATASET = {
-    "enhanced": dict(),  # Uses default full sample
+    "enhanced": dict(),  # Uses default full sample (2002-07-01 to present)
     "standard": dict(start_date="2023-01-01", data_type="standard"),
     "144a": dict(start_date="2023-01-01", data_type="144a"),
 }
 ```
 
-**Note**: Enhanced TRACE does not currently support custom start dates and processes the full sample (2002-07-01 to present).
+**Stage 1:** Edit `stage1/_stage1_settings.py`:
+```python
+DATE_CUT_OFF = "2023-12-31"  # Only include data through this date
+```
 
 ### How do I adjust memory usage?
-If you encounter memory errors, reduce the `chunk_size` in `_trace_settings.py`:
+If you encounter memory errors, reduce `chunk_size` in `stage0/_trace_settings.py`:
 
 ```python
 COMMON_KWARGS = {
-  chunk_size    = 150,
+    chunk_size = 150,  # Reduce from default 250
 }
 ```
 
-Reducing chunk size means you pull *fewer* bonds each iteration. Reducing RAM requirements.
+Or request more memory in job scripts (`stage0/run_enhanced_trace.sh`, etc.):
+```bash
+#$ -l m_mem_free=16G  # Increase from default
+```
 
 ### Can I disable certain filters?
-Yes! Edit the `FILTER_SWITCHES`, `FISD_PARAMS`, `COMMON_KWARGS`, `DS_PARAMS` or `BB_PARAMS` dictionaries in `_trace_settings.py`. 
+Yes! Edit `FILTER_SWITCHES` in `stage0/_trace_settings.py`:
+
+```python
+FILTER_SWITCHES = dict(
+    dick_nielsen            = True,
+    decimal_shift_corrector = True,
+    bounce_back_filter      = False,  # Disable this filter
+    # ... etc
+)
+```
 
 ### How do I change which bonds are included?
-Modify the `FISD_PARAMS` dictionary in `_trace_settings.py`:
+Modify `FISD_PARAMS` in `stage0/_trace_settings.py`:
 
 ```python
 FISD_PARAMS = {
-   "currency_usd_only": True,                   # foreign_currency == 'N'
-   "fixed_rate_only"  : True,                   # coupon_type != 'V'
+    "currency_usd_only": True,      # Only USD bonds
+    "fixed_rate_only": True,        # Only fixed-rate bonds
+    "tenor_min_years": 1.0,         # Minimum tenor
     # ... etc
 }
 ```
 
 ### Can I change the output format from Parquet to CSV?
-The code uses Parquet by default for efficiency. To change to CSV, you'll need to modify `output_format` in `COMMON_KWARGS` in `_trace_settings.py`.
+Yes! Edit `config.py` (applies to all stages):
+```python
+OUTPUT_FORMAT = "csv"  # Or "parquet" (recommended)
+```
+
+### How do I control Stage 0 error plot generation?
+Stage 0 error plots are **very slow** to generate (30+ minutes for Enhanced TRACE). Control this in `config.py`:
+```python
+STAGE0_OUTPUT_FIGURES = False  # Skip error plots (tables only - faster)
+STAGE0_OUTPUT_FIGURES = True   # Generate error plots (slow but comprehensive)
+```
+
+**Note:** Stage 1 always generates reports and figures regardless of this setting (essential for data quality).
+
+### How do I change which datasets to process across all stages?
+Edit `TRACE_MEMBERS` in `config.py` once, and it applies to all stages:
+```python
+TRACE_MEMBERS = ["enhanced"]                       # Enhanced only
+TRACE_MEMBERS = ["enhanced", "standard"]           # Two datasets
+TRACE_MEMBERS = ["enhanced", "standard", "144a"]  # All three (default)
+```
 
 ---
 
@@ -168,6 +241,27 @@ These files identify bonds that were corrected:
 
 Useful for understanding which bonds had price errors.
 
+### What is the ultra_distressed_cusips CSV file? (Stage 1)
+Stage 1 exports `stage1/data/ultra_distressed_cusips_{date}.csv` which contains all bonds flagged by the ultra-distressed filter. Each row shows:
+
+**Columns**:
+- `cusip_id`: Bond identifier
+- `total_observations`: Total trades for this CUSIP
+- `flagged_observations`: Number of flagged trades
+- `pct_flagged`: Percentage flagged (%)
+- `flag_anomalous_price`: Count of anomalous price flags
+- `flag_upward_spike`: Count of upward spike flags
+- `flag_plateau_sequence`: Count of plateau sequence flags
+- `flag_intraday_inconsistent`: Count of intraday inconsistent flags
+- `first_trade_date`: Earliest trade date
+- `last_trade_date`: Latest trade date
+
+**Use cases**:
+- Identify problematic bonds for manual review
+- Cross-reference with other bond characteristics (ratings, maturity, etc.)
+- Understand filtering patterns across bond universe
+- Quality control and diagnostics
+
 ### Where are the reports saved?
 Reports are saved in `data_reports/[enhanced|standard|144a]/` with:
 - LaTeX source file (`.tex`)
@@ -178,17 +272,53 @@ You can compile the LaTeX to PDF or view the figures directly.
 
 ### How do I download files from WRDS Cloud?
 
-**Windows (using WinSCP)**:
-1. Install WinSCP
-2. Connect to `wrds-cloud.wharton.upenn.edu`
-3. Navigate to your project directory
-4. Download the folders
+The pipeline generates a large folder (~6 GB) with hundreds of files. **Zip the folder first** for faster, more reliable downloads.
 
-**Mac/Linux (using scp)**:
+**Step 1: Create zip file on WRDS (via SSH)**
+
 ```bash
-scp -r username@wrds-cloud.wharton.upenn.edu:~/proj/stage0/enhanced ./local_destination/
-scp -r username@wrds-cloud.wharton.upenn.edu:~/proj/stage0/data_reports ./local_destination/
+# Connect to WRDS
+ssh {wrds_username}@wrds-cloud.wharton.upenn.edu
+
+# Zip to scratch space (your home directory has limited quota)
+cd /scratch/{institution}/
+zip -r trace-data-pipeline.zip ~/trace-data-pipeline/
 ```
+
+**Step 2: Download the zip file (from your LOCAL machine)**
+
+**Windows (PowerShell/Terminal):**
+```powershell
+scp {wrds_username}@wrds-cloud.wharton.upenn.edu:/scratch/{institution}/trace-data-pipeline.zip "{local_destination}"
+```
+
+**Mac/Linux:**
+```bash
+scp {wrds_username}@wrds-cloud.wharton.upenn.edu:/scratch/{institution}/trace-data-pipeline.zip "{local_destination}"
+```
+
+**Windows (WinSCP - GUI alternative):**
+1. Connect to `wrds-cloud.wharton.upenn.edu`
+2. Navigate to `/scratch/{institution}/`
+3. Download `trace-data-pipeline.zip`
+
+**Step 3: Extract locally**
+- **Windows**: Right-click → Extract All
+- **Mac**: Double-click the zip file
+- **Linux**: `unzip trace-data-pipeline.zip`
+
+**Step 4: Clean up (optional)**
+```bash
+# On WRDS Cloud
+rm /scratch/{institution}/trace-data-pipeline.zip
+```
+
+**Placeholders:**
+- `{wrds_username}`: Your WRDS username
+- `{institution}`: Your institution's scratch folder (e.g., `wharton`, `chicago`, `nyu`)
+- `{local_destination}`: Path on your local machine (e.g., `~/Downloads` or `C:\Users\YourName\Downloads`)
+
+For detailed instructions, see [QUICKSTART.md](QUICKSTART.md#download-results-to-your-local-machine).
 
 ---
 
@@ -246,7 +376,7 @@ qstat -j <job_id>  # View specific job details
 ```bash
 pip install --user wrds pandas numpy pandas-market-calendars
 # Or install all requirements:
-pip install --user -r requirements.txt
+python -m pip install --user -r requirements.txt
 ```
 
 ### The report generation job (build_reports) never starts
@@ -263,7 +393,68 @@ qstat  # Look for 'hqw' status - this means it's waiting for dependencies
 - Missing `references.bib`
 - Incomplete LaTeX installation
 
-**Solution**: Ensure all figure files generated before compiling, or set `output_figures = False` in `_build_error_files.py`.
+**Solution**: Ensure all figure files generated before compiling, or set `STAGE0_OUTPUT_FIGURES = False` in `config.py`.
+
+### The pipeline shows a disk space warning - what should I do?
+Before running the pipeline, it checks your WRDS quota. You'll see one of these:
+
+**Sufficient space (>= 4 GB):**
+```bash
+=== DISK SPACE CHECK ===
+[info] WRDS Quota - Home directory: 3.2 GB used / 10 GB limit
+[info] Available space: 6.8 GB
+[ok] Sufficient disk space available (6.8 GB >= 4.0 GB)
+```
+✅ **Proceed normally** - you have enough space.
+
+**Insufficient space (< 4 GB):**
+```bash
+=== DISK SPACE CHECK ===
+[info] WRDS Quota - Home directory: 7.88 GB used / 10 GB limit
+[info] Available space: 2.12 GB
+╔════════════════════════════════════════════════════════════════╗
+║                         ⚠️  WARNING  ⚠️                       ║
+║  INSUFFICIENT DISK SPACE DETECTED                              ║
+║  Available: 2.12 GB                                            ║
+║  Required:  At least 4.0 GB recommended                        ║
+╚════════════════════════════════════════════════════════════════╝
+[error] Exiting due to insufficient disk space.
+```
+⚠️ **Action required:**
+
+**Option 1: Free up space (recommended)**
+```bash
+# Check what's using space
+du -h ~/ | sort -h | tail -20
+
+# Remove old files/logs
+rm -rf ~/old_data/
+rm -f ~/stage0/logs/*.log  # Old log files
+rm -f ~/stage1/logs/*.log
+```
+
+**Option 2: Override warning (advanced users only)**
+```bash
+# Only if you're confident the pipeline won't exceed available space
+FORCE_RUN=1 ./run_pipeline.sh
+```
+
+**Why this matters:** The pipeline generates large intermediate files. Running out of disk space mid-processing can corrupt output files or cause job failures.
+
+### How do I check my WRDS disk quota?
+```bash
+quota  # Shows Home and Scratch directory usage/limits
+```
+
+Example output:
+```
+DIRECTORY  USED / LIMIT
+    Home:  7.88GB / 10GB
+ Scratch:  0B / 500GB
+```
+
+**Home directory** is where your project lives (10 GB limit on most WRDS accounts).
+**Scratch directory** is shared storage (500 GB limit, shared with institution).
 
 ---
 
@@ -271,15 +462,22 @@ qstat  # Look for 'hqw' status - this means it's waiting for dependencies
 
 ### How can I make processing faster?
 **Options**:
+
 1. **Increase chunk size** (if you have enough memory):
    ```python
-    COMMON_KWARGS = {
-    chunk_size    = 400,
-    ...
-                    }
-```
-2. **Disable figure generation** (saves 30-60 minutes):
-   Set `output_figures = False` in `_build_error_files.py`
+   COMMON_KWARGS = {
+       chunk_size = 400,
+       ...
+   }
+   ```
+
+2. **Disable Stage 0 error plot generation** (saves 30-60 minutes):
+   - Set `STAGE0_OUTPUT_FIGURES = False` in `config.py`
+
+3. **Memory optimizations (automatic)**:
+   - CUSIP columns use category dtype (~75% memory savings)
+   - Optimized groupby operations for large datasets
+   - Efficient parquet compression
 
 ### Can I run multiple datasets simultaneously?
 Yes! That's exactly what `./run_all_trace.sh` does. It submits Enhanced, Standard, and 144A as parallel jobs.
@@ -380,30 +578,40 @@ Yes! For collaboration or complex use cases, email alexander.dickerson1@unsw.edu
 
 ---
 
-## Stages 1 & 2
+## Stage 1 & 2
 
-### When will Stages 1 and 2 be released?
-Both stages are scheduled for **November 2025**.
+### Is Stage 1 available?
+**Yes!** Stage 1 is now in **public beta**. It enriches Stage 0 daily panels with:
+- Bond characteristics from FISD (coupon, maturity, issuer, etc.)
+- Bond analytics via QuantLib (duration, convexity, YTM, credit spreads)
+- Credit ratings from S&P and Moody's
+- Equity identifiers (PERMNO, PERMCO, GVKEY)
+- Ultra-distressed filters
+- Fama-French industry classifications
 
-### What will Stage 1 include?
-Stage 1 calculates daily bond metrics:
-- Accrued interest
-- Credit spreads
-- Duration and convexity
-- Yield-to-maturity
-- Additional bond characteristics
+See [stage1/QUICKSTART_stage1.md](stage1/QUICKSTART_stage1.md) to get started.
 
-### What will Stage 2 include?
-Stage 2 produces monthly panels with:
+### How do I run Stage 1?
+The easiest way is to use `./run_pipeline.sh` which automatically runs both Stage 0 and Stage 1.
+
+Alternatively, run Stage 1 manually (after Stage 0 completes):
+```bash
+qsub stage1/run_stage1.sh
+```
+
+### What about Stage 2?
+Stage 2 is **in development** and will produce monthly panels with:
 - 50+ bond characteristic signals
 - Credit risk factors
 - Liquidity measures
 - Momentum and reversal signals
 - Portfolio-ready outputs
 
-### Can I beta test Stages 1 and 2?
-Yes! Email alexander.dickerson1@unsw.edu.au to express interest in beta testing.
+**Expected release:** Coming soon
+
+### Can I beta test Stage 2?
+Yes! Email alexander.dickerson1@unsw.edu.au to express interest in beta testing Stage 2.
 
 ---
 
-**Last updated**: January 2025
+**Last updated**: November 2025

@@ -28,7 +28,7 @@ cd trace-data-pipeline/stage0
 python3 -m venv ~/wrds_env
 source ~/wrds_env/bin/activate
 python -m pip install -U pip
-python -m pip install -r requirements.txt   # do NOT add --user
+python -m pip install -r ../requirements.txt   # do NOT add --user
 ```
 
 ### Option B — conda (if installed)
@@ -36,13 +36,13 @@ python -m pip install -r requirements.txt   # do NOT add --user
 ```bash
 conda create -n wrds_env python=3.13 -y
 conda activate wrds_env
-python -m pip install -r requirements.txt   # do NOT add --user
+python -m pip install -r ../requirements.txt   # do NOT add --user
 ```
 
 > Use `--user` only if you are **not** in any virtual/conda environment (system Python):
 >
 > ```bash
-> python -m pip install --user -r requirements.txt
+> python -m pip install --user -r ../requirements.txt
 > ```
 
 

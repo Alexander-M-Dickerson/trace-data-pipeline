@@ -313,7 +313,7 @@ Calls `CreateDailyEnhancedTRACE` with the default cleaning/filters and audit log
 - Applies bounce-back price-error filtering
 - Computes daily price metrics: equal-weighted, volume-weighted, par-weighted, first, last, trade count
 - Computes daily volume metrics: quantity volume and dollar volume (in millions)
-- Computes customer-side bid/ask prices (value-weighted)
+- Computes bid/ask prices (value-weighted)
 - Generates comprehensive audit logs for each filter stage
 - **Saves all outputs to `enhanced/` subfolder**
 

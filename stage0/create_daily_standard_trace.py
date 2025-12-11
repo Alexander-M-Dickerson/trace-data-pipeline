@@ -266,6 +266,57 @@ def clean_reversal(clean4: pd.DataFrame) -> pd.DataFrame:
 
     return clean6
 # -------------------------------------------------------------------------
+def time_to_seconds(time_str):
+    """
+    Convert time string 'HH:MM:SS' to seconds since midnight (int32).
+
+    Parameters
+    ----------
+    time_str : str or pd.Series
+        Time string in 'HH:MM:SS' format or Series of time strings.
+
+    Returns
+    -------
+    int or pd.Series
+        Seconds since midnight (0-86399), or np.nan for invalid/missing values.
+
+    Examples
+    --------
+    >>> time_to_seconds('09:30:00')
+    34200
+    >>> time_to_seconds('16:00:00')
+    57600
+    >>> time_to_seconds(pd.Series(['09:30:00', '12:00:00']))
+    0    34200
+    1    43200
+    dtype: Int32
+
+    Notes
+    -----
+    - Returns np.nan for NaN/None inputs
+    - Returns np.nan for improperly formatted strings
+    - Output range: 0 (00:00:00) to 86399 (23:59:59)
+    - Uses Int32 dtype to save ~50% RAM compared to storing time strings
+    """
+    # Check if Series FIRST (before pd.isna which returns Series of bools)
+    if isinstance(time_str, pd.Series):
+        return time_str.apply(lambda x: time_to_seconds(x) if pd.notna(x) else np.nan)
+
+    if pd.isna(time_str):
+        return np.nan
+
+    parts = time_str.split(':')
+    if len(parts) != 3:
+        return np.nan
+
+    try:
+        hours = int(parts[0])
+        minutes = int(parts[1])
+        seconds = int(parts[2])
+        return hours * 3600 + minutes * 60 + seconds
+    except (ValueError, IndexError):
+        return np.nan
+# -------------------------------------------------------------------------
 def compute_trace_all_metrics(trace):
     """
     Aggregate TRACE trades to a daily (cusip_id, trd_exctn_dt) panel with
@@ -320,7 +371,13 @@ def compute_trace_all_metrics(trace):
     # Ensure we have dollar_vol
     if 'dollar_vol' not in trace.columns:
         trace['dollar_vol'] = trace['rptd_pr'] * trace['entrd_vol_qt'] / 100
-           
+
+    # Convert time to seconds since midnight (Int32 for RAM efficiency)
+    if 'trd_exctn_tm' in trace.columns:
+        trace['trd_exctn_tm_sec'] = time_to_seconds(trace['trd_exctn_tm']).astype('Int32')
+    else:
+        trace['trd_exctn_tm_sec'] = pd.NA
+
     # Split into bid and ask dataframes
     # Customer Only #
     _bid = trace[((trace['rpt_side_cd'] == 'B')&(trace['contra_party_type'] == 'C'))].copy()
@@ -340,7 +397,8 @@ def compute_trace_all_metrics(trace):
         'dollar_vol': 'sum',
         'entrd_vol_qt': 'sum',
         'dollar_weighted_price': 'sum',
-        'volume_weighted_price': 'sum'
+        'volume_weighted_price': 'sum',
+        'trd_exctn_tm_sec': ['mean', 'last']
     }
     
     results = trace.groupby(['cusip_id', 'trd_exctn_dt']).agg(agg_dict)
@@ -359,12 +417,15 @@ def compute_trace_all_metrics(trace):
         'rptd_pr_last': 'prc_last',
         'rptd_pr_max': 'prc_hi',
         'rptd_pr_min': 'prc_lo',
-        'rptd_pr_count': 'trade_count'
+        'rptd_pr_count': 'trade_count',
+        'trd_exctn_tm_sec_mean': 'time_ew',
+        'trd_exctn_tm_sec_last': 'time_last'
     }).reset_index()
-    
+
     # Select columns
     PricesAll = PricesAll[['cusip_id', 'trd_exctn_dt', 'prc_ew', 'prc_vw', 'prc_vw_par',
-                           'prc_first', 'prc_last', 'prc_hi', 'prc_lo', 'trade_count']]
+                           'prc_first', 'prc_last', 'prc_hi', 'prc_lo', 'trade_count',
+                           'time_ew', 'time_last']]
     
     #--------------------------------------------------------------------------
     # 2. Compute VolumesAll - Simple re-computation approach
@@ -391,31 +452,32 @@ def compute_trace_all_metrics(trace):
     #--------------------------------------------------------------------------
     
     # Initialize an empty result dataframe
-    prc_BID_ASK = pd.DataFrame(columns=['cusip_id', 'trd_exctn_dt', 'prc_bid', 
-                                        'prc_ask', 'bid_count', 'ask_count'])
+    prc_BID_ASK = pd.DataFrame(columns=['cusip_id', 'trd_exctn_dt', 'prc_bid',
+                                        'bid_last', 'prc_ask', 'bid_count', 'ask_count',
+                                        'bid_time_ew', 'bid_time_last'])
     
     # Process bid data
     if not _bid.empty:
         # Sort by cusip and execution date
         _bid = _bid.sort_values(['cusip_id', 'trd_exctn_dt'])
-        
-        # Compute sum of volumes per group for normalization
-        bid_vol_sums = _bid.groupby(['cusip_id', 'trd_exctn_dt'])['entrd_vol_qt'].transform('sum')
-        
-        # Calculate value weights directly (vectorized operation)
-        _bid['value_weights'] = _bid['entrd_vol_qt'] / bid_vol_sums
+
+        # Calculate dollar volume and value weights (fully vectorized)
+        _bid['dollar_volume'] = _bid['entrd_vol_qt'] * _bid['rptd_pr'] / 100
+        bid_dollar_vol_sums = _bid.groupby(['cusip_id', 'trd_exctn_dt'])['dollar_volume'].transform('sum')
+        _bid['value_weights'] = _bid['dollar_volume'] / bid_dollar_vol_sums
         
         # Calculate weighted price products
         _bid['weighted_price'] = _bid['rptd_pr'] * _bid['value_weights']
         
         # Group and aggregate
         bid_agg = _bid.groupby(['cusip_id', 'trd_exctn_dt']).agg({
-            'rptd_pr': 'count',
-            'weighted_price': 'sum'
+            'rptd_pr': ['count', 'last'],
+            'weighted_price': 'sum',
+            'trd_exctn_tm_sec': ['mean', 'last']
         })
-        
-        # Rename columns for clarity
-        bid_agg.columns = ['bid_count', 'prc_bid']
+
+        # Flatten multi-level columns
+        bid_agg.columns = ['bid_count', 'bid_last', 'prc_bid', 'bid_time_ew', 'bid_time_last']
         
         # Reset index for merging
         prc_BID = bid_agg.reset_index()
@@ -433,12 +495,11 @@ def compute_trace_all_metrics(trace):
     if not _ask.empty:
         # Sort by cusip and execution date
         _ask = _ask.sort_values(['cusip_id', 'trd_exctn_dt'])
-        
-        # Compute sum of volumes per group for normalization
-        ask_vol_sums = _ask.groupby(['cusip_id', 'trd_exctn_dt'])['entrd_vol_qt'].transform('sum')
-        
-        # Calculate value weights directly (vectorized operation)
-        _ask['value_weights'] = _ask['entrd_vol_qt'] / ask_vol_sums
+
+        # Calculate dollar volume and value weights (fully vectorized)
+        _ask['dollar_volume'] = _ask['entrd_vol_qt'] * _ask['rptd_pr'] / 100
+        ask_dollar_vol_sums = _ask.groupby(['cusip_id', 'trd_exctn_dt'])['dollar_volume'].transform('sum')
+        _ask['value_weights'] = _ask['dollar_volume'] / ask_dollar_vol_sums
         
         # Calculate weighted price products
         _ask['weighted_price'] = _ask['rptd_pr'] * _ask['value_weights']
@@ -458,12 +519,18 @@ def compute_trace_all_metrics(trace):
         if prc_BID_ASK.empty:
             # If we have no bid data, initialize with ask data
             prc_BID_ASK = prc_ASK.copy()
-            
+
             # Add empty bid columns
             if 'prc_bid' not in prc_BID_ASK.columns:
                 prc_BID_ASK['prc_bid'] = np.nan
+            if 'bid_last' not in prc_BID_ASK.columns:
+                prc_BID_ASK['bid_last'] = np.nan
             if 'bid_count' not in prc_BID_ASK.columns:
                 prc_BID_ASK['bid_count'] = 0
+            if 'bid_time_ew' not in prc_BID_ASK.columns:
+                prc_BID_ASK['bid_time_ew'] = pd.NA
+            if 'bid_time_last' not in prc_BID_ASK.columns:
+                prc_BID_ASK['bid_time_last'] = pd.NA
         else:
             # If we already have bid data, merge with ask data
             prc_BID_ASK = prc_BID_ASK.merge(
@@ -482,8 +549,9 @@ def compute_trace_all_metrics(trace):
     # Ensure all required columns exist
     if not prc_BID_ASK.empty:
         # Select and order columns
-        prc_BID_ASK = prc_BID_ASK[['cusip_id', 'trd_exctn_dt', 'prc_bid', 
-                                  'prc_ask', 'bid_count', 'ask_count']]
+        prc_BID_ASK = prc_BID_ASK[['cusip_id', 'trd_exctn_dt', 'prc_bid',
+                                  'bid_last', 'prc_ask', 'bid_count', 'ask_count',
+                                  'bid_time_ew', 'bid_time_last']]
     
     # ------------------------------------------------------------------ #
     # 4. Merge everything - FULL OUTER JOIN                              #
@@ -515,13 +583,14 @@ def clean_trace_data(
     start_date: str | None = None,
     data_type: str = "standard",
     volume_filter: float | tuple[str, float] = ("dollar", 10000.0),
-    trade_times: list[str] | None = None,  
+    trade_times: list[str] | None = None,
     calendar_name: str | None = None,
     ds_params: dict | None = None,
     bb_params: dict | None = None,
+    init_error_params: dict | None = None,
     filters: dict | None = None
 ):
-    
+
     if fetch_fn is None:
         fetch_fn = lambda sql, params=None: db.raw_sql(sql, params=params)
 
@@ -537,6 +606,7 @@ def clean_trace_data(
         yld_price_filter        = True,
         amtout_volume_filter    = True,
         trd_exe_mat_filter      = True,
+        flag_initial_price_errors = True,
     )
     f = {**FILTER_DEFAULTS, **(filters or {})}
     """
@@ -590,10 +660,13 @@ def clean_trace_data(
         back_to_anchor_tol, candidate_slack_abs, reassignment_margin_abs,
         use_unique_trailing_median, par_spike_heuristic, par_level,
         par_equal_tol, par_min_run, par_cooldown_after_flag.
+    init_error_params : dict or None, default None
+        Keyword overrides forwarded to flag_initial_price_errors.
+        Examples include abs_change, n_transactions.
 
     Returns
     -------
-    tuple[pandas.DataFrame, list[str], list[str]]
+    tuple[pandas.DataFrame, list[str], list[str], list[str]]
         final_df
             Daily metrics DataFrame per cusip_id and date, sorted and ready to export.
         bb_cusips_all
@@ -602,6 +675,9 @@ def clean_trace_data(
         dec_shift_cusips_all
             Unique CUSIPs that had at least one row corrected by the decimal
             shift corrector in any processed chunk.
+        init_price_cusips_all
+            Unique CUSIPs that had at least one row flagged by the
+            initial price error filter in any processed chunk.
 
     Notes
     -----
@@ -623,7 +699,8 @@ def clean_trace_data(
     all_super_list       = []
     bb_cusips_all        = []
     dec_shift_cusips_all = []
-    
+    init_price_cusips_all = []
+
     sort_cols = ["cusip_id","trd_exctn_dt","trd_exctn_tm", "msg_seq_nb"]
 
     # ---------- 1. chunk loop ----------
@@ -839,7 +916,7 @@ def clean_trace_data(
         else:
             log_filter(trace, trace, "volume_offamt_filter (skipped)", i)
 
-        # Filter 10: Trade execution date <= maturity filter                   
+        # Filter 10: Trade execution date <= maturity filter
         if f["trd_exe_mat_filter"]:
             trace = filter_with_log(
                 trace,
@@ -849,7 +926,34 @@ def clean_trace_data(
             )
         else:
             log_filter(trace, trace, "exctn_mat_dt_filter (skipped)", i)
-            
+
+        # Filter 11: Initial Price Errors
+        if f["flag_initial_price_errors"]:
+            _ie_defaults = dict(
+                id_col="cusip_id",
+                date_col="trd_exctn_dt",
+                price_col="rptd_pr",
+                abs_change=50.0,
+                n_transactions=3,
+            )
+            _ie = {**_ie_defaults, **(init_error_params or {})}
+            trace_ie = flag_initial_price_errors(trace, **_ie)
+
+            # Collect Init Price Error CUSIPs (audit/export only)
+            init_price_cusips = (
+                trace_ie.loc[trace_ie.get("initial_error_flag", 0).eq(1), "cusip_id"]
+                        .astype(str).str.strip().unique().tolist()
+            )
+
+            if init_price_cusips:
+                init_price_cusips_all.extend([str(c) for c in init_price_cusips])
+            trace = filter_with_log(trace_ie, trace_ie['initial_error_flag'] == 0, "init_price_error_filter", i)
+            trace.drop(['initial_error_flag'], inplace=True, axis=1)
+            gc.collect()
+        else:
+            log_filter(trace, trace, "init_price_error_filter (skipped)", i)
+        gc.collect()
+
         #* ************************************** */
         #* DAILY AGGREGATION                      */
         #* ************************************** */ 
@@ -870,11 +974,11 @@ def clean_trace_data(
         logging.info(f"Chunk {i+1}: took {elapsed_time} seconds")
         logging.info("-" * 50)  
             
-    if all_super_list:                
+    if all_super_list:
         final_df = pd.concat(all_super_list, ignore_index=True)
-        return final_df, bb_cusips_all, dec_shift_cusips_all               
+        return final_df, bb_cusips_all, dec_shift_cusips_all, init_price_cusips_all
     else:
-        return pd.DataFrame(), bb_cusips_all, dec_shift_cusips_all                    
+        return pd.DataFrame(), bb_cusips_all, dec_shift_cusips_all, init_price_cusips_all
 # -------------------------------------------------------------------------
 def decimal_shift_corrector(
     df: pd.DataFrame,
@@ -1337,6 +1441,105 @@ def flag_price_change_errors(
     out["filtered_error"] = filtered.astype(np.int8)
     return out
 # -------------------------------------------------------------------------
+def flag_initial_price_errors(
+    df: pd.DataFrame,
+    *,
+    id_col: str = "cusip_id",
+    date_col: str = "trd_exctn_dt",
+    price_col: str = "rptd_pr",
+    abs_change: float = 50.00,
+    n_transactions: int = 3
+) -> pd.DataFrame:
+    """
+    Flag erroneous initial prices that jump to correct levels.
+
+    Logic:
+    ------
+    For each CUSIP:
+    1. Examine first n_transactions (default: 3)
+    2. Find first large price jump (abs change > abs_change)
+    3. Flag all rows BEFORE the jump as errors
+
+    Example:
+    --------
+    CUSIP has prices: 0.360, 0.403, 106.000, 106.500
+    - Rows 0-1: prices are 0.360, 0.403 (suspiciously low)
+    - Row 2: price jumps to 106.000 (jump = 105.597 > 50)
+    - Flag rows 0-1 as errors, keep row 2 onwards
+
+    Rationale:
+    - Prices before a large jump are likely data entry errors
+    - Price after the jump is likely correct
+    - Only checks first n_transactions to avoid false positives
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input dataframe with bond price data
+    id_col : str, default "cusip_id"
+        Column name for bond identifier
+    date_col : str, default "trd_exctn_dt"
+        Column name for date
+    price_col : str, default "rptd_pr"
+        Column name for price (in % of par)
+    abs_change : float, default 50.0
+        Minimum absolute price change to trigger flagging
+        Default 50.0 = $50 change for a $1000 par bond
+    n_transactions : int, default 3
+        Number of initial transactions to scan for each CUSIP
+
+    Returns
+    -------
+    pd.DataFrame
+        Copy of input with added 'initial_error_flag' column:
+        - 0: Keep observation (no initial error detected)
+        - 1: Flag for removal (erroneous initial price)
+
+    Notes
+    -----
+    - Only examines first n_transactions for each CUSIP
+    - Flags all rows BEFORE the first large jump
+    - Fast implementation using groupby + numpy arrays
+    """
+    out = df.copy()
+
+    # Sort by CUSIP and date
+    out = out.sort_values([id_col, date_col]).reset_index(drop=True)
+
+    # Calculate price differences within each CUSIP (vectorized)
+    out['_price_diff'] = out.groupby(id_col, observed=True)[price_col].diff().abs()
+
+    # Initialize flag array
+    n = len(out)
+    flagged = np.zeros(n, dtype=np.int8)
+
+    # Process each CUSIP group
+    for _, gidx in out.groupby(id_col, observed=True).groups.items():
+        idxs = np.asarray(gidx)
+        m = len(idxs)
+
+        # Only scan first n_transactions
+        scan_len = min(m, n_transactions)
+
+        if scan_len > 1:
+            # Get price differences for first n transactions
+            diffs = out.loc[idxs[:scan_len], '_price_diff'].to_numpy(float)
+
+            # Find first large jump (skip position 0 which has NaN diff)
+            for i in range(1, scan_len):
+                if not np.isnan(diffs[i]) and diffs[i] > abs_change:
+                    # Flag all positions BEFORE this jump
+                    flagged[idxs[:i]] = 1
+                    break  # Only process first large jump
+
+    # Add flag column
+    out['initial_error_flag'] = flagged
+
+    # Drop temporary column
+    out = out.drop(columns=['_price_diff'])
+
+    return out
+# -------------------------------------------------------------------------
 def _hms_to_seconds(x: str) -> float:
     """
     Convert an HH:MM:SS string (zero-padded or not) to seconds since midnight.
@@ -1765,7 +1968,7 @@ def build_fisd(db, params: dict | None = None, *, data_type: str = "standard"):
     """
     fisd_issuer = db.raw_sql(qry_issuer)
     fisd_issue  = db.raw_sql(qry_issue)
-    fisd        = pd.merge(fisd_issue, fisd_issuer, on="issuer_id", how="left")
+    fisd        = pd.merge(fisd_issue, fisd_issuer, on="issuer_id", how="left").copy()
 
     # ---- 2) Start log -----------------------------------------------------
     log_fisd_filter(fisd, fisd, "start")
@@ -1773,7 +1976,7 @@ def build_fisd(db, params: dict | None = None, *, data_type: str = "standard"):
     # ---- 3) Currency (foreign_currency == 'N') ---------------------------
     if p["currency_usd_only"]:
         before = fisd
-        fisd = fisd.loc[(fisd["foreign_currency"] == "N")]
+        fisd = fisd.loc[(fisd["foreign_currency"] == "N")].copy()
         log_fisd_filter(before, fisd, "USD currency")
     else:
         log_fisd_filter(fisd, fisd, "USD currency (skipped)")
@@ -1781,7 +1984,7 @@ def build_fisd(db, params: dict | None = None, *, data_type: str = "standard"):
     # ---- 4) Fixed-rate ----------------------------------------------------
     if p["fixed_rate_only"]:
         before = fisd
-        fisd = fisd.loc[fisd["coupon_type"] != "V"]
+        fisd = fisd.loc[fisd["coupon_type"] != "V"].copy()
         log_fisd_filter(before, fisd, "fixed rate")
     else:
         log_fisd_filter(fisd, fisd, "fixed rate (skipped)")
@@ -1789,7 +1992,7 @@ def build_fisd(db, params: dict | None = None, *, data_type: str = "standard"):
     # ---- 5) Non-convertible ----------------------------------------------
     if p["non_convertible_only"]:
         before = fisd
-        fisd = fisd.loc[fisd["convertible"] == "N"]
+        fisd = fisd.loc[fisd["convertible"] == "N"].copy()
         log_fisd_filter(before, fisd, "non convertible")
     else:
         log_fisd_filter(fisd, fisd, "non convertible (skipped)")
@@ -1797,7 +2000,7 @@ def build_fisd(db, params: dict | None = None, *, data_type: str = "standard"):
     # ---- 6) Non-asset-backed ---------------------------------------------
     if p["non_asset_backed_only"]:
         before = fisd
-        fisd = fisd.loc[fisd["asset_backed"] == "N"]
+        fisd = fisd.loc[fisd["asset_backed"] == "N"].copy()
         log_fisd_filter(before, fisd, "non asset backed")
     else:
         log_fisd_filter(fisd, fisd, "non asset backed (skipped)")
@@ -1809,16 +2012,20 @@ def build_fisd(db, params: dict | None = None, *, data_type: str = "standard"):
     if p["exclude_bond_types"]:
         before = fisd
         exclude_btypes = set(p["excluded_bond_types"])
-        fisd = fisd.loc[~fisd["bond_type"].isin(exclude_btypes)]
+        fisd = fisd.loc[~fisd["bond_type"].isin(exclude_btypes)].copy()
         log_fisd_filter(before, fisd, "exclude gov muni ABS types")
     else:
         log_fisd_filter(fisd, fisd, "exclude gov muni ABS types (skipped)")
 
     # ---- 9) Valid coupon frequency ---------------------------------------
+    # Convert interest_frequency to int before filtering
+    # Handle NA values by converting to numeric, filling NA with -1, then converting to int
+    fisd["interest_frequency"] = pd.to_numeric(fisd["interest_frequency"], errors='coerce').fillna(-1).astype(int)
+
     if p["valid_coupon_frequency_only"]:
         before = fisd
         invalid_freq = set(p["invalid_coupon_freq"])
-        fisd = fisd.loc[~fisd["interest_frequency"].isin(invalid_freq)]
+        fisd = fisd.loc[~fisd["interest_frequency"].isin(invalid_freq)].copy()
         log_fisd_filter(before, fisd, "valid coupon frequency")
     else:
         log_fisd_filter(fisd, fisd, "valid coupon frequency (skipped)")
@@ -1829,7 +2036,7 @@ def build_fisd(db, params: dict | None = None, *, data_type: str = "standard"):
         date_cols = ["offering_date", "dated_date"]
         fisd[date_cols] = fisd[date_cols].apply(pd.to_datetime, errors="coerce")
         req_cols = date_cols + ["interest_frequency", "day_count_basis", "coupon_type", "coupon"]
-        fisd = fisd.dropna(subset=req_cols)
+        fisd = fisd.dropna(subset=req_cols).copy()
         log_fisd_filter(before, fisd, "complete accrual fields")
     else:
         log_fisd_filter(fisd, fisd, "complete accrual fields (skipped)")
@@ -1837,7 +2044,7 @@ def build_fisd(db, params: dict | None = None, *, data_type: str = "standard"):
     # ---- 11) principal_amt == 1000 ---------------------------------------
     if p["principal_amt_eq_1000_only"]:
         before = fisd
-        fisd = fisd.loc[fisd["principal_amt"] == 1000]
+        fisd = fisd.loc[fisd["principal_amt"] == 1000].copy()
         log_fisd_filter(before, fisd, "principal_amt == 1,000")
     else:
         log_fisd_filter(fisd, fisd, "principal_amt == 1,000 (skipped)")
@@ -1849,7 +2056,7 @@ def build_fisd(db, params: dict | None = None, *, data_type: str = "standard"):
             r"EQUITY\-LINKED|EQUITY LINKED|EQUITYLINKED|INDEX\-LINKED|INDEX LINKED|INDEXLINKED",
             case=False, na=False
         ).astype(int)
-        fisd = fisd[fisd["equity_linked"] == 0].drop(columns="equity_linked")
+        fisd = fisd[fisd["equity_linked"] == 0].drop(columns="equity_linked").copy()
         log_fisd_filter(before, fisd, "exclude equity and index linked")
     else:
         log_fisd_filter(fisd, fisd, "exclude equity and index linked (skipped)")
@@ -1860,16 +2067,16 @@ def build_fisd(db, params: dict | None = None, *, data_type: str = "standard"):
         fisd["maturity"] = pd.to_datetime(fisd["maturity"], errors="coerce")
         fisd["offering_date"] = pd.to_datetime(fisd["offering_date"], errors="coerce")
         fisd["tenor"] = (fisd["maturity"] - fisd["offering_date"]).dt.days / 365.25
-        fisd = fisd.loc[fisd["tenor"] >= float(p["tenor_min_years"])]
+        fisd = fisd.loc[fisd["tenor"] >= float(p["tenor_min_years"])].copy()
         log_fisd_filter(before, fisd, f"tenor >= {p['tenor_min_years']} year(s)")
     else:
         log_fisd_filter(fisd, fisd, f"tenor >= {p['tenor_min_years']} year(s) (skipped)")
-        
-        
+
+
     # ---- 13) 144A Only or Not?  ------------------------------------
     before = fisd
     if str(data_type).lower() == "144a":
-        fisd = fisd.loc[(fisd["rule_144a"] == "Y") | (fisd["private_placement"] == "Y")]
+        fisd = fisd.loc[(fisd["rule_144a"] == "Y") | (fisd["private_placement"] == "Y")].copy()
         log_fisd_filter(before, fisd, "Only keep 144A bonds")
   
     # ---- 14) Housekeeping + fisd_off  ------------------------------
@@ -1884,14 +2091,16 @@ def build_fisd(db, params: dict | None = None, *, data_type: str = "standard"):
 def error_checks(
     db,
     cusip_chunks,
+    fisd_off: pd.DataFrame,
     start_date: str | None = None,
     data_type: str = "standard",
     volume_filter: float | tuple[str, float] = ("dollar", 10000.0),
-    trade_times: list[str] | None = None,  
+    trade_times: list[str] | None = None,
     calendar_name: str | None = None,
     *,
     ds_params: dict | None = None,
     bb_params: dict | None = None,
+    init_error_params: dict | None = None,
     filters: dict | None = None
                     ):
     # --- Filter Defaults -----------------
@@ -1906,13 +2115,14 @@ def error_checks(
         yld_price_filter        = True,
         amtout_volume_filter    = True,
         trd_exe_mat_filter      = True,
+        flag_initial_price_errors = True,
     )
     f = {**FILTER_DEFAULTS, **(filters or {})}
     """
-    Slimline filtering function for the plots of filtered data 
+    Slimline filtering function for the plots of filtered data
 
     """
-    
+
     # ---------- 0. validate data_type ----------
     data_type = data_type.lower()
     if data_type == "standard":
@@ -1921,12 +2131,14 @@ def error_checks(
         table_name = "trace.trace_btds144a"
     else:
         raise ValueError("data_type must be 'standard' or '144a'")
-    
+
     all_super_list         = []
     all_super_listbb       = []
+    all_super_list_ie      = []
     bb_cusips_all          = []
     dec_shift_cusips_all   = []
-    
+    init_price_cusips_all  = []
+
     sort_cols = ["cusip_id","trd_exctn_dt","trd_exctn_tm", "msg_seq_nb"]
     
     # ---------- 1. chunk loop ----------
@@ -2017,8 +2229,14 @@ def error_checks(
                       
             dec_shift_cusips_all.extend([str(c) for c in ds_cusips])
             
-            traceds = trace.sort_values(sort_cols, kind="mergesort", ignore_index=True).copy()                        
-                    
+            # Keep only columns needed for decimal-shift plotting (memory optimization)
+            DS_COLS = ["cusip_id", "trd_exctn_dt", "rptd_pr", "dec_shift_flag", "suggested_price"]
+            traceds = (
+                trace[DS_COLS]
+                .sort_values(["cusip_id", "trd_exctn_dt"], kind="mergesort", ignore_index=True)
+                .copy()
+            )
+
         else:
             log_filter(trace, trace, "decimal_shift (skipped)", i, replace=True, n_rows_replaced=0)
         gc.collect()
@@ -2095,7 +2313,7 @@ def error_checks(
         trace = trace.sort_values(sort_cols, kind="mergesort", ignore_index=True)
         
         # Filter 7: Bounce-Back
-        if f["bounce_back_filter"]:            
+        if f["bounce_back_filter"]:
             _bb_defaults = _bb_defaults = dict(
                 id_col="cusip_id",
                 date_col="trd_exctn_dt",
@@ -2116,38 +2334,117 @@ def error_checks(
                 par_cooldown_after_flag=2,
             )
             _bb = {**_bb_defaults, **(bb_params or {})}
-            
+
             trace_bb = flag_price_change_errors(
                 trace,
                 **_bb
             )
-            
+
             # Collect BB CUSIPs (audit/export only)
             bb_cusips = (
                 trace_bb.loc[trace_bb.get("filtered_error", 0).eq(1), "cusip_id"]
                         .astype(str).str.strip().unique().tolist()
             )
-                               
+
             bb_cusips_all.extend([str(c) for c in bb_cusips])
-            
+
             gc.collect()
         else:
+            trace_bb = trace.copy()
+            trace_bb["filtered_error"] = 0
             log_filter(trace, trace, "bounce_back_filter (skipped)", i)
-        gc.collect()    
-        
-        trace_bb = trace_bb.sort_values(sort_cols, kind="mergesort", ignore_index=True)
-                       
+        gc.collect()
+
+        # ============================================================
+        # From here onwards, work on trace_ie (copy of trace_bb)
+        # trace_bb stays untouched for bounce-back plotting
+        # IMPORTANT: Remove rows flagged by bounce-back filter before
+        # applying subsequent filters
+        # ============================================================
+        trace_ie = trace_bb[trace_bb['filtered_error'] == 0].copy()
+
+        # Filter 8: Yield != Price
+        if f["yld_price_filter"]:
+            mask = (trace_ie["rptd_pr"] != trace_ie["yld_pt"]) | trace_ie["yld_pt"].isna()
+            trace_ie = filter_with_log(trace_ie, mask, "price_yld_filter", i)
+        else:
+            log_filter(trace_ie, trace_ie, "price_yld_filter (skipped)", i)
+
+        # Filter 9: Amount-outstanding vs. volume filter
+        trace_ie = trace_ie.merge(fisd_off, how="left", left_on='cusip_id', right_on='cusip_id')
+        if f["amtout_volume_filter"]:
+            trace_ie = filter_with_log(
+                trace_ie,
+                trace_ie['entrd_vol_qt'] < trace_ie['offering_amt']*1000*0.50,
+                "volume_offamt_filter",
+                i
+            )
+        else:
+            log_filter(trace_ie, trace_ie, "volume_offamt_filter (skipped)", i)
+
+        # Filter 10: Execution date cannot exceed maturity
+        if f["trd_exe_mat_filter"]:
+            trace_ie = filter_with_log(
+                trace_ie,
+                trace_ie['trd_exctn_dt'] <= trace_ie['maturity'],
+                "exctn_mat_dt_filter",
+                i
+            )
+        else:
+            log_filter(trace_ie, trace_ie, "exctn_mat_dt_filter (skipped)", i)
+
+        # Filter 11: Initial Price Errors
+        if f["flag_initial_price_errors"]:
+            _ie_defaults = dict(
+                id_col="cusip_id",
+                date_col="trd_exctn_dt",
+                price_col="rptd_pr",
+                abs_change=50.0,
+                n_transactions=3,
+            )
+            _ie = {**_ie_defaults, **(init_error_params or {})}
+            trace_ie = flag_initial_price_errors(trace_ie, **_ie)
+
+            # Collect Init Price Error CUSIPs (audit/export only)
+            ie_cusips = (
+                trace_ie.loc[trace_ie.get("initial_error_flag", 0).eq(1), "cusip_id"]
+                        .astype(str).str.strip().unique().tolist()
+            )
+
+            if ie_cusips:
+                init_price_cusips_all.extend([str(c) for c in ie_cusips])
+            gc.collect()
+        else:
+            log_filter(trace_ie, trace_ie, "init_price_error_filter (skipped)", i)
+            # Ensure column exists even when skipped (for plotting consistency)
+            trace_ie["initial_error_flag"] = 0
+        gc.collect()
+
+        # Keep only columns needed for plotting (memory optimization)
+        BB_COLS = ["cusip_id", "trd_exctn_dt", "rptd_pr", "filtered_error"]
+        IE_COLS = ["cusip_id", "trd_exctn_dt", "rptd_pr", "initial_error_flag"]
+
+        trace_bb = (
+            trace_bb[BB_COLS]
+            .sort_values(["cusip_id", "trd_exctn_dt"], kind="mergesort", ignore_index=True)
+        )
+        trace_ie = (
+            trace_ie[IE_COLS]
+            .sort_values(["cusip_id", "trd_exctn_dt"], kind="mergesort", ignore_index=True)
+        )
+
         # Run garbage collection to reclaim memory
         del trace
         gc.collect()
-                
-        # Append here #        
+
+        # Append here (now with minimal columns only)
         all_super_list.append(traceds)
         all_super_listbb.append(trace_bb)
-        
-        del(traceds,trace_bb)
-        
-        # CUSIP check 
+        all_super_list_ie.append(trace_ie)
+
+        del(traceds, trace_bb, trace_ie)
+
+        # CUSIP check (only for bb and ds - ie is checked separately)
         merged_cusips = pd.unique(pd.Series(bb_cusips + ds_cusips)).tolist()
         
         # If cusip_chunks only has one list, always use index 0
@@ -2167,13 +2464,23 @@ def error_checks(
               
         elapsed_time = round(time.time() - start_time, 2)
         logging.info(f"Chunk {i}: took {elapsed_time} seconds")
+
+        # Memory tracking after each chunk
+        try:
+            import psutil
+            mem_gb = psutil.Process().memory_info().rss / (1024**3)
+            logging.info(f"[MEMORY] Chunk {i}: {mem_gb:.2f} GB")
+        except ImportError:
+            pass
+
         logging.info("-" * 50)
-    
-    gc.collect()                                           
+
+    gc.collect()
     final_df_ds = pd.concat(all_super_list,   ignore_index=True)
     final_df_bb = pd.concat(all_super_listbb, ignore_index=True)
-        
-    return final_df_ds, final_df_bb, bb_cusips_all, dec_shift_cusips_all                           
+    final_df_ie = pd.concat(all_super_list_ie, ignore_index=True)
+
+    return final_df_ds, final_df_bb, final_df_ie, bb_cusips_all, dec_shift_cusips_all, init_price_cusips_all
 # -------------------------------------------------------------------------
 def export_trace_dataframes(
     all_data: pd.DataFrame,
@@ -2181,11 +2488,12 @@ def export_trace_dataframes(
     ct_audit_records: Sequence[Mapping[str, Any]],
     audit_records:    Sequence[Mapping[str, Any]],
     *,
-    data_type: str = "standard",        
+    data_type: str = "standard",
     output_format: str = "csv",
     out_dir: str | Path = ".",
     bounce_back_cusips: list[str] | None = None,
     decimal_shift_cusips: list[str] | None = None,
+    init_price_cusips: list[str] | None = None,
     fisd_audit_records: list[dict] | None = None,
     stamp: str | None = None,
 ) -> None:
@@ -2215,24 +2523,26 @@ def export_trace_dataframes(
 
     df_bb = _uniq_df(bounce_back_cusips)
     df_ds = _uniq_df(decimal_shift_cusips)
+    df_ie = _uniq_df(init_price_cusips)
 
     # ---------- 1. file-name suffix ----------
     dt = data_type.lower()
-    
+
     if dt not in {"standard", "144a"}:
         raise ValueError("data_type must be 'standard' or '144a'")
-        
+
     suffix = "_standard" if dt == "standard" else "_144a"
 
     # ---------- 2. mapping ----------
     files: dict[str, pd.DataFrame] = {
         f"trace{suffix}"                     : all_data,
         f"trace_fisd{suffix}"                : fisd_df,
-        f"fisd_filters{suffix}"              : fisd_filters_df, 
+        f"fisd_filters{suffix}"              : fisd_filters_df,
         f"dick_nielsen_filters_audit{suffix}": clean_trace_audit_df,
         f"drr_filters_audit{suffix}"         : audit_df,
         f"bounce_back_cusips{suffix}"        : df_bb,
         f"decimal_shift_cusips{suffix}"      : df_ds,
+        f"init_price_cusips{suffix}"         : df_ie,
     }
 
     # ---------- 3. write ----------
@@ -2334,14 +2644,15 @@ class ProcessStandardTRACE:
         chunk_size: int = 250,
         clean_agency: bool = True,
         out_dir: str | Path = ".",
-        start_date: str | None = None,     
+        start_date: str | None = None,
         log_level: int = logging.INFO,
         data_type: str = "standard",
         volume_filter: float | tuple[str, float] = ("dollar", 10000.0),
         trade_times: list[str] | None = None,
-        calendar_name: str | None = None,       
+        calendar_name: str | None = None,
         ds_params: dict | None = None,
         bb_params: dict | None = None,
+        init_error_params: dict | None = None,
         filters: dict | None = None,
         fisd_params: dict | None = None
     ) -> None:
@@ -2361,9 +2672,10 @@ class ProcessStandardTRACE:
         self.calendar_name = calendar_name        
         self.ds_params = ds_params or {}
         self.bb_params = bb_params or {}
+        self.init_error_params = init_error_params or {}
         self.filters    = filters or {}
         self.fisd_params = fisd_params or {}
-        
+
         self.out_dir = Path(out_dir).expanduser()     
 
         # handle "" or Path("")  
@@ -2386,8 +2698,9 @@ class ProcessStandardTRACE:
         self.audit_records:      List[Dict] = []
         self.fisd_audit_records: List[Dict] = []
         self.ct_audit_records:   List[Dict] = []
-        self.bounce_back_cusips_all: list[str] = []     
-        self.decimal_shift_cusips_all: list[str] = []  
+        self.bounce_back_cusips_all: list[str] = []
+        self.decimal_shift_cusips_all: list[str] = []
+        self.init_price_cusips_all: list[str] = []  
 
     # ---------------------------------------------------------------------
     # -------------- MAIN --------------
@@ -2398,6 +2711,8 @@ class ProcessStandardTRACE:
             self._connect_wrds()
             fisd, fisd_off = self._build_fisd()
             cusip_chunks   = self._make_cusip_chunks(fisd)
+            # TODO
+            # cusip_chunks = cusip_chunks[:20]
             all_data = self._run_clean_trace(cusip_chunks, fisd_off)
             self._export(all_data, fisd)
             return all_data
@@ -2442,8 +2757,8 @@ class ProcessStandardTRACE:
 
     def _run_clean_trace(self, cusip_chunks, fisd_off):
         self.logger.info("Running TRACE cleaning loop ...")
-        
-        all_data, bb_list, ds_list = clean_trace_data(
+
+        all_data, bb_list, ds_list, ie_list = clean_trace_data(
             self.db,
             cusip_chunks,
             fisd_off,
@@ -2451,19 +2766,22 @@ class ProcessStandardTRACE:
             fetch_fn=self._raw_sql_with_retry,
             start_date=self.start_date,
             data_type=self.data_type,
-            volume_filter=self.volume_filter,            
+            volume_filter=self.volume_filter,
             trade_times=self.trade_times,
             calendar_name=self.calendar_name,
             ds_params=self.ds_params,
             bb_params=self.bb_params,
+            init_error_params=self.init_error_params,
             filters=self.filters
         )
-           
+
         if bb_list:
             self.bounce_back_cusips_all.extend(bb_list)
         if ds_list:
             self.decimal_shift_cusips_all.extend(ds_list)
-    
+        if ie_list:
+            self.init_price_cusips_all.extend(ie_list)
+
         return all_data
                                
 
@@ -2473,7 +2791,7 @@ class ProcessStandardTRACE:
         subfolder = "144a" if str(self.data_type).lower() == "144a" else "standard"
         out_sub = self.out_dir / subfolder
         out_sub.mkdir(parents=True, exist_ok=True)
-    
+
         export_trace_dataframes(
             all_data,
             fisd_df,
@@ -2484,6 +2802,7 @@ class ProcessStandardTRACE:
             out_dir=out_sub,
             bounce_back_cusips=self.bounce_back_cusips_all,
             decimal_shift_cusips=self.decimal_shift_cusips_all,
+            init_price_cusips=self.init_price_cusips_all,
             fisd_audit_records=self.fisd_audit_records,
             stamp=RUN_STAMP,
         )

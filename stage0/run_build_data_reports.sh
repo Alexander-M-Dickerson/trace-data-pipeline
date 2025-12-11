@@ -4,7 +4,8 @@
 #$ -cwd                         # Run from current working directory
 #$ -pe onenode 1
 #$ -l m_mem_free=32G
-#$ -o logs/_data_reports.out    # Log standard output
-#$ -e logs/_data_reports.err    # Log standard error
+#$ -o stage0/logs/_data_reports.out    # Log standard output
+#$ -e stage0/logs/_data_reports.err    # Log standard error
 
+cd stage0
 python3 _build_error_files.py

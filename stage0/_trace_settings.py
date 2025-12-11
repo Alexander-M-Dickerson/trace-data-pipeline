@@ -3,9 +3,11 @@
 from __future__ import annotations
 from pathlib import Path
 import os
+import sys
 
-# --- Change your username here please ----
-WRDS_USERNAME = os.getenv("WRDS_USERNAME", "")
+# Import shared configuration from root-level config.py
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from config import WRDS_USERNAME, AUTHOR, OUTPUT_FORMAT
 
 # --- FISD universe build params --------------------------------------
 FISD_PARAMS = {
@@ -44,6 +46,7 @@ FILTER_SWITCHES =  dict(
     yld_price_filter        = True,  # 8: rptd_pr != yld_pt
     amtout_volume_filter    = True,  # 9: entrd_vol_qt < 0.5*offamt*1000
     trd_exe_mat_filter      = True,  # 10: trd_exctn_dt <= maturity
+    flag_initial_price_errors = True, # 11: flag_initial_price_errors() [note:see init_error_params]
 )
 
 # --- Decimal-shift corrector params ---------------------------------
@@ -79,10 +82,16 @@ BB_PARAMS = {
     "par_cooldown_after_flag": 2,
 }
 
+# --- Initial price error filter params --------------------------------
+INIT_ERROR = {
+    "abs_change": 50.0,
+    "n_transactions": 3,
+}
+
 # --- Arguments identical across all runners ---------------------------
 COMMON_KWARGS = dict(
-    wrds_username = WRDS_USERNAME,    
-    output_format = "parquet",
+    wrds_username = WRDS_USERNAME,
+    output_format = OUTPUT_FORMAT,  # Imported from shared config.py
     chunk_size    = 250,
     clean_agency  = True,
     out_dir       = "",
@@ -91,6 +100,7 @@ COMMON_KWARGS = dict(
     calendar_name = "NYSE",
     ds_params     = DS_PARAMS,
     bb_params     = BB_PARAMS,
+    init_error_params = INIT_ERROR,
     filters       = FILTER_SWITCHES,
     fisd_params   = FISD_PARAMS
 )
