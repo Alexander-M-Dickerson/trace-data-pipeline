@@ -20,27 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.0.0] - 2025-12-11
 
-### Added - Stage 1 Release (Bond Analytics & Enrichment)
+### Added - Stage 1 Release (Bond Analytics)
 
 #### Core Features
 - **Complete bond analytics pipeline** enriching Stage 0 daily data with comprehensive metrics
 - **Automated orchestration** via `run_pipeline.sh` (handles both Stage 0 and Stage 1)
 - **Research-ready output** with ~50+ variables per bond-day observation
-
-#### Bond Characteristics Integration (FISD)
-- **Comprehensive bond attributes** from Mergent FISD
-  - Coupon rates and payment frequencies
-  - Maturity dates and bond tenors
-  - Offering amounts and amounts outstanding
-  - Callable and puttable features
-  - Security types and bond classifications
-  - Issuer identifiers and names
-- **Automated FISD filtering**
-  - USD-only bonds
-  - Fixed-rate securities
-  - Tenor constraints (minimum/maximum)
-  - Valid maturity dates
-  - Currency and interest type validation
 
 #### Bond Analytics via QuantLib
 - **Yield-to-maturity (YTM)** calculations using QuantLib bond pricing engine
@@ -52,19 +37,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Efficient multi-core processing** with joblib parallelization
 
 #### Credit Ratings Integration
-- **S&P ratings** from WRDS CompuStat Ratings Monthly
+- **S&P ratings** from WRDS 
   - Numeric ratings (1-22 scale)
   - NAIC designations
-  - Historical rating changes tracking
-- **Moody's ratings** from WRDS Mergent FISD
-  - Numeric ratings (1-22 scale)
-  - Composite rating methodology
+- **Moody's ratings** from WRDS 
+  - Numeric ratings (1-21 scale)
 - **Automatic rating alignment** with bond-month observations
 
-#### Equity Identifiers (OSBAP Linker)
+#### Equity Identifiers 
 - **CRSP identifiers**: PERMNO and PERMCO
 - **Compustat identifier**: GVKEY
-- **Enables cross-asset research** linking bonds to equities
 
 #### Industry Classifications
 - **Fama-French 17 industry classification**
@@ -73,7 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Automatic monthly assignment** based on equity identifiers
 
 #### Ultra-Distressed Bond Filters
-- **Advanced price anomaly detection** to identify suspicious observations
+- **Price anomaly detection** to identify suspicious observations
 - **Five-stage filtering methodology**:
   1. **Anomalous price detection**: Ultra-low prices with normal price context
   2. **Upward spike detection**: High prices inconsistent with recent trading
@@ -84,7 +66,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CUSIP-level export** tracking all flagged bonds with detailed statistics
   - Export file: `stage1/data/ultra_distressed_cusips_{date}.csv`
   - Includes flag counts, percentages, and date ranges
-  - Enables quality control and manual review workflows
 
 #### Treasury Yield Integration
 - **Liu-Wu zero-coupon treasury yields** (1961-present)
@@ -130,7 +111,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Equity identifiers (PERMNO, PERMCO, GVKEY)
   - Industry classifications (FF17, FF30)
   - Ultra-distressed filter flags
-- **LaTeX data quality reports** (always generated)
+- **LaTeX data quality reports** 
   - 8 comprehensive tables analyzing data quality
   - Time-series visualization plots
   - Filter effect summaries
@@ -170,8 +151,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Fama-French industry classifications (FF17, FF30)
 
 #### Runtime Performance
-- **Stage 1 processing time**: ~2 hours (WRDS Cloud, 2-4 cores)
-- **Complete pipeline (Stage 0 + Stage 1)**: ~7 hours total
+- **Stage 1 processing time**: ~3 hours (WRDS Cloud, 2-4 cores)
+- **Complete pipeline (Stage 0 + Stage 1)**: ~7-10 hours total
   - Stage 0 (Enhanced): ~4 hours
   - Stage 0 (Standard): ~30-60 minutes
   - Stage 0 (144A): ~30-60 minutes
