@@ -213,7 +213,7 @@ def _log_runtime_environment() -> None:
     if pa:   logging.info("pyarrow %s (%s)", pa.__version__, getattr(pa, "__file__", "?"))
     if mpl:  logging.info("matplotlib %s (%s)", mpl.__version__, getattr(mpl, "__file__", "?"))
     if mcal: logging.info("pandas_market_calendars %s (%s)", mcal.__version__, getattr(mcal, "__file__", "?"))
-    if wrds: logging.info("wrds   %s (%s)", wrds.__version__, getattr(wrds, "__file__", "?"))
+    if wrds: logging.info("wrds   %s (%s)", getattr(wrds, "__version__", "unknown"), getattr(wrds, "__file__", "?"))
     logging.info("CWD: %s", os.getcwd())
     logging.info("PATH: %s", os.environ.get("PATH", ""))
     logging.info("MPLBACKEND: %s", os.environ.get("MPLBACKEND", ""))

@@ -1,13 +1,13 @@
 # TRACE Data Pipeline - Python Requirements
 # Stage 0-2: TRACE Processing
-# Tested on Python 3.12.11
+# Tested on Python 3.12.11 and 3.14.2 (WRDS cloud)
 # Install with: python -m pip install -r requirements.txt
 
 # Core data processing
-pandas==2.2.3
-numpy==2.2.5
+pandas>=2.2.3
+numpy>=2.0
 pyarrow>=20.0.0
-numba==0.61.2
+numba>=0.60; python_version<"3.14"
 
 # WRDS database access
 wrds>=3.3.0
@@ -18,9 +18,9 @@ pandas-market-calendars>=5.1.1
 # Progress bars
 tqdm
 
-# Bond analytics (Stage 1 - REQUIRED versions)
-QuantLib==1.37
-joblib==1.5.1
+# Bond analytics (Stage 1)
+QuantLib>=1.36
+joblib>=1.4
 
 # Excel/Google Sheets reading (Stage 1)
 openpyxl

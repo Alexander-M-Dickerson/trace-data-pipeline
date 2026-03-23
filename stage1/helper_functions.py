@@ -20,7 +20,13 @@ import sys, gc, io
 from pathlib import Path
 from pandas.tseries.offsets import MonthEnd
 from typing import Callable, Optional, List
-from numba import jit
+try:
+    from numba import jit
+except ImportError:
+    def jit(*args, **kwargs):
+        def decorator(func):
+            return func
+        return decorator
 from io import BytesIO
 import warnings
 warnings.filterwarnings('ignore')

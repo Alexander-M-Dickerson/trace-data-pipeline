@@ -2888,7 +2888,7 @@ def CreateDailyStandardTRACE(wrds_username: str, *,
     logging.info("Python %s @ %s", platform.python_version(), sys.executable)
     logging.info("pandas %s (%s)", pd.__version__, pd.__file__)
     logging.info("numpy  %s (%s)", np.__version__, np.__file__)
-    logging.info("wrds   %s (%s)", wrds.__version__, wrds.__file__)
+    logging.info("wrds   %s (%s)", getattr(wrds, "__version__", "unknown"), wrds.__file__)
     logging.info("pyarrow %s (%s)", pa.__version__, pa.__file__)    
     logging.info("pandas_market_calendars %s (%s)", mcal.__version__, mcal.__file__)
     return ProcessStandardTRACE(wrds_username,data_type=data_type,**kwargs).CreateDailyStandardTRACE()
