@@ -490,20 +490,19 @@ stage1/
 
 **Structure:** Panel data with one row per (cusip_id, trd_exctn_dt) combination
 
-**Key variables (~45 columns):**
+**The output has 44 columns.** `stage1/DATA_DICTIONARY.md` is the authoritative
+reference; this is a summary.
 
 **Identifiers:**
 - `cusip_id` - 9-character CUSIP identifier
-- `issuer_cusip` - 6-character issuer CUSIP
-- `permno` - CRSP PERMNO (equity identifier)
+- `permno` - CRSP PERMNO (equity identifier); NULL where no dated equity link exists
 - `permco` - CRSP PERMCO (company identifier)
 - `gvkey` - Compustat GVKEY (company identifier)
 - `trd_exctn_dt` - Trade execution date
 
 **Computed bond analytics (QuantLib):**
 - `pr` - Volume-weighted price (clean price from TRACE)
-- `prclean` - Clean price from QuantLib (should match `pr`)
-- `prfull` - Dirty price (clean price plus accrued interest: `prclean + acclast`)
+- `prfull` - Dirty price (clean price plus accrued interest: `pr + acclast`)
 - `acclast` - Accrued interest since last coupon payment date
 - `accpmt` - Cumulative sum of all coupon payments made on or before settlement date
 - `accall` - Total accumulation (`acclast + accpmt`)
@@ -530,23 +529,27 @@ stage1/
 - `ask_count` - Number of ask quotes
 
 **Bond characteristics (from FISD):**
-- `coupon` - Coupon rate (%)
-- `principal_amt` - Principal amount (typically 1000)
 - `bond_age` - Age of bond in years
-- `bond_amt_outstanding` - Amount outstanding ($ millions)
-- `callable` - Callable indicator
+- `bond_amt_outstanding` - Amount outstanding, in **thousands of dollars**, exactly as
+  FISD reports it. A bond with $250m outstanding carries `250000`. Market value is
+  `bond_amt_outstanding * (pr + acclast) * 10`, in dollars.
 
-**Industry classifications:**
+`coupon`, `principal_amt` and `callable` are used during processing but are not in
+the output; take them from FISD if you need them.
+
+**Industry classifications** (from the issuer's SIC code in FISD; unmatched SIC codes
+fall into each scheme's "Other" bucket, so these are never null):
+- `ff12num` - Fama-French 12 industry code (1-12)
 - `ff17num` - Fama-French 17 industry code (1-17)
 - `ff30num` - Fama-French 30 industry code (1-30)
 
 **Credit ratings:**
 - `sp_rating` - S&P letter rating
-- `sp_naic` - NAIC rating category (from S&P)
 - `mdy_rating` - Moody's letter rating
 - `spc_rating` - S&P composite rating (S&P, else Moody's if S&P missing)
 - `mdc_rating` - Moody's composite rating
-- `comp_rating` - Composite rating: average of `spc_rating` and `mdc_rating`
+
+`sp_naic` and `comp_rating` are computed during processing but are not in the output.
 
 **Database source:**
 - `db_type` - Source database (1=Enhanced, 2=Standard, 3=144A)

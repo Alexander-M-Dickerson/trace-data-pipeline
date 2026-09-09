@@ -18,6 +18,93 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.0] - 2026-09-09
+
+### Added
+- **`ff12num`**: the Fama-French 12 industry classification, alongside the existing
+  FF17 and FF30. Verified against an independent build across all 69,091 traded
+  CUSIPs with zero differences -- as were `ff17num` and `ff30num`, proving they were
+  not disturbed.
+- **`PRICE_NORM`** (Stage 0, on by default): rescales unit-quoted bonds to percent of
+  par. Small-denomination issues ($10, $25, $100 notes) are quoted in unit dollars,
+  so a $10 note at par prints `10.00` rather than `100` -- and every filter
+  downstream assumes percent of par, so those bonds read as deeply distressed with
+  tenfold-understated volume. **This is a no-op under the default settings**, because
+  `principal_amt_eq_1000_only` keeps only $1,000-principal bonds; it matters when you
+  turn that screen off.
+- **Auto-rolling `DATE_CUT_OFF`**: accepts `"auto:-Nmo"` (default `"auto:-3mo"`) and
+  resolves against the data's last trade date, so the sample end tracks the data
+  instead of needing an edit each vintage. A fixed `"YYYY-MM-DD"` still works.
+- **`limit_chunks`** (Stage 0): process only the first N CUSIP chunks, so a config
+  change can be checked in minutes rather than a ~4-hour run. Default `None`.
+- **Fail-fast input validation**: `validate_config()` now checks for the files
+  `run_pipeline.sh` downloads on the login node, and Stage 1 asserts that the
+  treasury curve covers the panel before spending an hour on analytics.
+- **`.gitattributes`**: pins the shell runners to LF endings. On a Windows clone they
+  previously came down as CRLF, which `bash` on the WRDS cloud rejects.
+
+### Changed
+- **BREAKING for `permno` / `permco` / `gvkey` consumers.** The bond-firm linker is
+  now bond-level and dated: one row per (9-character CUSIP, ownership window), rather
+  than issuer-CUSIP-6 matched to a calendar month and forward-filled. Bonds are
+  attributed to the firm that owned them *at the time* rather than to whichever firm
+  owned them last. Measured against the previous linker on a 30.4M-row panel:
+  3,424 bonds gain a link, 4,808 are relabelled, 1,424 are absent from the new
+  linker, and 4,177 lose their identifiers outside the ownership window -- mostly
+  bonds still trading after the firm's equity stopped being listed. Row-level
+  coverage falls from 89.94% to 87.90%. That is the intended direction: a missing
+  link is an answer, a stale one is a silent error.
+  The release also ships `fl_verdicts.parquet` (every refusal and its reason) and
+  `firm_names.parquet` (permno to a dated firm name).
+- `gvkey` remains `Int32`; the source ships it zero-padded, so re-pad to 6 characters
+  before joining to Compustat.
+- `issuer_cusip` is no longer a join key. It was already absent from the output.
+
+### Fixed
+- **Step 5 I/O amplification.** Each chunk read the whole accumulated parquet back,
+  concatenated and rewrote it -- roughly 25 GB of I/O to produce a 2.5 GB file, while
+  holding three copies of the data inside a 24 GB job. Chunks now write part files
+  that are concatenated once. Output is unchanged.
+- **Worker over-subscription.** `N_CORES` defaulted to the host's core count while
+  Grid Engine grants this job a single slot, and joblib copies data per worker. It
+  now defaults to 4, honours `STAGE1_N_CORES` or `NSLOTS`, and is capped by the real
+  core count. `calculate_credit_spreads` no longer falls back to a hard-coded 10.
+  *No scheduler directive changed*: `m_mem_free` is a per-slot request here, so
+  adding `-pe onenode N` would multiply the memory request N-fold.
+- **Artifact stamp mismatch.** One run could emit `stage1_20251206.parquet` beside
+  `sp_ratings_20251118.parquet`, and a run crossing midnight could stamp its own
+  outputs with two different dates. Every artifact of a run now shares one stamp.
+- Removed dtype casts for columns already dropped; aligned the ultra-distressed
+  filter's defaults with the config the pipeline actually passes (documentation only
+  -- the filter's behaviour is unchanged); escaped the last invalid escape sequence,
+  so the repo compiles clean under `-W error::SyntaxWarning`.
+- Documentation corrections: the data dictionary listed 7 columns that are not in the
+  output and is now checked against the real schema; `bond_amt_outstanding` is in
+  **thousands of dollars** (the README said millions, the dictionary said "bond
+  units"); Stage 0's output files are `trace_<member>_YYYYMMDD.parquet`, not
+  `<member>_YYYYMMDD.parquet`; and three claims in the 2.0.0 notes above did not
+  match the code (no OAS is computed; the ratings come from Mergent FISD rather than
+  an unnamed WRDS source; SIC codes come from FISD's issuer table, not from CRSP via
+  PERMNO).
+
+### Investigated -- no change
+- **`dated_date` filtering** is retained. Of 17,845 FISD CUSIPs with no `dated_date`,
+  only **5** actually trade in TRACE, so relaxing the screen would gain nothing.
+- **`bond_amt_outstanding` scaling** is correct as-is: raw FISD `amount_outstanding`
+  in $ thousands, with no rescaling anywhere in the pipeline.
+- **Standard TRACE (`db_type=2`) never survives Stage 1.** Standard rows are kept only
+  for dates after the last Enhanced date, and any trailing cutoff falls before that,
+  so the two conditions cannot both hold. This was already true under the previous
+  fixed cutoff -- which is why shipped Stage 1 files contain only db_type 1 and 3.
+
+### Considered, not included
+Order-flow measures (`qbuy`, `qsell`, `order_imbalance` and their 28-day trailing
+sums), O'Hara-Zhou realized half-spreads, a quoted `bid_ask_bps`, ask-side symmetry
+(`ask_last`, `ask_time_ew`, `ask_time_last`), and any change to Stage 0's serial
+chunk loop.
+
+---
+
 ## [2.0.0] - 2025-12-11
 
 ### Added - Stage 1 Release (Bond Analytics)
@@ -31,16 +118,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Yield-to-maturity (YTM)** calculations using QuantLib bond pricing engine
 - **Macaulay duration** and **modified duration** (interest rate sensitivity)
 - **Convexity** (second-order price sensitivity)
-- **Option-adjusted spreads (OAS)** relative to treasury curve
 - **Credit spreads** computed against Liu-Wu zero-coupon treasury yields
 - **Robust error handling** for bonds with missing or invalid parameters
 - **Efficient multi-core processing** with joblib parallelization
 
 #### Credit Ratings Integration
-- **S&P ratings** from WRDS 
+- **S&P ratings** from Mergent FISD (`fisd.fisd_ratings`, `rating_type='SPR'`)
   - Numeric ratings (1-22 scale)
   - NAIC designations
-- **Moody's ratings** from WRDS 
+- **Moody's ratings** from Mergent FISD (`fisd.fisd_ratings`, `rating_type='MR'`)
   - Numeric ratings (1-21 scale)
 - **Automatic rating alignment** with bond-month observations
 
@@ -51,8 +137,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Industry Classifications
 - **Fama-French 17 industry classification**
 - **Fama-French 30 industry classification**
-- **SIC code mapping** from CRSP via PERMNO linkage
-- **Automatic monthly assignment** based on equity identifiers
+- **SIC code mapping** from the issuer's SIC code in Mergent FISD
 
 #### Ultra-Distressed Bond Filters
 - **Price anomaly detection** to identify suspicious observations

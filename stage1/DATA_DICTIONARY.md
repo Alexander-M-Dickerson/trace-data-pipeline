@@ -60,11 +60,35 @@ All bonds in the dataset have a principal amount of $1,000.
 | Column | Type | Description |
 |--------|------|-------------|
 | `cusip_id` | category | 9-character CUSIP identifier (unique bond ID) |
-| `issuer_cusip`* | category | 6-character issuer CUSIP (identifies the issuing company) |
 | `permno` | Int32 | CRSP PERMNO equity identifier (links to stock data) |
 | `permco` | Int32 | CRSP PERMCO company identifier |
-| `gvkey`† | Int32 | Compustat GVKEY identifier (links to accounting data) |
+| `gvkey` | Int32 | Compustat GVKEY identifier (links to accounting data) |
 | `trd_exctn_dt` | datetime | Trade execution date |
+
+#### How bonds are linked to firms
+
+The equity identifiers come from the **bond-firm linker** published at
+[openbondassetpricing.com](https://openbondassetpricing.com/), downloaded by
+`run_pipeline.sh`. The mapping is **bond-level and dated**: one row per
+(9-character CUSIP, ownership window `[w0, w1]`), so a bond that changes hands --
+through an acquisition, a spin-off or a rename -- points at the right firm in each
+period rather than at whichever firm owned it last.
+
+A consequence worth stating plainly: **`permno` is NULL for about 12% of bond-days**,
+and that is deliberate. It is NULL when the bond is outside every window we can
+support -- most often when the bond still trades after the firm's equity stopped
+being listed. A missing identifier is an answer; a stale one is a silent error. If
+you need to know *why* a particular bond has no link, the published release ships
+`fl_verdicts.parquet`, which records every refusal and its reason, and
+`firm_names.parquet`, which maps `permno` to a dated firm name.
+
+**`gvkey` is stored numerically here** for continuity with earlier releases, but
+Compustat's GVKEY is a 6-character zero-padded string. Re-pad it (`f"{gvkey:06d}"`)
+before joining to Compustat.
+
+`issuer_cusip` (the 6-character issuer CUSIP) is **not** in the output. It was the
+join key for the previous issuer-month linker and is no longer used; derive it as
+`cusip_id.str[:6]` if you need it.
 
 ---
 
@@ -145,11 +169,18 @@ All bonds in the dataset have a principal amount of $1,000.
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `coupon`* | float32 | Annual coupon rate (%) |
-| `principal_amt`* | Int16 | Principal amount per bond (typically $1,000) |
 | `bond_age` | float32 | Bond age since issuance (years) |
-| `bond_amt_outstanding` | Int64 | Number of bond units outstanding |
-| `callable`* | Int8 | Callable flag: 1=callable, 0=not callable |
+| `bond_amt_outstanding` | Int64 | Amount outstanding, in **thousands of dollars** |
+
+`bond_amt_outstanding` is FISD's `amount_outstanding` as-of the trade date (the most
+recent record at or before it), falling back to `offering_amt` where no history
+exists. It is in **$ thousands**, exactly as FISD reports it -- no rescaling is
+applied. So a bond with $250,000,000 outstanding carries `250000`. Market value is
+`bond_amt_outstanding * (pr + acclast) * 10`, in dollars: x1000 to convert thousands
+to dollars, /100 because the price is a percent of par.
+
+`coupon`, `principal_amt` and `callable` are used during processing but are **not**
+in the output file; take them from FISD directly if you need them.
 
 ---
 
@@ -157,8 +188,13 @@ All bonds in the dataset have a principal amount of $1,000.
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `ff17num` | int8 | Fama-French 17 industry classification |
-| `ff30num` | int8 | Fama-French 30 industry classification |
+| `ff12num` | int8 | Fama-French 12 industry classification (1-12) |
+| `ff17num` | int8 | Fama-French 17 industry classification (1-17) |
+| `ff30num` | int8 | Fama-French 30 industry classification (1-30) |
+
+Assigned from the **issuer's SIC code in FISD** (not from CRSP via PERMNO). A bond
+whose SIC matches no range falls into that scheme's "Other" bucket -- 12, 17 or 30
+respectively -- so these columns are never null.
 
 ---
 
@@ -167,11 +203,12 @@ All bonds in the dataset have a principal amount of $1,000.
 | Column | Type | Description |
 |--------|------|-------------|
 | `sp_rating`† | Int8 | S&P credit rating (1-22, where 22=default) |
-| `sp_naic`* | Int8 | S&P NAIC category (1-6) |
 | `mdy_rating`† | Int8 | Moody's credit rating (1-21, where 21=default) |
 | `spc_rating`† | Int8 | S&P composite rating (1-22) |
 | `mdc_rating`† | Int8 | Moody's composite rating (1-22) |
-| `comp_rating`* | float64 | Average of spc_rating and mdc_rating |
+
+`sp_naic` and `comp_rating` are computed during processing but are **not** in the
+output file.
 
 #### S&P Rating Scale (sp_rating, spc_rating)
 
@@ -243,7 +280,8 @@ All bonds in the dataset have a principal amount of $1,000.
 |----------|-------------|
 | `spc_rating` | S&P rating; if missing, filled with `mdy_rating` (Moody's 21 → 22 for default alignment) |
 | `mdc_rating` | Moody's rating; if missing, filled with `sp_rating` (S&P 22 → 21 for default alignment) |
-| `comp_rating` | Average of `spc_rating` and `mdc_rating` |
+
+`comp_rating` (their average) is computed during processing but is not in the output.
 
 ---
 
@@ -256,4 +294,4 @@ All bonds in the dataset have a principal amount of $1,000.
 
 ---
 
-**Last Updated:** December 2025
+**Last Updated:** September 2026

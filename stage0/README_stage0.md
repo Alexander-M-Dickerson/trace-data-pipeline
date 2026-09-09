@@ -499,17 +499,17 @@ stage0/
 │   └── 04_reports.err
 │
 ├── enhanced/                    # Enhanced TRACE data outputs
-│   ├── enhanced_YYYYMMDD.parquet
+│   ├── trace_enhanced_YYYYMMDD.parquet
 │   ├── *_audit_*.parquet
 │   └── *_cusips_*.parquet
 │
 ├── standard/                    # Standard TRACE data outputs
-│   ├── standard_YYYYMMDD.parquet
+│   ├── trace_standard_YYYYMMDD.parquet
 │   ├── *_audit_*.parquet
 │   └── *_cusips_*.parquet
 │
 ├── 144a/                        # Rule 144A data outputs
-│   ├── 144a_YYYYMMDD.parquet
+│   ├── trace_144a_YYYYMMDD.parquet
 │   ├── *_audit_*.parquet
 │   └── *_cusips_*.parquet
 │
@@ -553,9 +553,9 @@ data/
 - Logs contain timestamps, row counts, filter statistics, and any errors
 
 **Daily panels** (Parquet format, in respective subfolders):
-- `enhanced/enhanced_YYYYMMDD.parquet`: Enhanced TRACE daily panel (~30 million rows for full sample)
-- `standard/standard_YYYYMMDD.parquet`: Standard TRACE daily panel
-- `144a/144a_YYYYMMDD.parquet`: Rule 144A daily panel
+- `enhanced/trace_enhanced_YYYYMMDD.parquet`: Enhanced TRACE daily panel (~30 million rows for full sample)
+- `standard/trace_standard_YYYYMMDD.parquet`: Standard TRACE daily panel
+- `144a/trace_144a_YYYYMMDD.parquet`: Rule 144A daily panel
 
 All panels have identical column structure:
 - **Keys**: `cusip_id`, `trd_exctn_dt`

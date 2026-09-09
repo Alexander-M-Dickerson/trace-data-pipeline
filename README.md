@@ -302,9 +302,9 @@ trace-data-pipeline/
 Stage 0 produces daily panels in dataset-specific subfolders with the following structure:
 
 **File locations:**
-- `enhanced/enhanced_YYYYMMDD.parquet`
-- `standard/standard_YYYYMMDD.parquet`
-- `144a/144a_YYYYMMDD.parquet`
+- `enhanced/trace_enhanced_YYYYMMDD.parquet`
+- `standard/trace_standard_YYYYMMDD.parquet`
+- `144a/trace_144a_YYYYMMDD.parquet`
 
 **Quality reports location:**
 - `data_reports/enhanced/` - Enhanced TRACE reports
@@ -548,6 +548,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Last Updated:** November 2025
-**Stage 0 Version:** 1.0.0 (Public Beta)
-**Stage 1 Version:** 1.0.0 (Public Beta)
+**Last Updated:** September 2026
+**Stage 0 Version:** 2.1.0
+**Stage 1 Version:** 2.1.0
