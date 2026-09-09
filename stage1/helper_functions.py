@@ -4347,11 +4347,11 @@ def standardize_float_dtypes(df: pd.DataFrame, verbose: bool = False) -> pd.Data
 
 def add_ff_industries(fisd_df: pd.DataFrame, verbose: bool = True):
     """
-    Add Fama-French 17 and 30 industry classifications to FISD data based on SIC codes.
+    Add Fama-French 12, 17 and 30 industry classifications to FISD data based on SIC codes.
 
-    Downloads and parses both FF17 and FF30 industry classification files, then matches
-    SIC codes to industries using fast vectorized operations. Returns only numeric codes
-    (ff17num, ff30num) to save RAM; mappings returned separately for plotting.
+    Downloads and parses the FF12, FF17 and FF30 industry classification files, then
+    matches SIC codes to industries using fast vectorized operations. Returns only numeric
+    codes (ff12num, ff17num, ff30num) to save RAM; mappings returned separately for plotting.
 
     If internet is not available (e.g., on WRDS compute nodes), falls back to local files.
 
@@ -4365,12 +4365,13 @@ def add_ff_industries(fisd_df: pd.DataFrame, verbose: bool = True):
     Returns
     -------
     tuple
-        (fisd_df, ff17_mapping, ff30_mapping)
-        - fisd_df: DataFrame with added 'ff17num' (1-17) and 'ff30num' (1-30) columns
-        - ff17_mapping: dict mapping industry number to name for FF17
-        - ff30_mapping: dict mapping industry number to name for FF30
-        Missing/unmatched SIC codes are assigned to industry 17 (Other) for FF17
-        and industry 30 (Other) for FF30
+        (fisd_df, ff12_mapping, ff17_mapping, ff30_mapping)
+        - fisd_df: DataFrame with added 'ff12num' (1-12), 'ff17num' (1-17) and
+          'ff30num' (1-30) columns
+        - ff12_mapping / ff17_mapping / ff30_mapping: industry number -> name
+        Missing/unmatched SIC codes are assigned to the scheme's "Other" bucket:
+        12 for FF12, 17 for FF17, 30 for FF30. Note FF12's Other bucket lists no
+        SIC ranges of its own, so for FF12 every 12 comes from that fallback.
 
     Notes
     -----
@@ -4380,12 +4381,158 @@ def add_ff_industries(fisd_df: pd.DataFrame, verbose: bool = True):
     - Automatically handles offline mode for WRDS compute nodes
     """
     if verbose:
-        print("Adding Fama-French 17 and 30 industry classifications...")
+        print("Adding Fama-French 12, 17 and 30 industry classifications...")
 
     fisd_df = fisd_df.copy()
 
     # Check internet connectivity once at the start
     has_internet = _check_internet_connectivity()
+
+    # ========================================================================
+    # Process FF12
+    # ========================================================================
+    ff12_url = "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/Siccodes12.zip"
+    ff12_local_file = "data/Siccodes12.txt"
+    ff12_mapping = {}
+
+    try:
+        # Try to get FF12 content - either from internet or local file
+        content = None
+
+        if has_internet:
+            try:
+                if verbose:
+                    print(f"  Internet available - downloading FF12 file...")
+                response = requests.get(ff12_url, timeout=30)
+                response.raise_for_status()
+
+                # Extract text file from zip
+                with zipfile.ZipFile(BytesIO(response.content)) as z:
+                    with z.open('Siccodes12.txt') as f:
+                        content = f.read().decode('utf-8', errors='ignore')
+
+                if verbose:
+                    print("  Successfully downloaded FF12 from internet")
+
+            except Exception as e:
+                if verbose:
+                    print(f"  Failed to download FF12 from internet: {e}")
+                    print(f"  Falling back to local file: {ff12_local_file}")
+                has_internet = False  # Trigger local file fallback
+
+        if not has_internet or content is None:
+            # No internet or download failed - use local file
+            from pathlib import Path
+            local_path = Path(ff12_local_file)
+
+            if not local_path.exists():
+                raise FileNotFoundError(
+                    f"No internet connection and local file not found: {ff12_local_file}\n"
+                    f"Please download the file manually:\n"
+                    f"  wget -O data/Siccodes12.zip \"{ff12_url}\"\n"
+                    f"  unzip data/Siccodes12.zip -d data/\n"
+                    f"Or run from the WRDS login node (which has internet access)."
+                )
+
+            if verbose:
+                print(f"  Internet not available - loading FF12 from local file: {ff12_local_file}")
+            with open(local_path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+            if verbose:
+                print(f"  Successfully loaded FF12 from {ff12_local_file}")
+        
+        # Parse FF12 industry definitions
+        industries = []
+        current_ind_num = None
+        current_ind_name = None
+
+        for line in content.split('\n'):
+            line = line.strip()
+            if not line:
+                continue
+
+            parts = line.split()
+            if parts and parts[0].isdigit() and len(parts[0]) <= 2:
+                current_ind_num = int(parts[0])
+                if len(parts) >= 2:
+                    current_ind_name = parts[1]
+                continue
+
+            if current_ind_num is not None and '-' in line:
+                range_str = line.split()[0] if line.split() else ''
+                if '-' in range_str:
+                    try:
+                        start_str, end_str = range_str.split('-')
+                        start_sic = int(start_str)
+                        end_sic = int(end_str)
+                        industries.append({
+                            'ind_num': current_ind_num,
+                            'ind_name': current_ind_name,
+                            'sic_start': start_sic,
+                            'sic_end': end_sic
+                        })
+                    except (ValueError, IndexError):
+                        continue
+        
+        if verbose:
+            print(f"  Parsed {len(industries)} SIC code ranges across 12 industries")
+        
+        # FF12 differs from FF17/FF30: its "Other" bucket (12) lists NO SIC ranges,
+        # so industry 12 is reached purely by fallback. A failed parse would then
+        # produce a uniform, plausible-looking ff12num=12 column rather than an
+        # obvious error. Assert the file really parsed.
+        if len(industries) < 40:
+            raise ValueError(
+                f"Siccodes12 parsed to only {len(industries)} SIC ranges (expected ~49). "
+                "The file is probably truncated or in an unexpected format."
+            )
+
+        # Build FF12 lookup
+        ind_df = pd.DataFrame(industries)
+        ff12_mapping = ind_df.groupby('ind_num')['ind_name'].first().to_dict()
+        ff12_mapping[12] = "Other"
+        
+        intervals = pd.IntervalIndex.from_arrays(
+            ind_df['sic_start'], 
+            ind_df['sic_end'], 
+            closed='both'
+        )
+        interval_to_ind_ff12 = dict(zip(intervals, ind_df['ind_num']))
+        
+        def match_sic_to_ff12(sic_code):
+            if pd.isna(sic_code):
+                return 12
+            try:
+                sic_int = int(sic_code)
+                for interval, ind_num in interval_to_ind_ff12.items():
+                    if sic_int in interval:
+                        return ind_num
+                return 12
+            except (ValueError, TypeError):
+                return 12
+        
+        if verbose:
+            print(f"  Matching {len(fisd_df):,} SIC codes to FF12 industries...")
+        
+        fisd_df['ff12num'] = fisd_df['sic_code'].apply(match_sic_to_ff12)
+        
+        if verbose:
+            ind_counts = fisd_df['ff12num'].value_counts().sort_index()
+            print(f"  FF12 distribution:")
+            for ind_num, count in ind_counts.items():
+                ind_name = ff12_mapping.get(ind_num, "Unknown")
+                pct = 100 * count / len(fisd_df)
+                print(f"    Industry {ind_num:2d} ({ind_name:12s}): {count:6,} bonds ({pct:5.2f}%)")
+        
+        if verbose:
+            print(" FF12 industries added successfully")
+        
+    except Exception as e:
+        if verbose:
+            print(f" Error adding FF12 industries: {e}")
+            print("  Defaulting all bonds to industry 12 (Other)")
+        fisd_df['ff12num'] = 12
+        ff12_mapping = {12: "Other"}
 
     # ========================================================================
     # Process FF17
@@ -4659,7 +4806,7 @@ def add_ff_industries(fisd_df: pd.DataFrame, verbose: bool = True):
         fisd_df['ff30num'] = 30
         ff30_mapping = {30: "Other"}
     
-    return fisd_df, ff17_mapping, ff30_mapping
+    return fisd_df, ff12_mapping, ff17_mapping, ff30_mapping
 
 
 def create_industry_marketcap_evolution_plot(

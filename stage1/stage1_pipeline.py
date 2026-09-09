@@ -143,6 +143,7 @@ table1_tex     = None
 table2_tex     = None
 
 # Fama-French industry mappings (set by step3, used by step10)
+FF12_MAPPING   = None
 FF17_MAPPING   = None
 FF30_MAPPING   = None
 
@@ -312,7 +313,7 @@ def step2_load_trace_data():
 def step3_load_fisd_data():
     """Load FISD bond characteristics from stage0/enhanced/."""
     mem_start = hf.log_memory_usage("step3_load_fisd_data_start")
-    global fisd, db, FF17_MAPPING, FF30_MAPPING
+    global fisd, db, FF12_MAPPING, FF17_MAPPING, FF30_MAPPING
     
     logger.info("=" * 80)
     logger.info("STEP 3: Loading FISD Data")
@@ -341,8 +342,19 @@ def step3_load_fisd_data():
 
     # Add Fama-French 17 industry classification
     logger.info("Adding Fama-French 17 industry classifications...")
-    fisd, FF17_MAPPING, FF30_MAPPING = hf.add_ff_industries(fisd, verbose=False)
+    fisd, FF12_MAPPING, FF17_MAPPING, FF30_MAPPING = hf.add_ff_industries(fisd, verbose=False)
     logger.info("FF17 and FF30 industries added: ff17num and ff30num columns created")
+    # FF12's "Other" bucket (12) lists no SIC ranges of its own, so a failed download
+    # or parse yields a uniform ff12num=12 column that looks perfectly plausible --
+    # unlike FF17/FF30, whose collapse is obvious. Fail loudly instead.
+    if len(FF12_MAPPING) < 12 or fisd["ff12num"].nunique() < 2:
+        raise RuntimeError(
+            f"FF12 industry assignment collapsed: {len(FF12_MAPPING)} industries mapped, "
+            f"{fisd['ff12num'].nunique()} distinct value(s) assigned. Siccodes12.txt is "
+            "missing or unparseable -- check stage1/data/Siccodes12.txt and the FF12 "
+            "download block in run_pipeline.sh."
+        )
+    logger.info("Stored FF12_MAPPING with %d industries", len(FF12_MAPPING))
     logger.info("Stored FF17_MAPPING with %d industries", len(FF17_MAPPING))
     logger.info("Stored FF30_MAPPING with %d industries", len(FF30_MAPPING))
     
@@ -378,7 +390,7 @@ def step4_merge_fisd():
         "cusip_id", "offering_date", "dated_date", "interest_frequency",
         "coupon", "day_count_basis", "coupon_type", "maturity",
         "principal_amt"
-    , "ff17num", "ff30num"
+    , "ff12num", "ff17num", "ff30num"
     ]
 
 

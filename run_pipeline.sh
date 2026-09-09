@@ -131,6 +131,15 @@ if [[ -f "stage1/data/linker_file_2025.zip" ]]; then
     rm -f stage1/data/linker_file_2025.zip
 fi
 
+echo "[download] Fama-French 12 Industry Classification..."
+wget -q -O stage1/data/Siccodes12.zip     "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/Siccodes12.zip"     && echo "[ok] FF12 downloaded"     || echo "[warn] Failed to download FF12 (may already exist)"
+
+if [[ -f "stage1/data/Siccodes12.zip" ]]; then
+    echo "[extract] Unzipping FF12..."
+    unzip -q -o stage1/data/Siccodes12.zip -d stage1/data/         && echo "[ok] FF12 extracted"         || echo "[warn] Failed to extract FF12"
+    rm -f stage1/data/Siccodes12.zip
+fi
+
 echo "[download] Fama-French 17 Industry Classification..."
 wget -q -O stage1/data/Siccodes17.zip \
     "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/Siccodes17.zip" \
@@ -161,7 +170,7 @@ fi
 
 echo "[verify] Checking downloaded files..."
 MISSING_FILES=0
-for file in "liu_wu_yields.xlsx" "OSBAP_Linker_October_2025.parquet" "Siccodes17.txt" "Siccodes30.txt"; do
+for file in "liu_wu_yields.xlsx" "OSBAP_Linker_October_2025.parquet" "Siccodes12.txt" "Siccodes17.txt" "Siccodes30.txt"; do
     if [[ -f "stage1/data/$file" ]]; then
         echo "[ok] $file"
     else
