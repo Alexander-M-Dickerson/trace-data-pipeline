@@ -241,22 +241,23 @@ Submit the complete automated pipeline:
 ```
 
 **What happens:**
-1. Submits 3 jobs to run in parallel:
-   - `trace_enhanced` (Enhanced TRACE)
-   - `trace_standard` (Standard TRACE)
-   - `trace_144a` (Rule 144A TRACE)
-2. Submits a 4th job (`build_reports`) with `-hold_jid` dependency on the first three
-3. The report job waits in the queue until ALL three data jobs complete
-4. Once all three finish, the report generation job automatically starts
-5. Reports are generated for all three datasets and saved in their respective folders
+1. Reads `TRACE_MEMBERS` from `config.py` and submits exactly those members. The
+   default is `["enhanced", "144a"]`; Standard is opt-in.
+2. Enhanced and 144A go in together -- their WRDS connection budgets are sized to
+   co-exist. Each asks for cores and memory matched to its worker count.
+3. Standard, if requested, is held behind them with `-hold_jid`, so it runs alone and
+   can use the whole connection budget rather than a slice of it.
+4. `build_reports` is held on every stage-0 job actually submitted.
+5. Stage 1 is held on the report job.
 
 **Output from the script:**
 ```
-[submit] Enhanced TRACE ...
-[submit] Standard TRACE ...
-[submit] 144A TRACE ...
-[submit] Build data reports (after all TRACE jobs finish) ...
-[ok] All jobs submitted with dependency. Reports will run after <job_ids> complete.
+[info] members: enhanced 144a
+[submit] enhanced TRACE  (-pe onenode 5 -l m_mem_free=8G) ...
+         job 4821094
+[submit] 144a TRACE  (-pe onenode 1 -l m_mem_free=16G) ...
+         job 4821095
+[submit] Build data reports (waits for 4821094,4821095) ...
 ```
 
 > **Tip:** Check status with `qstat`. The report job will show status `hqw` (hold) until the data jobs finish. Tail logs with `tail -f logs/01_enhanced.out` (or `.err`).

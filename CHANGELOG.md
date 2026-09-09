@@ -18,6 +18,90 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.2.0] - 2026-09-09
+
+Stage 0 was the pipeline's long pole: ~4 hours for Enhanced, spent in a chunk loop
+that ran strictly one CUSIP chunk at a time on a single WRDS connection while the job
+held a whole compute node. This release runs those chunks concurrently.
+
+### Added
+- **Concurrent chunk fetching.** Enhanced pulls 5 CUSIP chunks at once, each worker
+  process holding its own WRDS connection; 144A runs alongside on one; Standard, when
+  requested, runs afterwards and may use the whole budget. Set by `CONCURRENCY` in
+  `stage0/_trace_settings.py`, overridable per run with `STAGE0_WORKERS`.
+- **`stage0/_wrds_pool.py`** -- one connection per worker, opened inside the child so
+  no socket is inherited across a fork, with a serialised staggered handshake.
+- **`stage0/_chunk_runner.py`** -- row-balanced chunk planning plus the scheduler,
+  which returns results in chunk order however they completed and aborts the run if
+  any chunk is missing.
+- **Row-balanced chunks.** Chunks are packed to ~750,000 trade rows instead of a fixed
+  250 CUSIPs. Measured over the Enhanced universe (111,727 CUSIPs / 345,874,974
+  trades), the worst chunk falls from 3,392,802 rows to 749,992 -- a 4.5x cut in the
+  memory a job must reserve, since that is set by the worst chunk and not the average.
+  `chunk_size` keeps its old meaning for the report job's own chunking.
+- **Grid resource requests** derived from each member's worker count and validated
+  against the WRDS caps (8 cores, 48 GB per job) before submission. `m_mem_free` is
+  charged PER SLOT, so an over-request does not error -- it pends forever, silently.
+- **A test suite**, the repo's first: `run_smoke_test.sh` runs stage0 -> reports ->
+  stage1 on a few chunks in minutes and asserts 28 cross-stage invariants;
+  `tests/test_chunk_plan.py` and `tests/test_chunk_scheduler.py` cover the partition
+  and scheduling properties without needing WRDS.
+- **Canonical output ordering.** Stage 0 sorts by `(cusip_id, trd_exctn_dt)` before
+  export. Row order no longer depends on the work plan, which is what makes a
+  before/after comparison meaningful at all. The row SET is unchanged.
+
+### Changed
+- **`TRACE_MEMBERS` now drives submission**, not just what later stages read.
+  `run_pipeline.sh` used to submit all three members regardless.
+- **The default is `["enhanced", "144a"]`. Standard is opt-in.** Stage 1 keeps
+  Standard rows only after the last Enhanced date, so nearly all of a Standard run was
+  being discarded. Ask for it with
+  `TRACE_MEMBERS="enhanced standard 144a" ./run_pipeline.sh`.
+- Per-filter log lines are collected per chunk and emitted by the parent in chunk
+  order, so the `.out` reads the same at any worker count.
+- The NYSE trading calendar is built once per run rather than rebuilt inside every
+  chunk (185 ms -> 12 ms per chunk).
+
+### Fixed
+- **`db_type` was assigned by POSITION in `TRACE_MEMBERS`** (`db_type = i` over
+  `enumerate`), so dropping a member silently renumbered the rest. With the new
+  default, 144A would have become `db_type = 2`, and the overlap clip immediately
+  below keeps `db_type == 2` rows only after the last Enhanced date -- deleting
+  almost every 144A row. The job would have exited 0 with a normal-looking file.
+  Reproduced deliberately before fixing: 1,362 of 1,527 144A rows destroyed, 11%
+  retention, exit code 0. Now an explicit `DB_TYPE_BY_MEMBER` map, with a startup
+  assertion that every configured member has a code.
+- **`-hold_jid ${J1},${J2},${J3}` broke when a member was not submitted**, leaving an
+  unset variable and a malformed `-hold_jid 123,,125`. The hold list is now built from
+  the jobs actually submitted, verified across four member sets.
+- **`DATE_CUT_OFF` could auto-roll past the treasury curve** and abort any run
+  including 144A -- a regression from 2.1.0's own auto-roll, caught by 2.1.0's own
+  guard. Now clamped to the last date the curve covers.
+- **The report job could not find stage-0 files if the run crossed a date boundary.**
+  It resolves the stamp from its own start date, probing +/-1 day; a longer gap failed
+  outright. It now falls back to the newest complete set on disk, as stage 1 already
+  did.
+- **`create_daily_stage1.py` located `stage1_pipeline.py` via `ROOT_PATH`** instead of
+  its own directory, so it broke under a redirected root.
+- **A refused WRDS connection was fatal where a dropped one was retried.** Both
+  engines' `_raw_sql_with_retry` now recognise it. Note that the wrds package reports
+  EVERY connect failure as `EOFError: EOF when reading a line`, because its failure
+  path calls `input()` -- that covers both a missing username and the connection
+  limit, and the pool now distinguishes them.
+- **`_run_*_trace.py` had no `__main__` guard**, which on a spawn platform would have
+  had every pool worker restart the whole pipeline recursively.
+- The `ChainedAssignmentError` FutureWarning is suppressed by message, so stage-0
+  `.err` logs stay readable without hiding every other warning.
+
+### Verification
+Concurrent output is byte-identical to serial, on both engines, with chunks completing
+out of order and with several chunks per worker: all stage-0 parquet files match,
+audit tables included, and the replayed filter logs match character for character.
+The measured WRDS connection ceiling on the development account is 7 held
+simultaneously (the 8th fails); the budget leaves one spare for a mid-run reconnect.
+
+---
+
 ## [2.1.0] - 2026-09-09
 
 ### Added

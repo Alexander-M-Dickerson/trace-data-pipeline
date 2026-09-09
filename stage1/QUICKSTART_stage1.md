@@ -97,7 +97,7 @@ nano stage1/_stage1_settings.py
 **Optional customizations in `stage1/_stage1_settings.py`:**
 ```python
 # Which TRACE datasets to include
-TRACE_MEMBERS = ["enhanced", "standard", "144a"]  # Or just ["enhanced"]
+TRACE_MEMBERS = ["enhanced", "144a"]  # the default; add "standard" to opt in
 
 # Date cutoff
 DATE_CUT_OFF = "2025-03-31"  # Only include data through this date

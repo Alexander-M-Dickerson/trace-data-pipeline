@@ -33,11 +33,25 @@ OUTPUT_FORMAT = "parquet"  # Options: "parquet" (recommended), "csv"
 # ============================================================================
 # TRACE DATABASE SELECTION
 # ============================================================================
-# Which TRACE datasets to process across all stages
+# Which TRACE datasets to process across all stages.
 # Options: "enhanced", "standard", "144a"
-# Overridable from the environment (space-separated) so a test run can select members
-# without editing this file:  TRACE_MEMBERS="enhanced 144a" ./run_smoke_test.sh
-TRACE_MEMBERS = os.getenv("TRACE_MEMBERS", "enhanced standard 144a").split()
+#
+# This now drives SUBMISSION as well as what the later stages read: run_pipeline.sh
+# submits exactly these members. It used to submit all three regardless, and this knob
+# only decided what stage 1 picked up afterwards.
+#
+# STANDARD IS NO LONGER A DEFAULT. It is the WRDS Standard tape -- the delayed,
+# lower-detail feed -- and Enhanced plus 144A already cover the universe the pipeline
+# is built around. Standard costs a whole extra multi-hour job for coverage that is
+# then clipped anyway: stage1 keeps Standard rows only AFTER the last Enhanced date
+# (stage1_pipeline.py's overlap clip), so nearly all of it is discarded. Add it back
+# when you specifically want that trailing window:
+#
+#     TRACE_MEMBERS="enhanced standard 144a" ./run_pipeline.sh
+#
+# When Standard IS requested it is scheduled after the other two rather than beside
+# them, so it can use the whole WRDS connection budget instead of a slice of it.
+TRACE_MEMBERS = os.getenv("TRACE_MEMBERS", "enhanced 144a").split()
 
 # ============================================================================
 # STAGE-SPECIFIC OUTPUT SETTINGS

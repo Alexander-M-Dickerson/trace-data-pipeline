@@ -201,28 +201,93 @@ else
     echo "[ok] All required data files present"
 fi
 
-# Stage 0: Submit Enhanced, Standard, and 144A TRACE data extraction jobs
-# These run in parallel and use the stage0 directory as working directory
+# Stage 0: submit exactly the members named in TRACE_MEMBERS.
+#
+# This block used to hard-code all three qsub calls and then hold the report job on
+# "-hold_jid ${J1},${J2},${J3}". Dropping a member left its variable unset and the
+# flag became "-hold_jid 123,,125", so the ids are built up here from the jobs
+# ACTUALLY submitted.
 echo ""
 echo "=== STAGE 0: TRACE Data Extraction ==="
-echo "[submit] Enhanced TRACE ..."
-J1=$(qsub -terse -N trace_enhanced stage0/run_enhanced_trace.sh)
 
-echo "[submit] Standard TRACE ..."
-J2=$(qsub -terse -N trace_standard stage0/run_standard_trace.sh)
+# python3 on WRDS; overridable so the submission graph can be dry-run elsewhere.
+PY="${PYTHON:-python3}"
 
-echo "[submit] 144A TRACE ..."
-J3=$(qsub -terse -N trace_144a stage0/run_144a_trace.sh)
+MEMBERS=$("${PY}" -c "import sys; sys.path.insert(0,'.'); from config import TRACE_MEMBERS; print(' '.join(TRACE_MEMBERS))") || {
+    echo "[error] could not read TRACE_MEMBERS from config.py"; exit 1; }
+echo "[info] members: ${MEMBERS}"
 
-# Stage 0: Build data reports after all extraction jobs complete
-echo "[submit] Build data reports (waits for all TRACE jobs) ..."
-J4=$(qsub -terse -N build_reports -hold_jid ${J1},${J2},${J3} stage0/run_build_data_reports.sh)
+# Fail HERE if the members ask for more WRDS connections than the account can hold.
+# Four hours in, the same problem arrives as "EOFError: EOF when reading a line".
+"${PY}" -c "
+import sys; sys.path.insert(0,'.'); sys.path.insert(0,'stage0')
+from _trace_settings import validate_connection_budget
+validate_connection_budget('''${MEMBERS}'''.split())
+" || { echo "[error] WRDS connection budget exceeded -- see stage0/_trace_settings.py"; exit 1; }
 
-# Stage 1: Process daily aggregation after stage0 reports are ready
+declare -A RUNNER=( [enhanced]=stage0/run_enhanced_trace.sh \
+                    [standard]=stage0/run_standard_trace.sh \
+                    [144a]=stage0/run_144a_trace.sh )
+declare -A JOBNAME=( [enhanced]=trace_enhanced [standard]=trace_standard [144a]=trace_144a )
+
+# Cores and memory, DERIVED from each member's worker count rather than written into
+# the job scripts, so the request cannot drift away from CONCURRENCY. The scripts' own
+# resource directives stay untouched. qsub_resources refuses to emit anything above
+# the WRDS caps, because an unsatisfiable request does not fail -- it pends forever,
+# in silence -- and m_mem_free is charged PER SLOT, so asking for 96 GB by accident
+# is a two-character mistake.
+res_for() {
+    "${PY}" -c "
+import sys; sys.path.insert(0,'.'); sys.path.insert(0,'stage0')
+from _trace_settings import qsub_resources
+print(qsub_resources('$1'))
+"
+}
+
+STAGE0_IDS=()          # every stage0 job, for the report job's hold list
+CONCURRENT_IDS=()      # enhanced + 144a, which Standard waits on
+
+# Enhanced and 144A first: they run side by side and their connection budgets are
+# sized to co-exist.
+for member in enhanced 144a; do
+    [[ " ${MEMBERS} " == *" ${member} "* ]] || continue
+    res=$(res_for "${member}") || { echo "[error] bad resource request for ${member}"; exit 1; }
+    echo "[submit] ${member} TRACE  (${res}) ..."
+    jid=$(qsub -terse -N "${JOBNAME[$member]}" ${res} "${RUNNER[$member]}")
+    STAGE0_IDS+=("${jid}"); CONCURRENT_IDS+=("${jid}")
+    echo "         job ${jid}"
+done
+
+# Standard, if asked for, runs AFTER them -- so it gets the whole connection budget
+# rather than a slice, and the peak memory of two big jobs never overlaps.
+if [[ " ${MEMBERS} " == *" standard "* ]]; then
+    res=$(res_for standard) || { echo "[error] bad resource request for standard"; exit 1; }
+    echo "[submit] standard TRACE  (${res}, held until enhanced/144a finish) ..."
+    if [[ ${#CONCURRENT_IDS[@]} -gt 0 ]]; then
+        hold=$(IFS=,; echo "${CONCURRENT_IDS[*]}")
+        jid=$(qsub -terse -N "${JOBNAME[standard]}" ${res} -hold_jid "${hold}" "${RUNNER[standard]}")
+    else
+        jid=$(qsub -terse -N "${JOBNAME[standard]}" ${res} "${RUNNER[standard]}")
+    fi
+    STAGE0_IDS+=("${jid}")
+    echo "         job ${jid}"
+fi
+
+if [[ ${#STAGE0_IDS[@]} -eq 0 ]]; then
+    echo "[error] TRACE_MEMBERS selected no known member: '${MEMBERS}'"
+    exit 1
+fi
+
+# Stage 0: build the data reports once every extraction job is done.
+HOLD_STAGE0=$(IFS=,; echo "${STAGE0_IDS[*]}")
+echo "[submit] Build data reports (waits for ${HOLD_STAGE0}) ..."
+J4=$(qsub -terse -N build_reports -hold_jid "${HOLD_STAGE0}" stage0/run_build_data_reports.sh)
+
+# Stage 1: daily aggregation, once the reports are ready.
 echo ""
 echo "=== STAGE 1: Daily Aggregation & Analytics ==="
 echo "[submit] Stage 1 pipeline (waits for stage0 reports) ..."
-J5=$(qsub -terse -N stage1_pipeline -hold_jid ${J4} stage1/run_stage1.sh)
+J5=$(qsub -terse -N stage1_pipeline -hold_jid "${J4}" stage1/run_stage1.sh)
 
 # Stage 2: (Future placeholder)
 # echo ""
@@ -237,10 +302,8 @@ echo "=== SUBMISSION COMPLETE ==="
 echo "[ok] Pre-stage data downloads completed"
 echo "[ok] All jobs submitted with dependencies:"
 echo ""
-echo "  Stage 0 - Data Extraction (parallel):"
-echo "    Enhanced TRACE: ${J1}"
-echo "    Standard TRACE: ${J2}"
-echo "    144A TRACE:     ${J3}"
+echo "  Stage 0 - Data Extraction (${MEMBERS}):"
+echo "    job ids: ${STAGE0_IDS[*]}"
 echo ""
 echo "  Stage 0 - Reports (waits for data):"
 echo "    Build Reports:  ${J4}"

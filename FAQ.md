@@ -22,7 +22,8 @@ Both Stage 0 and Stage 1 are designed for WRDS Cloud due to database access requ
 ### How long does processing take?
 Using `./run_pipeline.sh` (complete automated pipeline):
 - **Pre-stage (data downloads)**: ~5 minutes
-- **Stage 0 (Enhanced TRACE)**: ~4 hours
+- **Stage 0 (Enhanced TRACE)**: ~4 hours before v2.2.0, which pulls 5 CUSIP chunks
+  at once over separate WRDS connections
 - **Stage 0 (Standard TRACE)**: ~30-60 minutes
 - **Stage 0 (Rule 144A)**: ~30-60 minutes
 - **Stage 0 (Report generation)**: ~30-60 minutes
@@ -163,7 +164,8 @@ Edit `TRACE_MEMBERS` in `config.py` once, and it applies to all stages:
 ```python
 TRACE_MEMBERS = ["enhanced"]                       # Enhanced only
 TRACE_MEMBERS = ["enhanced", "standard"]           # Two datasets
-TRACE_MEMBERS = ["enhanced", "standard", "144a"]  # All three (default)
+TRACE_MEMBERS = ["enhanced", "144a"]              # The DEFAULT
+TRACE_MEMBERS = ["enhanced", "standard", "144a"]  # All three (Standard is opt-in)
 ```
 
 ---

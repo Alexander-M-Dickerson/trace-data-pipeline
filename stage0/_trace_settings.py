@@ -159,6 +159,56 @@ def validate_connection_budget(members) -> None:
         )
 
 
+# --- Grid resource requests -------------------------------------------
+# A serial job could live on the WRDS batch default (2 cores / 16 GB). A pool of five
+# worker processes cannot, so each stage0 job now asks for what it will actually use.
+#
+# ❗m_mem_free is charged PER SLOT, not per job. Ask for 4 slots at 24G and you have
+# asked for 96 GB, the scheduler can never satisfy it, and the job PENDS FOREVER --
+# silently, with no error anywhere. WRDS hard caps are 8 cores and 48 GB TOTAL per
+# job, so what must hold is:  slots x mem_per_slot <= 48.
+#
+# These are passed on the qsub COMMAND LINE, not written into the job scripts, so the
+# request follows CONCURRENCY automatically instead of drifting away from it. The
+# scripts' own #$ directives are untouched.
+#
+# Slots match the worker count: the parent mostly waits while workers do the fetching
+# and cleaning. Memory per slot is sized for the peak inside decimal_shift_corrector,
+# which copies a chunk and adds columns -- roughly 2.5x a ~750k-row frame, so ~1.5 GB
+# per worker -- plus headroom for the parent, which holds every chunk's daily frame
+# until the end and is the real consumer.
+MAX_SLOTS_PER_JOB = 8
+MAX_MEM_GB_PER_JOB = 48
+
+MEM_PER_SLOT_GB = {
+    "enhanced": 8,    # 5 slots x 8G = 40 GB
+    "standard": 8,    # 6 slots x 8G = 48 GB, exactly the cap
+    "144a":     16,   # 1 slot -- same 16 GB it has always had
+}
+
+
+def qsub_resources(member: str) -> str:
+    """qsub flags for one stage0 member, derived from its worker count.
+
+    Returns e.g. "-pe onenode 5 -l m_mem_free=8G". Raises rather than emit a request
+    the scheduler can never satisfy, because that failure mode is an invisible
+    permanent pend.
+    """
+    slots = max(1, int(CONCURRENCY.get(member, 1)))
+    mem = int(MEM_PER_SLOT_GB.get(member, 16))
+    if slots > MAX_SLOTS_PER_JOB:
+        raise ValueError(
+            f"{member}: {slots} slots exceeds the WRDS limit of {MAX_SLOTS_PER_JOB} "
+            "cores per job. Lower CONCURRENCY in stage0/_trace_settings.py.")
+    if slots * mem > MAX_MEM_GB_PER_JOB:
+        raise ValueError(
+            f"{member}: {slots} slots x {mem}G = {slots * mem} GB exceeds the WRDS "
+            f"limit of {MAX_MEM_GB_PER_JOB} GB per job (m_mem_free is charged PER "
+            "SLOT). Lower MEM_PER_SLOT_GB or CONCURRENCY in "
+            "stage0/_trace_settings.py.")
+    return f"-pe onenode {slots} -l m_mem_free={mem}G"
+
+
 # --- Price-scale normalization ----------------------------------------
 # TRACE rptd_pr is a PERCENT OF PAR for the standard $1,000-principal bond: at par
 # it prints 100. Small-denomination issues -- retail and structured notes with a

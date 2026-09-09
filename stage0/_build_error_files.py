@@ -272,6 +272,42 @@ def _shift_date(tag: str, delta_days: int) -> str:
     d = datetime.strptime(tag, "%Y%m%d").date()
     return (d + timedelta(days=delta_days)).strftime("%Y%m%d")
 
+def _latest_tag_with(in_dir_t: Path, names) -> str | None:
+    """Newest YYYYMMDD stamp under `in_dir_t` for which EVERY named file exists.
+
+    The last resort when the run stamp does not match what is on disk. That stamp is
+    this process's OWN start date, so it drifts whenever stage 0 finishes on one day
+    and the report job starts on another -- a queue behind a long job, or a run that
+    crosses midnight. The +/-1 day probe above covers the common case; this covers the
+    rest, and mirrors how stage 1 already finds its input
+    (_stage1_settings.get_latest_stage0_date).
+
+    `names` are format strings taking {tag}.
+    """
+    import re
+    if not in_dir_t.is_dir():
+        return None
+    probe = names[0].replace("{tag}", "*")
+    stamps = set()
+    for f in in_dir_t.glob(probe):
+        m = re.search(r"_(\d{8})\.parquet$", f.name)
+        if m:
+            stamps.add(m.group(1))
+    for tag in sorted(stamps, reverse=True):
+        if all((in_dir_t / n.format(tag=tag)).exists() for n in names):
+            return tag
+    return None
+
+
+def _delta_days(base_tag: str, tag: str) -> int:
+    try:
+        a = datetime.strptime(base_tag, "%Y%m%d").date()
+        b = datetime.strptime(tag, "%Y%m%d").date()
+        return (b - a).days
+    except Exception:
+        return 9999
+
+
 def _choose_existing_date_tag(base_tag: str, in_dir_t: Path, dtype: str) -> tuple[str, int]:
     """
     Return (date_tag, delta_days). delta_days in {0, -1, +1} if found,
@@ -300,6 +336,15 @@ def _choose_existing_date_tag(base_tag: str, in_dir_t: Path, dtype: str) -> tupl
         if _all_exist(cand):
             return cand, delta
 
+    # Last resort: whatever the newest COMPLETE set on disk is.
+    found = _latest_tag_with(in_dir_t, [
+        f"fisd_filters_{dtype}_{{tag}}.parquet",
+        f"dick_nielsen_filters_audit_{dtype}_{{tag}}.parquet",
+        f"drr_filters_audit_{dtype}_{{tag}}.parquet",
+    ])
+    if found:
+        return found, _delta_days(base_tag, found)
+
     # none found
     return base_tag, 9999
 
@@ -327,6 +372,13 @@ def _choose_existing_date_tag_for_figs(base_tag: str, in_dir_t: Path, dtype: str
         cand = _shift_date(base_tag, delta)
         if _all_exist(cand):
             return cand, delta
+
+    found = _latest_tag_with(in_dir_t, [
+        f"bounce_back_cusips_{dtype}_{{tag}}.parquet",
+        f"decimal_shift_cusips_{dtype}_{{tag}}.parquet",
+    ])
+    if found:
+        return found, _delta_days(base_tag, found)
 
     return base_tag, 9999
 

@@ -463,13 +463,15 @@ Monthly panel with 50+ corporate bond signals ready for asset pricing research.
 **Expected Runtime (WRDS Cloud):**
 
 Using `./run_pipeline.sh` (complete automated pipeline from ROOT):
-- **Stage 0 - Data processing** (parallel): ~4-8 hours
-  - Enhanced TRACE: ~4 hours
-  - Standard TRACE: ~30-60 minutes
+- **Stage 0 - Data processing** (Enhanced and 144A in parallel):
+  - Enhanced TRACE: ~4 hours before v2.2.0. It now pulls 5 CUSIP chunks at a time over
+    separate WRDS connections, so expect materially less -- how much depends on how
+    the fetch and the clean divide up on the day.
   - 144A TRACE: ~30-60 minutes
-- **Stage 0 - Report generation**: ~30-60 minutes (waits for all three datasets)
+  - Standard TRACE: ~30-60 minutes, and OPT-IN since v2.2.0 (`TRACE_MEMBERS`). When
+    requested it is scheduled after the other two, not beside them.
+- **Stage 0 - Report generation**: ~30-60 minutes (waits for every member submitted)
 - **Stage 1 - Bond analytics**: ~2 hours (waits for Stage 0 reports)
-- **Total**: ~7 hours for complete pipeline (Stage 0 + Stage 1)
 
 **How it works:**
 The script uses SGE's `-hold_jid` feature to create automatic dependency chains:
@@ -549,5 +551,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Last Updated:** September 2026
-**Stage 0 Version:** 2.1.0
-**Stage 1 Version:** 2.1.0
+**Stage 0 Version:** 2.2.0
+**Stage 1 Version:** 2.2.0
