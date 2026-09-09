@@ -88,6 +88,27 @@ INIT_ERROR = {
     "n_transactions": 3,
 }
 
+# --- Price-scale normalization ----------------------------------------
+# TRACE rptd_pr is a PERCENT OF PAR for the standard $1,000-principal bond: at par
+# it prints 100. Small-denomination issues -- retail and structured notes with a
+# principal of $10, $25 or $100 -- are quoted in UNIT dollars, so a $10 note at par
+# prints 10.00. Every filter downstream assumes percent of par (price bounds, the
+# decimal-shift gates, the bounce-back point threshold, stage 1's ultra-distressed
+# thresholds, dollar volume, QuantLib), so left alone those bonds read as deeply
+# distressed with tenfold-understated volume.
+#
+# When on, each non-$1,000 CUSIP is rescaled by 100/principal_amt if that puts its
+# MEDIAN price nearer par -- decided once per bond, so distressed prints cannot flip
+# the regime. $1,000-principal bonds are never touched.
+#
+# This is a NO-OP under the default screens: FISD_PARAMS["principal_amt_eq_1000_only"]
+# is True, so no such bond is in the universe and every factor resolves to 1.0. It
+# earns its keep the moment you turn that screen off -- which is exactly when the
+# tape fills with unit-quoted notes.
+PRICE_NORM = {
+    "normalize_nonpar1000": True,
+}
+
 # --- Arguments identical across all runners ---------------------------
 COMMON_KWARGS = dict(
     wrds_username = WRDS_USERNAME,
@@ -105,7 +126,8 @@ COMMON_KWARGS = dict(
     bb_params     = BB_PARAMS,
     init_error_params = INIT_ERROR,
     filters       = FILTER_SWITCHES,
-    fisd_params   = FISD_PARAMS
+    fisd_params   = FISD_PARAMS,
+    price_norm    = PRICE_NORM
 )
 
 

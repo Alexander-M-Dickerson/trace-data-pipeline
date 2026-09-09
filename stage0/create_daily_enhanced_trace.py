@@ -390,6 +390,84 @@ def compute_trace_all_metrics(trace):
     merged = merged.sort_values(['cusip_id','trd_exctn_dt']).reset_index(drop=True)
     return merged    
 # -------------------------------------------------------------------------
+def normalize_price_scale(trace, principal_amt, *, chunk_id=None, logger=None):
+    """Rescale unit-quoted bonds to percent of par.
+
+    TRACE `rptd_pr` is a percent of par for the standard $1,000-principal bond: at
+    par it prints 100. Small-denomination issues -- retail and structured notes with
+    a principal of $10, $25, $100 -- are quoted in UNIT dollars instead, so a $10
+    note at par prints 10.00, not 100.
+
+    Everything downstream assumes percent of par: the price bounds, the decimal-shift
+    gates, the bounce-back point threshold, the ultra-distressed thresholds in
+    stage 1, dollar volume (`entrd_vol_qt * rptd_pr / 100`) and QuantLib (face 100).
+    Left alone, a healthy $10 note reads as a bond trading at 10 percent of par --
+    flagged distressed, with dollar volume understated tenfold and a nonsense yield.
+
+    Each CUSIP's quote convention is decided ONCE, from the median of its positive
+    prices, so a run of distressed prints cannot flip the regime for that bond. The
+    factor is 100/principal_amt when that moves the median closer to 100 in log
+    distance, and 1.0 otherwise. $1,000-principal bonds are never touched.
+
+    With the default FISD screen (`principal_amt_eq_1000_only=True`) no such bond is
+    in the universe, so this is a no-op and the output is unchanged. It matters only
+    when that screen is turned off.
+
+    Parameters
+    ----------
+    trace : pandas.DataFrame
+        One CUSIP chunk, with `cusip_id` and `rptd_pr`.
+    principal_amt : pandas.DataFrame
+        Columns ['cusip_id', 'principal_amt'], already restricted to bonds whose
+        principal is positive and not 1000.
+    chunk_id, logger : optional
+        Passed through to the audit logger.
+
+    Returns
+    -------
+    tuple[pandas.DataFrame, int]
+        The frame with `rptd_pr` rescaled, and the number of CUSIPs rescaled.
+    """
+    if trace.empty or principal_amt is None or len(principal_amt) == 0:
+        return trace, 0
+
+    prin = principal_amt.drop_duplicates("cusip_id").set_index("cusip_id")["principal_amt"]
+    prin = prin[(prin > 0) & (prin != 1000)]
+    if prin.empty:
+        return trace, 0
+
+    pos = trace.loc[trace["rptd_pr"] > 0, ["cusip_id", "rptd_pr"]]
+    pos = pos[pos["cusip_id"].isin(prin.index)]
+    if pos.empty:
+        return trace, 0
+
+    med = pos.groupby("cusip_id")["rptd_pr"].median()
+    med = med[med > 0]
+    if med.empty:
+        return trace, 0
+
+    prin = prin.reindex(med.index)
+    candidate = 100.0 / prin
+    # Keep the rescale only when it puts the bond's typical price nearer to par.
+    better = np.abs(np.log(med * candidate / 100.0)) < np.abs(np.log(med / 100.0))
+    factor = candidate.where(better, 1.0)
+    factor = factor[factor != 1.0]
+    if factor.empty:
+        return trace, 0
+
+    mult = trace["cusip_id"].map(factor).astype("float64").fillna(1.0)
+    trace = trace.copy()
+    trace["rptd_pr"] = (trace["rptd_pr"] * mult).round(6)
+
+    n_rescaled = int(len(factor))
+    if logger is not None:
+        n_rows = int((mult != 1.0).sum())
+        logger(dict(chunk=chunk_id, stage="price_scale_normalization",
+                    rows_before=len(trace), rows_after=len(trace),
+                    cusips_rescaled=n_rescaled, rows_rescaled=n_rows))
+    return trace, n_rescaled
+
+# -------------------------------------------------------------------------
 def clean_trace_data(
     db,
     cusip_chunks,
@@ -403,7 +481,9 @@ def clean_trace_data(
     ds_params: dict | None = None,
     bb_params: dict | None = None,
     init_error_params: dict | None = None,
-    filters: dict | None = None
+    filters: dict | None = None,
+    price_norm: dict | None = None,
+    principal_amt=None
                     ):
     
     if fetch_fn is None:
@@ -513,6 +593,15 @@ def clean_trace_data(
             continue
               
         trace["rptd_pr"] = trace["rptd_pr"].astype("float64").round(6)
+
+        # Filter 0: price-scale normalization. Runs BEFORE every other filter, because
+        # all of them assume prices are a percent of par. No-op unless the FISD screen
+        # `principal_amt_eq_1000_only` has been turned off. See normalize_price_scale.
+        if (price_norm or {}).get("normalize_nonpar1000") and principal_amt is not None:
+            trace, n_rescaled = normalize_price_scale(trace, principal_amt, chunk_id=i)
+            if n_rescaled:
+                logging.info("Chunk %d: rescaled %d unit-quoted CUSIP(s) to percent of par",
+                             i + 1, n_rescaled)
         trace = trace.drop(columns=["index"], errors="ignore").reset_index(drop=True)
         
         # Initial log for cleaning
@@ -2939,7 +3028,8 @@ class ProcessEnhancedTRACE:
         bb_params: dict | None = None,
         init_error_params: dict | None = None,
         filters: dict | None = None,
-        fisd_params: dict | None = None
+        fisd_params: dict | None = None,
+        price_norm: dict | None = None
     ) -> None:
         # user options
         self.wrds_username = wrds_username
@@ -2959,6 +3049,7 @@ class ProcessEnhancedTRACE:
         self.init_error_params = init_error_params or {}
         self.filters    = filters or {}
         self.fisd_params = fisd_params or {}
+        self.price_norm  = price_norm or {}
 
         self.out_dir = Path(out_dir).expanduser()     
 
@@ -3005,7 +3096,8 @@ class ProcessEnhancedTRACE:
                     "THIS IS A PARTIAL RUN; the output is not the full universe.",
                     self.limit_chunks, len(kept), len(cusip_chunks))
                 cusip_chunks = kept
-            all_data = self._run_clean_trace(cusip_chunks, fisd_off)
+            all_data = self._run_clean_trace(
+                cusip_chunks, fisd_off, self._principal_amounts(fisd))
             self._export(all_data, fisd)
             return all_data
         finally:
@@ -3033,6 +3125,33 @@ class ProcessEnhancedTRACE:
         self.logger.info("Filtering FISD universe ...")
         return build_fisd(self.db, params=self.fisd_params)  # uses global log helpers
 
+    def _principal_amounts(self, fisd: pd.DataFrame):
+        """cusip_id -> principal_amt for bonds NOT denominated at $1,000.
+
+        Only these can be unit-quoted, so only these are candidates for price-scale
+        normalization. Returns None when the feature is off or the screened universe
+        contains no such bond -- which is the case under the default FISD screen
+        `principal_amt_eq_1000_only=True`, making the whole feature a no-op.
+        """
+        if not self.price_norm.get("normalize_nonpar1000"):
+            return None
+        if "principal_amt" not in fisd.columns:
+            self.logger.warning("principal_amt absent from FISD; skipping price-scale "
+                                "normalization")
+            return None
+        prin = fisd[["complete_cusip", "principal_amt"]].copy()
+        prin.columns = ["cusip_id", "principal_amt"]
+        prin["principal_amt"] = pd.to_numeric(prin["principal_amt"], errors="coerce")
+        prin = prin[(prin["principal_amt"] > 0) & (prin["principal_amt"] != 1000)]
+        prin = prin.drop_duplicates("cusip_id")
+        if prin.empty:
+            self.logger.info("Price-scale normalization enabled but the universe holds no "
+                             "non-$1000-principal bonds -- nothing to rescale.")
+            return None
+        self.logger.info("Price-scale normalization: %d candidate CUSIP(s) with principal "
+                         "!= 1000 in the universe", len(prin))
+        return prin
+
     def _make_cusip_chunks(self, fisd: pd.DataFrame):
         self.logger.info("Creating CUSIP batches ...")
         cusips = list(fisd["complete_cusip"].unique())
@@ -3043,7 +3162,7 @@ class ProcessEnhancedTRACE:
 
         return list(divide_chunks(cusips, self.chunk_size))
 
-    def _run_clean_trace(self, cusip_chunks, fisd_off):
+    def _run_clean_trace(self, cusip_chunks, fisd_off, principal_amt=None):
         self.logger.info("Running TRACE cleaning loop ...")
         all_data, bb_list, ds_list, ie_list = clean_trace_data(
             self.db,
@@ -3057,7 +3176,9 @@ class ProcessEnhancedTRACE:
             ds_params=self.ds_params,
             bb_params=self.bb_params,
             init_error_params=self.init_error_params,
-            filters=self.filters
+            filters=self.filters,
+            price_norm=self.price_norm,
+            principal_amt=principal_amt
         )
 
         # accumulate across all chunks/runs

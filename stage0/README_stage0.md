@@ -381,10 +381,36 @@ Controls which bonds are included in the universe:
 - `exclude_bond_types`: Drop specific bond types like TXMU, MBS, FGOV, etc. (default: `True`)
 - `valid_coupon_frequency_only`: Drop bonds with invalid interest frequency (default: `True`)
 - `require_accrual_fields`: Require offering_date, dated_date to be non-null (default: `True`)
-- `principal_amt_eq_1000_only`: Keep only bonds with $1000 par value (default: `True`)
+- `principal_amt_eq_1000_only`: Keep only bonds with $1000 par value (default: `True`).
+  **If you turn this off, leave `PRICE_NORM` on** -- see below.
 - `exclude_equity_index_linked`: Exclude equity-linked and index-linked bonds (default: `True`)
 - `enforce_tenor_min`: Require bonds to have minimum tenor (default: `True`)
 - `tenor_min_years`: Minimum tenor in years (default: `1.0`)
+
+### Price-Scale Normalization (`PRICE_NORM`)
+
+- `normalize_nonpar1000`: Rescale unit-quoted bonds to percent of par (default: `True`)
+
+TRACE's `rptd_pr` is a **percent of par** for the standard $1,000-principal bond: at
+par it prints `100`. Small-denomination issues -- retail and structured notes with a
+principal of $10, $25 or $100 -- are quoted in **unit dollars** instead, so a $10 note
+at par prints `10.00`, not `100`.
+
+Everything downstream assumes percent of par: the price bounds, the decimal-shift
+gates, the bounce-back point threshold, Stage 1's ultra-distressed thresholds, dollar
+volume (`entrd_vol_qt * rptd_pr / 100`) and QuantLib (face value 100). Left alone, a
+perfectly healthy $10 note reads as a bond trading at 10% of par -- flagged as
+distressed, with dollar volume understated tenfold and a nonsense yield.
+
+When enabled, each CUSIP whose `principal_amt` is not 1000 is rescaled by
+`100 / principal_amt`, but only if that moves the bond's **median** price closer to par
+in log distance. The decision is made once per bond from its median, so a run of
+distressed prints cannot flip the convention. $1,000-principal bonds are never touched.
+
+**Under the default settings this does nothing.** `principal_amt_eq_1000_only` is
+`True`, so no non-$1,000 bond is in the universe and every factor resolves to `1.0` --
+the output is identical whether the toggle is on or off. It matters only when you turn
+that screen off, which is precisely when the tape fills with unit-quoted notes.
 
 ### Filter Toggles (`FILTER_SWITCHES`)
 
