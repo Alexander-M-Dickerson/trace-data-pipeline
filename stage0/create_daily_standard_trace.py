@@ -22,6 +22,34 @@ import gc
 from functools import reduce
 import pyarrow as pa
 import pandas_market_calendars as mcal
+
+# Silence ONE pandas warning class, by message, so the .err logs stay readable.
+#
+# pandas 2.2 emits a ChainedAssignmentError FutureWarning from DataFrame.__setitem__
+# when the frame's Python refcount is low AND one of its data blocks is still shared
+# with another object. build_fisd trips both conditions on the real FISD frame, at
+# plain column assignments such as
+#     fisd["interest_frequency"] = pd.to_numeric(...).fillna(-1).astype(int)
+# which are NOT chained assignment -- the boilerplate in the warning text
+# ("df[col][row_indexer] = value") does not describe this code. Confirmed on the WRDS
+# cloud: pandas 2.2.3, copy_on_write=False, PANDAS_COPY_ON_WRITE unset, and no chained
+# assignment anywhere in this file.
+#
+# This is SUPPRESSION, not a fix. The block sharing that triggers it is still there,
+# and under pandas 3.0 (Copy-on-Write by default) these assignments need re-checking:
+# they may silently become no-ops. Before upgrading pandas, delete this filter and get
+# a traceback to the real source with:
+#     python3 -W error::FutureWarning -c "import sys, wrds; sys.path.insert(0,'.'); #         import create_daily_enhanced_trace as E; from _trace_settings import get_config; #         E.build_fisd(wrds.Connection(), params=get_config('enhanced')['fisd_params'])"
+#
+# Scoped to this one message, so every other FutureWarning still surfaces. That is the
+# difference from stage1/helper_functions.py, which does a blanket
+# warnings.filterwarnings('ignore') and hides everything.
+import warnings
+warnings.filterwarnings(
+    "ignore",
+    message="ChainedAssignmentError",   # regex, matched against the START of the message
+    category=FutureWarning,
+)
 RUN_STAMP = pd.Timestamp.today().strftime("%Y%m%d")
 # -------------------------------------------------------------------------
 def _configure_root_logger(level: int = logging.INFO) -> None:
