@@ -4,8 +4,11 @@
 #$ -cwd
 #$ -pe onenode 1
 #$ -l m_mem_free=16G
-#$ -o smoke/logs/smoke.out
-#$ -e smoke/logs/smoke.err
+# Written to the REPO ROOT, not smoke/logs/, on purpose: SGE opens these before the
+# script runs, and smoke/logs/ does not exist in a fresh clone -- the job would go
+# straight to Eqw without executing a line. The root always exists.
+#$ -o smoke_test.out
+#$ -e smoke_test.err
 #
 # run_smoke_test.sh -- whole-chain validation on a handful of CUSIP chunks.
 #
@@ -21,7 +24,8 @@
 # On the WRDS Cloud this must be SUBMITTED, not run on the login node -- CPU- and
 # memory-intensive work is not permitted on the head nodes:
 #
-#   qsub run_smoke_test.sh
+#   ./download_inputs.sh          # once, on the login node -- needs internet
+#   qsub run_smoke_test.sh        # from the REPO ROOT
 #
 # It runs the REAL stage0/stage1 code straight out of this repo. Nothing is copied,
 # so the run can never be validating a stale duplicate. Outputs are redirected purely
@@ -31,7 +35,30 @@
 
 set -uo pipefail
 
-REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Find the repo. This is not as simple as dirname "$0", because under qsub SGE COPIES
+# the job script into its spool directory and runs the copy -- so BASH_SOURCE points at
+# something like /gridware/sge/default/spool/<node>/job_scripts, and every path built
+# from it lands nowhere. That made the submitted run, which is the documented way to
+# run this on WRDS, report the repo's own inputs as missing.
+#
+# So: try the candidates in order and take the first that actually LOOKS like the repo,
+# rather than trusting any single one of them.
+#   SGE_O_WORKDIR  the directory qsub was invoked from -- correct under a job
+#   PWD            "#$ -cwd" starts the job there too, and it is right for a local run
+#   BASH_SOURCE    correct locally; the spool copy under qsub
+_looks_like_repo() { [[ -d "$1/stage0" && -d "$1/stage1" ]]; }
+
+REPO=""
+for _cand in "${SGE_O_WORKDIR:-}" "${PWD}" "$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"; do
+    [[ -n "${_cand}" ]] || continue
+    if _looks_like_repo "${_cand}"; then REPO="${_cand}"; break; fi
+done
+if [[ -z "${REPO}" ]]; then
+    echo "[error] Cannot locate the repo (no candidate has both stage0/ and stage1/)."
+    echo "        Tried: SGE_O_WORKDIR='${SGE_O_WORKDIR:-}' PWD='${PWD}'"
+    echo "        Submit from the repo root:  cd ~/trace-data-pipeline && qsub run_smoke_test.sh"
+    exit 1
+fi
 ROOT="${REPO}/smoke"
 CHUNKS=5
 MEMBERS=""
@@ -48,7 +75,7 @@ while [[ $# -gt 0 ]]; do
         --root)         ROOT="$2";   shift 2 ;;
         --members)      MEMBERS="$2"; shift 2 ;;
         --with-reports) WITH_REPORTS=1; shift ;;
-        -h|--help)      sed -n '10,30p' "${BASH_SOURCE[0]}"; exit 0 ;;
+        -h|--help)      sed -n '13,34p' "${BASH_SOURCE[0]}"; exit 0 ;;
         *) echo "[error] unknown option: $1"; exit 2 ;;
     esac
 done
@@ -134,7 +161,12 @@ else
 fi
 if [[ ${MISSING} -ne 0 ]]; then
     echo
-    echo "[error] Run the PRE-STAGE download block of run_pipeline.sh first (login node)."
+    echo "[error] Stage 1's external inputs are not in the repo yet."
+    echo "        Fetch them ON THE LOGIN NODE -- compute nodes have no internet -- then"
+    echo "        submit this again:"
+    echo
+    echo "            cd ${REPO} && ./download_inputs.sh"
+    echo "            qsub run_smoke_test.sh"
     exit 1
 fi
 
@@ -194,8 +226,8 @@ rc=$?
 
 echo
 if [[ ${rc} -eq 0 ]]; then
-    echo "SMOKE TEST PASSED. Logs under ${ROOT}"
+    echo "SMOKE TEST PASSED. Per-stage logs under ${ROOT}; job output in smoke_test.out"
 else
-    echo "SMOKE TEST FAILED. Logs under ${ROOT}"
+    echo "SMOKE TEST FAILED. Per-stage logs under ${ROOT}; job output in smoke_test.out"
 fi
 exit ${rc}
