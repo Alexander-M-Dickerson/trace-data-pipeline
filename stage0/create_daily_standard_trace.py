@@ -25,6 +25,7 @@ import pandas_market_calendars as mcal
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # sibling modules
 import _chunk_runner
+import _wrds_pool
 
 # Silence ONE pandas warning class, by message, so the .err logs stay readable.
 #
@@ -3088,8 +3089,14 @@ class ProcessStandardTRACE:
                 except Exception:
                     self._reconnect_wrds()
                 return self.db.raw_sql(sql, params=params)
-            except (SAOperationalError, PGOperationalError) as e:
+            except (SAOperationalError, PGOperationalError, EOFError) as e:
                 attempt += 1
+                # Retry a dropped connection -- and a REFUSED one. WRDS caps how many
+                # sessions a user may hold, and the wrds package's connect-failure
+                # path calls input(), so in a batch job that refusal arrives as
+                # "EOFError: EOF when reading a line": a server-side limit wearing a
+                # keyboard error's clothes. Left uncaught it kills the chunk outright,
+                # which is what used to happen. _wrds_pool owns the signature list.
                 msg = str(e).lower()
                 transient = (
                     "ssl connection has been closed" in msg
@@ -3097,6 +3104,7 @@ class ProcessStandardTRACE:
                     or "connection not open" in msg
                     or "terminating connection" in msg
                     or "connection reset" in msg
+                    or _wrds_pool._is_connection_limit(e)
                 )
                 if not transient or attempt > max_retries:
                     self.logger.exception("DB query failed (attempt %s/%s)", attempt, max_retries)

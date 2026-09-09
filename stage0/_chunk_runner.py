@@ -2,7 +2,13 @@
 """
 _chunk_runner.py
 ================
-How stage0 divides the CUSIP universe into work units.
+How stage0 divides the CUSIP universe into work units, and how it runs them.
+
+Two halves: plan_chunks decides what a work unit IS, run_chunks decides who executes
+it. They sit together because the second only became worth having once the first made
+chunks even enough in size to run several at once.
+
+PART ONE -- THE PLAN
 
 The original scheme was a fixed count of CUSIPs per chunk (250). That is simple but
 badly unbalanced, because trading activity is enormously skewed: measured over the
@@ -24,12 +30,20 @@ scan and the Dick-Nielsen reversal keys all lead with it -- and chunks are disjo
 CUSIP sets. So which chunk a bond lands in cannot affect its result. What DOES change
 is the audit tables, whose chunk column and per-chunk counts follow the new grouping.
 
+PART TWO -- THE SCHEDULER
+
+run_chunks executes the plan, serially or across a pool of processes each holding its
+own WRDS connection, and hands the results back IN CHUNK ORDER regardless of the order
+they finished in. See its docstring for why the ordering is a correctness requirement
+rather than a tidiness one.
+
 Author: Open Source Bond Asset Pricing
 """
 
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import Iterable, Sequence
 
 
@@ -124,3 +138,98 @@ def summarize_plan(chunks: Iterable[Sequence[str]],
         log("Chunk plan: %d chunks over %d CUSIPs (fixed size; row counts unavailable)",
             stats["n_chunks"], stats["n_cusips"])
     return stats
+
+
+# =========================================================================
+# THE SCHEDULER
+# =========================================================================
+@dataclass
+class ChunkResult:
+    """One chunk's output, on its way back from wherever it was computed.
+
+    `data` is None for a chunk whose WRDS query returned nothing -- distinct from an
+    empty frame, and it carries no audit rows either, matching what the original
+    inline loop did with its `continue`.
+    """
+    chunk_id: int
+    data: object                 # pandas.DataFrame | None
+    audit_rows: list
+    ct_audit_rows: list
+    bb_cusips: list
+    ds_cusips: list
+    ie_cusips: list
+    n_rows: int = 0
+    elapsed: float = 0.0
+
+
+def run_chunks(chunks,
+               run_serial,
+               *,
+               n_workers: int = 1,
+               pool_task=None,
+               pool_initializer=None,
+               pool_initargs: tuple = (),
+               logger: logging.Logger | None = None) -> list:
+    """Run every chunk and return the results in ASCENDING CHUNK ORDER.
+
+    `n_workers <= 1` calls `run_serial(chunk_id, cusips, n_chunks)` in this process --
+    the original loop, on the caller's own connection. Above that, `pool_task` is run
+    in a process pool, each worker holding its own WRDS connection opened by
+    `pool_initializer`.
+
+    Ordering is not cosmetic. The audit tables are read back by the reporting stage,
+    which reconstructs each chunk's filter sequence from row order, so results must be
+    reassembled by chunk id no matter what order they completed in.
+
+    A chunk that produces no result ABORTS the run. Silently missing chunks are
+    silently missing bonds in a file that otherwise looks entirely normal, and stage 1
+    would happily consume it.
+    """
+    chunks = list(chunks)
+    log = logger or logging.getLogger(__name__)
+    n = len(chunks)
+    if n == 0:
+        return []
+
+    if n_workers <= 1 or n == 1:
+        return [run_serial(i, list(ch), n) for i, ch in enumerate(chunks)]
+
+    if pool_task is None:
+        raise ValueError("run_chunks needs a pool_task to run with n_workers > 1")
+
+    import multiprocessing as mp
+
+    n_workers = min(int(n_workers), n)
+    tasks = [(i, list(ch), n) for i, ch in enumerate(chunks)]
+    log.info("Running %d chunks across %d worker processes "
+             "(one WRDS connection each)", n, n_workers)
+
+    # NO maxtasksperchild. Workers stay alive for the whole run on purpose: recycling
+    # one would mean a fresh ~5 s WRDS handshake per chunk -- 485 of them on Enhanced
+    # -- and would hammer the per-user connection limit for nothing. (The house rule
+    # in trace_duckdb about fresh processes exists for DuckDB's parallelism collapse
+    # and does not transfer here.)
+    pool = mp.Pool(n_workers, initializer=pool_initializer, initargs=pool_initargs)
+    got: dict[int, ChunkResult] = {}
+    try:
+        for res in pool.imap_unordered(pool_task, tasks):
+            got[res.chunk_id] = res
+            log.info("chunk %d/%d complete (id %d, %s rows, %.1fs)",
+                     len(got), n, res.chunk_id, f"{res.n_rows:,}", res.elapsed)
+        pool.close()
+    except BaseException:
+        # A worker raised, or we were interrupted. Kill the pool rather than let it
+        # linger holding connections.
+        pool.terminate()
+        raise
+    finally:
+        pool.join()
+
+    missing = [i for i in range(n) if i not in got]
+    if missing:
+        raise RuntimeError(
+            f"{len(missing)} of {n} chunks returned no result: "
+            f"{missing[:20]}{' ...' if len(missing) > 20 else ''}. "
+            "Refusing to export a partial tape.")
+
+    return [got[i] for i in range(n)]
