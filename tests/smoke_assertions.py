@@ -239,10 +239,26 @@ def check_stage1(root, members, stage0, min_rows, r):
                 f"{n_ff12} distinct values" + ("" if n_ff12 > 1 else
                 "  <-- Siccodes12 parse failed; every bond fell into the Other bucket"))
 
-    if "permno" in df.columns:
-        cov = float(df["permno"].notna().mean()) * 100.0
-        r.check("stage1 permno coverage is plausible", 50.0 <= cov <= 99.0,
-                f"{cov:.1f}% of rows")
+    # Equity-link coverage is checked PER MEMBER, because it differs by an order of
+    # magnitude between them and a pooled figure just measures the sample's mix.
+    # Measured: Enhanced ~80%, 144A ~25% -- 144A issues are private placements and
+    # Rule 144A offerings, which far less often have a listed equity parent. Pooling
+    # them made this check fail on a 144A-heavy sample for no good reason.
+    # What we actually want to catch is a linker merge that produced nothing, or one
+    # that matched everything (which would mean the dated window was ignored).
+    if "permno" in df.columns and "db_type" in df.columns:
+        PERMNO_BAND = {"enhanced": (50.0, 99.0), "standard": (30.0, 99.0),
+                       "144a": (2.0, 90.0)}
+        for m in sorted(members):
+            if m in NEVER_SURVIVES_STAGE1:
+                continue
+            sub = df[df["db_type"] == CANONICAL_DB_TYPE[m]]
+            if not len(sub):
+                continue
+            cov = float(sub["permno"].notna().mean()) * 100.0
+            lo, hi = PERMNO_BAND.get(m, (2.0, 99.0))
+            r.check(f"stage1 permno coverage plausible for {m}", lo <= cov <= hi,
+                    f"{cov:.1f}% of {len(sub):,} rows (expected {lo:.0f}-{hi:.0f}%)")
 
     if "credit_spread" in df.columns:
         cov = float(df["credit_spread"].notna().mean()) * 100.0

@@ -95,6 +95,27 @@ INIT_ERROR = {
 # A limited run logs a loud warning; its output is NOT the full universe.
 LIMIT_CHUNKS = int(os.environ.get("STAGE0_LIMIT_CHUNKS", "0")) or None
 
+# --- Chunk sizing ------------------------------------------------------
+# Work units are packed to about this many TRADE ROWS rather than a fixed count of
+# CUSIPs. Activity is enormously skewed, so 250-CUSIP chunks ranged from 7,806 rows
+# to 3,392,802 over the Enhanced universe -- and the memory a job must reserve is set
+# by the worst chunk, not the average.
+#
+# Measured on the real universe (111,727 CUSIPs / 345,874,974 trades):
+#   fixed 250 CUSIPs   447 chunks, max 3,392,802 rows (~2.7 GB raw frame)
+#   packed to 750,000  474 chunks, max   749,992 rows (~0.6 GB raw frame)
+# Nearly the same number of chunks, but a 4.5x smaller worst case -- which is what
+# makes running several at once affordable.
+#
+# This does not change the cleaned data: every per-chunk filter groups by cusip_id
+# and chunks are disjoint CUSIP sets, so regrouping cannot move a row. It does change
+# the audit tables, whose chunk column follows the new grouping.
+# Set to None to restore fixed chunk_size chunks.
+# Overridable from the environment, which is how the smoke test keeps its chunks
+# small enough to run in minutes while still exercising the packing path:
+#     STAGE0_TARGET_ROWS=40000 ./run_smoke_test.sh
+TARGET_ROWS_PER_CHUNK = int(os.environ.get("STAGE0_TARGET_ROWS", "0")) or 750_000
+
 # --- WRDS connection budget -------------------------------------------
 # WRDS publishes a limit of 5 CONCURRENT JOBS but does NOT publish a per-user limit
 # on database CONNECTIONS. There is one, and hitting it is nasty: the wrds package's
@@ -164,6 +185,7 @@ COMMON_KWARGS = dict(
     wrds_username = WRDS_USERNAME,
     output_format = OUTPUT_FORMAT,  # Imported from shared config.py
     chunk_size    = 250,
+    target_rows_per_chunk = TARGET_ROWS_PER_CHUNK,
     limit_chunks  = LIMIT_CHUNKS,   # dev/test only: process just the first N CUSIP
                                     # chunks (None = the full universe). Lets a config
                                     # change be checked in minutes rather than a ~4h run.

@@ -36,10 +36,15 @@ ROOT="${REPO}/smoke"
 CHUNKS=5
 MEMBERS=""
 WITH_REPORTS=0
+# Production packs chunks to ~750k trade rows. That is the right size for a real run
+# and far too big for a smoke run, where the point is to exercise every code path
+# quickly. Pack small instead: the packing logic is still exercised, the volume is not.
+TARGET_ROWS=40000
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --chunks)       CHUNKS="$2"; shift 2 ;;
+        --target-rows)  TARGET_ROWS="$2"; shift 2 ;;
         --root)         ROOT="$2";   shift 2 ;;
         --members)      MEMBERS="$2"; shift 2 ;;
         --with-reports) WITH_REPORTS=1; shift ;;
@@ -50,6 +55,7 @@ done
 
 PY="${PYTHON:-python3}"
 export STAGE0_LIMIT_CHUNKS="${CHUNKS}"
+export STAGE0_TARGET_ROWS="${TARGET_ROWS}"
 [[ -n "${MEMBERS}" ]] && export TRACE_MEMBERS="${MEMBERS}"
 
 # Figures are the slowest part of stage0 and prove nothing about the cross-stage seams.
@@ -65,12 +71,36 @@ echo " repo          : ${REPO}"
 echo " scratch root  : ${ROOT}"
 echo " members       : ${MEMBER_LIST}"
 echo " chunks/member : ${CHUNKS}"
+echo " rows/chunk    : ${TARGET_ROWS} (production packs to 750000)"
 echo " data reports  : $([[ ${WITH_REPORTS} -eq 1 ]] && echo yes || echo 'skipped (--with-reports to include)')"
 echo "================================================================"
 
 # ---------------------------------------------------------------- scratch root
+# Keep the CUSIP row counts across runs. The aggregate that produces them scans the
+# whole source table -- 93 s for Enhanced -- which is nothing against a real run but
+# dominates a smoke run, and re-measuring it on every iteration makes this tool
+# annoying enough that people stop using it.
+CACHE_KEEP="$(mktemp -d)"
+if compgen -G "${ROOT}/stage0/*/cusip_row_counts_*.parquet" > /dev/null 2>&1; then
+    for f in "${ROOT}"/stage0/*/cusip_row_counts_*.parquet; do
+        member="$(basename "$(dirname "${f}")")"
+        mkdir -p "${CACHE_KEEP}/${member}"
+        cp "${f}" "${CACHE_KEEP}/${member}/"
+    done
+    echo "[info] preserving cached CUSIP row counts across the rebuild"
+fi
+
 rm -rf "${ROOT}"
 mkdir -p "${ROOT}/stage0/logs" "${ROOT}/stage1/data" "${ROOT}/stage1/logs"
+
+if compgen -G "${CACHE_KEEP}/*/cusip_row_counts_*.parquet" > /dev/null 2>&1; then
+    for f in "${CACHE_KEEP}"/*/cusip_row_counts_*.parquet; do
+        member="$(basename "$(dirname "${f}")")"
+        mkdir -p "${ROOT}/stage0/${member}"
+        cp "${f}" "${ROOT}/stage0/${member}/"
+    done
+fi
+rm -rf "${CACHE_KEEP}"
 
 # Stage 1 needs the files run_pipeline.sh fetches on the login node. Reuse the
 # repo's copies if they are already there; otherwise say so plainly rather than

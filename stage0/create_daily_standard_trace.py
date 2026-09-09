@@ -19,9 +19,12 @@ import numpy as np
 import time
 import wrds
 import gc
-from functools import reduce
+from functools import reduce, lru_cache
 import pyarrow as pa
 import pandas_market_calendars as mcal
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # sibling modules
+import _chunk_runner
 
 # Silence ONE pandas warning class, by message, so the .err logs stay readable.
 #
@@ -1093,7 +1096,18 @@ def clean_trace_data(
         logging.info("-" * 50)  
             
     if all_super_list:
+        # Sort once, globally, so the output is CANONICAL.
+        #
+        # The concatenation alone leaves row order dependent on chunk order and chunk
+        # composition: each chunk is internally sorted, but the blocks arrive in the
+        # order the universe was sliced. That makes the file's byte content an
+        # artefact of the work plan -- so re-chunking, or completing chunks out of
+        # order, would produce a different file holding identical data, and no
+        # before/after comparison could tell a real change from a reshuffle.
+        # One sort removes the whole class of question.
         final_df = pd.concat(all_super_list, ignore_index=True)
+        final_df = final_df.sort_values(
+            ["cusip_id", "trd_exctn_dt"], kind="mergesort", ignore_index=True)
         return final_df, bb_cusips_all, dec_shift_cusips_all, init_price_cusips_all
     else:
         return pd.DataFrame(), bb_cusips_all, dec_shift_cusips_all, init_price_cusips_all
@@ -1733,6 +1747,22 @@ def add_filter_flags(group):
     
     return filtered_group
 # -------------------------------------------------------------------------
+@lru_cache(maxsize=8)
+def _valid_session_dates(calendar_name: str, start_date: str, end_date: str) -> frozenset:
+    """Session dates for one calendar and window, built once per run.
+
+    filter_by_calendar is called for every CUSIP chunk with the same arguments, and
+    each call was rebuilding the whole exchange schedule -- hundreds of times over a
+    full run. The schedule depends only on these three values, so memoise it. The
+    result is identical; only the repetition is gone.
+    """
+    import pandas_market_calendars as mcal
+    cal = mcal.get_calendar(calendar_name)
+    sched = cal.schedule(start_date=start_date, end_date=end_date)
+    return frozenset(sched.index.tz_localize(None).normalize().date)
+
+
+# -------------------------------------------------------------------------
 def filter_by_calendar(
     df: pd.DataFrame,
     calendar_name: str | None,
@@ -1766,7 +1796,7 @@ def filter_by_calendar(
         return df
 
     try:
-        import pandas_market_calendars as mcal
+        import pandas_market_calendars as mcal  # noqa: F401  (checked here, used in the cache)
     except Exception as e:
         raise RuntimeError(
             "pandas_market_calendars is required for filter_by_calendar but is not available."
@@ -1776,11 +1806,8 @@ def filter_by_calendar(
     if end_date is None:
         end_date = pd.Timestamp.today().normalize().strftime("%Y-%m-%d")
 
-    # Build schedule and set of valid session dates (date-only)
-    cal = mcal.get_calendar(calendar_name)
-    sched = cal.schedule(start_date=start_date, end_date=end_date)
-    # Normalize to date (no time, no tz)
-    valid_dates = pd.Index(sched.index.tz_localize(None).normalize().date)
+    # Valid session dates, built once per (calendar, window) and reused across chunks.
+    valid_dates = _valid_session_dates(calendar_name, start_date, end_date)
 
     # Parse input date column to date-only
     d_parsed = pd.to_datetime(df[date_col], errors="coerce").dt.normalize().dt.date
@@ -2774,7 +2801,8 @@ class ProcessStandardTRACE:
         init_error_params: dict | None = None,
         filters: dict | None = None,
         fisd_params: dict | None = None,
-        price_norm: dict | None = None
+        price_norm: dict | None = None,
+        target_rows_per_chunk: int | None = None
     ) -> None:
         # user options
         self.wrds_username = wrds_username
@@ -2797,6 +2825,8 @@ class ProcessStandardTRACE:
         self.filters    = filters or {}
         self.fisd_params = fisd_params or {}
         self.price_norm  = price_norm or {}
+        self.target_rows_per_chunk = (None if target_rows_per_chunk is None
+                                      else int(target_rows_per_chunk))
 
         self.out_dir = Path(out_dir).expanduser()     
 
@@ -2903,15 +2933,69 @@ class ProcessStandardTRACE:
                          "!= 1000 in the universe", len(prin))
         return prin
 
+    def _row_count_sql(self) -> str:
+        table = "trace.trace" if self.data_type == "standard" else "trace.trace_btds144a"
+        where = "cusip_id IS NOT NULL AND TRIM(cusip_id) != ''"
+        if self.start_date:
+            # Match the chunk query's own date predicate, or the counts would describe
+            # rows this run will never fetch.
+            where += f" AND trd_exctn_dt >= '{self.start_date}'"
+        return f"SELECT cusip_id, COUNT(*) AS n FROM {table} WHERE {where} GROUP BY cusip_id"
+
+    def _row_counts_cache_path(self) -> Path:
+        """Where this run's CUSIP row counts live, beside the run's other outputs."""
+        return self.out_dir / self.data_type / f"cusip_row_counts_{RUN_STAMP}.parquet"
+
+    def _cusip_row_counts(self, cusips):
+        """cusip_id -> trade-row count, for row-balanced chunk packing.
+
+        One aggregate over the source table. Returns None -- meaning fall back to
+        fixed-size chunks -- if packing is disabled or the query fails, because a
+        slower chunking scheme is a far better outcome than a failed run.
+        """
+        if not self.target_rows_per_chunk:
+            return None
+
+        # Cache it. The aggregate scans the whole source table -- measured at 93 s for
+        # Enhanced's 477,532 CUSIPs -- which is negligible against a multi-hour run but
+        # dominates a short one. Keyed by the run stamp, so a new day re-measures.
+        cache = self._row_counts_cache_path()
+        if cache.exists():
+            try:
+                df = pd.read_parquet(cache)
+                self.logger.info("Row counts: reusing %s cached CUSIP counts from %s",
+                                 f"{len(df):,}", cache.name)
+                return dict(zip(df["cusip_id"].astype(str), df["n"].astype("int64")))
+            except Exception:
+                self.logger.warning("Cached row counts at %s unreadable; re-querying",
+                                    cache)
+
+        sql = self._row_count_sql()
+        try:
+            t0 = time.time()
+            df = self._raw_sql_with_retry(sql)
+            self.logger.info("Row counts: %s CUSIPs in %.1fs",
+                             f"{len(df):,}", time.time() - t0)
+            try:
+                cache.parent.mkdir(parents=True, exist_ok=True)
+                df.to_parquet(cache, index=False)
+            except Exception:
+                self.logger.warning("Could not cache row counts to %s", cache)
+            return dict(zip(df["cusip_id"].astype(str), df["n"].astype("int64")))
+        except Exception:
+            self.logger.exception(
+                "Row-count query failed; falling back to fixed-size chunks of %d CUSIPs",
+                self.chunk_size)
+            return None
+
     def _make_cusip_chunks(self, fisd: pd.DataFrame):
         self.logger.info("Creating CUSIP batches ...")
         cusips = list(fisd["complete_cusip"].unique())
-
-        def divide_chunks(seq, n):
-            for i in range(0, len(seq), n):
-                yield seq[i : i + n]
-
-        return list(divide_chunks(cusips, self.chunk_size))
+        row_counts = self._cusip_row_counts(cusips)
+        chunks = _chunk_runner.plan_chunks(
+            cusips, row_counts, self.target_rows_per_chunk, self.chunk_size)
+        _chunk_runner.summarize_plan(chunks, row_counts, self.logger)
+        return chunks
 
     def _run_clean_trace(self, cusip_chunks, fisd_off, principal_amt=None):
         self.logger.info("Running TRACE cleaning loop ...")
