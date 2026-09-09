@@ -147,6 +147,54 @@ FF12_MAPPING   = None
 FF17_MAPPING   = None
 FF30_MAPPING   = None
 
+
+# ============================================================================
+# MERGE SAFETY
+# ============================================================================
+
+def _merge_1to1(left, right, *, on, how="left", label=""):
+    """Left-join a lookup that MUST have one row per key, and say so if it does not.
+
+    Every merge in this pipeline that joins a per-bond or per-issue lookup onto the
+    bond-day panel is many-to-ONE by intent. If the right frame has a duplicate key the
+    join silently multiplies panel rows instead of failing -- and the panel is not
+    re-checked for uniqueness until step 7, several steps and (on a full run) more than
+    an hour later. The 2026-09-09 run lost ~1.5 hours of stage-1 work to exactly that:
+    a single CUSIP with two FISD issue records duplicated 268 bond-days in step 6, and
+    step 7 reported it as a linker problem.
+
+    pandas' own validate="m:1" raises, but does not name the offending keys, which is
+    the first thing anyone debugging this needs. So check explicitly, report the keys,
+    and keep validate= as the backstop.
+    """
+    dup = right[on].duplicated()
+    if dup.any():
+        bad = list(right.loc[dup, on].unique()[:5])
+        raise ValueError(
+            f"{label or 'lookup'} has {int(dup.sum())} duplicate '{on}' value(s), "
+            f"e.g. {bad}. Left-joining it would duplicate panel rows. Collapse the "
+            f"lookup to one row per '{on}' before merging.")
+    return left.merge(right, on=on, how=how, validate="m:1")
+
+
+def _offering_amt_by_cusip(issues_for_amt):
+    """Collapse fisd_mergedissue to ONE row per CUSIP, keeping the largest offering.
+
+    fisd_mergedissue is keyed by issue_id. A bond can hold more than one issue record --
+    29357JAC0 has an ABS row and a CDEB row with the same issuer, maturity and coupon --
+    so this frame is NOT safe to join on cusip_id as it stands.
+
+    Largest offering_amt is the tie-break, matching the mergent_amounts dedup in step 6
+    and, on the known case, selecting the same issue record stage 0's FISD screen keeps.
+    """
+    return (
+        issues_for_amt[["cusip_id", "offering_amt"]]
+        .dropna(subset=["cusip_id"])
+        .sort_values(["cusip_id", "offering_amt"])
+        .drop_duplicates(subset=["cusip_id"], keep="last")
+    )
+
+
 # ============================================================================
 # STEP 1: LOAD TREASURY YIELDS
 # ============================================================================
@@ -456,11 +504,11 @@ def step4_merge_fisd():
 
     logger.info("Merging FISD columns: %s", available_cols)
 
-    # Merge FISD and calculate bond_maturity/bond_age
-    traced_pre_filter = (
-        final_df
-        .merge(fisd[available_cols], on="cusip_id", how="left")
-    )
+    # Merge FISD and calculate bond_maturity/bond_age.
+    # _merge_1to1: the stage-0 FISD artifact is one row per CUSIP today, and this
+    # asserts it stays that way rather than silently multiplying the panel.
+    traced_pre_filter = _merge_1to1(
+        final_df, fisd[available_cols], on="cusip_id", label="stage0 FISD universe")
 
     # Free memory from final_df as it's no longer needed
     del final_df
@@ -470,7 +518,19 @@ def step4_merge_fisd():
     traced_pre_filter["bond_maturity"] = (traced_pre_filter["maturity"] - traced_pre_filter["trd_exctn_dt"]).dt.days / 365.25
     traced_pre_filter["bond_age"] = (traced_pre_filter["trd_exctn_dt"] - traced_pre_filter["offering_date"]).dt.days / 365.25
 
-    # Convert interest_frequency to int for filtering
+    # Convert interest_frequency to int for filtering.
+    # A plain .astype(int) raises on ANY NaN, so a single bond-day whose CUSIP is missing
+    # from the FISD universe would abort the run here -- roughly 40 minutes in, with a
+    # bare "cannot convert" and nothing naming the cause. Report and drop instead: a
+    # bond-day with no coupon frequency cannot be priced downstream anyway.
+    n_missing_freq = int(traced_pre_filter["interest_frequency"].isna().sum())
+    if n_missing_freq:
+        bad = (traced_pre_filter.loc[traced_pre_filter["interest_frequency"].isna(),
+                                     "cusip_id"].astype(str).unique()[:5])
+        logger.warning("Dropping %d row(s) with no FISD interest_frequency "
+                       "(no coupon schedule, so not priceable). Examples: %s",
+                       n_missing_freq, list(bad))
+        traced_pre_filter = traced_pre_filter[traced_pre_filter["interest_frequency"].notna()]
     traced_pre_filter["interest_frequency"] = traced_pre_filter["interest_frequency"].astype(int)
 
     n_before_accrued = len(traced_pre_filter)
@@ -851,12 +911,27 @@ def step6_merge_ratings():
         direction="backward"
     )
     
-    # Fill remaining gaps with original offering amount
-    final_df = final_df.merge(
-        issues_for_amt[["cusip_id", "offering_amt"]],
-        on="cusip_id",
-        how="left"
-    )
+    # Fill remaining gaps with the original offering amount.
+    #
+    # ❗fisd_mergedissue is one row per ISSUE, not per CUSIP, and this frame comes
+    # straight from it -- the drop_duplicates above operates on mergent_amounts, a
+    # different frame. A bond can carry two issue records: 29357JAC0 has an ABS row and
+    # a CDEB row with the same issuer, maturity and coupon. Joining that on cusip_id
+    # duplicates EVERY bond-day of such a CUSIP.
+    #
+    # That is what happened on the 2026-09-09 run: 268 duplicated bond-days, which
+    # surfaced ~1.5 hours later as a duplicate-key abort in step 7 and cost the whole
+    # stage-1 run. Collapse to one row per CUSIP first, keeping the largest offering
+    # amount -- the same rule the mergent_amounts dedup above uses, and the one that
+    # picks the same issue record stage 0's FISD screen keeps.
+    offer_by_cusip = _offering_amt_by_cusip(issues_for_amt)
+    n_collapsed = len(issues_for_amt) - len(offer_by_cusip)
+    if n_collapsed:
+        logger.info("offering_amt lookup: collapsed %d multi-issue row(s) to one per CUSIP",
+                    n_collapsed)
+
+    final_df = _merge_1to1(
+        final_df, offer_by_cusip, on="cusip_id", label="offering_amt lookup")
     
     final_df = final_df.sort_values(["cusip_id", "trd_exctn_dt"])
     
@@ -915,6 +990,9 @@ def step6_merge_ratings():
     """)
     
     fisd_r.dropna(inplace=True)
+    # dropna() above makes this safe today; be explicit so a schema change cannot turn
+    # it into a bare "cannot convert float NaN to integer" three hours into a run.
+    fisd_r = fisd_r[fisd_r['issue_id'].notna()]
     fisd_r['issue_id'] = fisd_r['issue_id'].astype(int)
     fisd_r['callable'] = (fisd_r['callable'] == 'Y').astype(int)
     
@@ -1010,19 +1088,12 @@ def step6_merge_ratings():
     # --- Merge Call Dummies to main panel ---
     logger.info("Merging call dummies...")
     
-    final_df = final_df.merge(
-        fisd[['issue_id','cusip_id']],
-        how="left",
-        left_on=['cusip_id'],
-        right_on=['cusip_id']
-    )
-    
-    final_df = final_df.merge(
-        fisd_r,
-        how="left",
-        left_on=['issue_id'],
-        right_on=['issue_id']
-    )
+    final_df = _merge_1to1(
+        final_df, fisd[['issue_id', 'cusip_id']], on="cusip_id",
+        label="FISD cusip->issue_id map")
+
+    final_df = _merge_1to1(
+        final_df, fisd_r, on="issue_id", label="FISD call dummies")
     final_df.drop(['issue_id'], axis=1, inplace=True, errors="ignore")
     final_df['callable'] = final_df['callable'].fillna(0).astype(int)
 
@@ -1226,11 +1297,24 @@ def step7_merge_linker():
             "should have at most one open window per bond per date; a duplicate "
             "(cusip_id, w0) would fan rows out."
         )
-    dup = final_df.duplicated(subset=["cusip_id", "trd_exctn_dt"]).sum()
-    if dup:
+    # A DIFFERENT property from the row-count check above, and it is not about the
+    # linker: this is simply the first place the panel's uniqueness is re-checked after
+    # step 2's dedup. A duplicate here was created by an earlier many-to-one merge whose
+    # right frame had a duplicate key -- on the 2026-09-09 run, one CUSIP with two FISD
+    # issue records. Say so, and name the keys, so the next reader does not begin by
+    # investigating the linker, as we did.
+    dups = final_df.loc[final_df.duplicated(subset=["cusip_id", "trd_exctn_dt"],
+                                            keep=False)]
+    if len(dups):
+        sample = (dups[["cusip_id", "trd_exctn_dt"]]
+                  .drop_duplicates().head(5).to_dict("records"))
         raise RuntimeError(
-            f"{dup} duplicate (cusip_id, trd_exctn_dt) rows after the linker merge."
-        )
+            f"{len(dups)} rows share a (cusip_id, trd_exctn_dt) key. The linker merge "
+            "did NOT create these -- it is a merge_asof on a by-key and it left the row "
+            f"count unchanged ({before} -> {after}). They come from an earlier "
+            "many-to-one merge whose right frame had duplicate keys. Every such merge "
+            "now goes through _merge_1to1, so suspect anything added since. "
+            f"Examples: {sample}")
 
     # issuer_cusip is no longer the join key -- the linker is bond-level. Kept because
     # downstream code still expects the column; variable_drop() removes it shortly.
@@ -2237,8 +2321,11 @@ def step10_generate_reports():
     logger.info("=" * 80)
     
     # Check that step10a was called
-    if 'table1_tex' not in globals() or 'table2_tex' not in globals():
-        raise RuntimeError("step10a_build_filter_tables() must be called before step10_generate_reports()")
+    # Both names are bound to None at module scope, so `not in globals()` was always
+    # False and this guard never fired. Test the value, which is what was meant.
+    if table1_tex is None or table2_tex is None:
+        raise RuntimeError(
+            "step10a_build_filter_tables() must be called before step10_generate_reports()")
     
     # Create reports directory
     reports_dir = STAGE1_DIR / "data_reports"

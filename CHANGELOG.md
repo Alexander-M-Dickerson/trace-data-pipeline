@@ -18,6 +18,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.2.1] - 2026-09-10
+
+A stage-1 bug fix. The 2026-09-09 full run cleared stage 0 in 2 hours and then lost
+~1.5 hours of stage-1 work to a duplicate-key abort that named the wrong culprit.
+
+### Fixed
+- **Stage 1 aborted with "N duplicate (cusip_id, trd_exctn_dt) rows after the linker
+  merge."** The linker did not cause it. `fisd.fisd_mergedissue` is one row per
+  **issue_id**, not per CUSIP, and step 6 left-joined it on `cusip_id` to fill missing
+  offering amounts without collapsing it first. A bond holding two issue records --
+  `29357JAC0` carries an ABS row and a CDEB row with the same issuer, maturity and
+  coupon -- therefore had EVERY one of its bond-days duplicated. 268 of them survived
+  the filters on that run.
+
+  The lookup is now collapsed to one row per CUSIP (`_offering_amt_by_cusip`, keeping
+  the largest offering amount -- the same rule the `mergent_amounts` dedup above uses,
+  and the one that selects the same issue record stage 0's FISD screen keeps).
+
+  Reproduced against live WRDS data before and after: 304 bond-days x 2 issue records
+  -> 608 rows before, 304 -> 304 after, offering amounts still fully populated.
+
+  Note the cross-database dedup was NOT at fault and is unchanged: step 2 already sorts
+  on `(cusip_id, trd_exctn_dt, db_type)` and keeps first, so Enhanced beats 144A and the
+  panel leaves step 2 unique. The Enhanced/144A tape overlap is real -- 365 bond-days
+  over 252 CUSIPs measured locally -- and was already handled.
+
+- **Every many-to-one key join now fails AT the join, naming the key.** The panel's
+  uniqueness was not re-checked anywhere between step 2 and step 7, so a defect created
+  in step 6 surfaced five steps and an hour and a half later. `_merge_1to1` checks the
+  right frame's key before merging and reports the offending values; it now guards the
+  FISD characteristic merge (step 4), the cusip->issue_id map and the call-dummy join
+  (step 6), as well as the offering-amount lookup. All four are safe against today's
+  data -- the point is that a future FISD vintage gaining multiplicity fails in seconds
+  with the key named.
+
+- **The step-7 duplicate check no longer blames the linker.** It is a whole-frame
+  duplicate count, not a merge-integrity check, and `merge_asof` on a by-key cannot fan
+  out. It now says so, reports the row count it did not change, and names example keys.
+
+- **Late aborts that would kill a multi-hour run with an unhelpful message**:
+  `interest_frequency` and `issue_id` used a bare `.astype(int)` that raises on any NaN
+  a FISD left-join leaves; both now report and handle the gap.
+
+- **A guard that could never fire.** `if 'table1_tex' not in globals()` in step 10 was
+  always False -- both names are bound to `None` at module scope. It now tests the
+  value, which is what was meant.
+
+### Changed
+- **Stage 1 requests `-pe onenode 4 -l m_mem_free=10G` (40 GB)** instead of 24 GB on a
+  single slot. It was already running 4 joblib workers inside a 1-slot allocation --
+  `_stage1_settings.py` resolves `N_CORES` from `$NSLOTS` -- and the panel reached
+  16.35 GB by step 6, with steps 5, 8 and 10 each peaking near 2x the panel while they
+  concatenate chunk frames. `m_mem_free` is charged per slot, so this is 4 x 10G against
+  the WRDS caps of 8 cores and 48 GB.
+
+### Added
+- **`tests/test_merge_keys.py`** -- asserts, in ~30 seconds and without a pipeline run,
+  the key uniqueness each merge depends on, and reproduces the fan-out above before and
+  after the fix. The smoke test could not catch this class: it asserts panel uniqueness
+  and passed 28/28, because a four-chunk sample contains no multi-issue CUSIP. The
+  property that matters is not "is the output unique" but "is every lookup keyed the way
+  its join assumes".
+
+---
+
 ## [2.2.0] - 2026-09-09
 
 Stage 0 was the pipeline's long pole: ~4 hours for Enhanced, spent in a chunk loop
