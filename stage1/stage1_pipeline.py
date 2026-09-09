@@ -195,9 +195,26 @@ def step2_load_trace_data():
     logger.info("STEP 2: Loading TRACE Data from Stage0")
     logger.info("=" * 80)
 
+    # db_type is a PUBLISHED code, documented in stage1/DATA_DICTIONARY.md as
+    # "1=Enhanced, 2=Standard, 3=144A", and downstream research keys on 3 meaning 144A.
+    # It used to be the member's POSITION in TRACE_MEMBERS, which meant dropping a
+    # member silently renumbered the rest: with TRACE_MEMBERS = ["enhanced", "144a"],
+    # 144A became 2, and the overlap clip below then deleted it as though it were
+    # Standard. The job succeeded and the file looked normal. Bind the code to the
+    # member, never to its position.
+    DB_TYPE_BY_MEMBER = {"enhanced": 1, "standard": 2, "144a": 3}
+
+    unknown = [m for m in TRACE_MEMBERS if m not in DB_TYPE_BY_MEMBER]
+    if unknown:
+        raise ValueError(
+            f"TRACE_MEMBERS contains member(s) with no db_type code: {unknown}. "
+            f"Known members: {sorted(DB_TYPE_BY_MEMBER)}. Add the code here and to "
+            "stage1/DATA_DICTIONARY.md before using a new member."
+        )
+
     trace_parts = []
 
-    for i, member in enumerate(TRACE_MEMBERS, start=1):
+    for member in TRACE_MEMBERS:
         # Construct path: stage0/enhanced/trace_enhanced_YYYYMMDD.parquet
         member_folder = STAGE0_DIR / member
         filename = f"trace_{member}_{STAGE0_DATE_STAMP}.parquet"
@@ -211,7 +228,7 @@ def step2_load_trace_data():
 
         logger.info("Loading %s...", filepath.name)
         df_i = hf.load_and_process_trace_file(filepath)
-        df_i["db_type"] = i  # Tag by load order: 1=enhanced, 2=standard, 3=144a
+        df_i["db_type"] = DB_TYPE_BY_MEMBER[member]  # by MEMBER, never by position
         trace_parts.append(df_i)
         logger.info("  Loaded %s: %d rows", member, len(df_i))
 
@@ -259,10 +276,31 @@ def step2_load_trace_data():
     # the data now, and rebind the module global so every later consumer (the data
     # report, the log lines) sees the concrete date rather than the spec.
     global DATE_CUT_OFF
-    resolved = resolve_date_cut_off(DATE_CUT_OFF, raw_max)
-    if resolved != DATE_CUT_OFF:
+    spec = DATE_CUT_OFF
+    resolved = resolve_date_cut_off(spec, raw_max)
+    if resolved != spec:
         logger.info("Resolved DATE_CUT_OFF %s -> %s (last trade date %s)",
-                    DATE_CUT_OFF, resolved, raw_max)
+                    spec, resolved, raw_max)
+
+        # The sample end is bounded by EVERY input's frontier, not just TRACE's.
+        # credit_spread needs a treasury yield for the trade date, and the Liu-Wu
+        # curve is a separate source with its own end. 144A runs months ahead of
+        # Enhanced, so an auto cutoff derived from the combined tape can land past
+        # the curve -- which would leave the tail with a NULL credit_spread.
+        # Clamp, loudly. An explicit literal cutoff is the user's choice and is left
+        # alone; the coverage guard at the end of this step still checks it.
+        try:
+            yld_max = pd.to_datetime(ylds["trd_exctn_dt"]).max()
+            if pd.notna(yld_max) and pd.to_datetime(resolved) > yld_max:
+                logger.warning(
+                    "DATE_CUT_OFF %s is past the %s treasury curve (ends %s). "
+                    "Clamping the sample end to the curve so credit_spread is "
+                    "defined everywhere. Refresh the yield source to go further.",
+                    resolved, yld_type, yld_max.date())
+                resolved = yld_max.strftime("%Y-%m-%d")
+        except NameError:
+            logger.warning("Yields not loaded; cannot clamp DATE_CUT_OFF to the curve")
+
         DATE_CUT_OFF = resolved
     cut_off_date = pd.to_datetime(DATE_CUT_OFF)
     before = len(final_df)

@@ -35,13 +35,17 @@ OUTPUT_FORMAT = "parquet"  # Options: "parquet" (recommended), "csv"
 # ============================================================================
 # Which TRACE datasets to process across all stages
 # Options: "enhanced", "standard", "144a"
-TRACE_MEMBERS = ["enhanced", "standard", "144a"]
+# Overridable from the environment (space-separated) so a test run can select members
+# without editing this file:  TRACE_MEMBERS="enhanced 144a" ./run_smoke_test.sh
+TRACE_MEMBERS = os.getenv("TRACE_MEMBERS", "enhanced standard 144a").split()
 
 # ============================================================================
 # STAGE-SPECIFIC OUTPUT SETTINGS
 # ============================================================================
 # Stage 0: Error plot generation (WARNING: Can take VERY long to run)
-STAGE0_OUTPUT_FIGURES = True  # Set to False to skip error plots for faster processing
+# Overridable from the environment so a smoke run can skip the slow plot pass:
+#     STAGE0_OUTPUT_FIGURES=0 ./run_smoke_test.sh --with-reports
+STAGE0_OUTPUT_FIGURES = os.getenv("STAGE0_OUTPUT_FIGURES", "1") not in ("0", "false", "False")
 
 # Stage 1: Always generates reports and figures (no config needed)
 # Stage 1 outputs are essential for data quality assessment and always produced

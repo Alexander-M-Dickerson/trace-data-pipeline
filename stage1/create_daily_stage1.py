@@ -41,14 +41,24 @@ def run_stage1(config: dict):
         The stage1_pipeline module with all processed data
     """
 
-    # Import stage1_pipeline as a module
+    # Import stage1_pipeline as a module.
+    #
+    # Resolve it next to THIS file, not under ROOT_PATH. ROOT_PATH says where the DATA
+    # lives -- _stage1_settings explicitly documents pointing it at a data directory --
+    # while stage1_pipeline.py always sits beside create_daily_stage1.py. Deriving the
+    # code location from the data location breaks any run whose outputs live outside
+    # the checkout: a separate results tree, or the smoke test's scratch root.
     stage1_dir = Path(config["stage1_dir"])
-    pipeline_script_path = stage1_dir / "stage1_pipeline.py"
+    pipeline_script_path = Path(__file__).resolve().parent / "stage1_pipeline.py"
+
+    if not pipeline_script_path.exists():
+        # Fall back to the previous behaviour so an unusual layout still works.
+        pipeline_script_path = stage1_dir / "stage1_pipeline.py"
 
     if not pipeline_script_path.exists():
         raise FileNotFoundError(
             f"Pipeline script not found: {pipeline_script_path}\n"
-            "Expected stage1_pipeline.py in stage1/ directory"
+            "Expected stage1_pipeline.py beside create_daily_stage1.py"
         )
 
     # Load the module dynamically

@@ -162,3 +162,6 @@ wheels/
 !.gitignore
 !README.md
 !LICENSE
+
+# Smoke-test scratch root (run_smoke_test.sh)
+smoke/

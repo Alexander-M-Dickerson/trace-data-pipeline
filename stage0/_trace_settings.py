@@ -88,6 +88,13 @@ INIT_ERROR = {
     "n_transactions": 3,
 }
 
+# --- Dev/test chunk limit ---------------------------------------------
+# Process only the first N CUSIP chunks. None = the full universe (production).
+# Overridable from the environment so a smoke run needs no edit here:
+#     STAGE0_LIMIT_CHUNKS=5 ./run_smoke_test.sh
+# A limited run logs a loud warning; its output is NOT the full universe.
+LIMIT_CHUNKS = int(os.environ.get("STAGE0_LIMIT_CHUNKS", "0")) or None
+
 # --- Price-scale normalization ----------------------------------------
 # TRACE rptd_pr is a PERCENT OF PAR for the standard $1,000-principal bond: at par
 # it prints 100. Small-denomination issues -- retail and structured notes with a
@@ -114,9 +121,9 @@ COMMON_KWARGS = dict(
     wrds_username = WRDS_USERNAME,
     output_format = OUTPUT_FORMAT,  # Imported from shared config.py
     chunk_size    = 250,
-    limit_chunks  = None,   # dev/test only: process just the first N CUSIP chunks
-                            # (None = the full universe). Lets a config change be
-                            # checked in minutes instead of a ~4h production run.
+    limit_chunks  = LIMIT_CHUNKS,   # dev/test only: process just the first N CUSIP
+                                    # chunks (None = the full universe). Lets a config
+                                    # change be checked in minutes rather than a ~4h run.
     clean_agency  = True,
     out_dir       = "",
     volume_filter = ("dollar", 10000),
