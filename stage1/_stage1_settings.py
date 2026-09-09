@@ -41,16 +41,37 @@ ROOT_PATH = ""  # Auto-detect from current working directory
 # NOTE: TRACE_MEMBERS is imported from config.py (shared across all stages)
 
 # --- Execution Settings ---
-# Auto-detect number of CPU cores (leave as None for auto-detection)
+# Number of worker processes for the joblib passes (bond analytics, credit spreads).
+# Leave as None to pick a safe value automatically; set an integer to force one.
 N_CORES = None    # Set to None for auto-detection, or specify a number (e.g., 10)
 N_CHUNKS = 10      # Number of chunks for parallel operations
 
-# Auto-detect N_CORES if not set
+# Default worker count when N_CORES is not set explicitly.
+#
+# This used to be multiprocessing.cpu_count(), which reports the cores of the whole
+# HOST -- WRDS Cloud compute nodes have up to 24. But run_stage1.sh requests no
+# parallel environment, so Grid Engine grants the job a single slot with a 24 GB
+# memory limit. Spawning one worker per host core therefore over-subscribed the
+# node, and because joblib's process backend copies the data each worker touches,
+# it multiplied memory against that 24 GB grant.
+#
+# NOTE FOR ANYONE TEMPTED TO ADD `#$ -pe onenode N` TO run_stage1.sh: on this
+# cluster m_mem_free is a PER-SLOT request, so `-pe onenode 4` with the current
+# `-l m_mem_free=24G` asks for 4 x 24 = 96 GB on one node, and larger slot counts
+# exceed the node ceiling and pend forever. If you want more cores, divide the
+# memory at the same time (e.g. `-pe onenode 4` with `-l m_mem_free=6G`).
+STAGE1_DEFAULT_N_CORES = 4
+
 if N_CORES is None:
     import multiprocessing
-    N_CORES = multiprocessing.cpu_count()
-    # Use all available cores, but you can cap it if needed
-    # N_CORES = min(N_CORES, 20)  # Uncomment to cap at 20 cores
+    # Honour an explicit override, then a scheduler-granted slot count, then the
+    # conservative default. Never more than the machine actually has.
+    N_CORES = (
+        int(os.environ.get("STAGE1_N_CORES", 0))
+        or int(os.environ.get("NSLOTS", 0))
+        or STAGE1_DEFAULT_N_CORES
+    )
+    N_CORES = max(1, min(N_CORES, multiprocessing.cpu_count()))
 
 # --- Date Filter ---
 DATE_CUT_OFF = "2025-03-31"  # Only include data on/before this date

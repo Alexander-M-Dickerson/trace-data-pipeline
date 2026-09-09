@@ -1022,14 +1022,20 @@ def ultra_distressed_filter(
     enable_plateau_filter: bool = True,
     plateau_ultra_low_threshold: float = 0.15,
     min_plateau_days: int = 2,
-    suspicious_round_numbers: List[float] = [0.001, 0.01, 0.05, 0.10, 
-                                             0.25,  0.50, 0.75, 1.00],
+    # Mirrors ULTRA_DISTRESSED_CONFIG["suspicious_round_numbers"]; 0.75 is
+    # deliberately absent (a plausible distressed price, not a placeholder).
+    suspicious_round_numbers: List[float] = [0.001, 0.01, 0.05, 0.10,
+                                             0.25,  0.50, 1.00],
     round_tolerance: float = 0.0001,
     lookback: int = 5,
     lookforward: int = 5,
     pre_post_price_ratio: float = 3.0,
     enable_intraday_filter: bool = True,
-    price_cols: list = ["prc_ew", "prc_vw", "prc_first", "prc_last"],
+    # Intraday inconsistency is a HIGH/LOW RANGE test, not a cross-estimator test:
+    # for a bond-day priced below intraday_price_threshold, flag it when
+    # (max - min) / mean across these columns exceeds intraday_range_threshold.
+    # Mirrors ULTRA_DISTRESSED_CONFIG["price_cols"], which is what the pipeline passes.
+    price_cols: list = ["prc_hi", "prc_lo"],
     intraday_range_threshold: float = 0.75,
     intraday_price_threshold: float = 20.0,
     n_jobs: int = -1,
@@ -1037,8 +1043,15 @@ def ultra_distressed_filter(
     keep_flag_columns: bool = False,
 ) -> pd.DataFrame:
     """
-    Apply all refined filters with implementation. 
-    Uses enhanced Numba compilation with fastmath and nogil for maximum speed. 
+    Apply all refined filters with implementation.
+    Uses enhanced Numba compilation with fastmath and nogil for maximum speed.
+
+    The defaults here mirror ULTRA_DISTRESSED_CONFIG in stage1/_stage1_settings.py,
+    which is what the pipeline passes. Tune the config, not these -- and note that
+    changing either moves the sample, because flag_refined_any drives a row filter.
+
+    `n_jobs` is accepted for backwards compatibility and is NOT used: the detectors
+    are numba kernels, not joblib workers.
     """
     
     out = df.copy()
@@ -1237,7 +1250,11 @@ def ultra_distressed_filter(
 def flag_intraday_inconsistency_vectorized(
     df: pd.DataFrame,
     *,
-    price_cols: list = ["prc_ew", "prc_vw", "prc_first", "prc_last"],
+    # Intraday inconsistency is a HIGH/LOW RANGE test, not a cross-estimator test:
+    # for a bond-day priced below intraday_price_threshold, flag it when
+    # (max - min) / mean across these columns exceeds intraday_range_threshold.
+    # Mirrors ULTRA_DISTRESSED_CONFIG["price_cols"], which is what the pipeline passes.
+    price_cols: list = ["prc_hi", "prc_lo"],
     intraday_range_threshold: float = 0.75,
     intraday_price_threshold: float = 20.0,
     verbose: bool = False,

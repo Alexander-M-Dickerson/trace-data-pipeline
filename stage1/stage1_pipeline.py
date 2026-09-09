@@ -59,6 +59,13 @@ tqdm.pandas()
 # ============================================================================
 
 timestamp_log = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+# One stamp for every artifact this run produces. Previously variable_drop() named
+# the ratings/call-dummy exports with STAGE0_DATE_STAMP while save_outputs() called
+# datetime.now() separately, so a single run could emit stage1_20251206.parquet
+# beside sp_ratings_20251118.parquet -- and a run crossing midnight could stamp its
+# own outputs with two different dates. Fixed once, here.
+RUN_STAMP = timestamp_log[:8]
 log_path = LOG_DIR / f"stage1_{timestamp_log}.log"
 
 logging.basicConfig(
@@ -81,7 +88,8 @@ import _distressed_plot_helpers as dph
 logger.info("=" * 80)
 logger.info("Stage 1 Pipeline Initialized")
 logger.info("Root path: %s", ROOT_PATH)
-logger.info("Stage0 date stamp: %s", STAGE0_DATE_STAMP)
+logger.info("Stage0 date stamp: %s (input vintage)", STAGE0_DATE_STAMP)
+logger.info("Run stamp:         %s (names every output of this run)", RUN_STAMP)
 logger.info("TRACE members: %s", ", ".join(TRACE_MEMBERS))
 logger.info("=" * 80)
 
@@ -543,14 +551,20 @@ def step5_compute_bond_analytics():
             f"Ensure step4 completed successfully."
         )
 
-    # Path for incremental output
-    final_output_path = STAGE1_DATA / "temp_final_merged.parquet"
-    if final_output_path.exists():
-        final_output_path.unlink()  # Remove if exists from previous run
-        logger.info("Removed existing temp final output")
+    # Paths for the per-chunk outputs. Each chunk is written once and read back once
+    # at the end. The previous version grew a single file -- every chunk after the
+    # first read the whole accumulated parquet back, concatenated, and rewrote it --
+    # which for 10 chunks and a ~2.5 GB result meant roughly 25 GB of I/O and held
+    # three copies of the data (existing + chunk + combined) inside a 24 GB job.
+    # Writing parts mirrors what step 4 already does for temp_trace_other_chunk_*.
+    part_paths = [STAGE1_DATA / f"temp_stage1_part_{i:03d}.parquet" for i in range(N_CHUNKS)]
+    for part_path in part_paths:
+        if part_path.exists():
+            part_path.unlink()  # Remove if exists from previous run
+    logger.info("Removed any stale part files from a previous run")
 
     logger.info("Will read trace_other from chunked parquet files in: %s", STAGE1_DATA)
-    logger.info("Will write merged results to: %s", final_output_path)
+    logger.info("Will write merged results to: %s", STAGE1_DATA / "temp_stage1_part_*.parquet")
 
     # ----- Process each chunk with incremental merge -------------------------
     for i in range(N_CHUNKS):
@@ -572,7 +586,7 @@ def step5_compute_bond_analytics():
 
         # 3. Calculate credit spreads
         logger.info("Calculating credit spreads...")
-        spreads = hf.calculate_credit_spreads(processed, ylds)
+        spreads = hf.calculate_credit_spreads(processed, ylds, n_jobs=N_CORES)
 
         # 4. Merge spreads back into processed chunk
         analytics_chunk = processed.merge(
@@ -608,18 +622,9 @@ def step5_compute_bond_analytics():
         del analytics_chunk, trace_other_chunk
         gc.collect()
 
-        # 7. Append to output parquet (incremental write)
-        if i == 0:
-            # First chunk: create new file
-            merged_chunk.to_parquet(final_output_path, index=False, compression='snappy')
-            logger.info("Created output parquet with first chunk")
-        else:
-            # Subsequent chunks: append
-            existing = pd.read_parquet(final_output_path)
-            combined = pd.concat([existing, merged_chunk], ignore_index=True)
-            combined.to_parquet(final_output_path, index=False, compression='snappy')
-            del existing, combined
-            logger.info("Appended chunk to output parquet")
+        # 7. Write this chunk to its own part file (one write, no read-back)
+        merged_chunk.to_parquet(part_paths[i], index=False, compression='snappy')
+        logger.info("Wrote %s", part_paths[i].name)
 
         del merged_chunk
         gc.collect()
@@ -629,8 +634,18 @@ def step5_compute_bond_analytics():
     # ----- Load final merged result -------------------------------------------
     logger.info("=" * 80)
     logger.info("All chunks processed. Loading final merged dataset...")
-    final_df = pd.read_parquet(final_output_path)
-    logger.info("Final merged shape: %s", final_df.shape)
+    # Concatenate the parts in chunk order -- the same row order the incremental
+    # append produced.
+    written_parts = [pp for pp in part_paths if pp.exists()]
+    if not written_parts:
+        raise FileNotFoundError(
+            f"No stage1 part files were written to {STAGE1_DATA}. "
+            "Step 5 produced no output; check the chunk logs above."
+        )
+    final_df = pd.concat([pd.read_parquet(pp) for pp in written_parts],
+                         ignore_index=True)
+    logger.info("Final merged shape: %s (from %d part files)",
+                final_df.shape, len(written_parts))
 
     # Clean up traced_out from memory
     del traced_out
@@ -648,10 +663,13 @@ def step5_compute_bond_analytics():
             chunk_files_removed += 1
     logger.info("Removed %d trace_other chunk files", chunk_files_removed)
 
-    # Remove final merged temp file
-    if final_output_path.exists():
-        final_output_path.unlink()
-        logger.info("Removed temp_final_merged.parquet")
+    # Remove the stage1 part files
+    parts_removed = 0
+    for part_path in part_paths:
+        if part_path.exists():
+            part_path.unlink()
+            parts_removed += 1
+    logger.info("Removed %d stage1 part files", parts_removed)
 
     print("\n[STEP 5 COMPLETE] Bond analytics computed with chunked merge")
     print(f"Shape: {final_df.shape}")
@@ -1214,14 +1232,11 @@ def variable_drop():
 
         # Ratings - Int8 (handles NaN, range 1-22)
         'sp_rating': 'Int8',
-        'sp_naic': 'Int8',
         'mdy_rating': 'Int8',
         'spc_rating': 'Int8',
         'mdc_rating': 'Int8',
-        'comp_rating': 'Int8',
 
         # Binary flags - Int8 (handles NaN if present)
-        'callable': 'Int8',
         'db_type': 'Int8',
 
         # Large amounts - Int64 (handles NaN)
@@ -1248,7 +1263,7 @@ def variable_drop():
     # ========================================================================
     logger.info("Exporting auxiliary objects to free memory...")
 
-    timestamp = STAGE0_DATE_STAMP  # Use consistent timestamp
+    timestamp = RUN_STAMP  # one stamp per run -- see RUN_STAMP above
 
     # Export S&P ratings
     if sp_ratings is not None:
@@ -1564,7 +1579,7 @@ def step8_ultra_distressed():
         gc.collect()
 
         # Export to CSV
-        output_path = STAGE1_DATA / f"ultra_distressed_cusips_{STAGE0_DATE_STAMP}.csv"
+        output_path = STAGE1_DATA / f"ultra_distressed_cusips_{RUN_STAMP}.csv"
         flagged_df.to_csv(output_path, index=False)
 
         logger.info("Exported flagged CUSIPs summary to: %s", output_path)
@@ -2030,14 +2045,11 @@ def step10a_build_filter_tables():
         
         # Ratings - Int8 (handles NaN, range 1-22)
         'sp_rating': 'Int8',
-        'sp_naic': 'Int8',
         'mdy_rating': 'Int8',
         'spc_rating': 'Int8',
         'mdc_rating': 'Int8',
-        'comp_rating': 'Int8',
         
         # Binary flags - Int8 (handles NaN if present)
-        'callable': 'Int8',
         'db_type': 'Int8',
         
         # Large amounts - Int64 (handles NaN)
@@ -2297,7 +2309,7 @@ def step10_generate_reports():
     # ========================================================================
     logger.info("Generating time-series figures...")
     
-    timestamp = datetime.now().strftime("%Y%m%d")
+    timestamp = RUN_STAMP
     plot_params = hf.PlotParams()
     
     # Define the 4 rating categories to plot
@@ -2716,7 +2728,7 @@ def step10_generate_reports():
             'The data contain one observation per trading day, where dollar volume represents the sum of '
             'all trades on that day. '
             'Each panel displays 13 cumulative lines showing the percentage of days with total daily '
-            'volume below specified thresholds, ranging from \$0-5k to \$20M+. '
+            'volume below specified thresholds, ranging from \\$0-5k to \\$20M+. '
             'The $y$-axis represents the cumulative percentage of days (0-100 percent). '
             'Data are aggregated monthly. '
             f'The sample spans the period {min_date_str_fig15} to {max_date_str_fig15}.'))
@@ -2813,7 +2825,7 @@ def step10_generate_reports():
     # ========================================================================
     logger.info("Generating LaTeX report...")
     
-    timestamp = datetime.now().strftime("%Y%m%d")
+    timestamp = RUN_STAMP
     tex_filename = f"stage1_data_report_{timestamp}.tex"
     tex_path = reports_dir / tex_filename
     
@@ -2874,7 +2886,7 @@ def save_outputs():
     logger.info("SAVING OUTPUTS")
     logger.info("=" * 80)
 
-    timestamp = datetime.now().strftime("%Y%m%d")
+    timestamp = RUN_STAMP
 
     # Main output
     out_file = STAGE1_DATA / f"stage1_{timestamp}.parquet"
