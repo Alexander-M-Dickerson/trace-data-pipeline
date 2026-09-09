@@ -121,6 +121,24 @@ LINKER_URL = "https://openbondassetpricing.com/wp-content/uploads/2025/11/linker
 LINKER_ZIPKEY = "OSBAP_Linker_October_2025.parquet"
 
 # ============================================================================
+# PRE-DOWNLOADED EXTERNAL FILES (DO NOT EDIT)
+# ============================================================================
+# WRDS compute nodes have no internet, so run_pipeline.sh fetches these on the
+# login node into stage1/data/ before any job is submitted. validate_config()
+# checks for them up front: without that check a missing file surfaces deep
+# inside step 6/7, after the ~30-minute QuantLib pass, instead of immediately.
+#
+# Keyed off LINKER_ZIPKEY so the entry follows automatically when the linker
+# release changes.
+EXTERNAL_FILES = {
+    "Liu-Wu treasury yields": "liu_wu_yields.xlsx",
+    "Fama-French 12 industries": "Siccodes12.txt",
+    "Fama-French 17 industries": "Siccodes17.txt",
+    "Fama-French 30 industries": "Siccodes30.txt",
+    "bond-firm linker": LINKER_ZIPKEY,
+}
+
+# ============================================================================
 # DERIVED PATHS (DO NOT EDIT)
 # ============================================================================
 
@@ -284,6 +302,7 @@ def get_config() -> dict:
         # External data
         "linker_url": LINKER_URL,
         "linker_zipkey": LINKER_ZIPKEY,
+        "external_files": EXTERNAL_FILES,
 
         # Output settings
         "output_format": OUTPUT_FORMAT,
@@ -326,6 +345,26 @@ def validate_config(config: dict) -> None:
             "Please ensure stage0 has been run with the correct date stamp."
         )
 
+    # Check the externally-downloaded inputs BEFORE the pipeline starts. These are
+    # fetched by run_pipeline.sh on the login node (WRDS compute nodes have no
+    # internet). Steps 1, 3 and 7 need them; without this check the run fails hours
+    # in -- after the QuantLib pass -- for want of a file we could catch in the
+    # first second.
+    missing_external = []
+    for label, filename in config.get("external_files", {}).items():
+        if not (config["stage1_data"] / filename).exists():
+            missing_external.append(f"  {filename:<45s} ({label})")
+
+    if missing_external:
+        raise FileNotFoundError(
+            "Required external data files not found in "
+            f"{config['stage1_data']}:\n" + "\n".join(missing_external) + "\n\n"
+            "These are downloaded on the WRDS login node (compute nodes have no\n"
+            "internet access). From the project ROOT, run:\n"
+            "  ./run_pipeline.sh          # downloads them, then submits the jobs\n"
+            "or fetch them by hand -- see the PRE-STAGE block in run_pipeline.sh."
+        )
+
     # Validate output format
     valid_formats = ["parquet", "csv"]
     if config["output_format"] not in valid_formats:
@@ -359,5 +398,6 @@ def print_config_summary(config: dict) -> None:
     print(f"Yield Source:       {config['yld_type']}")
     print(f"Output Format:      {config['output_format']}")
     print(f"CPU Cores:          {config['n_cores']}")
+    print(f"External files:     {', '.join(config['external_files'].values())}")
     print("NOTE: Stage 1 always generates comprehensive reports and figures")
     print("=" * 80)

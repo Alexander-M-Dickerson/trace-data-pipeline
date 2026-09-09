@@ -2642,6 +2642,7 @@ class ProcessStandardTRACE:
         *,
         output_format: str = "csv",
         chunk_size: int = 250,
+        limit_chunks: int | None = None,
         clean_agency: bool = True,
         out_dir: str | Path = ".",
         start_date: str | None = None,
@@ -2660,6 +2661,7 @@ class ProcessStandardTRACE:
         self.wrds_username = wrds_username
         self.output_format = output_format.lower()
         self.chunk_size    = int(chunk_size)
+        self.limit_chunks  = None if limit_chunks is None else int(limit_chunks)
         self.clean_agency  = clean_agency
         self.out_dir       = Path(out_dir)
         self.start_date    = start_date
@@ -2711,8 +2713,16 @@ class ProcessStandardTRACE:
             self._connect_wrds()
             fisd, fisd_off = self._build_fisd()
             cusip_chunks   = self._make_cusip_chunks(fisd)
-            # TODO
-            # cusip_chunks = cusip_chunks[:20]
+            if self.limit_chunks is not None:
+                # Dev/test escape hatch: process only the first N CUSIP chunks so a
+                # config or filter change can be checked in minutes rather than
+                # re-running the full ~4h universe. Never set for a production run.
+                kept = cusip_chunks[: self.limit_chunks]
+                self.logger.warning(
+                    "limit_chunks=%d set -- processing %d of %d CUSIP chunks. "
+                    "THIS IS A PARTIAL RUN; the output is not the full universe.",
+                    self.limit_chunks, len(kept), len(cusip_chunks))
+                cusip_chunks = kept
             all_data = self._run_clean_trace(cusip_chunks, fisd_off)
             self._export(all_data, fisd)
             return all_data

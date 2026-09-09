@@ -93,6 +93,9 @@ COMMON_KWARGS = dict(
     wrds_username = WRDS_USERNAME,
     output_format = OUTPUT_FORMAT,  # Imported from shared config.py
     chunk_size    = 250,
+    limit_chunks  = None,   # dev/test only: process just the first N CUSIP chunks
+                            # (None = the full universe). Lets a config change be
+                            # checked in minutes instead of a ~4h production run.
     clean_agency  = True,
     out_dir       = "",
     volume_filter = ("dollar", 10000),

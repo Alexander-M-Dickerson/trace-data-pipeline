@@ -263,6 +263,29 @@ def step2_load_trace_data():
     if "issuer_cusip" in final_df.columns:
         final_df['issuer_cusip'] = final_df['issuer_cusip'].astype('category')
 
+    # --- Treasury-curve coverage guard -------------------------------------------
+    # credit_spread = ytm - (treasury yield interpolated at the bond's maturity), and
+    # the curve is joined on the exact trade date. The Liu-Wu curve is a third-party
+    # spreadsheet: if it ever stops being updated it will end BEFORE the TRACE
+    # frontier, and every trade past its last date silently gets a NULL
+    # credit_spread instead of an error. Catch that here, while it is still cheap.
+    try:
+        yld_max = pd.to_datetime(ylds["trd_exctn_dt"]).max()
+        panel_max = final_df["trd_exctn_dt"].max()
+        if pd.notna(yld_max) and pd.notna(panel_max) and yld_max < panel_max:
+            n_uncovered = int((final_df["trd_exctn_dt"] > yld_max).sum())
+            raise ValueError(
+                f"{yld_type} treasury curve ends {yld_max:%Y-%m-%d}, but the TRACE "
+                f"panel runs to {panel_max:%Y-%m-%d}.\n"
+                f"{n_uncovered:,} bond-day rows would receive a NULL credit_spread.\n"
+                "Either refresh the yield source, or lower DATE_CUT_OFF in "
+                "stage1/_stage1_settings.py to the curve's last date."
+            )
+        logger.info("Treasury curve covers the panel (curve to %s, panel to %s)",
+                    yld_max, panel_max)
+    except NameError:
+        logger.warning("Yields not loaded; skipping treasury-curve coverage check")
+
     print("\n[STEP 2 COMPLETE] TRACE data loaded")
     print(f"Shape: {final_df.shape}")
     print(f"Columns: {list(final_df.columns)}")
