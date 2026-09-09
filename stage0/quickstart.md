@@ -82,14 +82,14 @@ You have two equivalent ways to start the master script:
 **Method 1 — run via bash (no permission change needed):**
 
 ```bash
-bash run_all_trace.sh
+bash run_pipeline.sh
 ```
 
 **Method 2 — make it executable once, then run directly:**
 
 ```bash
-chmod +x run_all_trace.sh      # one-time setup
-./run_all_trace.sh
+chmod +x ../*.sh *.sh           # one-time setup
+./run_pipeline.sh
 ```
 
 What this does:

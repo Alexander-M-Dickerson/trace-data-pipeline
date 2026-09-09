@@ -14,7 +14,7 @@ Transforms raw TRACE data into a research-ready bond dataset with:
 - ⭐ **Credit ratings** (S&P and Moody's)
 - 🔗 **Equity identifiers** (PERMNO, PERMCO, GVKEY)
 - 🚨 **Quality filters** (ultra-distressed bond detection)
-- 🏭 **Industry classifications** (Fama-French 17 and 30)
+- 🏭 **Industry classifications** (Fama-French 12, 17 and 30)
 
 **Output:** A comprehensive parquet file with 50+ variables per bond-day.
 
@@ -107,8 +107,12 @@ python -m pip install -r requirements.txt
 ### Step 3: Run the Pipeline
 
 ```bash
-# Make the script executable
-chmod +x run_pipeline.sh
+# Make the scripts executable (once per clone)
+chmod +x *.sh stage0/*.sh stage1/*.sh
+
+# OPTIONAL BUT RECOMMENDED: prove the chain works first, in ~10 minutes
+bash download_inputs.sh     # LOGIN NODE only -- compute nodes have no internet
+qsub run_smoke_test.sh      # result in smoke_test.out
 
 # Run the complete pipeline
 ./run_pipeline.sh
@@ -116,15 +120,17 @@ chmod +x run_pipeline.sh
 
 **What happens:**
 
-1. **Pre-Stage** (automatic data download):
+1. **Pre-Stage** (`download_inputs.sh`, on the login node):
    - Liu-Wu treasury zero-coupon yields
-   - OSBAP Linker (equity identifiers)
+   - bond-firm linker (equity identifiers)
    - Fama-French industry classifications
 
-2. **Stage 0** (TRACE data extraction):
-   - Enhanced TRACE (2002-present)
-   - Standard TRACE (2024-present)
-   - 144A TRACE (2002-present)
+2. **Stage 0** (TRACE data extraction) -- submits exactly the members in
+   `TRACE_MEMBERS`, which defaults to Enhanced + 144A:
+   - Enhanced TRACE (2002-present), pulling 5 CUSIP chunks at a time
+   - 144A TRACE (2002-present), running alongside it
+   - Standard TRACE (2024-present) -- OPT-IN; when requested it runs after the other
+     two so it can use the whole WRDS connection budget
    - Data quality reports
 
 3. **Stage 1** (bond analytics):
@@ -389,10 +395,18 @@ After the pipeline completes:
 
 ```
 trace-data-pipeline/
-├── config.py                        # Shared configuration (WRDS_USERNAME, OUTPUT_FORMAT)
+├── config.py                        # Shared configuration (WRDS_USERNAME, TRACE_MEMBERS)
 ├── run_pipeline.sh                  # Main pipeline orchestrator
+├── download_inputs.sh               # Stage 1's external inputs (LOGIN NODE)
+├── run_smoke_test.sh                # Whole-chain check in minutes
 ├── README.md                        # Detailed documentation
 ├── QUICKSTART.md                    # This file
+│
+├── tests/                           # Run before you commit
+│   ├── smoke_assertions.py          # The 28 cross-stage invariants
+│   ├── test_chunk_plan.py           # No WRDS needed
+│   ├── test_chunk_scheduler.py      # No WRDS needed
+│   └── probe_wrds_connections.py    # Measures your connection ceiling
 │
 ├── stage0/                          # TRACE data extraction
 │   ├── run_enhanced_trace.sh        # SGE job script
@@ -401,7 +415,9 @@ trace-data-pipeline/
 │   ├── run_build_data_reports.sh
 │   ├── create_daily_enhanced_trace.py
 │   ├── create_daily_standard_trace.py
-│   ├── _trace_settings.py           # Stage 0 configuration
+│   ├── _chunk_runner.py             # Chunk planning + concurrent scheduler
+│   ├── _wrds_pool.py                # One WRDS connection per worker
+│   ├── _trace_settings.py           # Stage 0 configuration (incl. CONCURRENCY)
 │   ├── logs/                        # Job logs
 │   ├── enhanced/                    # Enhanced TRACE outputs
 │   ├── standard/                    # Standard TRACE outputs
@@ -417,7 +433,8 @@ trace-data-pipeline/
     └── data/                        # Stage 1 outputs
         ├── stage1_YYYYMMDD.parquet  # Final dataset
         ├── liu_wu_yields.xlsx       # Treasury yields (auto-downloaded)
-        ├── OSBAP_Linker_*.parquet   # Equity linker (auto-downloaded)
+        ├── bond_firm_linker_2026/   # Equity linker (auto-downloaded)
+        ├── Siccodes12.txt           # FF12 industries (auto-downloaded)
         ├── Siccodes17.txt           # FF17 industries (auto-downloaded)
         └── Siccodes30.txt           # FF30 industries (auto-downloaded)
 ```
@@ -444,12 +461,16 @@ nano config.py  # Set WRDS_USERNAME
 # Install dependencies (Stage 1 only)
 python -m pip install --user -r requirements.txt
 
+# Fetch stage 1's external inputs (login node) and check the chain end to end
+chmod +x *.sh stage0/*.sh stage1/*.sh
+bash download_inputs.sh
+qsub run_smoke_test.sh             # ~10 min -> smoke_test.out
+
 # Run complete pipeline
-chmod +x run_pipeline.sh
 ./run_pipeline.sh
 
 # Monitor
-qstat                              # Job status
+qstat                              # Job status ('hqw' = held, waiting: normal)
 tail -f stage0/logs/01_enhanced.out # Stage 0 progress
 tail -f stage1/logs/stage1.out     # Stage 1 progress
 

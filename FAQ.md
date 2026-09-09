@@ -22,13 +22,15 @@ Both Stage 0 and Stage 1 are designed for WRDS Cloud due to database access requ
 ### How long does processing take?
 Using `./run_pipeline.sh` (complete automated pipeline):
 - **Pre-stage (data downloads)**: ~5 minutes
-- **Stage 0 (Enhanced TRACE)**: ~4 hours before v2.2.0, which pulls 5 CUSIP chunks
-  at once over separate WRDS connections
-- **Stage 0 (Standard TRACE)**: ~30-60 minutes
-- **Stage 0 (Rule 144A)**: ~30-60 minutes
+- **Stage 0 (Enhanced TRACE)**: was ~4 hours serial. Since v2.2.0 it pulls 5 CUSIP
+  chunks at once over separate WRDS connections -- measured 4.5x on the chunk loop
+  itself, so expect materially less, though how much depends on how fetch and clean
+  divide up on the day.
+- **Stage 0 (Rule 144A)**: ~30-60 minutes, running at the same time as Enhanced
+- **Stage 0 (Standard TRACE)**: ~30-60 minutes, and OPT-IN since v2.2.0. When requested
+  it is scheduled after the other two rather than beside them.
 - **Stage 0 (Report generation)**: ~30-60 minutes
 - **Stage 1 (Bond analytics)**: ~2 hours
-- **Total**: ~7 hours for complete pipeline
 
 ### What if I only want Enhanced TRACE?
 You can customize which datasets to process in `config.py` (applies to all stages):
@@ -337,13 +339,13 @@ For detailed instructions, see [QUICKSTART.md](QUICKSTART.md#download-results-to
 ### I'm getting "Permission denied" errors
 **Solution**: Make scripts executable:
 ```bash
-chmod +x run_all_trace.sh run_enhanced_trace.sh run_standard_trace.sh run_144a_trace.sh
+chmod +x run_pipeline.sh download_inputs.sh stage0/run_*.sh
 ```
 
 ### I'm getting "bad interpreter" or `^M` errors
 **Solution**: Convert Windows line endings to Unix:
 ```bash
-sed -i 's/\r$//' run_all_trace.sh
+sed -i 's/\r$//' run_pipeline.sh
 # Or fix all shell scripts:
 find . -name "*.sh" -exec sed -i 's/\r$//' {} \;
 ```
@@ -382,7 +384,14 @@ python -m pip install --user -r requirements.txt
 ```
 
 ### The report generation job (build_reports) never starts
-**Explanation**: This is normal! When using `./run_all_trace.sh`, the report job shows status `hqw` (holding) until all three data jobs complete. It will automatically start when ready.
+**Explanation**: This is normal. `./run_pipeline.sh` holds the report job until every
+stage-0 job it submitted completes, and holds Stage 1 until the reports are done. They
+start automatically.
+
+Not to be confused with `qw` **without** the `h`: that means the job is queued but not
+held, and if it stays there the resource request is the thing to check. Stage 0 asks for
+one slot per worker (`-pe onenode 5` for Enhanced by default) -- lower the member's
+`CONCURRENCY` in `stage0/_trace_settings.py` and resubmit if your queue cannot place it.
 
 **Check progress**:
 ```bash
@@ -482,7 +491,7 @@ DIRECTORY  USED / LIMIT
    - Efficient parquet compression
 
 ### Can I run multiple datasets simultaneously?
-Yes! That's exactly what `./run_all_trace.sh` does. It submits Enhanced, Standard, and 144A as parallel jobs.
+Yes! That's exactly what `./run_pipeline.sh` does. It submits Enhanced, Standard, and 144A as parallel jobs.
 
 ---
 

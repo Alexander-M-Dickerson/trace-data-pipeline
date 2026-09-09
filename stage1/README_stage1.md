@@ -197,7 +197,7 @@ mkdir -p data
 # Download Liu-Wu treasury yields from Google Sheets (run on WRDS login node)
 wget -O data/liu_wu_yields.xlsx "https://docs.google.com/spreadsheets/d/11HsxLl_u2tBNt3FyN5iXGsIKLwxvVz7t/export?format=xlsx&id=11HsxLl_u2tBNt3FyN5iXGsIKLwxvVz7t"
 
-# Download OSBAP Linker file (for equity identifiers)
+# Download the bond-firm linker (for equity identifiers)
 wget -O data/linker_file_2025.zip "https://openbondassetpricing.com/wp-content/uploads/2025/11/linker_file_2025.zip"
 
 # Unzip the linker file
@@ -205,7 +205,7 @@ unzip data/linker_file_2025.zip -d data/
 
 # Verify downloads
 ls -lh data/liu_wu_yields.xlsx
-ls -lh data/OSBAP_Linker_October_2025.parquet
+ls -lh data/bond_firm_linker_2026/fl_linker.parquet
 
 # Clean up zip file (optional)
 rm data/linker_file_2025.zip
@@ -292,7 +292,7 @@ The pipeline executes 10 steps in sequence:
 - Converts letter ratings to numeric scores
 - Creates composite rating variables
 
-### Step 7: Merge OSBAP Linker
+### Step 7: Merge the bond-firm linker
 - Downloads OSBAP (Open-Source Bond Asset Pricing) linker file
 - Adds equity identifiers: PERMNO, PERMCO and GVKEY
 - Enables cross-referencing with other datasets

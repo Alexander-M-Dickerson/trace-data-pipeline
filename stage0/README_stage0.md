@@ -12,6 +12,7 @@ Please also see **Generating the TRACE Data Reports** for instructions on how to
 ## Table of Contents
 
 - [Repo Layout](#repo-layout-key-files)
+- [How Stage 0 Spends Its Time](#how-stage-0-spends-its-time-and-why-it-is-no-longer-4-hours)
 - [Python on the WRDS Cloud](#python-on-the-wrds-cloud)
 - [Getting the Code onto WRDS](#getting-the-code-onto-wrds)
 - [Requirements](#requirements)
@@ -31,23 +32,27 @@ Please also see **Generating the TRACE Data Reports** for instructions on how to
 ```
 stage0/
   # Shell scripts for job submission
-  run_all_trace.sh            # Submits all jobs (Enhanced, Standard, 144A)
+  (submission lives in ../run_pipeline.sh, which reads TRACE_MEMBERS)
   run_enhanced_trace.sh       # Submits Enhanced TRACE job
   run_standard_trace.sh       # Submits Standard TRACE job
   run_144a_trace.sh           # Submits Rule 144A TRACE job
   run_build_data_reports.sh   # Submits the data report generation job
 
   # Configuration
-  _trace_settings.py          # Central configuration: filters, parameters, WRDS username
+  _trace_settings.py          # Central configuration: filters, parameters, CONCURRENCY,
+                              # WRDS username, and the grid resource requests
 
   # Python runners (called by shell scripts)
   _run_enhanced_trace.py      # Enhanced runner (calls CreateDailyEnhancedTRACE)
   _run_standard_trace.py      # Standard runner (calls CreateDailyStandardTRACE)
   _run_144a_trace.py          # 144A runner (calls CreateDailyStandardTRACE with data_type=144a)
-  
+
   # Core processing modules
   create_daily_enhanced_trace.py # Main functions for Enhanced TRACE processing
   create_daily_standard_trace.py # Main functions for Standard/144A TRACE processing
+  _chunk_runner.py            # How the CUSIP universe is split into work units, and
+                              # the scheduler that runs several of them at once
+  _wrds_pool.py               # One WRDS connection per worker process
 
   # Report generation
   _build_error_files.py       # Generates TRACE data quality reports
@@ -58,9 +63,90 @@ stage0/
   data_reports/               # LaTeX reports and figures (if generated)
 ```
 
-**Important:** `run_all_trace.sh` executes all three data processing jobs in parallel, then uses SGE's `-hold_jid` to automatically submit the report generation job once all three complete. This means everything runs in one go.
+**Important:** submission lives in `../run_pipeline.sh`, which reads `TRACE_MEMBERS` from
+`config.py` and submits exactly those members. Enhanced and 144A go in together;
+Standard, if requested, is held behind them with `-hold_jid`. The report job is then held
+on every stage-0 job actually submitted, and Stage 1 on the report job — so the whole
+thing still runs in one go.
 
-Each `run_*.sh` is a thin SGE wrapper that sets `-cwd` (current working directory), exports your environment (`-V`), and writes logs into `./logs/`.
+Each `run_*.sh` is a thin SGE wrapper that sets `-cwd` (current working directory),
+exports your environment (`-V`), and writes logs into `./logs/`. Cores and memory are
+**not** set in these scripts: `run_pipeline.sh` computes them per member from
+`CONCURRENCY` and passes them on the `qsub` command line, so the request cannot drift
+away from the worker count.
+
+---
+
+## How Stage 0 spends its time (and why it is no longer ~4 hours)
+
+Stage 0 is a loop over chunks of CUSIPs: fetch a chunk from WRDS, clean it, aggregate it
+to bond-days. Until v2.2.0 that loop was strictly serial on one WRDS connection, which is
+why Enhanced took about four hours while holding a whole compute node.
+
+**Chunks are now packed by ROW COUNT, not CUSIP count.** Trading activity is enormously
+skewed, so 250-CUSIP chunks ranged from 7,806 rows to 3,392,802 over the Enhanced
+universe — and the memory a job must reserve is set by the worst chunk, not the average.
+Packing to ~750,000 rows brings the worst case to 749,992, a 4.5x reduction, for about
+the same number of chunks. `target_rows_per_chunk` controls this. `chunk_size` still
+exists and still means CUSIPs-per-chunk, because the report job uses it for its own
+independent chunking of flagged CUSIPs.
+
+Re-chunking cannot change the cleaned data. Every per-chunk filter groups by `cusip_id` —
+the decimal-shift anchor, the bounce-back scan, the initial-price-error scan, the
+Dick-Nielsen reversal keys — and chunks are disjoint CUSIP sets, so which chunk a bond
+lands in cannot affect its result. What *does* change is the audit tables, whose `chunk`
+column follows the new grouping.
+
+**Several chunks are fetched at once**, each worker process holding its own WRDS
+connection. `CONCURRENCY` in `_trace_settings.py` sets how many; `STAGE0_WORKERS`
+overrides it for a single run.
+
+**Output is sorted canonically before export**, by `(cusip_id, trd_exctn_dt)`. Row order
+no longer depends on the work plan, which is what makes it possible to *prove* a
+scheduling change did not alter the data — the parquet files come out byte-identical
+whether one worker ran the chunks or six did. Measured on 5 chunks: 18 s wall against
+81.3 s of serial work.
+
+### The WRDS connection budget
+
+| member | connections | when it runs |
+|---|---|---|
+| `enhanced` | 5 | alongside 144A |
+| `144a` | 1 | alongside Enhanced |
+| `standard` | 6 | after both, so it can use the lot |
+
+**The measured ceiling is 7 connections held simultaneously** — the 8th fails. (The "5"
+WRDS publishes is the concurrent-*job* limit, a different thing.) Enhanced + 144A is
+therefore 6, leaving one spare so a mid-run reconnect cannot be refused.
+`validate_connection_budget` enforces this at submit time rather than four hours in.
+
+Measure it on your own account before raising anything:
+
+```bash
+python3 tests/probe_wrds_connections.py --max 10
+```
+
+❗**A refused connection does not look like one.** The `wrds` package answers *every*
+failed connect by re-prompting for a username, so in a batch job — where stdin is closed
+— it surfaces as `EOFError: EOF when reading a line`. That single error covers both a
+missing `WRDS_USERNAME` and the connection limit; `_wrds_pool.py` distinguishes them and
+says which.
+
+### Grid resources
+
+`m_mem_free` is charged **per slot**, so `slots × m_mem_free ≤ 48 GB` (and ≤ 8 cores).
+Get this wrong and the job does not error — it pends forever, silently.
+`qsub_resources()` derives the request from `CONCURRENCY` and refuses anything over the
+caps:
+
+| member | request | total |
+|---|---|---|
+| `enhanced` | `-pe onenode 5 -l m_mem_free=8G` | 40 GB |
+| `144a` | `-pe onenode 1 -l m_mem_free=16G` | 16 GB |
+| `standard` | `-pe onenode 6 -l m_mem_free=8G` | 48 GB |
+
+If a job sits at `qw` and will not start, the slot request is the first thing to check:
+lower the member's `CONCURRENCY` and resubmit — the resource request follows.
 
 ---
 
@@ -193,23 +279,32 @@ SSH into the WRDS cloud and install required Python packages. The essential pack
 ### 2. Navigate to the repository and configure settings
 
 ```bash
-cd ~/proj/stage0
+cd ~/trace-data-pipeline
 ```
 
-**CRITICAL:** Edit `_trace_settings.py` and change the `WRDS_USERNAME` variable to your WRDS username:
+**CRITICAL:** set your WRDS username. It lives in the shared `config.py` at the repo
+ROOT -- `_trace_settings.py` imports it from there, so editing `_trace_settings.py` will
+not do anything.
 
-```python
-WRDS_USERNAME = os.getenv("WRDS_USERNAME", "your_wrds_username_here")
-```
-
-To easily change this via command line by opening `nano`, follow these instructions:
+The simplest way is an environment variable, which needs no file edited at all:
 
 ```bash
-nano _trace_settings.py
+export WRDS_USERNAME="your_wrds_id"
+echo 'export WRDS_USERNAME="your_wrds_id"' >> ~/.bashrc   # make it persistent
 ```
-Change your username at the top, e.g., `wrds_user1` (set this to *your* username).
-Save and exit `nano`, press Ctrl + O, then Enter to save. Press Ctrl + X to exit `nano`.
-You can confirm the change was actioned by executing `grep WRDS_USERNAME _trace_settings.py`.
+
+Or edit the fallback in `config.py`:
+
+```bash
+nano config.py
+# WRDS_USERNAME = os.getenv("WRDS_USERNAME", "your_wrds_username")
+```
+Save and exit `nano` with Ctrl+O, Enter, then Ctrl+X. Confirm with
+`python3 -c "from config import WRDS_USERNAME; print(WRDS_USERNAME)"`.
+
+❗If this is left as the placeholder `your_wrds_username`, the run dies with
+`EOFError: EOF when reading a line` -- the `wrds` package prompting on a closed stdin.
+That looks exactly like the connection limit and is not.
 
 The WRDS password should be handled by the `.pgpass` file which you should have set up following the WRDS documentation.
 
@@ -218,7 +313,7 @@ Review the default filter settings in `_trace_settings.py`. All filters are enab
 ### 3. Make scripts executable (run once)
 
 ```bash
-chmod +x run_all_trace.sh run_enhanced_trace.sh run_standard_trace.sh run_144a_trace.sh run_build_data_reports.sh
+chmod +x run_pipeline.sh download_inputs.sh run_smoke_test.sh stage0/run_*.sh stage1/run_stage1.sh
 ```
 
 ### 4. Fix line endings (if editing on Windows)
@@ -237,7 +332,7 @@ find . -name "*.sh" -exec sed -i 's/\r$//' {} \;
 Submit the complete automated pipeline:
 
 ```bash
-./run_all_trace.sh
+./run_pipeline.sh
 ```
 
 **What happens:**
@@ -463,7 +558,16 @@ Fine-tune the bounce-back price-error detection:
 
 Settings applied to all runners:
 - `output_format`: `"parquet"` (lightweight) or `"csv"` (larger `.csv.gzip`)
-- `chunk_size`: Number of CUSIPs per batch - `250`
+- `chunk_size`: CUSIPs per batch - `250`. Since v2.2.0 this no longer decides Stage 0's
+  own chunking (see `target_rows_per_chunk`), but it is still read by the report job for
+  its independent chunking of flagged CUSIPs, so it is kept.
+- `target_rows_per_chunk`: trade rows per chunk - `750_000`. THIS is what sizes Stage 0's
+  work units. Set to `None` to fall back to fixed `chunk_size` chunks.
+  Override for one run with `STAGE0_TARGET_ROWS`.
+- `n_workers`: chunks fetched at once, one WRDS connection each. Comes from `CONCURRENCY`
+  per member; override for one run with `STAGE0_WORKERS`.
+- `limit_chunks`: process only the first N chunks - `None`. A dev/test escape hatch;
+  never set it for a production run. Override with `STAGE0_LIMIT_CHUNKS`.
 - `clean_agency`: Apply agency de-duplication - `True`
 - `out_dir`: Output directory - `""` (current directory)
 - `volume_filter`: Tuple of `(kind, threshold)`:
@@ -550,7 +654,7 @@ data/
 - `01_enhanced.out`, `01_enhanced.err`: Enhanced TRACE job logs
 - `02_standard.out`, `02_standard.err`: Standard TRACE job logs
 - `03_144a.out`, `03_144a.err`: 144A TRACE job logs
-- `04_reports.out`, `04_reports.err`: Report generation logs (when using `run_all_trace.sh`)
+- `04_reports.out`, `04_reports.err`: Report generation logs (when using `run_pipeline.sh`)
 - Logs contain timestamps, row counts, filter statistics, and any errors
 
 **Daily panels** (Parquet format, in respective subfolders):
@@ -591,7 +695,7 @@ scp -r wrds_username@wrds-cloud.wharton.upenn.edu:~/proj/stage0/logs ./local_des
 
 ## Generating the TRACE Data Reports
 
-When you run `./run_all_trace.sh`, reports are automatically generated for all three datasets after data processing completes using SGE's `-hold_jid` dependency feature. However, you can also generate or regenerate reports separately.
+When you run `./run_pipeline.sh`, reports are automatically generated for all three datasets after data processing completes using SGE's `-hold_jid` dependency feature. However, you can also generate or regenerate reports separately.
 
 ### Configuration
 
@@ -613,7 +717,7 @@ OUT_DIR        = ""          # Leave blank for current directory
 
 ### Running the report generator separately
 
-If you want to regenerate reports with different settings or didn't run `./run_all_trace.sh`:
+If you want to regenerate reports with different settings or didn't run `./run_pipeline.sh`:
 
 Make the script executable (first time only):
 ```bash
@@ -676,20 +780,30 @@ Or use your favorite LaTeX editor (TeXShop, TeXstudio, Overleaf, etc.).
 
 - **Environment setup**: Ensure your WRDS Python environment has all required packages. If you're using a module or conda environment, load/activate it before submitting jobs.
 
-- **Automated workflow**: The `run_all_trace.sh` script uses SGE's `-hold_jid` feature to create job dependencies. The report generation job automatically waits in the queue (status `hqw`) until all three data jobs complete. This is the recommended workflow.
+- **Automated workflow**: `run_pipeline.sh` uses SGE's `-hold_jid` to create job
+  dependencies, built from the jobs actually submitted. The report job waits at `hqw`
+  until every stage-0 job finishes. This is the recommended workflow.
 
-- **Job dependency**: When you run `./run_all_trace.sh`, you'll see four jobs in `qstat`:
-  - `trace_enhanced` - running or queued
-  - `trace_standard` - running or queued
-  - `trace_144a` - running or queued
-  - `build_reports` - status `hqw` (holding) until the above three finish
+- **Job dependency**: with the default `TRACE_MEMBERS = ["enhanced", "144a"]` you will
+  see four jobs in `qstat`:
+  - `trace_enhanced` - running or queued, 5 slots
+  - `trace_144a` - running or queued, 1 slot
+  - `build_reports` - `hqw` until both finish
+  - `stage1_pipeline` - `hqw` until the reports finish
 
-- **Memory considerations**: Each job processes 250 CUSIPs at a time by default. If you encounter memory issues, reduce `chunk_size` in `_trace_settings.py`.
+  Add `standard` to `TRACE_MEMBERS` and a fifth appears, itself held behind the other
+  two rather than running beside them.
+
+- **Memory considerations**: chunks are packed to ~750,000 trade rows, and each worker
+  holds one chunk at a time. If you hit memory trouble, lower `target_rows_per_chunk` or
+  `CONCURRENCY` — in that order, since the per-worker peak is set by chunk size.
 
 - **Runtime expectations**:
-  - Enhanced TRACE (full sample): 4-8 hours depending on WRDS load
-  - Standard TRACE (from 2024): 30-60 minutes
-  - Rule 144A (full sample): 2-4 hours
+  - Enhanced TRACE (full sample): was 4-8 hours serial; materially less since v2.2.0
+    pulls 5 chunks at once. How much less depends on how fetch and clean divide up on the
+    day — measured 4.5x on the chunk loop itself.
+  - Standard TRACE (from 2024): 30-60 minutes, and opt-in
+  - Rule 144A (full sample): 30-60 minutes
   - Data reports (with figures): 30-60 minutes per dataset
 
 - **Disk space**: Enhanced TRACE generates ~30M rows. Parquet files are compressed and typically 500MB-1GB per dataset. CSV files are much larger.
@@ -720,16 +834,16 @@ Or use your favorite LaTeX editor (TeXShop, TeXstudio, Overleaf, etc.).
 
 - **Script not executable**: 
   ```bash
-  chmod +x run_all_trace.sh run_enhanced_trace.sh run_standard_trace.sh run_144a_trace.sh
+  chmod +x run_pipeline.sh download_inputs.sh stage0/run_*.sh
   ```
 
-- **Permission denied** when trying to run `./run_all_trace.sh`:
+- **Permission denied** when trying to run `./run_pipeline.sh`:
   You probably missed the `chmod +x` step above.
 
 - **Bad interpreter** or `^M` errors:
   Convert Windows line endings to Unix:
   ```bash
-  sed -i 's/\r$//' run_all_trace.sh
+  sed -i 's/\r$//' ../run_pipeline.sh
   # Or fix all shell scripts at once:
   find . -name "*.sh" -exec sed -i 's/\r$//' {} \;
   ```
@@ -806,7 +920,7 @@ wc -l logs/*.out         # Count lines in log files
 If a job fails:
 1. Review the error log: `cat logs/01_enhanced.err`
 2. Fix the issue in configuration or code
-3. Resubmit: `qsub run_enhanced_trace.sh` (or `./run_all_trace.sh`)
+3. Resubmit: `qsub run_enhanced_trace.sh` (or `./run_pipeline.sh`)
 
 ---
 
@@ -901,19 +1015,31 @@ COMMON_KWARGS = dict(
 
 ### Chunking strategy
 
-The default `chunk_size = 250` balances memory usage and processing speed. Adjust based on your needs:
+Chunks are packed to `target_rows_per_chunk` trade rows (default `750_000`), not to a
+fixed CUSIP count. Size it against the memory available per worker: the peak inside
+`decimal_shift_corrector` is roughly 2.5x the raw chunk, because it copies the frame and
+adds columns.
 
-- **Faster processing** (more memory): `chunk_size = 500`
-- **Lower memory** (slower): `chunk_size = 100`
+- **Lower memory per worker**: `target_rows_per_chunk = 400_000`
+- **Fewer, larger chunks**: `target_rows_per_chunk = 1_500_000`
+- **Restore the old fixed-CUSIP behaviour**: `target_rows_per_chunk = None`
+
+The row counts behind the packing are measured once per run and cached beside the output
+as `cusip_row_counts_<stamp>.parquet` (about 93 s for the Enhanced universe). If that
+query fails, the planner falls back to fixed `chunk_size` chunks rather than aborting.
 
 ### Parallel processing
 
-To maximize throughput, submit all three jobs simultaneously:
-```bash
-./run_all_trace.sh
-```
+Two levels, and they compose:
 
-This uses SGE's parallel job execution capability.
+**Within a job**, `CONCURRENCY` decides how many chunks are fetched at once, each on its
+own WRDS connection.
+
+**Across jobs**, `run_pipeline.sh` submits Enhanced and 144A together, and holds Standard
+behind them:
+```bash
+./run_pipeline.sh
+```
 
 ### Output format choice
 

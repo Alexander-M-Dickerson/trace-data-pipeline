@@ -45,7 +45,14 @@ held a whole compute node. This release runs those chunks concurrently.
 - **A test suite**, the repo's first: `run_smoke_test.sh` runs stage0 -> reports ->
   stage1 on a few chunks in minutes and asserts 28 cross-stage invariants;
   `tests/test_chunk_plan.py` and `tests/test_chunk_scheduler.py` cover the partition
-  and scheduling properties without needing WRDS.
+  and scheduling properties without needing WRDS; `tests/probe_wrds_connections.py`
+  measures your own account's connection ceiling.
+- **`download_inputs.sh`** -- stage 1's external inputs (Liu-Wu yields, the bond-firm
+  linker, the FF industry files) split out of `run_pipeline.sh` into their own script.
+  They must be fetched on the LOGIN NODE, because compute nodes have no internet, so a
+  submitted smoke test could never fetch them itself. It now exits non-zero when a file
+  is missing instead of warning and continuing: every one is required for stage 1's 44
+  columns, so a miss is a run that dies hours later having burned the grid time.
 - **Canonical output ordering.** Stage 0 sorts by `(cusip_id, trd_exctn_dt)` before
   export. Row order no longer depends on the work plan, which is what makes a
   before/after comparison meaningful at all. The row SET is unchanged.
@@ -93,12 +100,54 @@ held a whole compute node. This release runs those chunks concurrently.
 - The `ChainedAssignmentError` FutureWarning is suppressed by message, so stage-0
   `.err` logs stay readable without hiding every other warning.
 
+Three more surfaced the first time the smoke test was SUBMITTED to a real grid rather
+than run locally, which is the only way it is meant to be used on WRDS:
+
+- **`run_smoke_test.sh` resolved the repo to SGE's spool directory.** `qsub` does not run
+  the script where it sits -- it copies it into the spool tree and runs the copy -- so
+  `dirname "$BASH_SOURCE"` gave `/gridware/sge/default/spool/<node>/job_scripts` and
+  every path built from it pointed nowhere. The visible symptom was the run reporting
+  five external inputs as missing while they sat in the repo. It now tries
+  `SGE_O_WORKDIR`, then `PWD`, then the script's own directory, taking the first that
+  actually contains `stage0/` and `stage1/`.
+- **`#$ -o smoke/logs/smoke.out` on a fresh clone.** SGE opens the output file before
+  running a line, and that directory does not exist until the script creates it, so a
+  fresh clone went straight to `Eqw` having executed nothing. Output now goes to
+  `smoke_test.out` in the repo root.
+- **Every shell script was committed as `100644`**, so a fresh clone on Linux gets
+  "Permission denied" from `./download_inputs.sh` or `./run_pipeline.sh`. Long-standing,
+  and caused by `core.filemode=false` on the Windows clone these are authored from, where
+  `chmod +x` never reaches a commit. Set explicitly with `git update-index --chmod=+x`;
+  `run_pipeline.sh` also now invokes its sibling through `bash` so it does not care.
+
+### Documentation
+- Repository structure listings in `README.md` and `QUICKSTART.md` rebuilt against the
+  actual file list. They had drifted: both showed `stage0/QUICKSTART_stage0.md` and
+  `stage1/requirements.txt`, neither of which exists, and neither listed `config.py`,
+  `FAQ.md`, `stage1/stage1_pipeline.py` or `stage1/DATA_DICTIONARY.md`.
+- **`run_all_trace.sh` no longer exists but was still referenced 23 times** across the
+  FAQ and both stage-0 guides. Replaced with `run_pipeline.sh` throughout.
+- **The stage-0 quick start told you to set `WRDS_USERNAME` in `_trace_settings.py`.**
+  That has not worked since the shared `config.py` was introduced -- `_trace_settings.py`
+  imports the value from there, so editing it does nothing. Corrected, with the
+  environment-variable route given first.
+- `OSBAP_Linker_*.parquet` renamed to `bond_firm_linker_2026/` wherever it appeared;
+  the linker changed in 2.1.0 and the docs had not followed.
+- `ff12num` shipped in 2.1.0 but the headline feature lists still said "17 and 30".
+- `CONTRIBUTING.md` documents the test suite and states the bar for any stage-0
+  scheduling change: byte-identical parquet output against a banked reference.
+
 ### Verification
 Concurrent output is byte-identical to serial, on both engines, with chunks completing
 out of order and with several chunks per worker: all stage-0 parquet files match,
 audit tables included, and the replayed filter logs match character for character.
 The measured WRDS connection ceiling on the development account is 7 held
 simultaneously (the 8th fails); the budget leaves one spare for a mid-run reconnect.
+
+Confirmed live on the WRDS grid: five workers opened five connections inside one second
+and ran five chunks in 18 s of wall clock against 81.3 s of serial work (4.5x), with
+completions arriving out of order and all 28 smoke assertions still passing. The
+`-pe onenode 5 -l m_mem_free=8G` request placed immediately.
 
 ---
 

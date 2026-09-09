@@ -126,7 +126,7 @@ cd ~/proj  # Navigate to your project root
 ```
 
 **This automatically:**
-1. Downloads required data files (Liu-Wu yields, OSBAP linker, FF industries)
+1. Downloads required data files (Liu-Wu yields, bond-firm linker, FF industries)
 2. Submits Stage 0 jobs (Enhanced, Standard, 144A TRACE extraction)
 3. Submits Stage 1 job (waits for Stage 0 to complete)
 
@@ -157,7 +157,7 @@ qsub run_stage1.sh
 4. Merges FISD with TRACE
 5. Computes bond analytics (duration, convexity, YTM, credit spreads) using QuantLib
 6. Merges S&P and Moody's credit ratings
-7. Merges OSBAP linker (equity identifiers)
+7. Merges bond-firm linker (equity identifiers)
 8. Applies ultra-distressed bond filters
 9. Applies final filters (price > 300%, July 2002 anomaly)
 10. Generates data quality reports

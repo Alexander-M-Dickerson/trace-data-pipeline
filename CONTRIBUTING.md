@@ -64,13 +64,37 @@ git checkout -b feature/your-feature-name
 
 ## Testing
 
-Before submitting a pull request:
+The repo ships a test suite. Run it before submitting a pull request.
 
-1. **Test locally** if possible
-2. **Test on WRDS Cloud** for production scenarios
-3. **Check logs** for errors or warnings
-4. **Verify outputs** match expected format
-5. **Run on small sample** before full dataset
+**No WRDS needed** -- seconds:
+
+```bash
+python3 tests/test_chunk_plan.py        # chunk-partition properties
+python3 tests/test_chunk_scheduler.py   # ordering + failure handling
+```
+
+**Whole chain, WRDS needed** -- ~10 minutes. Runs the real Stage 0 and Stage 1 code on a
+handful of CUSIP chunks and asserts 28 cross-stage invariants. Writes to `smoke/` and
+never touches production output:
+
+```bash
+bash download_inputs.sh          # once, on a machine with internet
+./run_smoke_test.sh              # locally
+qsub run_smoke_test.sh           # on WRDS -- head nodes forbid heavy work
+```
+
+❗**For any change to Stage 0's scheduling, chunking or ordering, the bar is
+byte-identical output.** Bank the parquet files from `smoke/stage0/` before your change,
+re-run after, and compare with `sha256sum`. This is possible because Stage 0 sorts
+canonically before export, and it is the only way to tell a real change from a reshuffle.
+The audit tables must match too -- the data reports reconstruct each chunk's filter
+sequence from row order.
+
+Then:
+
+1. **Check logs** for errors or warnings
+2. **Verify outputs** match the published schema (21 columns from Stage 0, 44 from Stage 1)
+3. **Run on a small sample** before the full dataset (`STAGE0_LIMIT_CHUNKS=5`)
 
 ## License
 

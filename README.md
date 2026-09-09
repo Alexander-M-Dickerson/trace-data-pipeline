@@ -29,7 +29,7 @@ Processes raw intraday TRACE transaction data to clean daily panels. Handles thr
 
 **Status:** Public beta - fully functional and ready for testing
 **Execution:** WRDS Cloud or your home machine (WRDS subscription required)
-**Documentation:** See [stage0/README_stage0.md](stage0/README_stage0.md) and [stage0/QUICKSTART_stage0.md](stage0/QUICKSTART_stage0.md)
+**Documentation:** See [stage0/README_stage0.md](stage0/README_stage0.md) and [stage0/quickstart.md](stage0/quickstart.md)
 
 ### Stage 1: Daily Bond Analytics  **PUBLIC BETA**
 Enriches Stage 0 daily panels with comprehensive bond analytics and characteristics:
@@ -37,7 +37,7 @@ Enriches Stage 0 daily panels with comprehensive bond analytics and characterist
 - **Credit ratings** from S&P and Moody's with numeric conversions
 - **Equity identifiers** equity linkers
 - **FISD bond characteristics** (coupon, maturity, issuer, amount outstanding, etc.)
-- **Fama-French industry classifications** (17 and 30 industries)
+- **Fama-French industry classifications** (12, 17 and 30 industries)
 - **Ultra-distressed filters** to flag potentially erroneous prices
 
 **Status:** Public beta - fully functional and ready for testing
@@ -105,7 +105,7 @@ Please reach out to `alexander.dickerson1@unsw.edu.au` if you would like to coll
 - **Credit ratings** from S&P and Moody's with numeric conversions
 - **External identifiers** 
 - **Ultra-distressed bond filters** to flag potentially erroneous prices
-- **Fama-French industry classifications** (17 and 30 industry groups)
+- **Fama-French industry classifications** (12, 17 and 30 industry groups)
 - Produces comprehensive daily bond-level dataset with 50+ variables
 - Ultra-distressed filter catches suspiciupus "rounded" price numbers at very low prices often associated with issues trading under default. See [README_distressed_filter.md](stage1/README_distressed_filter.md)
 
@@ -154,28 +154,39 @@ nano config.py
 python -m pip install --user -r requirements.txt
 ```
 
-3. **Run the complete pipeline:**
+3. **Check the chain works, before spending hours on it (recommended):**
 ```bash
-chmod +x run_pipeline.sh
+chmod +x *.sh stage0/*.sh stage1/*.sh
+bash download_inputs.sh     # LOGIN NODE ONLY -- compute nodes have no internet
+qsub run_smoke_test.sh      # ~10 min; output lands in smoke_test.out
+```
+This runs the real Stage 0 → Stage 1 code on a handful of CUSIP chunks and asserts
+28 cross-stage invariants. It writes to `smoke/` and never touches production output.
+
+4. **Run the complete pipeline:**
+```bash
 ./run_pipeline.sh
 ```
 
 **What happens:**
-1. **Pre-stage**: Auto-downloads required data files (Liu-Wu yields, OSBAP linker, FF industries)
-2. **Stage 0**: Submits 3 parallel jobs (Enhanced, Standard, 144A TRACE)
-3. **Stage 0 Reports**: Auto-generates when all TRACE jobs complete
-4. **Stage 1**: Auto-starts after Stage 0 reports finish
-5. **Total runtime**: ~7 hours on WRDS Cloud
+1. **Pre-stage**: `download_inputs.sh` fetches the Liu-Wu yields, the bond-firm linker
+   and the FF industry files on the login node (compute nodes have no internet).
+2. **Stage 0**: submits exactly the members in `TRACE_MEMBERS` — by default Enhanced and
+   144A, which run at the same time. Standard is opt-in and, when requested, is held
+   until the other two finish so it can use the whole WRDS connection budget.
+3. **Stage 0 Reports**: auto-generates when every submitted TRACE job completes.
+4. **Stage 1**: auto-starts after Stage 0 reports finish.
 
 **Automated features:**
 - ✅ Data downloads (no manual wget required)
-- ✅ Job dependencies (stages run in correct order)
-- ✅ Configuration auto-detection (STAGE0_DATE_STAMP, ROOT_PATH, N_CORES)
-- ✅ Centralized settings (`config.py` for shared settings)
+- ✅ Job dependencies built from the jobs actually submitted
+- ✅ Cores and memory requested per member, validated against the WRDS caps before
+  submission (`m_mem_free` is charged per slot; an over-request pends forever in silence)
+- ✅ Centralized settings (`config.py` shared; `stage0/_trace_settings.py` for Stage 0)
 
 **For detailed instructions:**
 - **Quick Start**: See [QUICKSTART.md](QUICKSTART.md) for complete walkthrough
-- **Stage 0**: See [stage0/README_stage0.md](stage0/README_stage0.md) or [stage0/QUICKSTART_stage0.md](stage0/QUICKSTART_stage0.md)
+- **Stage 0**: See [stage0/README_stage0.md](stage0/README_stage0.md) or [stage0/quickstart.md](stage0/quickstart.md)
 - **Stage 1**: See [stage1/README_stage1.md](stage1/README_stage1.md) or [stage1/QUICKSTART_stage1.md](stage1/QUICKSTART_stage1.md)
 
 ---
@@ -184,7 +195,7 @@ chmod +x run_pipeline.sh
 
 **Stage 0 - TRACE Data Processing:**
 - **[README](stage0/README_stage0.md)**: Complete guide for intraday to daily TRACE processing
-- **[QUICKSTART](stage0/QUICKSTART_stage0.md)**: Fast-track guide to get started quickly
+- **[QUICKSTART](stage0/quickstart.md)**: Fast-track guide to get started quickly
 - **[Configuration Guide](stage0/README_stage0.md#configuration-choices-you-can-edit)**: All configurable parameters
 - **[Troubleshooting](stage0/README_stage0.md#troubleshooting)**: Common issues and solutions
 
@@ -238,18 +249,33 @@ The pipeline generates a large folder (~6 GB) with hundreds of files. **Zip the 
 trace-data-pipeline/
 ├── LICENSE                           # MIT License
 ├── README.md                         # This file
+├── QUICKSTART.md                     # Fast-track guide (all stages)
+├── FAQ.md                            # Common questions
 ├── CONTRIBUTING.md                   # Contribution guidelines
 ├── CHANGELOG.md                      # Version history
 ├── requirements.txt                  # Python dependencies (all stages)
+├── config.py                         # Shared settings (TRACE_MEMBERS, username, ...)
 ├── run_pipeline.sh                   # ✨ One-push button orchestrator (ROOT)
-├── .gitignore                        # Git ignore rules
+├── download_inputs.sh                # Fetches stage 1's external inputs (LOGIN NODE)
+├── run_smoke_test.sh                 # Whole-chain validation in minutes
+├── .gitignore
+│
+├── tests/                            # Run before committing; no WRDS needed for 2 of 4
+│   ├── smoke_assertions.py           # The 28 cross-stage invariants
+│   ├── test_chunk_plan.py            # Chunk-partition properties
+│   ├── test_chunk_scheduler.py       # Ordering + failure handling
+│   └── probe_wrds_connections.py     # Measures your account's connection ceiling
 │
 ├── stage0/                           # ✅ PUBLIC BETA - Intraday to daily processing
 │   ├── README_stage0.md              # Detailed documentation
-│   ├── QUICKSTART_stage0.md          # Fast-track guide
-│   ├── _trace_settings.py            # Configuration file
+│   ├── quickstart.md                 # Fast-track guide
+│   ├── README_bounce_back_filter.md
+│   ├── README_decimal_shift_corrector.md
+│   ├── _trace_settings.py            # Configuration (CONCURRENCY, filters, FISD, ...)
 │   ├── create_daily_enhanced_trace.py
 │   ├── create_daily_standard_trace.py
+│   ├── _chunk_runner.py              # Chunk planning + the concurrent scheduler
+│   ├── _wrds_pool.py                 # One WRDS connection per worker process
 │   ├── _run_enhanced_trace.py        # Runner scripts
 │   ├── _run_standard_trace.py
 │   ├── _run_144a_trace.py
@@ -261,7 +287,7 @@ trace-data-pipeline/
 │   ├── run_build_data_reports.sh
 │   │
 │   ├── enhanced/                     # Enhanced TRACE output (auto-created)
-│   ├── standard/                     # Standard TRACE output (auto-created)
+│   ├── standard/                     # Standard TRACE output (auto-created, opt-in)
 │   ├── 144a/                         # Rule 144A output (auto-created)
 │   │
 │   └── data_reports/                 # Quality reports (auto-created)
@@ -272,22 +298,28 @@ trace-data-pipeline/
 ├── stage1/                           # ✅ PUBLIC BETA - Daily bond analytics
 │   ├── README_stage1.md              # Detailed documentation
 │   ├── QUICKSTART_stage1.md          # Fast-track guide
+│   ├── DATA_DICTIONARY.md            # Every output column
+│   ├── README_distressed_filter.md
 │   ├── _stage1_settings.py           # Configuration file
-│   ├── create_daily_stage1.py        # Main processing module
+│   ├── create_daily_stage1.py        # Driver
+│   ├── stage1_pipeline.py            # Main processing module
 │   ├── helper_functions.py           # Utility functions
+│   ├── _distressed_plot_helpers.py
 │   ├── _run_stage1.py                # Runner script
 │   ├── run_stage1.sh                 # Job submission script
-│   ├── requirements.txt              # Stage 1 specific dependencies
 │   │
-│   ├── data/                         # Stage 1 output (auto-created)
+│   ├── data/                         # Stage 1 output + downloaded inputs
 │   │   ├── stage1_YYYYMMDD.parquet   # Enriched dataset
 │   │   ├── liu_wu_yields.xlsx        # Downloaded treasury yields
-│   │   ├── OSBAP_Linker_*.parquet    # Downloaded linker file
+│   │   ├── bond_firm_linker_2026/    # Downloaded bond->firm linker
+│   │   ├── Siccodes12.txt            # FF12 industry file
 │   │   ├── Siccodes17.txt            # FF17 industry file
 │   │   ├── Siccodes30.txt            # FF30 industry file
 │   │   └── reports/                  # Data quality reports
 │   │
 │   └── logs/                         # Execution logs (auto-created)
+│
+├── smoke/                            # Scratch root for run_smoke_test.sh (auto-created)
 │
 └── stage2/                           # 🚧 COMING SOON - Monthly panel with signals
     └── (In development)
