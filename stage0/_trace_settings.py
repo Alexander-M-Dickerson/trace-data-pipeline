@@ -95,6 +95,49 @@ INIT_ERROR = {
 # A limited run logs a loud warning; its output is NOT the full universe.
 LIMIT_CHUNKS = int(os.environ.get("STAGE0_LIMIT_CHUNKS", "0")) or None
 
+# --- WRDS connection budget -------------------------------------------
+# WRDS publishes a limit of 5 CONCURRENT JOBS but does NOT publish a per-user limit
+# on database CONNECTIONS. There is one, and hitting it is nasty: the wrds package's
+# connect-failure path calls input() to re-prompt for a username, so in a batch job
+# the error arrives as "EOFError: EOF when reading a line" -- a rate limit disguised
+# as a keyboard error.
+#
+# MEASURED 2026-09-09 with tests/probe_wrds_connections.py (account phd18ad1):
+#   * 7 connections held simultaneously; the 8th failed with exactly that EOFError.
+#   * Opening 6 AT ONCE, with no stagger and no lock, succeeded -- so the ceiling is
+#     on connections HELD, not on how fast they are opened.
+#   * A connect costs about 5 s, so a pool of N costs ~5N seconds to start.
+# Re-measure on your own account before changing these:
+#     python3 tests/probe_wrds_connections.py --max 10
+MAX_WRDS_CONNECTIONS = 7
+
+# How many connections each stage0 job may hold. Enhanced and 144A run at the same
+# time, so their sum is what must fit; Standard is held behind them and runs alone,
+# so it may use the whole budget. One connection is deliberately left spare beneath
+# MAX_WRDS_CONNECTIONS so a mid-run reconnect cannot be refused.
+CONCURRENCY = {
+    "enhanced": 5,
+    "144a": 1,
+    "standard": 6,
+}
+
+
+def validate_connection_budget(members) -> None:
+    """Fail at submit time, not four hours into a run, if the budget is over the cap.
+
+    Only Enhanced and 144A overlap; Standard is scheduled after them.
+    """
+    concurrent = [m for m in members if m in ("enhanced", "144a")]
+    total = sum(CONCURRENCY.get(m, 1) for m in concurrent)
+    if total > MAX_WRDS_CONNECTIONS - 1:
+        raise ValueError(
+            f"WRDS connection budget exceeded: {concurrent} would hold {total} "
+            f"connections, but the measured ceiling is {MAX_WRDS_CONNECTIONS} and one "
+            "is reserved for reconnects. Lower CONCURRENCY in stage0/_trace_settings.py, "
+            "or re-measure with tests/probe_wrds_connections.py if your account differs."
+        )
+
+
 # --- Price-scale normalization ----------------------------------------
 # TRACE rptd_pr is a PERCENT OF PAR for the standard $1,000-principal bond: at par
 # it prints 100. Small-denomination issues -- retail and structured notes with a
