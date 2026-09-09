@@ -110,7 +110,10 @@ mkdir -p stage1/data
 # Stage 1's external inputs. Must happen on the LOGIN NODE -- compute nodes have no
 # internet. Kept in its own script so the smoke test can point at the same command.
 echo ""
-./download_inputs.sh || { echo "[error] input download failed"; exit 1; }
+# Invoked through bash rather than as ./download_inputs.sh so this does not depend
+# on the executable bit surviving the clone -- it has not, historically, because
+# these scripts are authored on Windows where core.filemode is false.
+bash ./download_inputs.sh || { echo "[error] input download failed"; exit 1; }
 
 
 # Stage 0: submit exactly the members named in TRACE_MEMBERS.
