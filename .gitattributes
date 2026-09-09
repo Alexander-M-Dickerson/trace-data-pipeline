@@ -1,0 +1,17 @@
+# Line endings are load-bearing: these scripts are submitted to the WRDS Cloud
+# Grid Engine and run under bash on Linux. A CRLF line ending makes bash fail with
+# a `\r: command not found` / `^M` error, which is why QUICKSTART.md documents that
+# symptom. Do not rely on a contributor's global core.autocrlf setting -- pin it here.
+* text=auto
+
+*.sh   text eol=lf
+*.py   text eol=lf
+*.md   text eol=lf
+*.txt  text eol=lf
+
+# Binary / already-compressed: never touch.
+*.parquet binary
+*.zip     binary
+*.xlsx    binary
+*.pdf     binary
+*.png     binary
