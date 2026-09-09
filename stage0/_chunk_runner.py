@@ -43,7 +43,7 @@ Author: Open Source Bond Asset Pricing
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Iterable, Sequence
 
 
@@ -160,6 +160,10 @@ class ChunkResult:
     ie_cusips: list
     n_rows: int = 0
     elapsed: float = 0.0
+    # Per-filter log lines held back so the parent can emit them in chunk order,
+    # rather than letting concurrent workers interleave them. Empty in a serial run,
+    # where they are emitted as they happen.
+    log_lines: list = field(default_factory=list)
 
 
 def run_chunks(chunks,
@@ -199,6 +203,15 @@ def run_chunks(chunks,
 
     import multiprocessing as mp
 
+    # fork where it exists (Linux, so WRDS): the context carries fisd_off, a
+    # whole-universe frame, and fork shares it by memory instead of pickling a copy to
+    # every worker. Windows has no fork and falls back to spawn, which works because
+    # the entry scripts carry a __main__ guard.
+    try:
+        mp_ctx = mp.get_context("fork")
+    except ValueError:
+        mp_ctx = mp.get_context("spawn")
+
     n_workers = min(int(n_workers), n)
     tasks = [(i, list(ch), n) for i, ch in enumerate(chunks)]
     log.info("Running %d chunks across %d worker processes "
@@ -209,7 +222,8 @@ def run_chunks(chunks,
     # -- and would hammer the per-user connection limit for nothing. (The house rule
     # in trace_duckdb about fresh processes exists for DuckDB's parallelism collapse
     # and does not transfer here.)
-    pool = mp.Pool(n_workers, initializer=pool_initializer, initargs=pool_initargs)
+    pool = mp_ctx.Pool(n_workers, initializer=pool_initializer,
+                       initargs=pool_initargs)
     got: dict[int, ChunkResult] = {}
     try:
         for res in pool.imap_unordered(pool_task, tasks):

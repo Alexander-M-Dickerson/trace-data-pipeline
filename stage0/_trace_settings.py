@@ -204,8 +204,14 @@ COMMON_KWARGS = dict(
 
 
 # --- Per-dataset overrides (only where needed) ------------------------
+# Concurrency can be forced from the environment, which is how the smoke test proves
+# the pool path without editing settings:  STAGE0_WORKERS=1 ./run_smoke_test.sh
+WORKERS_OVERRIDE = int(os.environ.get("STAGE0_WORKERS", "0")) or None
+
 PER_DATASET = {
-    "enhanced": dict(),  # no extra args required
+    # Enhanced is the long pole -- ~4 hours, and its chunk loop was strictly serial on
+    # one connection while the job held a whole node. CONCURRENCY holds the budget.
+    "enhanced": dict(n_workers=WORKERS_OVERRIDE or CONCURRENCY["enhanced"]),
     "standard": dict(start_date="2024-10-01", data_type="standard"),
     "144a":     dict(start_date="2002-07-01", data_type="144a"),
 }

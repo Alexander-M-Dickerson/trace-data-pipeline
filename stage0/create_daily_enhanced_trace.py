@@ -70,6 +70,11 @@ def _configure_root_logger(level: int = logging.INFO) -> None:
     )
     root.addHandler(handler)
     root.setLevel(level)
+# When this is a list, the per-filter cascade lines are collected instead of emitted,
+# so a concurrent run can replay them in chunk order. None = emit immediately.
+_LOG_LINES = None
+
+
 # -------------------------------------------------------------------------
 def log_filter(df_before: pd.DataFrame,
                df_after:  pd.DataFrame,
@@ -94,15 +99,20 @@ def log_filter(df_before: pd.DataFrame,
     )
 
     if replace:
-        logging.info(
-            f"[chunk {chunk_id:03}] {stage:<30} "
-            f"kept {rows_after:,} (replaced {int(removed):,})"
-        )
+        line = (f"[chunk {chunk_id:03}] {stage:<30} "
+                f"kept {rows_after:,} (replaced {int(removed):,})")
     else:
-        logging.info(
-            f"[chunk {chunk_id:03}] {stage:<30} "
-            f"kept {rows_after:,} (-{rows_before - rows_after:,})"
-        )
+        line = (f"[chunk {chunk_id:03}] {stage:<30} "
+                f"kept {rows_after:,} (-{rows_before - rows_after:,})")
+
+    # When several chunks run at once, these lines would interleave into an
+    # unreadable .out. _process_one_chunk points _LOG_LINES at a per-chunk list, and
+    # the parent replays them in chunk order -- so the log reads the same whether one
+    # worker ran the chunks or six did. Serial runs emit immediately, as before.
+    if _LOG_LINES is None:
+        logging.info(line)
+    else:
+        _LOG_LINES.append(line)
 
 # Filter with a boolean mask --------------------------
 def filter_with_log(df: pd.DataFrame,
@@ -524,9 +534,10 @@ def normalize_price_scale(trace, principal_amt, *, chunk_id=None, logger=None):
 # An empty chunk returns before the "start" audit row, contributing no audit rows at
 # all -- precisely what the inline loop's `continue` did.
 # -------------------------------------------------------------------------
-def _process_one_chunk(chunk_id, cusips, ctx, fetch_fn, n_chunks=None):
+def _process_one_chunk(chunk_id, cusips, ctx, fetch_fn, n_chunks=None,
+                       defer_logs=False):
     """Fetch and clean ONE CUSIP chunk. Returns a _chunk_runner.ChunkResult."""
-    global audit_records, ct_audit_records
+    global audit_records, ct_audit_records, _LOG_LINES
 
     f                 = ctx["filters"]
     fisd_off          = ctx["fisd_off"]
@@ -546,9 +557,12 @@ def _process_one_chunk(chunk_id, cusips, ctx, fetch_fn, n_chunks=None):
     # Per-chunk sinks. NEVER a shared list -- see the note above.
     my_audit, my_ct_audit = [], []
     bb_cusips_all, dec_shift_cusips_all, init_price_cusips_all = [], [], []
+    my_lines = [] if defer_logs else None
     prev_audit    = globals().get("audit_records")
     prev_ct_audit = globals().get("ct_audit_records")
+    prev_lines    = globals().get("_LOG_LINES")
     audit_records, ct_audit_records = my_audit, my_ct_audit
+    _LOG_LINES = my_lines
 
     def _result(data, elapsed):
         return _chunk_runner.ChunkResult(
@@ -561,6 +575,7 @@ def _process_one_chunk(chunk_id, cusips, ctx, fetch_fn, n_chunks=None):
             ie_cusips     = init_price_cusips_all,
             n_rows        = 0 if data is None else len(data),
             elapsed       = elapsed,
+            log_lines     = list(my_lines or []),
         )
 
     start_time = time.time()  # Start timer
@@ -843,6 +858,7 @@ def _process_one_chunk(chunk_id, cusips, ctx, fetch_fn, n_chunks=None):
         # Put back whatever the globals pointed at, so a serial caller's own lists
         # (aliased in _connect_wrds) survive untouched.
         audit_records, ct_audit_records = prev_audit, prev_ct_audit
+        _LOG_LINES = prev_lines
 
 
 # -------------------------------------------------------------------------
@@ -864,8 +880,8 @@ def _pool_init(ctx, wrds_username):
 
 def _pool_run_chunk(task):
     chunk_id, cusips, n_chunks = task
-    return _process_one_chunk(chunk_id, cusips, _POOL_CTX,
-                              _wrds_pool.raw_sql, n_chunks=n_chunks)
+    return _process_one_chunk(chunk_id, cusips, _POOL_CTX, _wrds_pool.raw_sql,
+                              n_chunks=n_chunks, defer_logs=True)
 
 
 # -------------------------------------------------------------------------
@@ -1001,6 +1017,8 @@ def clean_trace_data(
     # filter-cascade plots, which read the sequence off row order -- identical
     # regardless of worker count.
     for r in results:
+        for line in r.log_lines:          # empty in a serial run; already emitted
+            logging.info(line)
         audit_records.extend(r.audit_rows)
         ct_audit_records.extend(r.ct_audit_rows)
         if r.data is not None:
@@ -3316,6 +3334,7 @@ class ProcessEnhancedTRACE:
     def _disconnect_wrds(self) -> None:
         if self.db is not None:
             self.db.close()
+            self.db = None
             self.logger.info("WRDS session closed.")
 
     def _build_fisd(self):
@@ -3413,6 +3432,18 @@ class ProcessEnhancedTRACE:
         return chunks
 
     def _run_clean_trace(self, cusip_chunks, fisd_off, principal_amt=None):
+        if self.n_workers > 1:
+            # Close the parent's connection BEFORE the pool forks. Two reasons, and
+            # the first is the serious one: a psycopg2 socket shared between a parent
+            # and its children corrupts the protocol, and it does so quietly -- the
+            # damage surfaces later as unrelated errors. The second is arithmetic:
+            # a connection the parent no longer needs is one the workers cannot have.
+            # Nothing after this point needs it. build_fisd is done, and the export
+            # takes no handle.
+            self._disconnect_wrds()
+            self.logger.info(
+                "Pulling %d chunks across %d workers, one WRDS connection each.",
+                len(cusip_chunks), min(self.n_workers, len(cusip_chunks)))
         self.logger.info("Running TRACE cleaning loop ...")
         all_data, bb_list, ds_list, ie_list = clean_trace_data(
             self.db,
