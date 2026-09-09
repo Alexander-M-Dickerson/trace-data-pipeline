@@ -152,9 +152,23 @@ LIU_WU_URL = "https://docs.google.com/spreadsheets/d/11HsxLl_u2tBNt3FyN5iXGsIKLw
 # EXTERNAL DATA URLS
 # ============================================================================
 
-# OSBAP Linker file (for ISIN/FIGI/BBG identifiers)
-LINKER_URL = "https://openbondassetpricing.com/wp-content/uploads/2025/11/linker_file_2025.zip"
-LINKER_ZIPKEY = "OSBAP_Linker_October_2025.parquet"
+# Bond-firm linker: bond (cusip9) -> PERMNO / PERMCO / GVKEY, with a validity window.
+#
+# The mapping is DATED. A bond outlives its issuer's independence -- firms are
+# acquired, spun off and renamed -- so each row carries [w0, w1], the window over
+# which that firm owned that bond. Joining without the window attributes a bond to a
+# firm in years it did not own it, and it does not throw.
+#
+# ZIPKEY is the path INSIDE the archive, which is nested under a folder; the member is
+# read by exact name, so the folder prefix is required. run_pipeline.sh extracts to
+# stage1/data/, giving stage1/data/bond_firm_linker_2026/fl_linker.parquet -- the same
+# path the offline fallback in step 7 builds from LINKER_ZIPKEY.
+#
+# The archive also ships fl_verdicts.parquet (every refusal and its reason -- how you
+# tell a refusal from a gap) and firm_names.parquet (permno -> dated firm name).
+# Stage 1 reads only fl_linker.parquet.
+LINKER_URL = "https://openbondassetpricing.com/wp-content/uploads/2026/09/bond_firm_linker_2026.zip"
+LINKER_ZIPKEY = "bond_firm_linker_2026/fl_linker.parquet"
 
 # ============================================================================
 # PRE-DOWNLOADED EXTERNAL FILES (DO NOT EDIT)

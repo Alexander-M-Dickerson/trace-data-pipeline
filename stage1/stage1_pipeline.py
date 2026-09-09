@@ -1096,11 +1096,26 @@ def step7_merge_linker():
 
     dfl.columns = dfl.columns.str.lower()
 
-    dfl["date"] = pd.to_datetime(dfl["yyyymm"], format="%Y%m", errors="coerce")
-    dfl["year_month"] = dfl["date"].dt.to_period("M").astype(str)
+    # The linker is BOND-level and DATED: one row per (bond, ownership window).
+    # cusip9 -> permno/permco/gvkey, valid over [w0, w1].
+    dfl = dfl.rename(columns={"cusip9": "cusip_id"})
+    missing = {"cusip_id", "w0", "w1", "permno"} - set(dfl.columns)
+    if missing:
+        raise ValueError(
+            f"Linker file is missing required column(s): {sorted(missing)}. "
+            f"Expected the bond-firm linker schema (cusip9, w0, w1, permno, permco, "
+            f"gvkey). Got: {sorted(dfl.columns)}"
+        )
+
+    # confidence / window_src / rung describe HOW each link was earned. They are in
+    # the published file (and in fl_verdicts alongside it) for anyone auditing a
+    # link, but they are not carried into the daily panel.
+    dfl = dfl.drop(columns=["confidence", "window_src", "rung"], errors="ignore")
+
+    for c in ("w0", "w1"):
+        dfl[c] = pd.to_datetime(dfl[c], errors="coerce")
     dfl["permno"] = pd.to_numeric(dfl["permno"], errors="coerce").astype("Int64")
 
-    # Handle permco and gvkey - may not exist in all linker files
     if "permco" in dfl.columns:
         dfl["permco"] = pd.to_numeric(dfl["permco"], errors="coerce").astype("Int64")
         logger.info("permco column found and processed")
@@ -1108,34 +1123,80 @@ def step7_merge_linker():
         logger.warning("permco column not found in linker file - will be NaN in output")
 
     if "gvkey" in dfl.columns:
-        # Convert to integer, preserving missing values
-        dfl['gvkey'] = pd.to_numeric(dfl['gvkey'].round(0), errors='coerce').astype('Int32')
+        # GVKEY ships as a zero-padded string ('013557'). Kept numeric here for schema
+        # continuity with previous releases -- re-pad to 6 characters before joining to
+        # Compustat.
+        dfl["gvkey"] = pd.to_numeric(dfl["gvkey"], errors="coerce").astype("Int32")
         logger.info("gvkey column found and processed")
     else:
         logger.warning("gvkey column not found in linker file - will be NaN in output")
 
-    # Extend linker with forward fill
-    ffill_date = pd.to_datetime(final_df["trd_exctn_dt"].max()) + MonthEnd(0)
-    dfl = hf.extend_and_ffill_linker(dfl, ffill_date)
-    dfl = dfl.drop(columns=["date"], errors="ignore")
+    dfl = dfl.dropna(subset=["cusip_id", "w0"])
+    logger.info("Linker: %d rows over %d distinct bonds",
+                len(dfl), dfl["cusip_id"].nunique())
 
-    # Prep keys
-    final_df["issuer_cusip"] = final_df["cusip_id"].astype(str).str[:6]
+    # Prep keys. cusip_id is a category at this point; merge_asof matches `by` keys by
+    # value, and a category against a str silently matches NOTHING -- cast first.
+    final_df["cusip_id"] = final_df["cusip_id"].astype(str)
     final_df["trd_exctn_dt"] = pd.to_datetime(final_df["trd_exctn_dt"], errors="coerce")
-    final_df["year_month"] = final_df["trd_exctn_dt"].dt.to_period("M").astype(str)
 
-    # Merge
-    logger.info("Merging linker on issuer_cusip and year_month...")
+    # A bond with two owners over its life has two rows in the linker. A plain merge on
+    # cusip_id would fan every trade day of such a bond out to two rows before the
+    # window could be applied -- millions of transient rows on a 24 GB node. merge_asof
+    # takes the latest window that OPENED at or before the trade date and cannot fan
+    # out; the closed-window rows are then nulled below.
+    logger.info("Merging linker on cusip_id within [w0, w1]...")
     before = len(final_df)
-    final_df = final_df.merge(
+    # merge_asof requires the two `on` keys to have the SAME datetime resolution and
+    # raises MergeError otherwise. The panel's dates come back from parquet as
+    # datetime64[us] while the linker's windows are datetime64[ns], so align the
+    # linker to whatever the panel is using rather than assuming either.
+    ts_dtype = final_df["trd_exctn_dt"].dtype
+    for c in ("w0", "w1"):
+        dfl[c] = dfl[c].astype(ts_dtype)
+
+    dfl = dfl.sort_values("w0").reset_index(drop=True)
+    final_df = final_df.sort_values(["trd_exctn_dt"]).reset_index(drop=True)
+    final_df = pd.merge_asof(
+        final_df,
         dfl,
-        on=["issuer_cusip", "year_month"],
-        how="left"
+        left_on="trd_exctn_dt",
+        right_on="w0",
+        by="cusip_id",
+        direction="backward",
     )
     after = len(final_df)
     logger.info("Linker merge: %d -> %d rows", before, after)
 
-    final_df = final_df.drop(columns=["year_month", "yyyymm"], errors="ignore")
+    # merge_asof only enforces the window's LEFT edge. Drop the identifiers where the
+    # trade falls after the window closed -- typically the bond outliving the firm's
+    # listing. A missing link is the intended answer there; a stale one is not.
+    id_cols = [c for c in ("permno", "permco", "gvkey") if c in final_df.columns]
+    past_window = final_df["w1"].notna() & (final_df["trd_exctn_dt"] > final_df["w1"])
+    n_past = int(past_window.sum())
+    if n_past:
+        final_df.loc[past_window, id_cols] = pd.NA
+        logger.info("Cleared equity IDs on %d rows dated after the linker window closed",
+                    n_past)
+    final_df = final_df.drop(columns=["w0", "w1"], errors="ignore")
+
+    # The linker is one row per (bond, window) and the windows do not overlap, so the
+    # merge must be row-preserving. Assert it rather than trusting it.
+    if after != before:
+        raise RuntimeError(
+            f"Linker merge changed the row count ({before} -> {after}). The linker "
+            "should have at most one open window per bond per date; a duplicate "
+            "(cusip_id, w0) would fan rows out."
+        )
+    dup = final_df.duplicated(subset=["cusip_id", "trd_exctn_dt"]).sum()
+    if dup:
+        raise RuntimeError(
+            f"{dup} duplicate (cusip_id, trd_exctn_dt) rows after the linker merge."
+        )
+
+    # issuer_cusip is no longer the join key -- the linker is bond-level. Kept because
+    # downstream code still expects the column; variable_drop() removes it shortly.
+    final_df["issuer_cusip"] = final_df["cusip_id"].astype(str).str[:6]
 
     # Re-convert to category after merge to maintain memory optimization
     if "cusip_id" in final_df.columns:
@@ -1146,12 +1207,12 @@ def step7_merge_linker():
     # Check merge success
     merge_rate = (final_df['permno'].notna().sum() / len(final_df)) * 100
     logger.info("Merge success rate: %.2f%% of rows have equity IDs", merge_rate)
+    logger.info("Bonds with an equity link: %d of %d",
+                final_df.loc[final_df["permno"].notna(), "cusip_id"].nunique(),
+                final_df["cusip_id"].nunique())
 
     # Reorder columns
-    first_cols = ["cusip_id", "issuer_cusip", "permno"] + \
-                  (["permco"] if "permco" in final_df.columns else []) + \
-                  (["gvkey"] if "gvkey" in final_df.columns else []) + \
-                  ["trd_exctn_dt"]
+    first_cols = ["cusip_id", "issuer_cusip", "permno"] +                   (["permco"] if "permco" in final_df.columns else []) +                   (["gvkey"] if "gvkey" in final_df.columns else []) +                   ["trd_exctn_dt"]
     rest = [c for c in final_df.columns if c not in first_cols]
     final_df = final_df[first_cols + rest]
 
