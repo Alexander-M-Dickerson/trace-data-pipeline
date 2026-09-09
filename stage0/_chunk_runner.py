@@ -173,7 +173,8 @@ def run_chunks(chunks,
                pool_task=None,
                pool_initializer=None,
                pool_initargs: tuple = (),
-               logger: logging.Logger | None = None) -> list:
+               logger: logging.Logger | None = None,
+               first_chunk_id: int = 0) -> list:
     """Run every chunk and return the results in ASCENDING CHUNK ORDER.
 
     `n_workers <= 1` calls `run_serial(chunk_id, cusips, n_chunks)` in this process --
@@ -188,6 +189,10 @@ def run_chunks(chunks,
     A chunk that produces no result ABORTS the run. Silently missing chunks are
     silently missing bonds in a file that otherwise looks entirely normal, and stage 1
     would happily consume it.
+
+    `first_chunk_id` exists because the two engines number chunks differently and both
+    numberings are already in shipped audit tables: enhanced counts from 0, standard
+    and 144A from 1. Not worth unifying; worth not silently changing.
     """
     chunks = list(chunks)
     log = logger or logging.getLogger(__name__)
@@ -196,7 +201,8 @@ def run_chunks(chunks,
         return []
 
     if n_workers <= 1 or n == 1:
-        return [run_serial(i, list(ch), n) for i, ch in enumerate(chunks)]
+        return [run_serial(i, list(ch), n)
+                for i, ch in enumerate(chunks, start=first_chunk_id)]
 
     if pool_task is None:
         raise ValueError("run_chunks needs a pool_task to run with n_workers > 1")
@@ -213,7 +219,7 @@ def run_chunks(chunks,
         mp_ctx = mp.get_context("spawn")
 
     n_workers = min(int(n_workers), n)
-    tasks = [(i, list(ch), n) for i, ch in enumerate(chunks)]
+    tasks = [(i, list(ch), n) for i, ch in enumerate(chunks, start=first_chunk_id)]
     log.info("Running %d chunks across %d worker processes "
              "(one WRDS connection each)", n, n_workers)
 
@@ -239,11 +245,12 @@ def run_chunks(chunks,
     finally:
         pool.join()
 
-    missing = [i for i in range(n) if i not in got]
+    ids = range(first_chunk_id, first_chunk_id + n)
+    missing = [i for i in ids if i not in got]
     if missing:
         raise RuntimeError(
             f"{len(missing)} of {n} chunks returned no result: "
             f"{missing[:20]}{' ...' if len(missing) > 20 else ''}. "
             "Refusing to export a partial tape.")
 
-    return [got[i] for i in range(n)]
+    return [got[i] for i in ids]

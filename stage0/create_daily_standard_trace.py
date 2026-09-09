@@ -71,6 +71,11 @@ def _configure_root_logger(level: int = logging.INFO) -> None:
     root.addHandler(handler)
     root.setLevel(level)
 # -------------------------------------------------------------------------
+# When this is a list, the per-filter cascade lines are collected instead of emitted,
+# so a concurrent run can replay them in chunk order. None = emit immediately.
+_LOG_LINES = None
+
+
 def log_filter(df_before: pd.DataFrame,
                df_after:  pd.DataFrame,
                stage: str,
@@ -94,15 +99,19 @@ def log_filter(df_before: pd.DataFrame,
     )
 
     if replace:
-        logging.info(
-            f"[chunk {chunk_id:03}] {stage:<30} "
-            f"kept {rows_after:,} (replaced {int(removed):,})"
-        )
+        line = (f"[chunk {chunk_id:03}] {stage:<30} "
+                f"kept {rows_after:,} (replaced {int(removed):,})")
     else:
-        logging.info(
-            f"[chunk {chunk_id:03}] {stage:<30} "
-            f"kept {rows_after:,} (-{rows_before - rows_after:,})"
-        )
+        line = (f"[chunk {chunk_id:03}] {stage:<30} "
+                f"kept {rows_after:,} (-{rows_before - rows_after:,})")
+
+    # Concurrent chunks would interleave these into an unreadable .out.
+    # _process_one_chunk points _LOG_LINES at a per-chunk list and the parent replays
+    # them in chunk order, so the log reads the same at any worker count.
+    if _LOG_LINES is None:
+        logging.info(line)
+    else:
+        _LOG_LINES.append(line)
 
 # Convenience wrapper:  filter with a boolean mask --------------------------
 def filter_with_log(df: pd.DataFrame,
@@ -684,6 +693,372 @@ def normalize_price_scale(trace, principal_amt, *, chunk_id=None, logger=None):
     return trace, n_rescaled
 
 # -------------------------------------------------------------------------
+# THE PER-CHUNK UNIT OF WORK  (see the twin in create_daily_enhanced_trace.py)
+#
+# The loop body that used to sit inline in clean_trace_data, lifted out unchanged so
+# it can run serially in this process or in a pool worker with its own connection.
+#
+# The audit helpers append to MODULE GLOBALS, which _connect_wrds aliases to the
+# engine's instance lists. A worker has no such aliasing, and two workers appending to
+# one list would interleave rows from concurrent chunks -- which the data report
+# cannot survive, since _error_plot_helpers.py reconstructs each chunk's filter
+# sequence from ROW ORDER. So this rebinds them to per-chunk lists, returns those, and
+# restores the previous binding; the parent extends its own lists in chunk order.
+#
+# Two quirks of THIS engine that are reproduced exactly, because they are baked into
+# outputs already shipped:
+#   * chunk ids here are 1-BASED (enhanced is 0-based), and the exporter adds 1 again.
+#   * the per-chunk timing line prints "Chunk {chunk_id+1}" while the opening line
+#     prints "Chunk {chunk_id}" -- an off-by-one in the LOG only, left as it was.
+# -------------------------------------------------------------------------
+def _process_one_chunk(chunk_id, cusips, ctx, fetch_fn, n_chunks=None,
+                       defer_logs=False):
+    """Fetch and clean ONE CUSIP chunk. Returns a _chunk_runner.ChunkResult."""
+    global audit_records, ct_audit_records, _LOG_LINES
+
+    f                 = ctx["filters"]
+    fisd_off          = ctx["fisd_off"]
+    clean_agency      = ctx["clean_agency"]
+    start_date        = ctx["start_date"]
+    table_name        = ctx["table_name"]
+    volume_filter     = ctx["volume_filter"]
+    trade_times       = ctx["trade_times"]
+    calendar_name     = ctx["calendar_name"]
+    ds_params         = ctx["ds_params"]
+    bb_params         = ctx["bb_params"]
+    init_error_params = ctx["init_error_params"]
+    price_norm        = ctx["price_norm"]
+    principal_amt     = ctx["principal_amt"]
+
+    sort_cols = ["cusip_id","trd_exctn_dt","trd_exctn_tm", "msg_seq_nb"]
+
+    # Per-chunk sinks. NEVER a shared list -- see the note above.
+    my_audit, my_ct_audit = [], []
+    bb_cusips_all, dec_shift_cusips_all, init_price_cusips_all = [], [], []
+    my_lines = [] if defer_logs else None
+    prev_audit    = globals().get("audit_records")
+    prev_ct_audit = globals().get("ct_audit_records")
+    prev_lines    = globals().get("_LOG_LINES")
+    audit_records, ct_audit_records = my_audit, my_ct_audit
+    _LOG_LINES = my_lines
+
+    def _result(data, elapsed):
+        return _chunk_runner.ChunkResult(
+            chunk_id      = chunk_id,
+            data          = data,
+            audit_rows    = my_audit,
+            ct_audit_rows = my_ct_audit,
+            bb_cusips     = bb_cusips_all,
+            ds_cusips     = dec_shift_cusips_all,
+            ie_cusips     = init_price_cusips_all,
+            n_rows        = 0 if data is None else len(data),
+            elapsed       = elapsed,
+            log_lines     = list(my_lines or []),
+        )
+
+    start_time = time.time()
+    try:
+        logging.info(f"Processing chunk {chunk_id} of {n_chunks}")
+        temp_list = list(cusips)
+        temp_tuple = tuple(temp_list)
+
+        # ---------- 2. build query ----------
+        sql_query = f'''
+            SELECT cusip_id, bond_sym_id, bsym, trd_exctn_dt, trd_exctn_tm,
+                   msg_seq_nb, trc_st, wis_fl, cmsn_trd, ascii_rptd_vol_tx,
+                   rptd_pr, yld_pt, asof_cd, side, diss_rptg_side_cd,
+                   orig_msg_seq_nb, orig_dis_dt, rptg_party_type,
+                   contra_party_type
+            FROM {table_name}
+            WHERE cusip_id IN %(cusip_id)s
+              AND cusip_id IS NOT NULL
+              AND TRIM(cusip_id) != ''
+        '''
+        
+        params = {"cusip_id": temp_tuple}
+        if start_date:
+            sql_query += " AND trd_exctn_dt >= %(start_date)s"
+            params["start_date"] = start_date
+
+        # ---------- 3. fetch ----------
+        trace = fetch_fn(sql_query, params=params)
+                
+        logging.info(f"Chunk {chunk_id}: Retrieved {len(trace)} rows from WRDS")
+        
+        if len(trace) == 0:
+            # Return BEFORE the "start" audit row, so an empty chunk contributes
+            # no audit rows at all -- what the inline loop's `continue` did.
+            return _result(None, round(time.time() - start_time, 2))
+        
+        trace["rptd_pr"] = trace["rptd_pr"].astype("float64").round(6)
+
+        # Filter 0: price-scale normalization. Runs BEFORE every other filter, because
+        # all of them assume prices are a percent of par. No-op unless the FISD screen
+        # `principal_amt_eq_1000_only` has been turned off. See normalize_price_scale.
+        if (price_norm or {}).get("normalize_nonpar1000") and principal_amt is not None:
+            trace, n_rescaled = normalize_price_scale(trace, principal_amt, chunk_id=chunk_id)
+            if n_rescaled:
+                logging.info("Chunk %d: rescaled %d unit-quoted CUSIP(s) to percent of par",
+                             chunk_id + 1, n_rescaled)
+        trace = trace.drop(columns=["index"], errors="ignore").reset_index(drop=True)
+        
+        # Initial log for cleaning
+        log_filter(trace, trace, "start", chunk_id)
+        
+        # Filter 1: Dick-Nielsen
+        if f["dick_nielsen"]:
+            clean_chunk = clean_trace_standard_chunk(
+                trace,
+                chunk_id     = chunk_id,
+                logger       = log_ct_filter
+            )
+            log_filter(trace, clean_chunk, "dick_nielsen_filter", chunk_id)
+            trace = clean_chunk.copy()
+            del clean_chunk
+        else:
+            log_filter(trace, trace, "dick_nielsen_filter (skipped)", chunk_id)
+        gc.collect()
+
+        
+        # Pre decimal sort #
+        trace = trace.sort_values(sort_cols, kind="mergesort", ignore_index=True)
+        # Filter 2: Decimal Correction 
+        if f["decimal_shift_corrector"]:
+            _ds_defaults = _ds_defaults = dict(
+                id_col="cusip_id",
+                date_col="trd_exctn_dt",
+                time_col="trd_exctn_tm",
+                price_col="rptd_pr",
+                factors=(0.1, 0.01, 10.0, 100.0),
+                tol_pct_good=0.02,
+                tol_abs_good=8.0,
+                tol_pct_bad=0.05,
+                low_pr=5.0,
+                high_pr=300.0,
+                anchor="rolling",
+                window=5,
+                improvement_frac=0.2,
+                par_snap=True,
+                par_band=15.0,
+                output_type="cleaned",
+            )
+            _ds = {**_ds_defaults, **(ds_params or {})}
+        
+            trace, n_rows_replaced, replace_cusips = decimal_shift_corrector(
+                trace.sort_values(["cusip_id", "trd_exctn_dt", "trd_exctn_tm"]),
+                **_ds
+            )
+            if replace_cusips:
+                dec_shift_cusips_all.extend([str(c) for c in replace_cusips])
+        
+            log_filter(trace, trace, "decimal_shift", chunk_id, replace=True, n_rows_replaced=n_rows_replaced)
+        else:
+            log_filter(trace, trace, "decimal_shift (skipped)", chunk_id, replace=True, n_rows_replaced=0)
+        gc.collect()
+
+        
+        # Filter 3: Trading Time                                
+        if f["trading_time"]:
+            before_time = trace
+            trace = filter_by_trade_time(
+                df=trace,
+                trade_times=trade_times,
+                time_col="trd_exctn_tm",
+                keep_missing=False,
+            )
+            log_filter(before_time, trace, "trading_time_filter", chunk_id)
+            del before_time
+            gc.collect()
+        else:
+            log_filter(trace, trace, "trading_time_filter (skipped)", chunk_id)
+
+                
+        # Filter 4: Trading Calendar                               
+        if f["trading_calendar"]:
+            before_calr = trace
+            trace = filter_by_calendar(
+                df=trace,
+                calendar_name=calendar_name,
+                date_col="trd_exctn_dt",
+                start_date=start_date,
+                end_date=None,
+                keep_missing=False,
+            )
+            log_filter(before_calr, trace, "calendar_filter", chunk_id)
+            del before_calr
+            gc.collect()
+        else:
+            log_filter(trace, trace, "calendar_filter (skipped)", chunk_id)
+
+
+        # Filter 5: Prices                     
+        if f["price_filters"]:
+            trace = filter_with_log(trace, trace['rptd_pr'] > 0,     "neg_price_filter",   chunk_id)
+            trace = filter_with_log(trace, trace['rptd_pr'] <= 1000, "large_price_filter", chunk_id)
+        else:
+            log_filter(trace, trace, "neg_price_filter (skipped)",   chunk_id)
+            log_filter(trace, trace, "large_price_filter (skipped)", chunk_id)
+
+        # Filter 6: Trading Volume    
+        # Compute dollar volume
+        # entrd_vol_qt is in DOLLARS
+        # https://wrds-www.wharton.upenn.edu/documents/1241/TRACE_Enhanced_Corporate_and_Agency_Historic_Data_File_Layout_post_2_6_12_10252024v.pdf
+        # Applies PRE and POST 2012, see:
+        # https://wrds-www.wharton.upenn.edu/documents/1240/TRACE_Enhanced_Corporate_and_Agency_Historic_Data_File_Layout_pre_2_6_12_09092021v.pdf                  
+        trace['dollar_vol'] = (trace['entrd_vol_qt'] * trace['rptd_pr'] / 100)  # always compute
+        
+        if f["volume_filter_toggle"]:
+            vkind, vthr = _normalize_volume_filter(volume_filter)
+            if vkind == "dollar":
+                mask = trace['dollar_vol'] >= vthr
+                stage_name = "volume_filter[dollar]"  
+            else:  # "par"
+                mask = trace['entrd_vol_qt'] >= vthr
+                stage_name = "volume_filter[par]"
+            trace = filter_with_log(trace, mask, stage_name, chunk_id)
+        else:
+            log_filter(trace, trace, "volume_filter (skipped)", chunk_id)
+
+        # Pre BB sort #
+        trace = trace.sort_values(sort_cols, kind="mergesort", ignore_index=True)
+        # Filter 7: Bounce-back    
+        if f["bounce_back_filter"]:
+            _bb_defaults = dict(
+                id_col="cusip_id",
+                date_col="trd_exctn_dt",
+                time_col="trd_exctn_tm",
+                price_col="rptd_pr",
+                threshold_abs=35.0,
+                lookahead=5,
+                max_span=5,
+                window=5,
+                back_to_anchor_tol=0.25,
+                candidate_slack_abs=1.0,
+                reassignment_margin_abs=5.0,
+                use_unique_trailing_median=True,
+                par_spike_heuristic=True,
+                par_level=100.0,
+                par_equal_tol=1e-8,
+                par_min_run=3,
+                par_cooldown_after_flag=2,
+            )
+            _bb = {**_bb_defaults, **(bb_params or {})}
+        
+            trace = flag_price_change_errors(
+                trace.sort_values(["cusip_id", "trd_exctn_dt", "trd_exctn_tm"]),
+                **_bb
+            )
+            bb_cusips = list(trace[trace['filtered_error'] == 1]['cusip_id'].unique())
+            if bb_cusips:
+                bb_cusips_all.extend([str(c) for c in bb_cusips])
+        
+            trace = filter_with_log(trace, trace['filtered_error'] == 0, "bounce_back_filter", chunk_id)
+            trace.drop(['delta_rptd_pr', 'baseline_trailing', 'filtered_error'], axis=1, inplace=True)
+            gc.collect()
+        else:
+            log_filter(trace, trace, "bounce_back_filter (skipped)", chunk_id)                          
+        
+        # Filter 8: Bounce-back    
+        if f["yld_price_filter"]:
+            mask = (trace["rptd_pr"] != trace["yld_pt"]) | trace["yld_pt"].isna()
+            trace = filter_with_log(trace, mask, "price_yld_filter", chunk_id)
+        else:
+            log_filter(trace, trace, "price_yld_filter (skipped)", chunk_id)
+
+        
+        # Filter 9: Amount-outstanding vs volume filter                 
+        trace = trace.merge(fisd_off, how="left", on="cusip_id")
+        if f["amtout_volume_filter"]:
+            trace = filter_with_log(
+                trace,
+                trace['entrd_vol_qt'] < trace['offering_amt']*1000*0.50,
+                "volume_offamt_filter",
+                chunk_id
+            )
+        else:
+            log_filter(trace, trace, "volume_offamt_filter (skipped)", chunk_id)
+
+        # Filter 10: Trade execution date <= maturity filter
+        if f["trd_exe_mat_filter"]:
+            trace = filter_with_log(
+                trace,
+                trace['trd_exctn_dt'] <= trace['maturity'],
+                "exctn_mat_dt_filter",
+                chunk_id
+            )
+        else:
+            log_filter(trace, trace, "exctn_mat_dt_filter (skipped)", chunk_id)
+
+        # Filter 11: Initial Price Errors
+        if f["flag_initial_price_errors"]:
+            _ie_defaults = dict(
+                id_col="cusip_id",
+                date_col="trd_exctn_dt",
+                price_col="rptd_pr",
+                abs_change=50.0,
+                n_transactions=3,
+            )
+            _ie = {**_ie_defaults, **(init_error_params or {})}
+            trace_ie = flag_initial_price_errors(trace, **_ie)
+
+            # Collect Init Price Error CUSIPs (audit/export only)
+            init_price_cusips = (
+                trace_ie.loc[trace_ie.get("initial_error_flag", 0).eq(1), "cusip_id"]
+                        .astype(str).str.strip().unique().tolist()
+            )
+
+            if init_price_cusips:
+                init_price_cusips_all.extend([str(c) for c in init_price_cusips])
+            trace = filter_with_log(trace_ie, trace_ie['initial_error_flag'] == 0, "init_price_error_filter", chunk_id)
+            trace.drop(['initial_error_flag'], inplace=True, axis=1)
+            gc.collect()
+        else:
+            log_filter(trace, trace, "init_price_error_filter (skipped)", chunk_id)
+        gc.collect()
+
+        #* ************************************** */
+        #* DAILY AGGREGATION                      */
+        #* ************************************** */ 
+     
+        # Calculate all metrics with a single function call
+        # PricesAll, VolumesAll, prc_BID_ASK = compute_trace_all_metrics(trace)
+        AllData   = compute_trace_all_metrics(trace)
+        
+        # Free memory from the trace object and other large dataframes
+        del trace
+        
+        # Run garbage collection to reclaim memory
+        gc.collect()
+
+        elapsed_time = round(time.time() - start_time, 2)
+        logging.info(f"Chunk {chunk_id+1}: took {elapsed_time} seconds")
+        logging.info("-" * 50)
+        return _result(AllData, elapsed_time)
+    finally:
+        audit_records, ct_audit_records = prev_audit, prev_ct_audit
+        _LOG_LINES = prev_lines
+
+
+# -------------------------------------------------------------------------
+# Pool entry points. Module-level, because multiprocessing pickles by name.
+_POOL_CTX = None
+
+
+def _pool_init(ctx, wrds_username):
+    """Runs once per worker process: its own context, its own WRDS connection."""
+    global _POOL_CTX
+    _POOL_CTX = ctx
+    _configure_root_logger()
+    _wrds_pool.worker_init(wrds_username)
+
+
+def _pool_run_chunk(task):
+    chunk_id, cusips, n_chunks = task
+    return _process_one_chunk(chunk_id, cusips, _POOL_CTX, _wrds_pool.raw_sql,
+                              n_chunks=n_chunks, defer_logs=True)
+
+
+# -------------------------------------------------------------------------
 def clean_trace_data(
     db,
     cusip_chunks,
@@ -701,7 +1076,9 @@ def clean_trace_data(
     init_error_params: dict | None = None,
     filters: dict | None = None,
     price_norm: dict | None = None,
-    principal_amt=None
+    principal_amt=None,
+    n_workers: int = 1,
+    wrds_username: str | None = None
 ):
 
     if fetch_fn is None:
@@ -809,293 +1186,54 @@ def clean_trace_data(
     else:
         raise ValueError("data_type must be 'standard' or '144a'")
 
-    all_super_list       = []
-    bb_cusips_all        = []
-    dec_shift_cusips_all = []
+    # Everything the per-chunk unit of work needs, gathered once. Handed to workers by
+    # the pool initializer; passed straight through in the serial path.
+    ctx = dict(
+        filters           = f,
+        fisd_off          = fisd_off,
+        clean_agency      = clean_agency,
+        start_date        = start_date,
+        table_name        = table_name,
+        volume_filter     = volume_filter,
+        trade_times       = trade_times,
+        calendar_name     = calendar_name,
+        ds_params         = ds_params,
+        bb_params         = bb_params,
+        init_error_params = init_error_params,
+        price_norm        = price_norm,
+        principal_amt     = principal_amt,
+    )
+
+    # Chunk ids stay 1-BASED here, unlike the enhanced engine -- shipped audit tables
+    # carry that numbering and the exporter adds 1 again on top of it.
+    results = _chunk_runner.run_chunks(
+        cusip_chunks,
+        lambda cid, cus, n: _process_one_chunk(cid, cus, ctx, fetch_fn, n_chunks=n),
+        n_workers        = n_workers,
+        pool_task        = _pool_run_chunk,
+        pool_initializer = _pool_init,
+        pool_initargs    = (ctx, wrds_username),
+        logger           = logging.getLogger(__name__),
+        first_chunk_id   = 1,
+    )
+
+    all_super_list        = []
+    bb_cusips_all         = []
+    dec_shift_cusips_all  = []
     init_price_cusips_all = []
 
-    sort_cols = ["cusip_id","trd_exctn_dt","trd_exctn_tm", "msg_seq_nb"]
+    # Reassemble in ASCENDING CHUNK ORDER, whatever order the chunks finished in.
+    for r in results:
+        for line in r.log_lines:          # empty in a serial run; already emitted
+            logging.info(line)
+        audit_records.extend(r.audit_rows)
+        ct_audit_records.extend(r.ct_audit_rows)
+        if r.data is not None:
+            all_super_list.append(r.data)
+        bb_cusips_all.extend(r.bb_cusips)
+        dec_shift_cusips_all.extend(r.ds_cusips)
+        init_price_cusips_all.extend(r.ie_cusips)
 
-    # ---------- 1. chunk loop ----------
-    for i, temp_list in enumerate(cusip_chunks, start=1):
-        start_time = time.time()
-        logging.info(f"Processing chunk {i} of {len(cusip_chunks)}")
-        print(f"Processing chunk {i} of {len(cusip_chunks)}")
-
-        temp_tuple = tuple(temp_list)
-
-        # ---------- 2. build query ----------
-        sql_query = f'''
-            SELECT cusip_id, bond_sym_id, bsym, trd_exctn_dt, trd_exctn_tm,
-                   msg_seq_nb, trc_st, wis_fl, cmsn_trd, ascii_rptd_vol_tx,
-                   rptd_pr, yld_pt, asof_cd, side, diss_rptg_side_cd,
-                   orig_msg_seq_nb, orig_dis_dt, rptg_party_type,
-                   contra_party_type
-            FROM {table_name}
-            WHERE cusip_id IN %(cusip_id)s
-              AND cusip_id IS NOT NULL
-              AND TRIM(cusip_id) != ''
-        '''
-        
-        params = {"cusip_id": temp_tuple}
-        if start_date:
-            sql_query += " AND trd_exctn_dt >= %(start_date)s"
-            params["start_date"] = start_date
-
-        # ---------- 3. fetch ----------
-        trace = fetch_fn(sql_query, params=params)
-                
-        logging.info(f"Chunk {i}: Retrieved {len(trace)} rows from WRDS")
-        
-        if len(trace) == 0:
-            continue
-        
-        trace["rptd_pr"] = trace["rptd_pr"].astype("float64").round(6)
-
-        # Filter 0: price-scale normalization. Runs BEFORE every other filter, because
-        # all of them assume prices are a percent of par. No-op unless the FISD screen
-        # `principal_amt_eq_1000_only` has been turned off. See normalize_price_scale.
-        if (price_norm or {}).get("normalize_nonpar1000") and principal_amt is not None:
-            trace, n_rescaled = normalize_price_scale(trace, principal_amt, chunk_id=i)
-            if n_rescaled:
-                logging.info("Chunk %d: rescaled %d unit-quoted CUSIP(s) to percent of par",
-                             i + 1, n_rescaled)
-        trace = trace.drop(columns=["index"], errors="ignore").reset_index(drop=True)
-        
-        # Initial log for cleaning
-        log_filter(trace, trace, "start", i)
-        
-        # Filter 1: Dick-Nielsen
-        if f["dick_nielsen"]:
-            clean_chunk = clean_trace_standard_chunk(
-                trace,
-                chunk_id     = i,
-                logger       = log_ct_filter
-            )
-            log_filter(trace, clean_chunk, "dick_nielsen_filter", i)
-            trace = clean_chunk.copy()
-            del clean_chunk
-        else:
-            log_filter(trace, trace, "dick_nielsen_filter (skipped)", i)
-        gc.collect()
-
-        
-        # Pre decimal sort #
-        trace = trace.sort_values(sort_cols, kind="mergesort", ignore_index=True)
-        # Filter 2: Decimal Correction 
-        if f["decimal_shift_corrector"]:
-            _ds_defaults = _ds_defaults = dict(
-                id_col="cusip_id",
-                date_col="trd_exctn_dt",
-                time_col="trd_exctn_tm",
-                price_col="rptd_pr",
-                factors=(0.1, 0.01, 10.0, 100.0),
-                tol_pct_good=0.02,
-                tol_abs_good=8.0,
-                tol_pct_bad=0.05,
-                low_pr=5.0,
-                high_pr=300.0,
-                anchor="rolling",
-                window=5,
-                improvement_frac=0.2,
-                par_snap=True,
-                par_band=15.0,
-                output_type="cleaned",
-            )
-            _ds = {**_ds_defaults, **(ds_params or {})}
-        
-            trace, n_rows_replaced, replace_cusips = decimal_shift_corrector(
-                trace.sort_values(["cusip_id", "trd_exctn_dt", "trd_exctn_tm"]),
-                **_ds
-            )
-            if replace_cusips:
-                dec_shift_cusips_all.extend([str(c) for c in replace_cusips])
-        
-            log_filter(trace, trace, "decimal_shift", i, replace=True, n_rows_replaced=n_rows_replaced)
-        else:
-            log_filter(trace, trace, "decimal_shift (skipped)", i, replace=True, n_rows_replaced=0)
-        gc.collect()
-
-        
-        # Filter 3: Trading Time                                
-        if f["trading_time"]:
-            before_time = trace
-            trace = filter_by_trade_time(
-                df=trace,
-                trade_times=trade_times,
-                time_col="trd_exctn_tm",
-                keep_missing=False,
-            )
-            log_filter(before_time, trace, "trading_time_filter", i)
-            del before_time
-            gc.collect()
-        else:
-            log_filter(trace, trace, "trading_time_filter (skipped)", i)
-
-                
-        # Filter 4: Trading Calendar                               
-        if f["trading_calendar"]:
-            before_calr = trace
-            trace = filter_by_calendar(
-                df=trace,
-                calendar_name=calendar_name,
-                date_col="trd_exctn_dt",
-                start_date=start_date,
-                end_date=None,
-                keep_missing=False,
-            )
-            log_filter(before_calr, trace, "calendar_filter", i)
-            del before_calr
-            gc.collect()
-        else:
-            log_filter(trace, trace, "calendar_filter (skipped)", i)
-
-
-        # Filter 5: Prices                     
-        if f["price_filters"]:
-            trace = filter_with_log(trace, trace['rptd_pr'] > 0,     "neg_price_filter",   i)
-            trace = filter_with_log(trace, trace['rptd_pr'] <= 1000, "large_price_filter", i)
-        else:
-            log_filter(trace, trace, "neg_price_filter (skipped)",   i)
-            log_filter(trace, trace, "large_price_filter (skipped)", i)
-
-        # Filter 6: Trading Volume    
-        # Compute dollar volume
-        # entrd_vol_qt is in DOLLARS
-        # https://wrds-www.wharton.upenn.edu/documents/1241/TRACE_Enhanced_Corporate_and_Agency_Historic_Data_File_Layout_post_2_6_12_10252024v.pdf
-        # Applies PRE and POST 2012, see:
-        # https://wrds-www.wharton.upenn.edu/documents/1240/TRACE_Enhanced_Corporate_and_Agency_Historic_Data_File_Layout_pre_2_6_12_09092021v.pdf                  
-        trace['dollar_vol'] = (trace['entrd_vol_qt'] * trace['rptd_pr'] / 100)  # always compute
-        
-        if f["volume_filter_toggle"]:
-            vkind, vthr = _normalize_volume_filter(volume_filter)
-            if vkind == "dollar":
-                mask = trace['dollar_vol'] >= vthr
-                stage_name = "volume_filter[dollar]"  
-            else:  # "par"
-                mask = trace['entrd_vol_qt'] >= vthr
-                stage_name = "volume_filter[par]"
-            trace = filter_with_log(trace, mask, stage_name, i)
-        else:
-            log_filter(trace, trace, "volume_filter (skipped)", i)
-
-        # Pre BB sort #
-        trace = trace.sort_values(sort_cols, kind="mergesort", ignore_index=True)
-        # Filter 7: Bounce-back    
-        if f["bounce_back_filter"]:
-            _bb_defaults = dict(
-                id_col="cusip_id",
-                date_col="trd_exctn_dt",
-                time_col="trd_exctn_tm",
-                price_col="rptd_pr",
-                threshold_abs=35.0,
-                lookahead=5,
-                max_span=5,
-                window=5,
-                back_to_anchor_tol=0.25,
-                candidate_slack_abs=1.0,
-                reassignment_margin_abs=5.0,
-                use_unique_trailing_median=True,
-                par_spike_heuristic=True,
-                par_level=100.0,
-                par_equal_tol=1e-8,
-                par_min_run=3,
-                par_cooldown_after_flag=2,
-            )
-            _bb = {**_bb_defaults, **(bb_params or {})}
-        
-            trace = flag_price_change_errors(
-                trace.sort_values(["cusip_id", "trd_exctn_dt", "trd_exctn_tm"]),
-                **_bb
-            )
-            bb_cusips = list(trace[trace['filtered_error'] == 1]['cusip_id'].unique())
-            if bb_cusips:
-                bb_cusips_all.extend([str(c) for c in bb_cusips])
-        
-            trace = filter_with_log(trace, trace['filtered_error'] == 0, "bounce_back_filter", i)
-            trace.drop(['delta_rptd_pr', 'baseline_trailing', 'filtered_error'], axis=1, inplace=True)
-            gc.collect()
-        else:
-            log_filter(trace, trace, "bounce_back_filter (skipped)", i)                          
-        
-        # Filter 8: Bounce-back    
-        if f["yld_price_filter"]:
-            mask = (trace["rptd_pr"] != trace["yld_pt"]) | trace["yld_pt"].isna()
-            trace = filter_with_log(trace, mask, "price_yld_filter", i)
-        else:
-            log_filter(trace, trace, "price_yld_filter (skipped)", i)
-
-        
-        # Filter 9: Amount-outstanding vs volume filter                 
-        trace = trace.merge(fisd_off, how="left", on="cusip_id")
-        if f["amtout_volume_filter"]:
-            trace = filter_with_log(
-                trace,
-                trace['entrd_vol_qt'] < trace['offering_amt']*1000*0.50,
-                "volume_offamt_filter",
-                i
-            )
-        else:
-            log_filter(trace, trace, "volume_offamt_filter (skipped)", i)
-
-        # Filter 10: Trade execution date <= maturity filter
-        if f["trd_exe_mat_filter"]:
-            trace = filter_with_log(
-                trace,
-                trace['trd_exctn_dt'] <= trace['maturity'],
-                "exctn_mat_dt_filter",
-                i
-            )
-        else:
-            log_filter(trace, trace, "exctn_mat_dt_filter (skipped)", i)
-
-        # Filter 11: Initial Price Errors
-        if f["flag_initial_price_errors"]:
-            _ie_defaults = dict(
-                id_col="cusip_id",
-                date_col="trd_exctn_dt",
-                price_col="rptd_pr",
-                abs_change=50.0,
-                n_transactions=3,
-            )
-            _ie = {**_ie_defaults, **(init_error_params or {})}
-            trace_ie = flag_initial_price_errors(trace, **_ie)
-
-            # Collect Init Price Error CUSIPs (audit/export only)
-            init_price_cusips = (
-                trace_ie.loc[trace_ie.get("initial_error_flag", 0).eq(1), "cusip_id"]
-                        .astype(str).str.strip().unique().tolist()
-            )
-
-            if init_price_cusips:
-                init_price_cusips_all.extend([str(c) for c in init_price_cusips])
-            trace = filter_with_log(trace_ie, trace_ie['initial_error_flag'] == 0, "init_price_error_filter", i)
-            trace.drop(['initial_error_flag'], inplace=True, axis=1)
-            gc.collect()
-        else:
-            log_filter(trace, trace, "init_price_error_filter (skipped)", i)
-        gc.collect()
-
-        #* ************************************** */
-        #* DAILY AGGREGATION                      */
-        #* ************************************** */ 
-     
-        # Calculate all metrics with a single function call
-        # PricesAll, VolumesAll, prc_BID_ASK = compute_trace_all_metrics(trace)
-        AllData   = compute_trace_all_metrics(trace)
-        
-        # Free memory from the trace object and other large dataframes
-        del trace
-        
-        # Run garbage collection to reclaim memory
-        gc.collect()
-               
-        all_super_list.append(AllData)
-               
-        elapsed_time = round(time.time() - start_time, 2)
-        logging.info(f"Chunk {i+1}: took {elapsed_time} seconds")
-        logging.info("-" * 50)  
-            
     if all_super_list:
         # Sort once, globally, so the output is CANONICAL.
         #
@@ -2803,7 +2941,8 @@ class ProcessStandardTRACE:
         filters: dict | None = None,
         fisd_params: dict | None = None,
         price_norm: dict | None = None,
-        target_rows_per_chunk: int | None = None
+        target_rows_per_chunk: int | None = None,
+        n_workers: int = 1
     ) -> None:
         # user options
         self.wrds_username = wrds_username
@@ -2826,6 +2965,9 @@ class ProcessStandardTRACE:
         self.filters    = filters or {}
         self.fisd_params = fisd_params or {}
         self.price_norm  = price_norm or {}
+        # How many CUSIP chunks to pull at once, each on its own WRDS connection.
+        # 1 is the serial path. See CONCURRENCY in _trace_settings.py.
+        self.n_workers = max(1, int(n_workers or 1))
         self.target_rows_per_chunk = (None if target_rows_per_chunk is None
                                       else int(target_rows_per_chunk))
 
@@ -2897,6 +3039,7 @@ class ProcessStandardTRACE:
     def _disconnect_wrds(self) -> None:
         if self.db is not None:
             self.db.close()
+            self.db = None
             self.logger.info("WRDS session closed.")
 
     def _build_fisd(self):
@@ -2999,6 +3142,15 @@ class ProcessStandardTRACE:
         return chunks
 
     def _run_clean_trace(self, cusip_chunks, fisd_off, principal_amt=None):
+        if self.n_workers > 1:
+            # Close the parent's connection BEFORE the pool forks: a psycopg2 socket
+            # shared between a parent and its children corrupts the protocol quietly,
+            # and a connection the parent no longer needs is one a worker cannot have.
+            # build_fisd is done and the export takes no handle.
+            self._disconnect_wrds()
+            self.logger.info(
+                "Pulling %d chunks across %d workers, one WRDS connection each.",
+                len(cusip_chunks), min(self.n_workers, len(cusip_chunks)))
         self.logger.info("Running TRACE cleaning loop ...")
 
         all_data, bb_list, ds_list, ie_list = clean_trace_data(
@@ -3007,6 +3159,8 @@ class ProcessStandardTRACE:
             fisd_off,
             clean_agency=self.clean_agency,
             fetch_fn=self._raw_sql_with_retry,
+            n_workers=self.n_workers,
+            wrds_username=self.wrds_username,
             start_date=self.start_date,
             data_type=self.data_type,
             volume_filter=self.volume_filter,

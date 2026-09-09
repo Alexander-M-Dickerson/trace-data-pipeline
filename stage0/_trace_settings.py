@@ -212,8 +212,13 @@ PER_DATASET = {
     # Enhanced is the long pole -- ~4 hours, and its chunk loop was strictly serial on
     # one connection while the job held a whole node. CONCURRENCY holds the budget.
     "enhanced": dict(n_workers=WORKERS_OVERRIDE or CONCURRENCY["enhanced"]),
-    "standard": dict(start_date="2024-10-01", data_type="standard"),
-    "144a":     dict(start_date="2002-07-01", data_type="144a"),
+    # Standard runs AFTER the other two, so it may use the whole budget. 144A is
+    # small (136 chunks vs Enhanced's 485) and runs alongside Enhanced, so it takes
+    # one connection -- see CONCURRENCY and validate_connection_budget above.
+    "standard": dict(start_date="2024-10-01", data_type="standard",
+                     n_workers=WORKERS_OVERRIDE or CONCURRENCY["standard"]),
+    "144a":     dict(start_date="2002-07-01", data_type="144a",
+                     n_workers=WORKERS_OVERRIDE or CONCURRENCY["144a"]),
 }
 
 def get_config(kind: str) -> dict:
