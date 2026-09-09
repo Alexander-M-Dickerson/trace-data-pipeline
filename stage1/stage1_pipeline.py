@@ -222,6 +222,12 @@ def step2_load_trace_data():
 
     logger.info("Combined TRACE data: %d rows", len(final_df))
 
+    # The data's last trade date. Computed here, unconditionally, because the
+    # DATE_CUT_OFF resolution below needs it even when only one TRACE member is
+    # loaded -- max_enhanced_date inside the branch below would be undefined then.
+    raw_max = final_df["trd_exctn_dt"].max()
+    logger.info("Last trade date in the stage0 data: %s", raw_max)
+
     # Handle overlaps: Only clip STANDARD to be after Enhanced max date
     # Keep ALL 144a data (do not clip)
     if len(TRACE_MEMBERS) > 1 and "enhanced" in TRACE_MEMBERS:
@@ -248,7 +254,16 @@ def step2_load_trace_data():
 
     logger.info("After clipping: %d rows", len(final_df))
 
-    # Apply date cutoff filter (in-place to save memory)
+    # Apply date cutoff filter (in-place to save memory).
+    # DATE_CUT_OFF may be a literal date or an "auto:-Nmo" spec; resolve it against
+    # the data now, and rebind the module global so every later consumer (the data
+    # report, the log lines) sees the concrete date rather than the spec.
+    global DATE_CUT_OFF
+    resolved = resolve_date_cut_off(DATE_CUT_OFF, raw_max)
+    if resolved != DATE_CUT_OFF:
+        logger.info("Resolved DATE_CUT_OFF %s -> %s (last trade date %s)",
+                    DATE_CUT_OFF, resolved, raw_max)
+        DATE_CUT_OFF = resolved
     cut_off_date = pd.to_datetime(DATE_CUT_OFF)
     before = len(final_df)
     final_df = final_df[final_df['trd_exctn_dt'] <= cut_off_date].copy()

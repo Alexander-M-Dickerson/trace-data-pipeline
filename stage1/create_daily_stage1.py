@@ -95,6 +95,11 @@ def run_stage1(config: dict):
     pipeline_module.LINKER_URL = config["linker_url"]
     pipeline_module.LINKER_ZIPKEY = config["linker_zipkey"]
 
+    # DATE_CUT_OFF may be an "auto:-Nmo" spec; step 2 resolves it once the data's
+    # last trade date is known.
+    from _stage1_settings import resolve_date_cut_off
+    pipeline_module.resolve_date_cut_off = resolve_date_cut_off
+
     # Create directories (in case they don't exist yet)
     for d in [config["stage1_dir"], config["stage1_data"], config["log_dir"]]:
         d.mkdir(parents=True, exist_ok=True)

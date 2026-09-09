@@ -74,7 +74,22 @@ if N_CORES is None:
     N_CORES = max(1, min(N_CORES, multiprocessing.cpu_count()))
 
 # --- Date Filter ---
-DATE_CUT_OFF = "2025-03-31"  # Only include data on/before this date
+# Only include data on or before this date. Two forms are accepted:
+#
+#   "YYYY-MM-DD"  a fixed date, used exactly as given.
+#   "auto:-Nmo"   the last day of the month N months before the last trade date
+#                 in the stage0 data. Resolved at run time, so the sample end
+#                 tracks the data instead of needing an edit every vintage.
+#
+# The default keeps a three-month trailing buffer. TRACE is revised after the
+# fact -- cancellations, corrections and reversals arrive for weeks -- so the
+# most recent months are not yet settled and are held out of the sample.
+#
+# Note this buffer means Standard TRACE (db_type=2) never survives: step 2 keeps
+# Standard only for dates AFTER the last Enhanced date, and any trailing cutoff
+# falls before that, so the two conditions cannot both hold. That was already
+# true of the previous fixed date; it is stated here so it is not a surprise.
+DATE_CUT_OFF = "auto:-3mo"
 
 # --- Output Settings ---
 # OUTPUT_FORMAT is imported from shared config.py
@@ -285,6 +300,49 @@ except (FileNotFoundError, ValueError) as e:
 # ============================================================================
 # CONFIGURATION GETTER FUNCTION
 # ============================================================================
+
+def resolve_date_cut_off(value, raw_max):
+    """Resolve a DATE_CUT_OFF spec against the last trade date in the data.
+
+    A fixed "YYYY-MM-DD" (or None) is returned unchanged. "auto:-Nmo" returns the
+    last day of the month N months before `raw_max`, e.g. raw_max 2025-06-30 with
+    N=3 gives 2025-03-31.
+
+    Parameters
+    ----------
+    value : str or None
+        Either a literal date, None, or an "auto:-Nmo" spec.
+    raw_max : anything date-like
+        The maximum trade date observed in the stage0 data.
+
+    Returns
+    -------
+    str or None
+        A "YYYY-MM-DD" date, or the input unchanged when it was not an auto spec.
+    """
+    import datetime as dt
+    import re
+
+    if value is None or not (isinstance(value, str) and value.startswith("auto")):
+        return value
+
+    m = re.fullmatch(r"auto:-(\d+)mo", value.strip())
+    if not m:
+        raise ValueError(
+            f"Invalid DATE_CUT_OFF spec: {value!r}. "
+            "Expected a 'YYYY-MM-DD' date or an 'auto:-Nmo' spec (e.g. 'auto:-3mo')."
+        )
+    n = int(m.group(1))
+
+    last = dt.date.fromisoformat(str(raw_max)[:10])
+    # Step back n months, then take the last day of that month.
+    total = (last.year * 12 + last.month - 1) - n
+    year, month = divmod(total, 12)
+    month += 1
+    first_of_next = (dt.date(year + 1, 1, 1) if month == 12
+                     else dt.date(year, month + 1, 1))
+    return (first_of_next - dt.timedelta(days=1)).isoformat()
+
 
 def get_config() -> dict:
     """
