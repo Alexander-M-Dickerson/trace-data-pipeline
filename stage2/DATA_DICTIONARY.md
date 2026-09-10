@@ -1037,13 +1037,6 @@ factor file, exactly as the other BBW factors are.
 The two premia are negatively correlated (−0.45 over the full extended history, −0.50 in the
 TRACE era), which is what makes them jointly estimable rather than two names for one series.
 
-> **Changed in 3.0.0.** These were previously two separate regressions — DEF on `mktbx`
-> alone, TERM on `mktb + termb`. No `defb` series existed anywhere: `defb` was only an output
-> rename of the `mktbx` loading. So `b_defb` was a *market* beta under another name, and in
-> the duration-adjusted panel it came out **bit-identical to `b_mktb`**, because `FACTOR_SWAP`
-> rewrites `mktb` to `mktbx` and made the two models the same regression. `b_defb` is now a
-> genuine default beta — its correlation with `b_mktb` is 0.94, not 1.00.
-
 #### Univariate Factor Betas (Dickerson, Mueller & Robotti, 2023)
 
 Univariate regressions isolating individual factor exposures:
@@ -1516,9 +1509,8 @@ Measured on the production panel (1.8 M bond-months):
 
 ❗**`b_defb` and `b_mktbx_dcapm`.** These correlate 0.97, which is high enough to matter if you
 put both in the same regression or treat them as separate cluster members. This is economically
-sensible — bonds with high market betas are bonds with high default betas — and it is a genuine
-0.97, not an artefact: before version 3.0.0 `b_defb` was *bit-identical* to `b_mktb` because the
-DEF model was degenerate. Its correlation with `b_mktb` is now 0.94.
+sensible — bonds with high market betas are bonds with high default betas. For reference,
+`b_defb` correlates 0.94 with `b_mktb`.
 
 Within the Credit and Default Betas cluster the loadings are related but distinct:
 
