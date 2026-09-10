@@ -1128,8 +1128,13 @@ def decimal_shift_corrector(
 
     Notes
     -----
-    - Sorting is by [id_col, date_col] and includes time_col if present in `df`.
-    - The rolling anchor uses unique values to reduce the impact of rapid repeats.
+    - This function does NOT sort and does NOT reset the index; it uses the row
+      order it is given, and `time_col` is accepted but never read. Sort the frame
+      before calling it (the pipeline does).
+    - "Unique" here means the (id_col, date_col, price_col) de-duplication applied
+      before the medians are taken -- repeated prints at the same price on the same
+      day count once. The medians themselves are plain medians, not medians of
+      unique values within the window.
     - Choose `output_type="uncleaned"` for audit/debugging; use "cleaned" to
       directly obtain a corrected price series.
     """
@@ -1282,10 +1287,14 @@ def flag_price_change_errors(
 
     Workflow (per id, time-sorted)
     ------------------------------
-    1) Sort by [id_col, date_col] and include time_col when present.
+    1) The CALLER must sort. This function does not: date_col and time_col are
+       accepted for signature compatibility and never read. Only id_col and
+       price_col are used, and every step is order-dependent, so an unsorted
+       frame yields silently wrong flags. clean_trace_data sorts immediately
+       before calling this ("Pre BB sort").
     2) Build a strictly backward-looking anchor:
        - If use_unique_trailing_median is True, use a trailing unique median
-         with window = window (effective 1..window rows back).
+         over window+1 rows (six at the default), shifted by one.
     3) Open a candidate when the absolute one-step price change is large
        (greater than or equal to threshold_abs) and the price is sufficiently
        displaced from the anchor (candidate_slack_abs).
@@ -1389,10 +1398,14 @@ def flag_price_change_errors(
                .transform(lambda s: rolling_unique_median(s, window=window+1))
         )
     else:
+        # The shift MUST sit inside the transform. Applied outside it, it shifts the
+        # whole frame, so the first print of each bond inherits the PREVIOUS bond's
+        # median -- a cross-bond leak. (Default is the unique-median branch above,
+        # so production output is unaffected by this.)
         out["baseline_trailing"] = (
             out.groupby(id_col, observed=True)[price_col]
-               .transform(lambda s: s.rolling(window=window+1, min_periods=1).median())
-               .shift(1)
+               .transform(lambda s: s.rolling(window=window+1, min_periods=1)
+                                     .median().shift(1))
                .astype(float)
         )
 

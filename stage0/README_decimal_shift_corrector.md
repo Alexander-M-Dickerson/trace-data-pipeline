@@ -24,18 +24,36 @@ The algorithm must distinguish genuine price movements from data entry errors.
 
 #### 1. Anchor Price Construction
 
-For each observation $i$, compute a **rolling unique-median anchor** $A_i$ using a centered window of width $2w + 1$:
+Anchors are computed on a **de-duplicated** view of the panel: rows sharing the same
+$(\texttt{id\_col}, \texttt{date\_col}, \texttt{price\_col})$ collapse to their first
+occurrence, so a price printed ten times the same day contributes once. The medians
+below are then plain medians over that de-duplicated series.
+
+For each observation $i$, the primary anchor $A_i$ is a **centered rolling median** of
+width $2w + 1$:
 
 $$
-A_i = \text{median}\left(\text{unique}(\{P_{i-w}, \ldots, P_i, \ldots, P_{i+w}\})\right)
+A_i = \mathrm{median}\left(\{P_{i-w}, \ldots, P_i, \ldots, P_{i+w}\}\right)
 $$
 
-**Fallback logic** (when centered window is unavailable):
-- If $A_i$ is undefined, use **forward-looking median**: $A_i = \text{median}(\{P_{i+1}, \ldots, P_{i+w+1}\})$
-- If still undefined, use **backward-looking median**: $A_i = \text{median}(\{P_{i-w}, \ldots, P_{i-1}\})$
-- If still undefined (rare), use **global median**: $A_i = \text{median}(\{P_1, \ldots, P_n\})$
+❗**This requires at least $w+1$ (default 6) observations inside the window.** With
+fewer, the centered median is undefined and the fallbacks below take over — which is
+what happens for any bond with a short de-duplicated history.
 
-**Note**: The algorithm uses **unique values** in the rolling window to reduce bias from repeated transactions at the same price.
+**Fallback logic** (when the centered window is unavailable):
+
+- **Forward-looking median**: $A_i = \mathrm{median}(\{P_i, P_{i+1}, \ldots, P_{i+w}\})$
+- then **backward-looking median**: $A_i = \mathrm{median}(\{P_{i-w}, \ldots, P_{i-1}, P_i\})$
+- then, only if the price itself is missing, the **median of every remaining row in the
+  frame** — across all bonds, not within the bond.
+
+❗**Both fallbacks include $P_i$ itself.** If $P_i$ is the decimal-shifted print, it
+contaminates its own anchor. On a short series this can pull the anchor far enough
+toward the bad price that the correction is rejected: a two-point tail of
+$\{1000.0, 100.2\}$ gives a forward anchor of $550.1$, against which neither the true
+price nor the shifted one looks right. The centered anchor does not have this problem
+in the same degree, because the bad print is one of eleven values rather than one of
+two.
 
 #### 2. Relative Error Metrics
 
@@ -99,13 +117,19 @@ $$
 P_{\mathrm{low}} \leq \tilde{P}_i(f) \leq P_{\mathrm{high}} \quad \text{(default: } P_{\mathrm{low}} = 5.0, P_{\mathrm{high}} = 300.0)
 $$
 
-**Condition 5: Best factor among all candidates (optimality)**
+**Condition 5: Best factor among the plausible candidates (optimality)**
 
-Among all factors satisfying Conditions 1-4, choose the factor $f^*$ that minimizes $\epsilon_{\mathrm{corr}}(i, f)$:
+The search and the gates happen in that order, and only **Condition 4** filters the
+candidate set. The winner is
 
 $$
-f^* = \arg\min_{f \in \mathcal{F}} \epsilon_{\mathrm{corr}}(i, f)
+f^* = \arg\min_{\{f \,\in\, \mathcal{F} \;:\; P_{\mathrm{low}} \,\leq\, f P_i \,\leq\, P_{\mathrm{high}}\}}
+      \epsilon_{\mathrm{corr}}(i, f)
 $$
+
+and Conditions 1, 2a/2b/2c and 3 are then applied to **$f^*$ alone**. A factor that
+would have passed the tolerance gates is never reconsidered once a different factor
+took the minimum. If no factor is plausible, the row is left untouched.
 
 ---
 
@@ -145,7 +169,7 @@ def decimal_shift_corrector(
 | `df` | `pd.DataFrame` | (required) | Input panel with transaction-level data |
 | `id_col` | `str` | `"cusip_id"` | Column name for bond identifier |
 | `date_col` | `str` | `"trd_exctn_dt"` | Column name for trade execution date |
-| `time_col` | `str \| None` | `"trd_exctn_tm"` | Column name for trade execution time (optional; used for sorting) |
+| `time_col` | `str \| None` | `"trd_exctn_tm"` | Accepted for signature compatibility with the other filters. **Never read** — the function does not sort. |
 | `price_col` | `str` | `"rptd_pr"` | Column name for reported price to evaluate |
 
 ### Algorithm Parameters
@@ -158,7 +182,7 @@ def decimal_shift_corrector(
 | `tol_pct_bad` | `float` | `0.05` | $\tau_{\mathrm{bad}}$ | Minimum raw relative error to consider a candidate for correction (5% default) |
 | `low_pr` | `float` | `5.0` | $P_{\mathrm{low}}$ | Lower bound for plausible corrected prices |
 | `high_pr` | `float` | `300.0` | $P_{\mathrm{high}}$ | Upper bound for plausible corrected prices |
-| `anchor` | `str` | `"rolling"` | — | Anchor type; currently only `"rolling"` is supported |
+| `anchor` | `str` | `"rolling"` | — | `"rolling"` uses the centered/fallback median described above. **Any other value** selects a live alternative branch: a plain per-`(id_col, date_col)` median, i.e. one anchor per bond-day. |
 | `window` | `int` | `5` | $w$ | Half-window size for rolling anchor (effective window = $2w+1 = 11$ observations) |
 | `improvement_frac` | `float` | `0.2` | $\gamma$ | Required proportional improvement vs raw error (20% means corrected error must be $\leq$ 20% of raw error) |
 | `par_snap` | `bool` | `True` | — | Enable relaxed acceptance for observations near par ($P = 100$) |
@@ -170,19 +194,23 @@ def decimal_shift_corrector(
 ## Algorithm Logic (Step-by-Step)
 
 ### Step 1: Data Preparation
-1. Sort DataFrame by `[id_col, date_col, time_col]` (if `time_col` is present)
-2. Reset index to ensure contiguous row numbering
+
+❗**The function does not sort and does not reset the index** — it works on the row order
+it is given, and `time_col` is accepted but never read. In the pipeline the frame arrives
+already ordered by `[cusip_id, trd_exctn_dt, trd_exctn_tm]`; if you call the function
+directly on unordered rows, the rolling anchors are computed over that order and are
+meaningless. Sort before calling.
 
 ### Step 2: Anchor Construction
 For each bond (`id_col` group):
 
 1. **Remove duplicate prices**: Drop rows with identical `(id_col, date_col, price_col)` combinations (keep first occurrence)
-2. **Compute rolling medians**:
-   - Centered median: `window = 2*w + 1, center=True, min_periods=w+1`
-   - Forward median: `window = w + 1` on reversed series
-   - Backward median: `window = w + 1` on original series
-3. **Compose anchor**: Use centered median; if NaN, use forward; if still NaN, use backward; if still NaN, use global median
-4. **Merge back**: Join anchor values to original DataFrame via `(id_col, date_col, price_col)`
+2. **Compute rolling medians** (per bond, on the de-duplicated series):
+   - Centered median: `window = 2*w + 1, center=True, min_periods=w+1` — undefined below 6 observations
+   - Forward median: `window = w + 1, min_periods=1` on the reversed series, i.e. $\{P_i, \ldots, P_{i+w}\}$
+   - Backward median: `window = w + 1, min_periods=1` on the original series, i.e. $\{P_{i-w}, \ldots, P_i\}$
+3. **Compose anchor**: centered; if NaN, forward; if still NaN, backward; if still NaN, the median of the whole de-duplicated frame (all bonds)
+4. **Merge back**: Join anchor values to the original DataFrame via `(id_col, date_col, price_col)`, `validate="m:1"`. Rows that find no match (their price was not in the de-duplicated view) fall back to the plain `(id_col, date_col)` median.
 
 ### Step 3: Candidate Testing
 For each row $i$ and each factor $f \in \mathcal{F}$:
@@ -246,127 +274,123 @@ ELSE:
 
 ### Example 1: Basic Decimal Shift Detection
 
-**Input Data** (CUSIP = `12345X678`, date = `2024-01-15`):
+Every number below was produced by running `decimal_shift_corrector` on the stated
+input, not derived by hand. The series are 13 prints long because the centered anchor
+needs six observations; a four- or five-row toy never reaches it.
 
-| Row | Time | Reported Price | Notes |
-|-----|------|----------------|-------|
-| 1 | 09:30:00 | 98.5 | Normal trade |
-| 2 | 10:00:00 | 99.0 | Normal trade |
-| 3 | 10:30:00 | 985.0 | **Error: 10x too high** |
-| 4 | 11:00:00 | 98.8 | Reverts to anchor |
-| 5 | 11:30:00 | 99.2 | Normal trade |
+**Input Data** (CUSIP = `12345X678`, date = `2024-01-15`, one 10x print at row 7):
 
-**Algorithm Execution**:
+```
+98.5  99.0  98.7  99.1  98.6  98.9  985.0  98.8  99.2  98.4  99.3  98.3  99.4
+                                     ^^^^^ row 7
+```
 
-1. **Anchor Construction** (Row 3, $w = 5$):
-   - Unique values in window: $\{98.5, 99.0, 985.0, 98.8, 99.2\}$
-   - Centered median (unique): $A_3 = 99.0$
+**Algorithm Execution** (row 7):
 
-2. **Error Detection**:
-   - Raw relative error: $\epsilon_{\mathrm{raw}}(3) = |985.0 - 99.0| / 99.0 = 8.949 = 894.9\%$ ✓ (exceeds 5% threshold)
+1. **Anchor**: the centered window is available, $A_7 = 98.90$.
 
-3. **Candidate Testing**:
+2. **Raw relative error**: $\epsilon_{\mathrm{raw}} = |985.0 - 98.90| / 98.90 = 8.9596$
+   (896.0%) — comfortably past the 5% floor.
 
-   | Factor $f$ | Candidate $\tilde{P}_3(f)$ | Plausible? | $\epsilon_{\mathrm{corr}}(3, f)$ |
-   |-----------|---------------------------|-----------|-------------------------------|
-   | 0.1 | 98.5 | ✓ | $\|98.5 - 99.0\| / 99.0 = 0.0051 = 0.51\%$ |
-   | 0.01 | 9.85 | ✗ (below 5.0) | — |
-   | 10.0 | 9850.0 | ✗ (above 300.0) | — |
-   | 100.0 | 98500.0 | ✗ (above 300.0) | — |
+3. **Candidate testing**:
 
-   - **Best factor**: $f^* = 0.1$ with $\epsilon_{\mathrm{corr}} = 0.51\%$
+   | Factor $f$ | Candidate $f \cdot P_7$ | Plausible? | $\epsilon_{\mathrm{corr}}$ |
+   |-----------|------------------------|-----------|---------------------------|
+   | 0.1 | 98.50 | ✓ | 0.0040 |
+   | 0.01 | 9.85 | ✓ | 0.9004 |
+   | 10.0 | 9,850 | ✗ (above 300.0) | — |
+   | 100.0 | 98,500 | ✗ (above 300.0) | — |
 
-4. **Acceptance Gates**:
-   - Gate 1 (raw error large): $894.9\% > 5\%$ ✓
-   - Gate 2a (corrected rel. error small): $0.51\% \leq 2\%$ ✓
-   - Gate 3 (improvement): $0.51\% \leq 0.2 \times 894.9\% = 179\%$ ✓
+   **Best factor**: $f^* = 0.1$, $\epsilon_{\mathrm{corr}} = 0.0040$.
 
-   **Decision**: **ACCEPT** correction
+4. **Acceptance gates**: Gate 1 ✓ ($8.9596 > 0.05$); Gate 2a ✓ ($0.0040 \leq 0.02$);
+   Gate 3 ✓ ($0.0040 \leq 0.2 \times 8.9596 = 1.7919$).
 
-**Output** (if `output_type = "cleaned"`):
-
-| Row | Time | Reported Price → **Corrected Price** | dec_shift_flag |
-|-----|------|-------------------------------------|----------------|
-| 3 | 10:30:00 | ~~985.0~~ → **98.5** | 1 |
+   **Decision: ACCEPT** — `dec_shift_flag = 1`, `dec_shift_factor = 0.1`,
+   `suggested_price = 98.50`.
 
 ---
 
 ### Example 2: False Positive Prevention (Genuine Price Jump)
 
-**Input Data** (CUSIP = `99999Z999`, credit downgrade event):
+**Input Data** (CUSIP = `99999Z999`, a credit downgrade between rows 6 and 7):
 
-| Row | Time | Reported Price | Notes |
-|-----|------|----------------|-------|
-| 1 | 09:00:00 | 95.0 | Pre-downgrade |
-| 2 | 09:30:00 | 94.5 | Pre-downgrade |
-| 3 | 10:00:00 | 85.0 | **Genuine price drop (downgrade announced)** |
-| 4 | 10:30:00 | 84.8 | Post-downgrade |
-| 5 | 11:00:00 | 85.5 | Post-downgrade |
+```
+95.0  94.8  95.2  94.5  95.1  94.9  85.0  84.8  85.5  84.9  85.2  85.3  84.7
+                                    ^^^^ row 7
+```
 
-**Algorithm Execution** (Row 3):
+**Algorithm Execution** (row 7):
 
-1. **Anchor**: $A_3 = \text{median}(\{95.0, 94.5, 85.0, 84.8, 85.5\}) = 85.5$
+1. **Anchor**: $A_7 = 85.50$. The centered window straddles the downgrade, and the median
+   has already moved to the post-downgrade level — which is the point of a median anchor.
 
-2. **Raw Error**: $\epsilon_{\mathrm{raw}}(3) = |85.0 - 85.5| / 85.5 = 0.0058 = 0.58\%$
+2. **Raw relative error**: $|85.0 - 85.50| / 85.50 = 0.0058$ (0.58%).
 
-3. **Gate 1 Check**: $0.58\% \not> 5\%$ → **REJECT** (raw error too small; not a decimal shift)
+3. **Gate 1**: $0.0058 \not> 0.05$ → **REJECT**. The price is where its neighbours are;
+   there is no error to fix.
 
-**Decision**: **NO correction** (genuine price movement preserved)
+**Decision: NO correction.** A 10-point genuine move is invisible to this filter, which
+is the intended behaviour — it looks for *multiplicative* errors, not large moves.
 
 ---
 
 ### Example 3: Par-Proximity Rule
 
-**Input Data** (CUSIP = `88888Y888`, recently issued bond trading near par):
+**Input Data** (CUSIP = `88888Y888`, recently issued, trading tightly around par):
 
-| Row | Time | Reported Price | Notes |
-|-----|------|----------------|-------|
-| 1 | 09:00:00 | 99.8 | Near par |
-| 2 | 09:30:00 | 100.0 | At par |
-| 3 | 10:00:00 | 1000.0 | **Error: 10x too high** |
-| 4 | 10:30:00 | 100.2 | Near par |
+```
+99.8  100.0  99.9  100.1  99.7  100.2  1000.0  100.3  99.6  100.4  99.5  100.5  99.4
+                                       ^^^^^^ row 7
+```
 
-**Algorithm Execution** (Row 3):
+**Algorithm Execution** (row 7):
 
-1. **Anchor**: $A_3 = 100.0$
+1. **Anchor**: $A_7 = 100.10$.
+2. **Raw relative error**: $|1000.0 - 100.10| / 100.10 = 8.9900$ (899.0%) ✓
+3. **Best factor**: $f^* = 0.1$ → $100.00$, $\epsilon_{\mathrm{corr}} = 0.0010$.
+   ($f = 0.01$ gives $10.00$, plausible but $\epsilon = 0.9001$; the 10x and 100x
+   candidates exceed `high_pr`.)
+4. **Gates**: 2a ✓ ($0.0010 \leq 0.02$); 2b ✓ ($|100.00 - 100.10| = 0.10 \leq 8.0$);
+   2c ✓ (anchor and candidate both within $\pm15$ of par); Gate 3 ✓.
 
-2. **Raw Error**: $\epsilon_{\mathrm{raw}}(3) = |1000.0 - 100.0| / 100.0 = 9.0 = 900\%$ ✓
+   **Decision: ACCEPT** → `suggested_price = 100.00`.
 
-3. **Best Factor**: $f^* = 0.1$ gives $\tilde{P}_3(0.1) = 100.0$
-
-4. **Corrected Error**: $\epsilon_{\mathrm{corr}}(3, 0.1) = |100.0 - 100.0| / 100.0 = 0.0\%$
-
-5. **Acceptance Gates**:
-   - Gate 2a: $0.0\% \leq 2\%$ ✓
-   - Gate 2c (par rule): $|A_3 - 100| = 0 \leq 15$ ✓ AND $|\tilde{P}_3 - 100| = 0 \leq 15$ ✓
-   - Gate 3: $0.0\% \leq 0.2 \times 900\% = 180\%$ ✓
-
-**Decision**: **ACCEPT** (par-proximity rule provides additional confidence)
+Note that here the par rule is not doing the work — 2a already passes on its own. The
+next example is one where the par rule *is* the only tolerance gate that passes, and the
+correction is still refused.
 
 ---
 
 ### Example 4: Improvement Gate Rejection
 
-**Input Data** (CUSIP = `77777W777`, noisy price series):
+**Input Data** (CUSIP = `77777W777`, trading near 90, one print at 11.25):
 
-| Row | Time | Reported Price | Anchor | Notes |
-|-----|------|----------------|--------|-------|
-| 1 | 09:00:00 | 80.0 | — | |
-| 2 | 09:30:00 | 120.0 | 100.0 | Volatile |
-| 3 | 10:00:00 | 85.0 | 100.0 | Volatile |
-| 4 | 10:30:00 | 115.0 | 100.0 | **Test this row** |
+```
+90.0  89.5  90.5  89.8  90.2  90.6  11.25  90.1  89.9  90.3  89.7  90.4  89.6
+                                    ^^^^^ row 7
+```
 
-**Algorithm Execution** (Row 4):
+**Algorithm Execution** (row 7):
 
-1. **Raw Error**: $\epsilon_{\mathrm{raw}}(4) = |115.0 - 100.0| / 100.0 = 0.15 = 15\%$ ✓ (exceeds 5%)
+1. **Anchor**: $A_7 = 90.10$.
+2. **Raw relative error**: $|11.25 - 90.10| / 90.10 = 0.8751$ (87.5%) ✓ — a large error,
+   and $11.25 \approx 112.5 / 10$ looks exactly like a 10x down-shift.
+3. **Best factor**: $f^* = 10.0$ → $112.50$. It is the only plausible candidate
+   ($1.125$, $0.1125$ and $1{,}125$ all fall outside $[5, 300]$).
+   $\epsilon_{\mathrm{corr}} = |112.50 - 90.10| / 90.10 = 0.2486$.
+4. **Gates**:
+   - 2a ✗ — $0.2486 \not\leq 0.02$
+   - 2b ✗ — $|112.50 - 90.10| = 22.40 \not\leq 8.0$
+   - **2c ✓** — $|90.10 - 100| = 9.90 \leq 15$ and $|112.50 - 100| = 12.50 \leq 15$, so
+     the par rule *would* accept
+   - **Gate 3 ✗** — $0.2486 \not\leq 0.2 \times 0.8751 = 0.1750$
 
-2. **Best Factor**: $f^* = 0.1$ gives $\tilde{P}_4(0.1) = 11.5$
-   - Plausibility check: $11.5 > 5.0$ ✓
-   - $\epsilon_{\mathrm{corr}}(4, 0.1) = |11.5 - 100.0| / 100.0 = 0.885 = 88.5\%$
-
-3. **Improvement Gate**: $88.5\% \not\leq 0.2 \times 15\% = 3\%$ → **FAIL**
-
-**Decision**: **REJECT** (correction makes things worse, not better)
+   **Decision: REJECT.** The par rule passed and the correction was still refused,
+   because $112.50$ is 24.9% away from the anchor when the improvement gate demands
+   17.5% or better. This is the case Gate 3 exists for: the par band is 30 points wide,
+   so on a bond trading near par it will wave through corrections that are merely
+   *plausible* rather than *right*.
 
 ---
 

@@ -31,7 +31,10 @@ B_i = \text{median}\left(\text{unique}(\{P_{i-w}, \ldots, P_{i-1}\})\right)
 $$
 
 where:
-- $w$ = window size (default: 5)
+- $w$ = window size (default: 5). ❗The rolling window is actually **$w+1$** -- six
+  trailing prints at the default -- because the code calls
+  `rolling_unique_median(s, window=window+1)`. The support is
+  $\{P_{i-w-1}, \ldots, P_{i-1}\}$.
 - **unique()** removes duplicate prices to reduce bias from repeated prints
 - $B_i$ is **shifted by 1** to ensure no look-ahead bias (does not include $P_i$)
 
@@ -234,7 +237,16 @@ def flag_price_change_errors(
 ## Algorithm Logic (Step-by-Step)
 
 ### Step 1: Preprocessing
-1. **Sort** DataFrame by `[id_col, date_col, time_col]` (if `time_col` is present)
+
+❗**This function does NOT sort, and it ignores `date_col` and `time_col` entirely.**
+Both appear in the signature but never in the body; the only columns it reads are
+`id_col` and `price_col`. Row order is whatever the caller supplies, and the algorithm
+is wholly order-dependent -- so `clean_trace_data` sorts by
+`[cusip_id, trd_exctn_dt, trd_exctn_tm, trd_rpt_dt, trd_rpt_tm, msg_seq_nb]`
+immediately before calling it (the "Pre BB sort"). Handing it an unsorted frame
+produces silently wrong flags.
+
+1. Copy the input. (No sort, no `reset_index`.)
 2. Compute **one-step price changes**: `delta_rptd_pr = df.groupby(id_col)[price_col].diff()`
 3. Compute **backward-looking anchor**: `baseline_trailing` using trailing median (window = $w+1$, shifted by 1)
 
@@ -365,15 +377,15 @@ FOR i = 0 to n-1:
 
 3. **Blame Reassignment**:
    - $|P_2 - B_2| = |94.0 - 92.75| = 1.25$
-   - $|P_3 - B_3| = 71.8$
-   - $1.25 - 71.8 = -70.55 \not\geq 5.0$ ✗
+   - $|P_3 - B_3| = 71.5$
+   - $1.25 - 71.5 = -70.25 \not\geq 5.0$ ✗
    - **No reassignment** (row 3 is the error)
 
 4. **Flagging**:
    - Flag row 3: `filtered[3] = 1`
    - **Plateau extension** (rows 4 to $\min(5, 3+5) = 5$):
-     - Row 4: $|P_4 - B_3| = |168.0 - 93.2| = 74.8 \geq \alpha \cdot \tau = 0.25 \times 35.0 = 8.75$ ✓ → Flag
-     - Row 5: $|P_5 - B_3| = |92.5 - 93.2| = 0.7 \not\geq 8.75$ ✗ → Stop
+     - Row 4: $|P_4 - B_3| = |168.0 - 93.5| = 74.5 \geq \alpha \cdot \tau = 0.25 \times 35.0 = 8.75$ ✓ → Flag
+     - Row 5: $|P_5 - B_3| = |92.5 - 93.5| = 1.0 \not\geq 8.75$ ✗ → Stop
    - Final flags: rows 3, 4
 
 **Output**:
@@ -395,9 +407,9 @@ FOR i = 0 to n-1:
 | 0 | 09:00:00 | 90.0 | — | — | Pre-downgrade |
 | 1 | 09:30:00 | 89.5 | -0.5 | 90.0 | |
 | 2 | 10:00:00 | **52.0** | **-37.5** | 89.75 | **Downgrade announced** |
-| 3 | 10:30:00 | 51.5 | -0.5 | 77.0 | Post-downgrade |
-| 4 | 11:00:00 | 52.5 | +1.0 | 64.3 | Stabilizing |
-| 5 | 11:30:00 | 52.2 | -0.3 | 57.7 | New level |
+| 3 | 10:30:00 | 51.5 | -0.5 | 89.50 | Post-downgrade |
+| 4 | 11:00:00 | 52.5 | +1.0 | 70.75 | Stabilizing |
+| 5 | 11:30:00 | 52.2 | -0.3 | 52.50 | New level |
 
 **Algorithm Execution**:
 
@@ -430,8 +442,8 @@ FOR i = 0 to n-1:
 | 0 | 09:00:00 | 98.5 | — | |
 | 1 | 09:30:00 | 99.2 | 98.5 | |
 | 2 | 10:00:00 | **100.0** | 98.85 | **Par print** (isolated) |
-| 3 | 10:30:00 | 99.1 | 98.9 | Reverts |
-| 4 | 11:00:00 | 98.8 | 99.1 | Normal |
+| 3 | 10:30:00 | 99.1 | 99.20 | Reverts |
+| 4 | 11:00:00 | 98.8 | 99.15 | Normal |
 
 **Algorithm Execution**:
 
@@ -455,30 +467,34 @@ FOR i = 0 to n-1:
 | Row | Time | Price | Baseline | Notes |
 |-----|------|-------|----------|-------|
 | 0 | 09:00:00 | 85.0 | — | Normal |
-| 1 | 09:30:00 | 84.5 | 85.0 | Normal |
+| 1 | 09:30:00 | 84.5 | 85.00 | Normal |
 | 2 | 10:00:00 | **100.0** | 84.75 | **Error: par spike** |
-| 3 | 10:15:00 | **100.0** | 85.0 | Continues |
-| 4 | 10:30:00 | **100.0** | 89.8 | Continues |
-| 5 | 10:45:00 | 84.8 | 92.3 | Returns |
+| 3 | 10:15:00 | **100.0** | 85.00 | Continues |
+| 4 | 10:30:00 | **100.0** | 85.00 | Continues |
+| 5 | 10:45:00 | 84.8 | 85.00 | Returns |
+
+(Anchors verified by running the function. They stay at 85.00 because the median is
+taken over **unique** prices: $\{85.0, 84.5, 100.0\}$ has median 85.0, whatever the
+repeats.)
 
 **Algorithm Execution**:
 
-1. **Row 2 (Par Candidate)**:
-   - Price is at par ✓
-   - $|P_2 - B_2| = |100.0 - 84.75| = 15.25 \geq 8.75$ ✓
-   - **Par candidate opened**
+1. **Row 2 opens as a PAR-ONLY candidate**:
+   - $|\Delta P_2| = |100.0 - 84.5| = 15.5$, which is **below** $\tau = 35$, so the
+     jump condition does NOT fire
+   - the price is at par and displaced from the anchor, so the par condition does
+   - hence `par_only = True`
 
-2. **Lookahead Scan**:
-   - No opposite big move (Path A fails)
-   - Row 5 returns to baseline: $|P_5 - B_2| = |84.8 - 84.75| = 0.05 \leq 8.75$ ✓
-   - **Path B resolved** at $j_{\mathrm{return}} = 5$
+2. **The lookahead is SKIPPED.** The scan is guarded by `if not par_only:` — a par-only
+   candidate never takes the quick-correction paths, and neither $j_{\mathrm{match}}$
+   nor $k_{\mathrm{return}}$ is ever computed. Only a *persistent par run* can flag here.
 
-3. **Flagging** (par-spike mode):
-   - Rows 2, 3, 4 all satisfy $|P_k - 100.0| \leq 10^{-8}$ ✓
-   - Flag rows 2, 3, 4
-   - Row 5 is not at par → not flagged
+3. **Persistent par-run branch**: rows 2, 3, 4 are all within `par_equal_tol` of 100.0,
+   so the run length is 3, which meets `par_min_run = 3` → flag rows 2, 3, 4.
+   Row 5 is not at par and is not flagged.
 
-4. **Cooldown**: Suppress non-par flags until row $5 + 2 = 7$ (next 2 rows after bounce-back)
+4. **Cooldown**: suppress non-par flags until `run_end + par_cooldown_after_flag`
+   $= 4 + 2 = 6$.
 
 **Output**:
 
@@ -491,37 +507,43 @@ FOR i = 0 to n-1:
 
 ---
 
-### Example 5: Blame Reassignment
+### Example 5: Spike, Plateau, Bounce-Back
 
-**Input Data** (CUSIP = `55555E555`, error on previous row):
+**Input Data** (CUSIP = `55555E555`, a two-print spike that snaps back):
 
 | Row | Time | Price | Baseline | Notes |
 |-----|------|-------|----------|-------|
 | 0 | 09:00:00 | 78.0 | — | |
 | 1 | 09:30:00 | 80.0 | 78.0 | Normal |
 | 2 | 10:00:00 | **185.0** | 79.0 | **True error here** |
-| 3 | 10:30:00 | 180.0 | 79.0 | Derivative error |
-| 4 | 11:00:00 | **79.5** | 79.0 | Bounce-back |
+| 3 | 10:30:00 | 180.0 | 80.0 | Derivative error |
+| 4 | 11:00:00 | **79.5** | 130.0 | Bounce-back |
+
+(Anchors verified by running the function.)
 
 **Algorithm Execution**:
 
-1. **Row 3 (Candidate Opening)**:
-   - $|\Delta P_3| = |180.0 - 185.0| = 5.0 \not\geq 34.0$ ✗ (no big jump at row 3)
-   - But $|P_3 - B_3| = |180.0 - 79.0| = 101.0 \geq 34.0$ ✓ (displaced from baseline)
-   - **Candidate opened** at row 3
+1. **Row 2 opens the candidate** — the scan reaches it first:
+   - $|\Delta P_2| = |185.0 - 80.0| = 105.0 \geq \tau = 35$ ✓
+   - **Candidate opened at row 2**, the row that actually carries the bad print.
 
-2. **Lookahead Scan**:
-   - Row 4: $\Delta P_4 = 79.5 - 180.0 = -100.5$ (opposite sign) ✓ AND $|\Delta P_4| = 100.5 \geq 34.0$ ✓
-   - **Path A resolved** at row 4
+   Row 3 is never evaluated as a candidate: its own $|\Delta P_3| = 5.0$ is far below
+   $\tau$, and after row 2 resolves, the cursor jumps past it.
 
-3. **Blame Reassignment** (check row 2):
-   - $|P_2 - B_2| = |185.0 - 79.0| = 106.0$
-   - $|P_3 - B_3| = 101.0$
-   - $106.0 - 101.0 = 5.0 \geq 5.0$ ✓
-   - $106.0 \geq \alpha \cdot \tau = 8.75$ ✓
-   - **Reassign to row 2** (it is more displaced)
+2. **Lookahead from row 2**: row 4 gives $\Delta P_4 = -100.5$ — opposite in sign and
+   large — so **Path A resolves** at row 4.
 
-4. **Flagging**: Rows 2, 3 flagged (row 2 is the true error, row 3 is the plateau)
+3. **Blame reassignment is TESTED and DECLINED**:
+   - $\mathrm{dev}_{\mathrm{prev}} = |P_1 - B_1| = |80.0 - 78.0| = 2.0$
+   - $\mathrm{dev}_{\mathrm{curr}} = |P_2 - B_2| = |185.0 - 79.0| = 106.0$
+   - reassignment needs $\mathrm{dev}_{\mathrm{prev}} - \mathrm{dev}_{\mathrm{curr}}
+     \geq 5.0$; here it is $-104.0$, so **no reassignment**.
+
+   That is the right outcome — row 2 is already the culprit. ❗There is currently no
+   worked example in which the reassignment branch actually fires.
+
+4. **Flagging**: row 2 as the candidate start, row 3 as the plateau that has not yet
+   returned to the anchor. Row 4 is the bounce-back and is preserved.
 
 **Output**:
 
@@ -621,7 +643,7 @@ After flagging a par block, the baseline may be shifted by the flagged rows. Coo
 |--------|------------------------|--------------------|
 | **Error Type** | Multiplicative (10x, 100x) | Additive (transient spikes) |
 | **Anchor** | Rolling unique-median (centered) | Trailing unique-median (backward-looking) |
-| **Detection Method** | Test specific factors {0.1, 10, 100} | Detect large jumps + reversion pattern |
+| **Detection Method** | Test specific factors {0.1, 0.01, 10, 100} | Detect large jumps + reversion pattern |
 | **Action** | **Correct** prices | **Flag** (remove) transactions |
 | **Sequence** | Applied first (Stage 2) | Applied after decimal correction (Stage 7) |
 
