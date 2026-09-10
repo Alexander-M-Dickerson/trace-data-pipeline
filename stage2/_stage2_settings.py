@@ -51,6 +51,11 @@ ROOT_PATH = ""  # Auto-detect from current working directory
 # ROOT_PATH = Path("~/proj").expanduser()                          # Linux/Mac
 # ROOT_PATH = Path("C:\\Users\\YourName\\Documents\\trace_data")   # Windows
 
+# --- Release vintage ---
+# Blank = derive from the Stage 1 stamp's year (20260909 -> "2026"), which is what makes
+# the naming extensible: next year's run publishes itself. Set a value only to override.
+RELEASE_VINTAGE = ""
+
 # --- Stage 1 input ---
 # Leave as None to use the newest stage1/data/stage1_YYYYMMDD.parquet.
 # Set a path (or the STAGE2_DAILY_INPUT environment variable) to pin one explicitly.
@@ -254,6 +259,34 @@ def date_stamp() -> str:
     name = daily_input().stem
     tail = name.split("_")[-1]
     return tail if len(tail) == 8 and tail.isdigit() else "unstamped"
+
+
+def release_vintage() -> str:
+    """The four-digit vintage a RELEASE is published under, e.g. "2026".
+
+    Build artifacts carry the Stage 1 date stamp (20260909) so a panel is always traceable
+    to the file it came from. Released artifacts carry the vintage YEAR instead, which is
+    what users cite -- `main_panel_2026.parquet`. Stamped while building, vintaged when
+    released.
+
+    Derived from the stamp's year rather than hard-coded, so next year's run publishes
+    itself. Override with RELEASE_VINTAGE in this file, or the STAGE2_RELEASE_VINTAGE
+    environment variable, if a release ever needs to differ from its build year.
+    """
+    override = os.environ.get("STAGE2_RELEASE_VINTAGE") or RELEASE_VINTAGE
+    if override:
+        return str(override)
+    stamp = date_stamp()
+    if len(stamp) == 8 and stamp.isdigit():
+        return stamp[:4]
+    from datetime import date
+    return str(date.today().year)
+
+
+def released_name(kind: str, suffix: str = ".parquet") -> str:
+    """The published filename for an artifact, e.g. released_name("main_panel") ->
+    "main_panel_2026.parquet"."""
+    return f"{kind}_{release_vintage()}{suffix}"
 
 
 def fisd_file() -> Path | None:
