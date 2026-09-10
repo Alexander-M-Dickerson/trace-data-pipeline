@@ -48,11 +48,42 @@ def build(con=None, mode: str | None = None, limit_cusips: int | None = None) ->
         end_signals = _read(blocks_dir, "end_signals")
         adj_signals = _read(blocks_dir, "adj_signals")
 
+    # Firm identifiers. Stage 1 attaches permno/permco/gvkey at BOND level using dated
+    # windows, and step 1 carries them through, so by default we use those directly.
+    #
+    # The alternative is the historical path: re-derive them here by merging a separate
+    # issuer-level linker keyed on the first six CUSIP characters and forward-filled by
+    # month. That is strictly worse -- issuer-level keys cannot distinguish two issuers
+    # sharing a CUSIP6, and a forward fill back-casts a link across a period where it did
+    # not hold. It stays reachable (set STAGE2_LINKER_FILE) only to reproduce a panel
+    # published before the change.
+    use_linker_file = cfg.AUX.get("linker") is not None
     with pt("wrangle_returns"):
         returns_main, returns_alt, signals_out = wrangle.wrangle_returns(
             end_returns=end_returns, bgn_returns=bgn_returns, end_signals=end_signals,
-            linker_url="local", linker_zipkey="OSBAP_Linker_October_2025.parquet",
+            linker_url="local" if use_linker_file else None,
+            linker_zipkey=(Path(cfg.AUX["linker"]).name if use_linker_file else None),
             local_dir=str(cfg.DATA_DIR), verbose=True)
+
+    if not use_linker_file:
+        with pt("attach_stage1_firm_ids"):
+            firm_ids = _read(blocks_dir, "firm_ids")
+            before = len(returns_main)
+            returns_main["issuer_cusip"] = returns_main["cusip"].astype(str).str[:6]
+            returns_main = returns_main.merge(firm_ids, on=["cusip", "date"], how="left",
+                                              validate="1:1")
+            assert len(returns_main) == before, (
+                f"firm_ids merge changed the row count ({before:,} -> {len(returns_main):,}); "
+                f"it must be one row per (cusip, date)")
+            matched = int(returns_main["permno"].notna().sum())
+            print(f"  Stage 1 firm ids: {matched:,} of {before:,} rows "
+                  f"({100 * matched / max(before, 1):.1f}%) carry a permno")
+            # wrangle_returns normalises dtypes internally, before this merge, so these
+            # columns would otherwise escape it. Match the shape the linker path produced
+            # so the panel's schema is unchanged and only the VALUES differ.
+            returns_main["issuer_cusip"] = returns_main["issuer_cusip"].astype("category")
+            for c in ("permno", "permco", "gvkey"):
+                returns_main[c] = returns_main[c].astype("float64")
 
     with pt("wrangle_signals"):
         value_std = _read(blocks_dir, "value_signals_std")

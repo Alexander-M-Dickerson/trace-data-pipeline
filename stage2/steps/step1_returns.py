@@ -383,6 +383,29 @@ SELECT cusip, date, ret_vw, tret, ret_std, ret_type FROM (
     _copy("all_returns", """
         SELECT cusip, date::TIMESTAMP AS date, ret_vw, tret, ret_std, ret_type
         FROM all_returns ORDER BY cusip, date""")
+    # firm_ids: Stage 1's permno/permco/gvkey collapsed to one row per bond-month, taken at
+    # the same month-end trade t_sig uses. Stage 7 merges this instead of re-deriving the
+    # identifiers from a separate issuer-level linker file.
+    #
+    # ! Read STRAIGHT FROM THE PIN and joined on (cusip_id, dt), rather than carried through
+    #   t_src. Adding columns to t_src changes the physical row order, and several float32
+    #   illiquidity kernels downstream are order-sensitive -- doing it that way moved six
+    #   unrelated columns by ~1e-13 relative. Identifiers must not perturb the numeric path.
+    _copy("firm_ids", f"""
+        SELECT e.cusip_id AS cusip, e.date_end_ref::TIMESTAMP AS date,
+               p.permno, p.permco, p.gvkey
+        FROM (
+            SELECT cusip_id, dt, date_end_ref FROM t_end_full
+            WHERE date_end_ref >= DATE '{cfg.START_DATE}'
+            QUALIFY row_number() OVER (PARTITION BY cusip_id, date_end_ref ORDER BY dt) = 1
+        ) e
+        JOIN (
+            SELECT cusip_id, dt, permno, permco, gvkey
+            FROM read_parquet('{pin_path.as_posix()}')
+            WHERE pr IS NOT NULL
+            QUALIFY row_number() OVER (PARTITION BY cusip_id, dt ORDER BY frn) = 1
+        ) p ON p.cusip_id = e.cusip_id AND p.dt = e.dt
+        ORDER BY cusip, date""")
     # returns_alt: the G1 golden target (wrangle_returns step 4 slice, float32)
     _copy("returns_alt", """
         SELECT cusip, date::TIMESTAMP AS date,
