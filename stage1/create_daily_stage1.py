@@ -13,7 +13,7 @@ This stage:
 4. Merges FISD data with TRACE
 5. Computes bond analytics (duration, convexity, credit spreads, etc.)
 6. Merges credit ratings (S&P and Moody's)
-7. Merges external identifiers via OSBAP linker
+7. Merges equity identifiers via the dated bond-firm linker
 8. Applies ultra-distressed bond filters
 9. Applies final price and date filters
 10. Generates comprehensive data quality reports 

@@ -517,12 +517,12 @@ reference; this is a summary.
 - `acclast` - Accrued interest since last coupon payment date
 - `accpmt` - Cumulative sum of all coupon payments made on or before settlement date
 - `accall` - Total accumulation (`acclast + accpmt`)
-- `ytm` - Yield to maturity (%)
+- `ytm` - Yield to maturity, as a DECIMAL (0.045 = 4.5%), not a percentage
 - `mod_dur` - Modified duration (years)
 - `mac_dur` - Macaulay duration (years)
 - `convexity` - Convexity
 - `bond_maturity` - Time to maturity (years)
-- `credit_spread` - Credit spread vs. treasury (%)
+- `credit_spread` - Credit spread over the MATURITY-matched treasury, as a DECIMAL (0.012 = 120bp), not a percentage
 
 **TRACE pricing (from Stage 0):**
 - `prc_ew` - Equal-weighted price
@@ -531,13 +531,14 @@ reference; this is a summary.
 - `prc_last` - Last trade price of day
 - `prc_hi` - Intraday high price
 - `prc_lo` - Intraday low price
-- `prc_bid` - Customer bid price
-- `prc_ask` - Customer ask price
+- `prc_bid` - Dealer bid: value-weighted price of trades where the DEALER bought
+  from a customer (`rpt_side_cd=='B'`), i.e. the customer sold
+- `prc_ask` - Dealer ask: the dealer SOLD to a customer (`rpt_side_cd=='S'`)
 - `trade_count` - Number of trades
 - `qvolume` - Par dollar volume ($ millions)
 - `dvolume` - Dollar volume ($ millions)
-- `bid_count` - Number of bid quotes
-- `ask_count` - Number of ask quotes
+- `bid_count` - Number of dealer BUY trades (TRACE has no quotes -- these are executions)
+- `ask_count` - Number of dealer SELL trades
 
 **Bond characteristics (from FISD):**
 - `bond_age` - Age of bond in years
@@ -555,8 +556,8 @@ fall into each scheme's "Other" bucket, so these are never null):
 - `ff30num` - Fama-French 30 industry code (1-30)
 
 **Credit ratings:**
-- `sp_rating` - S&P letter rating
-- `mdy_rating` - Moody's letter rating
+- `sp_rating` - S&P rating as a NUMERIC code, Int8 1-22 (1 = AAA, 22 = D)
+- `mdy_rating` - Moody's rating as a NUMERIC code, Int8 1-21
 - `spc_rating` - S&P composite rating (S&P, else Moody's if S&P missing)
 - `mdc_rating` - Moody's composite rating
 

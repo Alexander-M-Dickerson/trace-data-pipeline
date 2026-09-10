@@ -96,7 +96,7 @@ join key for the previous issuer-month linker and is no longer used; derive it a
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `pr` | float32 | Volume-weighted clean price (% of par) |
+| `pr` | float32 | **Dollar**-volume-weighted clean price, % of par (`Σ price x dollar_vol / Σ dollar_vol`). Contrast `prc_vw_par`, which weights by par quantity |
 | `prfull` | float32 | Dirty price = pr + acclast (% of par) |
 | `acclast` | float32 | Accrued interest — pure time-accrued interest component |
 | `accpmt` | float32 | Accumulated coupon payments since issue |
@@ -106,7 +106,7 @@ join key for the previous issuer-month linker and is no longer used; derive it a
 | `mac_dur` | float32 | Macaulay duration (years) |
 | `convexity` | float32 | Bond convexity |
 | `bond_maturity` | float32 | Time to maturity (years) |
-| `credit_spread` | float64 | Credit spread over duration-matched Treasury yield |
+| `credit_spread` | float64 | Credit spread over the **maturity**-matched Treasury yield (the Liu-Wu curve interpolated at `bond_maturity`, not at duration) |
 
 #### Price Definitions
 
@@ -161,7 +161,7 @@ join key for the previous issuer-month linker and is no longer used; derive it a
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `db_type` | Int8 | Source TRACE database: 1=Enhanced, 2=Standard, 3=144A |
+| `db_type` | Int8 | Source TRACE database: 1=Enhanced, 2=Standard, 3=144A. ❗**2 never appears.** Standard is opt-in and, when run, survives only for dates after the last Enhanced date — which the trailing `DATE_CUT_OFF` always precedes. Filtering `db_type == 2` returns zero rows by construction. |
 
 ---
 
@@ -263,23 +263,36 @@ output file.
 | 20 | Ca | High Yield |
 | 21 | C/D | Default |
 
+#### ❗Sample-defining operations you cannot see in the columns
+
+The panel is not the raw join. Before it is written, Stage 1:
+
+- **Winsorises `ytm` and `credit_spread` at the 0.5% / 99.5% quantiles WITHIN each
+  trade date.** Tail statistics on either column are computed on clipped data.
+- **Drops every bond-day with `bond_maturity < 1.0`** — inside one year of maturity.
+- **Drops rows with neither `spc_rating` nor `mdc_rating`.**
+- **Drops rows flagged by the ultra-distressed filter**, by the 2002-07 price-dip check,
+  and any with `pr > 300`.
+
+Each is a sample choice, not a column, so none of them shows up in the schema.
+
 #### NAIC Categories (sp_naic)
 
 | Code | Category | S&P Ratings |
 |------|----------|-------------|
-| 1 | Highest Quality | AAA, AA+, AA, AA- |
-| 2 | High Quality | A+, A, A- |
-| 3 | Medium Quality | BBB+, BBB, BBB- |
-| 4 | Low Quality | BB+, BB, BB- |
-| 5 | Lowest Quality | B+, B, B-, CCC+, CCC, CCC- |
-| 6 | In or Near Default | CC, C, D |
+| 1 | Highest Quality | AAA through A- (numeric 1-7) |
+| 2 | High Quality | BBB+, BBB, BBB- (8-10) |
+| 3 | Medium Quality | BB+, BB, BB- (11-13) |
+| 4 | Low Quality | B+, B, B- (14-16) |
+| 5 | Lowest Quality | CCC+, CCC, CCC- (17-19) |
+| 6 | In or Near Default | CC, C, D (20-22) |
 
 #### Composite Ratings
 
 | Variable | Description |
 |----------|-------------|
 | `spc_rating` | S&P rating; if missing, filled with `mdy_rating` (Moody's 21 → 22 for default alignment) |
-| `mdc_rating` | Moody's rating; if missing, filled with `sp_rating` (S&P 22 → 21 for default alignment) |
+| `mdc_rating` | Moody's rating, first rescaled 21 → 22 so its default bucket lines up with S&P's; if still missing, filled with `sp_rating` on the raw 1-22 scale. There is no S&P 22 → 21 mapping. |
 
 `comp_rating` (their average) is computed during processing but is not in the output.
 

@@ -49,17 +49,17 @@ N_CHUNKS = 10      # Number of chunks for parallel operations
 # Default worker count when N_CORES is not set explicitly.
 #
 # This used to be multiprocessing.cpu_count(), which reports the cores of the whole
-# HOST -- WRDS Cloud compute nodes have up to 24. But run_stage1.sh requests no
-# parallel environment, so Grid Engine grants the job a single slot with a 24 GB
-# memory limit. Spawning one worker per host core therefore over-subscribed the
-# node, and because joblib's process backend copies the data each worker touches,
-# it multiplied memory against that 24 GB grant.
+# HOST -- WRDS Cloud compute nodes have up to 24 -- so it spawned one worker per host
+# core regardless of what the job was actually granted, and joblib's process backend
+# copies the data each worker touches.
 #
-# NOTE FOR ANYONE TEMPTED TO ADD `#$ -pe onenode N` TO run_stage1.sh: on this
-# cluster m_mem_free is a PER-SLOT request, so `-pe onenode 4` with the current
-# `-l m_mem_free=24G` asks for 4 x 24 = 96 GB on one node, and larger slot counts
-# exceed the node ceiling and pend forever. If you want more cores, divide the
-# memory at the same time (e.g. `-pe onenode 4` with `-l m_mem_free=6G`).
+# The resolution order below reads $NSLOTS, so it now tracks the grant: since v2.2.1
+# run_stage1.sh requests `-pe onenode 4` with `-l m_mem_free=10G`, and N_CORES resolves
+# to 4 to match.
+#
+# ❗m_mem_free is charged PER SLOT, so the total is slots x mem and must stay within the
+# WRDS caps of 8 cores and 48 GB per job. 4 x 10G = 40 GB. Raising one without dividing
+# the other does not error -- the job pends forever, silently.
 STAGE1_DEFAULT_N_CORES = 4
 
 if N_CORES is None:

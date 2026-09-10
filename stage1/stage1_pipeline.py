@@ -680,7 +680,7 @@ def step5_compute_bond_analytics():
     # at the end. The previous version grew a single file -- every chunk after the
     # first read the whole accumulated parquet back, concatenated, and rewrote it --
     # which for 10 chunks and a ~2.5 GB result meant roughly 25 GB of I/O and held
-    # three copies of the data (existing + chunk + combined) inside a 24 GB job.
+    # three copies of the data (existing + chunk + combined) inside a 40 GB job.
     # Writing parts mirrors what step 4 already does for temp_trace_other_chunk_*.
     part_paths = [STAGE1_DATA / f"temp_stage1_part_{i:03d}.parquet" for i in range(N_CHUNKS)]
     for part_path in part_paths:
@@ -1175,10 +1175,10 @@ def step7_merge_linker():
     # Try to load linker file - either from internet or local file
     if has_internet:
         try:
-            logger.info("Internet available - downloading OSBAP linker from URL")
+            logger.info("Internet available - downloading the bond-firm linker from URL")
             logger.info("Loading linker file...")
             dfl = hf.load_parquet_from_zip_url(LINKER_URL, LINKER_ZIPKEY).copy()
-            logger.info("Successfully downloaded and extracted OSBAP linker")
+            logger.info("Successfully downloaded and extracted the bond-firm linker")
         except Exception as e:
             logger.warning(f"Failed to download from internet: {e}")
             logger.info("Falling back to local file")
@@ -1194,14 +1194,14 @@ def step7_merge_linker():
             raise FileNotFoundError(
                 f"No internet connection and local file not found: {local_file}\n"
                 f"Please download the file manually:\n"
-                f"  wget -O data/linker_file_2025.zip \"{LINKER_URL}\"\n"
-                f"  unzip data/linker_file_2025.zip -d data/\n"
+                f"  wget -O data/bond_firm_linker_2026.zip \"{LINKER_URL}\"\n"
+                f"  unzip data/bond_firm_linker_2026.zip -d data/\n"
                 f"Or run this from a machine with internet access."
             )
 
-        logger.info(f"Internet not available - loading OSBAP linker from local file: {local_file}")
+        logger.info(f"Internet not available - loading the bond-firm linker from: {local_file}")
         dfl = pd.read_parquet(local_path).copy()
-        logger.info(f"Successfully loaded OSBAP linker from {local_file}")
+        logger.info(f"Successfully loaded the bond-firm linker from {local_file}")
 
     dfl.columns = dfl.columns.str.lower()
 
