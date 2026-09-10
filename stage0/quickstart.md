@@ -97,12 +97,15 @@ clone gives "Permission denied", either `bash run_pipeline.sh` or
 `run_pipeline.sh` fetches Stage 1's external inputs itself (on the login node, which is
 the only place with internet), then submits Stage 0 for each member in `TRACE_MEMBERS`,
 the data-report job, and Stage 1.
-```
 
 What this does:
 
-* Submits three SGE jobs: `Enhanced`, `Standard`, `144A`
-* Submits a report job with `-hold_jid` that waits for the above to finish
+* Submits one SGE job per member in `TRACE_MEMBERS` -- by default `enhanced` and
+  `144a`, which go in together. `standard` is opt-in and is held behind them so it
+  gets the whole WRDS connection budget.
+* Submits the data-report job with `-hold_jid` on those stage-0 jobs.
+* Submits Stage 1 with `-hold_jid` on the same stage-0 jobs, so it runs **alongside**
+  the reports rather than after them (v2.2.2).
 * Jobs run on the WRDS cluster via `qsub`, so disconnecting SSH is safe
 
 Outputs:

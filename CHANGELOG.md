@@ -73,6 +73,23 @@ the code does, and re-deriving them turned up a real bug.
 - Two more instances of the pre-2.2.2 "Stage 1 is held on the report job" claim.
 - Ten `## ` sections missing from three tables of contents; a dead `ForkLift` URL; the
   filter READMEs' citation year (2024 -> 2025); a factor set missing `0.01`.
+- **Two broken code fences.** A stray closing ``` in `stage0/quickstart.md` swallowed
+  three paragraphs into a code block, and `stage1/README_stage1.md` opened an empty
+  ```` ```python ```` immediately before another one. Neither is visible in the source.
+  The stage-0 one also still said "Submits three SGE jobs: Enhanced, Standard, 144A" --
+  Standard has been opt-in since 2.2.0.
+
+### Added
+- **`tests/test_docs.py` gains six structural checks**, for the classes that came back
+  after being fixed: output trees vs the filename table the stage-0 writer actually
+  loops over (per file -- pooling let one doc cover another's omission), `qsub <script>`
+  paths resolving from the repo root, TOC completeness, in-page anchors, `OUTPUT_FORMAT`,
+  and code-fence balance. Each was mutation-tested: break the guarded thing and the
+  suite goes red with the right message. The qsub check found a second bad path on its
+  first run that hand-reading had missed.
+  The module docstring now states the limit: these checks cannot tell whether a sentence
+  is TRUE. Every one of them passed while nine worked examples carried invented
+  arithmetic and one carried the wrong verdict.
 
 ### Notes
 - No numeric path changed. Gates green: `test_docs`, `test_chunk_plan`,

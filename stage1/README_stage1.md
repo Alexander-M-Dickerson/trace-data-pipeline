@@ -348,7 +348,6 @@ Open `_stage1_settings.py` and adjust the following:
 
 ### User Configuration
 
-```python
 In the root `config.py` -- shared by every stage:
 
 ```python

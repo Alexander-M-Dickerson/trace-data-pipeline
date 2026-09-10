@@ -178,6 +178,33 @@ def check_output_format(docs):
     check("no doc presents OUTPUT_FORMAT='csv' as usable", not bad, str(bad))
 
 
+def check_fences(docs):
+    """Code fences must balance, and a fence must not open while one is already open.
+
+    2.2.3 found a stray closing ``` that silently swallowed the next three paragraphs
+    of stage0/quickstart.md into a code block, and an empty ```python immediately
+    followed by another ```python in stage1/README_stage1.md. Both render wrong and
+    neither is visible in the source.
+    """
+    odd, nested = [], []
+    for fname, text in docs_all.items():
+        fences = [(i, l.strip()[3:].strip())
+                  for i, l in enumerate(text.splitlines(), 1)
+                  if l.strip().startswith("```")]
+        if len(fences) % 2:
+            odd.append(f"{fname} ({len(fences)} fences)")
+        depth = 0
+        for i, info in fences:
+            if depth == 0:
+                depth = 1
+            elif info:          # a language tag while a fence is open: the first never closed
+                nested.append(f"{fname}:{i} ```{info}")
+            else:
+                depth = 0
+    check("every doc has an even number of code fences", not odd, str(odd))
+    check("no code fence opens while another is open", not nested, str(nested))
+
+
 def main():
     global docs_all
     docs = {f: (ROOT / f).read_text(encoding="utf-8") for f in DOC_FILES}
@@ -256,6 +283,7 @@ def main():
     check_qsub_paths(docs)
     check_toc(docs)
     check_output_format(docs)
+    check_fences(docs)
 
     print()
     if FAILURES:
