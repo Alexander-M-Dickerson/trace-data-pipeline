@@ -523,12 +523,22 @@ AUX = {
 
 # Validation targets exist only where a reference build is available to diff against.
 # A public build has none, and the validators skip cleanly on an empty mapping.
+#
+# The one entry a public user can populate is "factors": FACTOR_SOURCE="pinned" reads it,
+# which is how you reproduce a specific published vintage exactly.
 GOLDEN_OUTPUTS: dict = {}
+_pinned_factors = os.environ.get("STAGE2_FACTORS_PINNED") or FACTORS_PINNED_FILE
+if _pinned_factors:
+    GOLDEN_OUTPUTS["factors"] = Path(_pinned_factors)
 
 
 def tret_max_date(mode: str | None = None) -> str | None:
-    """Treasury-series vintage cutoff; None means use every month available."""
-    return TRET_MAX_DATE
+    """Treasury-series vintage cutoff; None means use every month available.
+
+    STAGE2_TRET_MAX_DATE overrides the setting, which is how a published vintage built
+    against an older Treasury pull is reproduced exactly.
+    """
+    return os.environ.get("STAGE2_TRET_MAX_DATE") or TRET_MAX_DATE
 
 
 def factor_source_for(mode: str | None = None) -> str:
