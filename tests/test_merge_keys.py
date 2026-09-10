@@ -39,6 +39,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "stage1"))
 
 FAILURES = []
+SKIPPED = []
 
 
 def check(name, cond, detail=""):
@@ -47,9 +48,11 @@ def check(name, cond, detail=""):
         FAILURES.append(name)
 
 
-def note(name, detail):
+def note(name, detail, skipped=False):
     """Report something worth knowing that is NOT a failure."""
     print(f"[note] {name:<58} {detail}")
+    if skipped:
+        SKIPPED.append(name)
 
 
 # ---------------------------------------------------------------- offline checks
@@ -57,7 +60,8 @@ def check_stage0_artifact():
     """The stage-0 FISD universe must be one row per CUSIP -- steps 3, 4 and 6 join it."""
     found = sorted(ROOT.glob("**/stage0/enhanced/trace_enhanced_fisd_*.parquet"))
     if not found:
-        note("stage0 FISD artifact", "none on disk; skipped (run stage 0 or the smoke test)")
+        note("stage0 FISD artifact", "none on disk; skipped (run stage 0 or the smoke test)",
+             skipped=True)
         return
     f = found[-1]
     d = pd.read_parquet(f, columns=["complete_cusip"])
@@ -154,16 +158,51 @@ def check_the_actual_bug(issues_for_amt, panel_days=304):
 
 
 # ---------------------------------------------------------------- WRDS checks
+def _connect_wrds_or_none(user):
+    """Connect WITHOUT ever prompting, and report a failure in one line.
+
+    ❗The wrds package answers a failed connect by calling input() for a username and
+    password. On a login node that does not raise -- it silently consumes whatever is
+    next in the terminal's paste buffer, which is usually the next command you typed.
+    That produced, verbatim:
+
+        FATAL: PAM authentication failed for user
+               "[phd18ad1@wrds-sbd-cloud-login-05-w ~]$ cd ~ && rm -rf trace-da"
+
+    followed by ~120 lines of SQLAlchemy traceback. So stdin is closed for the duration
+    of the connect: the prompt then hits EOF and raises, and we say what to check.
+    """
+    import contextlib, io, wrds
+    saved, devnull = sys.stdin, open(os.devnull)
+    chatter = io.StringIO()          # "Loading library list...", and the prompt text
+    try:
+        sys.stdin = devnull
+        with contextlib.redirect_stdout(chatter):
+            return wrds.Connection(wrds_username=user)
+    except Exception as e:
+        first = (str(e).strip().splitlines() or [type(e).__name__])[0][:110]
+        note("WRDS checks", "SKIPPED -- could not connect", skipped=True)
+        print(f"       {first}")
+        print(f"       Check ~/.pgpass has a line for "
+              f"wrds-pgdata.wharton.upenn.edu:9737:wrds:{user} and is chmod 600.")
+        return None
+    finally:
+        sys.stdin = saved
+        devnull.close()
+
+
 def check_wrds():
-    """The source tables, keyed as each join assumes."""
+    """The source tables, keyed as each join assumes. Aggregates only -- seconds."""
     user = os.environ.get("WRDS_USERNAME", "")
     if not user or user == "your_wrds_username":
-        note("WRDS checks", "WRDS_USERNAME not set; skipped (use --offline to silence)")
+        note("WRDS checks", "WRDS_USERNAME not set; skipped (--offline to silence)",
+             skipped=True)
         return
-    import wrds
-    db = wrds.Connection(wrds_username=user)
+    db = _connect_wrds_or_none(user)
+    if db is None:
+        return
     try:
-        # Joined on issue_id: ratings->cusip map, and the call dummies.
+        # Joined on issue_id: the ratings->cusip map, and the call dummies.
         for table, key in (("fisd_mergedissue", "issue_id"),
                            ("fisd_mergedredemption", "issue_id")):
             r = db.raw_sql(f"""
@@ -173,25 +212,34 @@ def check_wrds():
             check(f"fisd.{table} is one row per {key}", int(r["n"]) == int(r["k"]),
                   f"{int(r['n']):,} rows / {int(r['k']):,} keys")
 
-        # NOT a failure: this multiplicity is real, and is now handled by collapsing the
-        # lookup before the join. Reported so a jump in it is visible.
-        r = db.raw_sql("""
-            SELECT COUNT(*) AS n_extra FROM (
-              SELECT complete_cusip FROM fisd.fisd_mergedissue
-              WHERE complete_cusip IS NOT NULL
-              GROUP BY complete_cusip HAVING COUNT(*) > 1) t
-        """).iloc[0]
-        note("CUSIPs with >1 FISD issue record",
-             f"{int(r['n_extra'])} (handled: the offering_amt lookup collapses them)")
-
-        # Pull the real lookup frame, exactly as step 6 does, and reproduce the failure.
-        issues_for_amt = db.raw_sql("""
-            SELECT complete_cusip AS cusip_id, offering_amt
-            FROM fisd.fisd_mergedissue WHERE complete_cusip IS NOT NULL
+        # The CUSIPs carrying more than one issue record. This is the whole input to the
+        # reproduction below, and it is a handful of rows -- the previous version pulled
+        # all 773,423 rows of the table to find them, which is why this test was slow.
+        dups = db.raw_sql("""
+            SELECT complete_cusip AS cusip_id, COUNT(*) AS n_issues
+            FROM fisd.fisd_mergedissue
+            WHERE complete_cusip IS NOT NULL
+            GROUP BY complete_cusip HAVING COUNT(*) > 1
+            ORDER BY COUNT(*) DESC
         """)
+        note("CUSIPs with >1 FISD issue record",
+             f"{len(dups)} (handled: the offering_amt lookup collapses them)")
+        if len(dups) == 0:
+            note("fan-out reproduction", "nothing to reproduce in this FISD vintage")
+            return
+
+        # Fetch ONLY those CUSIPs' rows -- two rows, not three quarters of a million.
+        cusips = tuple(dups["cusip_id"].tolist())
+        issues_for_amt = db.raw_sql(
+            "SELECT complete_cusip AS cusip_id, offering_amt "
+            "FROM fisd.fisd_mergedissue WHERE complete_cusip IN %(c)s",
+            params={"c": cusips})
         check_the_actual_bug(issues_for_amt)
     finally:
-        db.close()
+        try:
+            db.close()
+        except Exception:
+            pass
 
 
 def main():
@@ -208,6 +256,10 @@ def main():
     if FAILURES:
         print(f"{len(FAILURES)} check(s) FAILED: {FAILURES}")
         return 1
+    if SKIPPED:
+        # A skip is not a pass. Say so, so nobody reads a green line as coverage.
+        print(f"merge-key checks passed, but {len(SKIPPED)} SKIPPED: {SKIPPED}")
+        return 0
     print("all merge-key checks passed")
     return 0
 
