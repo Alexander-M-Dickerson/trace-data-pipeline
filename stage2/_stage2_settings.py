@@ -166,7 +166,7 @@ QUOTE_ZIPKEY = "quote_returns_quantlib.parquet"
 # Built from licensed Lehman/ICE data that cannot be redistributed; only the finished
 # factor series is published. Do not replace this with a longer file: the build asserts
 # that every date in it exists in the factor panel.
-BBW_EXTENDED_URL = "https://openbondassetpricing.com/wp-content/uploads/2026/07/bbw_factors_extended_1973_2023.zip"
+BBW_EXTENDED_URL = "https://openbondassetpricing.com/wp-content/uploads/2026/09/bbw_factors_extended_1973_2023.zip"
 BBW_EXTENDED_ZIPKEY = "bbw_factors_extended_1973_2023.parquet"
 
 # Public factor sources (used when FACTOR_SOURCE == "public").
