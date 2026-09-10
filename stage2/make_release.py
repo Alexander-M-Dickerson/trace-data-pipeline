@@ -50,6 +50,7 @@ import pandas as pd
 import pyarrow.parquet as pq
 
 import _stage2_settings as cfg
+from lib import frontier
 
 # Sources that are not fetched over the web and so have no sidecar; recorded by hand.
 NON_WEB_SOURCES = {
@@ -406,7 +407,8 @@ def _resolve(blocks: Path, pattern: str) -> Path | None:
     return p if p.exists() else None
 
 
-def release_panel(mode: str, out_dir: Path, vintage: str) -> int:
+def release_panel(mode: str, out_dir: Path, vintage: str,
+                  truncate_frontier: bool = False) -> int:
     """Package the panel artifacts: redact, rename to the vintage, describe, zip."""
     panel_src = cfg.PANEL_DIR / f"main_panel_{mode}.parquet"
     if not panel_src.exists():
@@ -418,6 +420,29 @@ def release_panel(mode: str, out_dir: Path, vintage: str) -> int:
 
     print(f"reading  {panel_src.name} ...")
     panel = pd.read_parquet(panel_src)
+    # A month where Stage 1's cut-off landed inside TRACE Enhanced's reporting gap is
+    # not a cross-section -- what survives is the 144A universe alone. Do not publish it.
+    bad = frontier.degenerate_tail_months(panel)
+    dropped: list[str] = []
+    frontier_cut = None
+    if not bad.empty:
+        print()
+        print("FRONTIER: the last month(s) are not a usable cross-section:")
+        print(frontier.describe(bad))
+        if not truncate_frontier:
+            print()
+            print("  Nothing was written. Re-run with --truncate-frontier to publish")
+            print("  the panel up to the last healthy month, or rebuild Stage 1 with")
+            print("  a cut-off inside BOTH sources.")
+            return 1
+        cut = bad.index.min()
+        frontier_cut = pd.Timestamp(cut)
+        dropped = [str(d)[:10] for d in bad.index]
+        panel = panel[panel["date"] < cut].copy()
+        print(f"  --truncate-frontier: dropped {', '.join(dropped)}; "
+              f"panel now ends {str(panel['date'].max())[:10]}")
+        print()
+
     panel = redact_for_publication(panel)
     assert_publishable(panel, f"main_panel_{vintage}.parquet")
     print(f"redacted {', '.join(REDACT_NULL)} -> null; "
@@ -440,7 +465,19 @@ def release_panel(mode: str, out_dir: Path, vintage: str) -> int:
             print(f"  WARNING: {name} not found under {blocks} -- omitted from the bundle")
             continue
         dst = stage / f"{name}_{vintage}.parquet"
-        shutil.copy2(src, dst)
+        if frontier_cut is None:
+            shutil.copy2(src, dst)
+        else:
+            # Every artifact in a release stops at the same month. A sidecar reaching
+            # past the panel is a merge that silently drops rows, or a reader who
+            # believes the extra month is usable when the panel says it is not.
+            side = pd.read_parquet(src)
+            n0 = len(side)
+            side = side[pd.to_datetime(side["date"]) < frontier_cut]
+            side.to_parquet(dst, index=False, compression="zstd")
+            print(f"  {name}: truncated to the panel's frontier "
+                  f"({n0:,} -> {len(side):,} rows)")
+            del side
         written.append((name, dst))
 
     # The banner is a fixed-width box; pad rather than trusting the vintage to be
@@ -457,6 +494,7 @@ def release_panel(mode: str, out_dir: Path, vintage: str) -> int:
             "redaction": {"nulled": list(REDACT_NULL),
                           "ratings_collapsed": list(REDACT_RATINGS),
                           "investment_grade_max": IG_MAX},
+            "frontier_months_dropped": dropped,
             "files": {}}
     for name, path in written:
         md = pq.ParquetFile(path).metadata
@@ -533,6 +571,9 @@ def main() -> int:
                     help="which bundles to build (default all)")
     ap.add_argument("--out-dir", type=Path, default=None,
                     help="where to write the bundles (default stage2/release/)")
+    ap.add_argument("--truncate-frontier", action="store_true",
+                    help="publish up to the last month that is a real cross-section, "
+                         "dropping any collapsed trailing months (recorded in PROVENANCE).")
     args = ap.parse_args()
 
     vintage = cfg.release_vintage()
@@ -542,7 +583,7 @@ def main() -> int:
     rc = 0
     if args.what in ("all", "panel"):
         print("=" * 78 + f"\nPANEL BUNDLES ({vintage})\n" + "=" * 78)
-        rc |= release_panel(args.mode, out_dir, vintage)
+        rc |= release_panel(args.mode, out_dir, vintage, args.truncate_frontier)
     if args.what in ("all", "factors"):
         print("\n" + "=" * 78 + f"\nFACTOR BUNDLE ({vintage})\n" + "=" * 78)
         rc |= release_factors(args.mode, out_dir, vintage)

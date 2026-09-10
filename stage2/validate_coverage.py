@@ -149,7 +149,27 @@ def main() -> None:
     args = ap.parse_args()
     ok, report = check_coverage(args.panel, args.max_lag, allow_upstream=not args.strict)
     print(format_report(report))
+
+    # Column coverage says every VARIABLE reaches the frontier. It says nothing about
+    # whether the frontier month is a cross-section: a month carried by 144A alone
+    # passes every column check and is still unusable. Check that separately.
+    import pandas as pd
+    import pyarrow.parquet as pq
+    from lib import frontier as _frontier
+    have = set(pq.ParquetFile(args.panel).schema.names)
+    cols = [c for c in ("date", "cusip", "144a") if c in have]
+    bad = _frontier.degenerate_tail_months(pd.read_parquet(args.panel, columns=cols))
+    if bad.empty:
+        print("frontier: the last months are real cross-sections")
+    else:
+        ok = False
+        print("FRONTIER: the last month(s) are NOT a usable cross-section:")
+        print(_frontier.describe(bad))
+        print("  Publish with make_release.py --truncate-frontier, or rebuild Stage 1")
+        print("  with a cut-off inside both TRACE Enhanced and 144A.")
+
     if args.json_out:
+        report["degenerate_frontier_months"] = [str(d)[:10] for d in bad.index]
         args.json_out.write_text(json.dumps(report, indent=1))
     print("[coverage] overall:", "PASS" if ok else "FAIL")
     sys.exit(0 if ok else 1)
