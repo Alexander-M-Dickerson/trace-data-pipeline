@@ -176,6 +176,8 @@ stage2/data_reports/
 stage2/logs/
 # Run manifests are a record of YOUR build (inputs, hashes, timings), not ours.
 stage2/manifests/
+# Release bundles are built artifacts; publish them, do not commit them.
+stage2/release/
 
 # ...but stage 2's CODE lives in subpackages named lib/ and steps/, and the generic
 # Python rules above ignore any directory called "lib". Re-include them explicitly, or
