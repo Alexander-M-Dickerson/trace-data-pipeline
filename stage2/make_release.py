@@ -14,9 +14,20 @@ published number checkable.
     python3 make_release.py --mode prod_final --what panel    # just the panel
     python3 make_release.py --mode prod_final --out-dir dist  # somewhere else
 
-❗The panel we BUILD is not the panel we PUBLISH. `permco` and `gvkey` are proprietary
+❗**This script is for REDISTRIBUTION, and only redistribution.**
+
+The panel we BUILD is not the panel we PUBLISH: `permco` and `gvkey` are proprietary
 identifiers and the agency ratings are licensed, so both are redacted here before anything
-is written -- and `assert_publishable` refuses to package a file where that did not take.
+is written, and `assert_publishable` refuses to package a file where that did not take.
+
+**Your own build is NOT redacted and does not need to be.** The redaction exists so that
+the files put on openbondassetpricing.com can be downloaded by people who hold no licence.
+If you ran Stage 0-2 yourself you have a WRDS subscription and the licences that come with
+it, so the panel under `output/panel/` is complete -- full `permco`, `gvkey` and raw
+1-22 agency ratings -- and nothing in the build touches them. `redact_for_publication`
+returns a copy and is called from this file alone; running it does not alter your data.
+
+You only need this script if you are publishing a vintage for others to download.
 
 The vintage is derived from the data (see ``_stage2_settings.release_vintage``), so next
 year's run publishes itself.
@@ -188,7 +199,9 @@ def build_readme(factors: pd.DataFrame, prov: dict, sha: str) -> str:
 # Publication redaction
 # ---------------------------------------------------------------------------
 # The panel we BUILD is not the panel we PUBLISH. Two things in it are not ours to
-# redistribute, and the released 2025 vintage redacts both:
+# redistribute to an unlicensed audience, and the released 2025 vintage redacts both.
+# This applies to the DOWNLOAD only -- a user who runs the pipeline has the licences and
+# keeps the full panel:
 #
 #   permco, gvkey       proprietary identifiers -> nulled
 #   spc_rat, mdc_rat    licensed agency ratings -> collapsed to investment grade (1)

@@ -133,6 +133,12 @@ moving a column is a public API change and a CHANGELOG entry — the build fails
 shipping a silently permuted file. This caught a real reordering: the DEF/TERM fix swapped
 `b_defb` and `b_termb` before anyone noticed.
 
+**Your panel is complete.** `permco`, `gvkey` and the raw 1-22 agency ratings are all
+present in what you build. The copies published on openbondassetpricing.com have those
+redacted, because they can be downloaded by people who hold no licence for them — but that
+redaction happens in `make_release.py`, which you only run if you are publishing a vintage
+for others. Nothing in the build touches those columns.
+
 **The data report.**
 
 ```bash
