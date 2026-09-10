@@ -117,11 +117,30 @@ testing without editing the file.
 
 | Output | Contents |
 |---|---|
-| `output/panel/main_panel_YYYYMMDD.parquet` | The main panel — 140 columns, MMN-adjusted signals, used with `ret_vw` |
-| `output/panel/mmn_price_based_signals_YYYYMMDD.parquet` | The unadjusted twins (`*_mmn`), used with `ret_vw_bgn` |
-| `output/blocks/` | Per-step intermediates (betas, momentum, factors, alternative returns) |
-| `data_reports/` | The LaTeX data report and its figures |
+| `output/panel/main_panel_<mode>.parquet` | The main panel — 140 columns, MMN-adjusted signals, used with `ret_vw` |
+| `output/blocks/<mode>/mmn_price_based_signals_<stamp>.parquet` | The 38 unadjusted twins (`*_mmn`), used with `ret_vw_bgn` |
+| `output/blocks/<mode>/` | Per-step intermediates: `betas_std`, `betas_x`, `mom_ret`, `mom_retx`, `returns_alt`, `factors`, `factors_merged`, `bbw_factors`, `illiq_factors` |
+| `data_reports/` | The LaTeX data report, its figures and the PDF |
 | `manifests/` | A JSON run manifest per build: inputs, hashes, config, timings |
+| `release/` | What `make_release.py` packages for publication |
+
+`<mode>` is the build label (`stage1` by default); released files are renamed to the
+vintage year, e.g. `main_panel_2026.parquet`. `<stamp>` is Stage 1's date stamp.
+
+**The column contract.** The panel's 140 names **and their order** are frozen in
+[`lib/contract.py`](lib/contract.py) and asserted at the end of step 7. Adding, removing or
+moving a column is a public API change and a CHANGELOG entry — the build fails rather than
+shipping a silently permuted file. This caught a real reordering: the DEF/TERM fix swapped
+`b_defb` and `b_termb` before anyone noticed.
+
+**The data report.**
+
+```bash
+bash run_build_data_reports.sh                 # 14 tables, 11 figures, PDF
+bash run_build_data_reports.sh --no-external   # skip the DFPS/WRDS comparisons
+```
+
+Roughly 2½ minutes with both comparison suites, 1 minute without.
 
 Every column is defined in [`DATA_DICTIONARY.md`](DATA_DICTIONARY.md). Two companion
 notes cover the trickier methodology: [`README_Default.md`](README_Default.md) for

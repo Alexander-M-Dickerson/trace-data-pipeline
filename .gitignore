@@ -188,3 +188,6 @@ stage2/release/
 !stage2/steps/**
 !stage2/tests/
 !stage2/tests/**
+# The `**` negations above re-include everything under those folders, which defeats the
+# global __pycache__ rule at the top of this file. Exclude the caches again, explicitly.
+stage2/**/__pycache__/

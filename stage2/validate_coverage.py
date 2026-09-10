@@ -11,7 +11,7 @@ so both sides agree on NULL. This guard is orthogonal -- it asserts, on the ours
 every column that is healthy mid-panel still reaches within `max_lag` months of the panel's own max
 month. A column empty >= max_lag+1 months early, despite being populated earlier, is a straggler.
 
-    validate_coverage.py                                   # main_panel_ours, max_lag=1
+    validate_coverage.py                                   # the configured build, max_lag=1
     validate_coverage.py --panel <path> --max-lag 1 --json-out report.json
     validate_coverage.py --panel output/panel/main_panel_ours_plus.parquet
 
@@ -136,7 +136,10 @@ def format_report(report: dict) -> str:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="ours-panel column-coverage guard")
-    ap.add_argument("--panel", type=Path, default=cfg.PANEL_DIR / "main_panel_ours.parquet")
+    # Default to the configured build, not a mode name inherited from the reference
+    # engine -- a public run has INPUT_MODE = "stage1" and no main_panel_ours.parquet.
+    ap.add_argument("--panel", type=Path,
+                    default=cfg.PANEL_DIR / f"main_panel_{cfg.INPUT_MODE}.parquet")
     ap.add_argument("--max-lag", type=int, default=1,
                     help="max months a healthy column may end before the panel max (default 1: "
                          "allows forward-difference terminal-edge columns like lib/libd)")

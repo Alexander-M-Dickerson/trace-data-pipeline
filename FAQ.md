@@ -706,14 +706,20 @@ qsub stage1/run_stage1.sh
 ```
 
 ### What about Stage 2?
-Stage 2 is **in development** and will produce monthly panels with:
-- 50+ bond characteristic signals
-- Credit risk factors
-- Liquidity measures
-- Momentum and reversal signals
-- Portfolio-ready outputs
+Stage 2 builds the monthly asset-pricing panel from your Stage 1 output: **140 columns**
+per bond-month, covering
 
-**Expected release:** Coming soon
+- spreads, yields and size; value; momentum and reversal
+- illiquidity measures; volatility and downside risk
+- rolling 36-month betas on 37 factor models
+- portfolio-ready returns, with and without duration adjustment
+
+It runs on **your own machine**, not the WRDS grid, because it reads Stage 1's output
+rather than the TRACE tape. Every column is defined in
+[stage2/DATA_DICTIONARY.md](stage2/DATA_DICTIONARY.md).
+
+**Status:** the code is in this repository and builds. The first published data vintage
+is still to come.
 
 ### Can I beta test Stage 2?
 Yes! Email alexander.dickerson1@unsw.edu.au to express interest in beta testing Stage 2.

@@ -7,14 +7,95 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Coming Soon
-- **Stage 2**: Monthly panel with factor signals (Coming soon)
-  - 50+ bond characteristic signals
-  - Credit risk factors
-  - Liquidity measures
-  - Momentum and reversal signals
-  - Carry and value signals
-  - Portfolio construction ready outputs
+Nothing pending.
+
+---
+
+## [3.0.0] - 2026-09-10
+
+**Stage 2 ships**: the monthly asset-pricing panel, 140 columns per bond-month, built from
+your own Stage 1 output on your own machine. A major version because Stage 2 is a new
+public artifact with a frozen column contract, and because two of its numbers change what
+earlier work would have produced.
+
+### Added
+
+- **`stage2/`** — the monthly panel. Seven steps, each in a fresh process (step 2 is ~25 s
+  that way and ~91 s in a reused one; DuckDB's parallelism collapses in a long-lived
+  process). Measured end to end on 24 cores: 125 s, 111 s, 31 s, 68 s, 53 s, 13 s, 61 s.
+  - `_run_stage2.py` with `--dry-run`, `--from-step/--to-step`, `--limit-cusips`,
+    `--factor-source`, `--validate`
+  - `lib/` and `steps/`, ported from a validated reference implementation and proven
+    identical to it key-by-key across 12 outputs before any change was made
+  - `validate_coverage.py`, which separates a real coverage failure from an upstream one
+- **`lib/contract.py`** — the 140 column names **and their order**, frozen and asserted at
+  the end of every build. Changing it is a public API change.
+- **The data report** — `_build_data_report.py` + `run_build_data_reports.sh`: 14 tables and
+  11 figures, and a PDF where `pdflatex` exists. Comparison suites against the DFPS and
+  WRDS bond databases are on by default; `--no-external` drops them and needs no network.
+- **`make_release.py`** — packages a vintage with provenance, deriving the year from the
+  data rather than hard-coding it.
+- **Published factor panel** — `factors_<YYYY>.parquet` ships with each vintage, so
+  `--factor-source pinned` reproduces a released number exactly. Public factor sources
+  revise; without the pin, next month's build would not match this month's release.
+- **Documentation** — `README_stage2.md`, `QUICKSTART_stage2.md`, `README_Value.md`, and a
+  `DATA_DICTIONARY.md` that now covers the `_mmn` sidecar's 38 columns, every factor series,
+  and the near-duplicate pairs above 0.97.
+- **Gates** — the panel's columns must equal the report's definitions and the dictionary's
+  mnemonics; the documented factor-model table must equal `BETA_MODELS`; no two panel
+  columns may be bit-identical.
+
+### Changed
+
+- ❗**`b_defb` is now a real default beta.** It was not one. The DEF model regressed on
+  `mktbx` alone and `defb` was only an output rename of that loading — no `defb` series
+  existed anywhere. In the duration-adjusted panel `FACTOR_SWAP` rewrites `mktb` to `mktbx`,
+  which made the DEF and MKTB models *the same regression*: `b_defb` came out
+  **bit-identical to `b_mktb`** over 1.8 M rows. Both premia are now built for real —
+  `DEFB` = long-corporate minus long-government return, `TERMB` = long-government minus the
+  risk-free rate — and estimated in one two-factor regression, which is also better
+  conditioned than the specification the old documentation claimed (VIF 1.33 against 6.67).
+  `corr(b_defb, b_mktb)` is now 0.94, not 1.00.
+- ❗**`b_defb` and `b_termb` start 1997-12**, matching every other beta. They began in
+  2003-07 until the published pre-TRACE factor series gained the two columns.
+- ❗**Firm identifiers come from Stage 1**, not from a separate issuer-level linker. The
+  link is now bond-level and dated rather than issuer-cusip6 and forward-filled. `gvkey`
+  coverage falls from 95.0% to 86.5%: the old linker carried 111,430 rows (6.2%) with a
+  gvkey but no permno, and the new one is permno-anchored by construction. Firm-level
+  results move; this is the better link.
+- **Factors are rebuilt from public sources by default** (`--factor-source public`) rather
+  than read from a private pin. Correlation with the pinned vintage exceeds 0.997 on every
+  column, and the public build runs fresher.
+- `b_cptlt`, `b_dcpi` and `b_cpi_vol6` end before the panel does — He-Kelly-Manela have not
+  published past 2025-05, and FRED's CPIAUCSL is missing an observation. Upstream limits,
+  now reported as such instead of failing the coverage gate.
+
+### Fixed
+
+- **30 rows were missing from every descriptive table in the data report.** The statistics
+  helper skips a variable it cannot find, and the report asked for `mod_dur`, `conv` and
+  `pr` while the panel carries `md_dur`, `convx` and no price column. Three variables ×
+  ten panels, no error anywhere. The variable list is now checked against the panel up
+  front and fails loudly.
+- **The report's price was inverted.** `bbtm` is book-to-market — built as `100/pr` — so
+  the price is `100/bbtm`, not `bbtm*100`. Defaulted bonds now show a mean price of 57.6
+  where the old arithmetic printed 174.
+- **The panel's columns were silently reordered** by the DEF/TERM fix: `b_defb` and
+  `b_termb` swapped positions. Caught by the new contract, and corrected.
+- **The factor-model table documented 32 of 37 models**, two of which no longer existed,
+  and named regressors the code does not use — `LVL` and `YSP` are documented as
+  two-factor models on `mktb` but run univariate.
+- **`ret_vwx` was defined two ways in one sentence**, as `ret_vw - rfret` and as
+  `ret_vw - tret`. It is always `ret_vw - tret`.
+- **`requirements.txt` was missing DuckDB**, the entire Stage 2 engine, along with
+  PyBondLab, scipy and statsmodels — and closed with a claim that everything else was
+  standard library, which an AST sweep showed was false. `PyBondLab` is pinned to `==0.2.0`,
+  verified to reproduce this repository's bond factors bit for bit.
+- **`validate_coverage.py` defaulted to a panel name from the reference engine**, so a
+  public run found no file.
+- **`_run_stage2.py` refused inputs that `build_panel.py` accepted** — the validator and
+  the build resolved the auxiliary files by two different paths, only one of which honoured
+  the environment overrides.
 
 ---
 

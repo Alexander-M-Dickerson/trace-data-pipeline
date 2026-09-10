@@ -53,9 +53,9 @@ Produces a clean, error-corrected monthly panel with dozens of corporate bond si
 - Carry and value signals
 - Ready-to-use for monthly portfolio construction -- see [PyBondLab](https://github.com/GiulioRossetti94/PyBondLab/tree/main/examples)
 
-**Status:** In development
-**Release:** Coming soon
-**Execution:** WRDS Cloud or your home machine (WRDS subscription required)
+**Status:** Code complete and in this repository -- builds, tested, gated
+**Release:** First published data vintage pending
+**Execution:** Your own machine, NOT the WRDS grid (a WRDS subscription is still required)
 
 ---
 
@@ -63,7 +63,7 @@ Produces a clean, error-corrected monthly panel with dozens of corporate bond si
 
 - **Stage 0**: ✅ **Now available** - Public beta, ready for testing
 - **Stage 1**: ✅ **Now available** - Public beta, ready for testing
-- **Stage 2**: 🚧 **Coming soon** - In development
+- **Stage 2**: 🔨 **Code available** - Builds the monthly panel from your Stage 1 output; the first published data vintage is still to come
 
 **This project is under active development and any feedback is greatly appreciated.**
 Please reach out to `alexander.dickerson1@unsw.edu.au` if you would like to collaborate or beta test.
@@ -208,7 +208,10 @@ This runs the real Stage 0 → Stage 1 code on a handful of CUSIP chunks and ass
 - **[Troubleshooting](stage1/README_stage1.md#troubleshooting)**: Common issues and solutions
 
 **Stage 2 - Monthly Panel:**
-- Coming soon
+- **[Stage 2 README](stage2/README_stage2.md)**: What it builds and how to run it
+- **[Quick Start](stage2/QUICKSTART_stage2.md)**: The shortest path from Stage 1 output to a panel
+- **[Data Dictionary](stage2/DATA_DICTIONARY.md)**: All 140 columns, the factor models, and the `_mmn` sidecar
+- **[Default vs Value signals](stage2/README_Default.md)**: How the default-risk signals are built
 
 ---
 
@@ -325,8 +328,18 @@ trace-data-pipeline/
 │
 ├── smoke/                            # Scratch root for run_smoke_test.sh (auto-created)
 │
-└── stage2/                           # 🚧 COMING SOON - Monthly panel with signals
-    └── (In development)
+└── stage2/                           # Monthly asset-pricing panel (runs on YOUR machine)
+    ├── _run_stage2.py                # Entry point
+    ├── _stage2_settings.py           # Settings + fail-loud input contract
+    ├── _build_data_report.py         # LaTeX/PDF data report
+    ├── make_release.py               # Packages a vintage for publication
+    ├── lib/                          # Engine: returns, illiquidity, betas, value, ...
+    │   └── contract.py               # The panel's frozen 140-column contract
+    ├── steps/                        # step1..step7 + the factor build
+    ├── tests/                        # Contract, parity and boundary gates
+    ├── DATA_DICTIONARY.md            # Every column, every factor model
+    ├── data/  output/  data_reports/ # Gitignored build artifacts
+    └── logs/
 ```
 
 ---
@@ -496,7 +509,7 @@ All prices are in **percentage of par**.
 - ‡Columns marked with double dagger are excluded from the public download to reduce file size
 - All `prc_*` prices are in percentage of par (99 = 99% of $1,000 = $990)
 
-### Stage 2 Output (Coming Soon)
+### Stage 2 Output
 Monthly panel with 50+ corporate bond signals ready for asset pricing research.
 
 ---

@@ -300,12 +300,23 @@ def released_name(kind: str, suffix: str = ".parquet") -> str:
 
 
 def fisd_file() -> Path | None:
-    """Stage 0's FISD characteristics file (144a flag, domicile, SIC, issue_id)."""
+    """Stage 0's FISD characteristics file (144a flag, domicile, SIC, issue_id).
+
+    Honours STAGE2_FISD_FILE. It must: AUX below reads the same override, and when the two
+    disagreed the validator reported a file as missing that the build then used happily --
+    so `_run_stage2.py` refused to start on inputs `build_panel.py` accepted.
+    """
+    env = os.environ.get("STAGE2_FISD_FILE")
+    if env:
+        return Path(env)
     return _latest_stamped(STAGE0_DIR / "enhanced", "trace_enhanced_fisd_")
 
 
 def call_dummy_file() -> Path | None:
-    """Stage 1's callable-flag file."""
+    """Stage 1's callable-flag file. Honours STAGE2_CALL_FILE (see `fisd_file`)."""
+    env = os.environ.get("STAGE2_CALL_FILE")
+    if env:
+        return Path(env)
     return _latest_stamped(STAGE1_DATA, "call_dummy_")
 
 
@@ -559,10 +570,9 @@ DATE_STAMP = date_stamp()
 # Auxiliary merges. The reference pinned these to fixed files; here they are resolved
 # from the Stage 0 / Stage 1 outputs, with environment overrides for testing.
 AUX = {
-    "fisd": Path(os.environ["STAGE2_FISD_FILE"]) if os.environ.get("STAGE2_FISD_FILE")
-            else fisd_file(),
-    "call": Path(os.environ["STAGE2_CALL_FILE"]) if os.environ.get("STAGE2_CALL_FILE")
-            else call_dummy_file(),
+    # One resolution path, shared with validate_config -- see `fisd_file`.
+    "fisd": fisd_file(),
+    "call": call_dummy_file(),
     # The reference merged a separate issuer-level linker file to attach permno/permco/
     # gvkey. Stage 1 now attaches those itself, at bond level and with dated windows, so
     # this merge is on its way out. It is kept here (default None = skip) so the port can
