@@ -176,7 +176,9 @@ WRDS_TABLES = ("crsp.tfz_idx", "crsp.tfz_mth_ft", "ff.fivefactors_monthly", "cbo
 # DERIVED PATHS (DO NOT EDIT)
 # ============================================================================
 
-if not ROOT_PATH or ROOT_PATH == "":
+if os.environ.get("STAGE2_ROOT"):
+    ROOT_PATH = Path(os.environ["STAGE2_ROOT"])
+elif not ROOT_PATH or ROOT_PATH == "":
     current_dir = Path.cwd()
     ROOT_PATH = current_dir.parent if current_dir.name == "stage2" else current_dir
 else:
@@ -215,8 +217,11 @@ def _latest_stamped(directory: Path, prefix: str, suffix: str = ".parquet") -> P
     return best[1] if best else None
 
 
-def daily_input() -> Path:
+def daily_input(mode: str | None = None) -> Path:
     """The Stage 1 daily panel Stage 2 reads.
+
+    `mode` is accepted and ignored: the reference implementation carried several input
+    modes, the public pipeline has one.
 
     Precedence: STAGE2_DAILY_INPUT env var > DAILY_INPUT setting > newest
     stage1/data/stage1_YYYYMMDD.parquet.
@@ -478,6 +483,57 @@ def _validate_daily_panel(daily: Path) -> None:
             )
     finally:
         con.close()
+
+
+# ============================================================================
+# ENGINE COMPATIBILITY SURFACE (DO NOT EDIT)
+# ============================================================================
+# The build engine under lib/ and steps/ is a verbatim port of a validated reference
+# implementation, and it reads its configuration as `cfg.<NAME>`. Exposing that exact
+# surface here means those modules port with ONLY their import line changed -- which is
+# what makes the output provably identical to the reference.
+#
+# Everything below is an alias or a thin wrapper over the settings above. The names are
+# the reference's, not ours; edit the user-facing settings at the top of this file.
+
+REPO = ROOT_PATH                      # the reference called the tree root REPO
+DATA_DIR = STAGE2_DATA                # cached external inputs
+BBW_EXTENDED_CACHE = STAGE2_DATA / BBW_EXTENDED_ZIPKEY
+
+# The reference carried several input "modes" (a frozen golden vintage vs a live build).
+# The public pipeline has exactly one input: whatever Stage 1 produced.
+INPUT_MODE = "stage1"
+
+DATE_STAMP = date_stamp()
+
+# Auxiliary merges. The reference pinned these to fixed files; here they are resolved
+# from the Stage 0 / Stage 1 outputs, with environment overrides for testing.
+AUX = {
+    "fisd": Path(os.environ["STAGE2_FISD_FILE"]) if os.environ.get("STAGE2_FISD_FILE")
+            else fisd_file(),
+    "call": Path(os.environ["STAGE2_CALL_FILE"]) if os.environ.get("STAGE2_CALL_FILE")
+            else call_dummy_file(),
+    # The reference merged a separate issuer-level linker file to attach permno/permco/
+    # gvkey. Stage 1 now attaches those itself, at bond level and with dated windows, so
+    # this merge is on its way out. It is kept here (default None = skip) so the port can
+    # be proven identical to the reference before the behaviour is changed.
+    "linker": Path(os.environ["STAGE2_LINKER_FILE"]) if os.environ.get("STAGE2_LINKER_FILE")
+              else None,
+}
+
+# Validation targets exist only where a reference build is available to diff against.
+# A public build has none, and the validators skip cleanly on an empty mapping.
+GOLDEN_OUTPUTS: dict = {}
+
+
+def tret_max_date(mode: str | None = None) -> str | None:
+    """Treasury-series vintage cutoff; None means use every month available."""
+    return TRET_MAX_DATE
+
+
+def factor_source_for(mode: str | None = None) -> str:
+    """The factor-panel source ('public' | 'pinned'). A CLI override wins over this."""
+    return FACTOR_SOURCE
 
 
 def print_config_summary(config: dict) -> None:
