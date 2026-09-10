@@ -21,8 +21,16 @@ four-chunk sample simply contains no multi-issue CUSIP. The property that matter
 "is the output unique" but "is every lookup keyed the way the join assumes", and that is
 checkable in seconds against the source tables.
 
-    python3 tests/test_merge_keys.py                 # needs WRDS
-    python3 tests/test_merge_keys.py --offline       # skips the WRDS checks
+    python3 tests/test_merge_keys.py            # default: no WRDS needed, instant
+    python3 tests/test_merge_keys.py --wrds     # also check the FISD source tables
+
+❗The default needs NO database connection, and deliberately so. Nothing in this
+pipeline connects to WRDS from the login node -- run_pipeline.sh only reads config,
+downloads over HTTP and submits jobs; every WRDS connection happens inside a batch job.
+This repo has never required a ~/.pgpass, and does not now. The --wrds checks are a
+monitoring extra: they watch for a future FISD vintage growing more multi-issue CUSIPs.
+The fix itself does not depend on them -- the offering_amt lookup is collapsed
+unconditionally -- so run them wherever your credentials work, or not at all.
 
 Author: Open Source Bond Asset Pricing
 """
@@ -195,8 +203,7 @@ def check_wrds():
     """The source tables, keyed as each join assumes. Aggregates only -- seconds."""
     user = os.environ.get("WRDS_USERNAME", "")
     if not user or user == "your_wrds_username":
-        note("WRDS checks", "WRDS_USERNAME not set; skipped (--offline to silence)",
-             skipped=True)
+        note("WRDS checks", "WRDS_USERNAME not set; skipped", skipped=True)
         return
     db = _connect_wrds_or_none(user)
     if db is None:
@@ -244,12 +251,15 @@ def check_wrds():
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--offline", action="store_true", help="skip the WRDS checks")
+    ap.add_argument("--wrds", action="store_true",
+                    help="also check the FISD source tables (needs a working connection)")
+    ap.add_argument("--offline", action="store_true",
+                    help="accepted and ignored; offline is the default")
     args = ap.parse_args()
 
     check_merge_helper()
     check_stage0_artifact()
-    if not args.offline:
+    if args.wrds:
         check_wrds()
 
     print()
