@@ -65,6 +65,7 @@ DOC_FILES = [
     "README.md", "QUICKSTART.md", "FAQ.md", "CONTRIBUTING.md",
     "stage0/README_stage0.md", "stage0/quickstart.md",
     "stage1/README_stage1.md", "stage1/QUICKSTART_stage1.md",
+    "stage2/README_stage2.md",
 ]
 
 # Named in prose but produced at runtime or shipped inside a download, so they are
@@ -265,6 +266,7 @@ def main():
         and not (ROOT / f).exists()
         and not (ROOT / "stage0" / f).exists()
         and not (ROOT / "stage1" / f).exists()
+        and not (ROOT / "stage2" / f).exists()
         and not (ROOT / "tests" / f).exists()
     )
     check("every file named in the docs exists", not missing, str(missing))

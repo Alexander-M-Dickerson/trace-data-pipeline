@@ -1,0 +1,503 @@
+# -*- coding: utf-8 -*-
+"""
+Stage 2 Configuration Settings
+==============================
+Central configuration for Stage 2 monthly panel construction.
+Edit this file to customize your processing parameters.
+
+Stage 2 turns Stage 1's daily bond-day panel into the monthly asset-pricing panel
+(returns, characteristics, signals, factors, rolling betas).
+
+WHERE THIS RUNS
+---------------
+Stage 2 runs on YOUR OWN MACHINE, not on the WRDS cluster. Download the stage0/ and
+stage1/ output folders from WRDS first, then run stage 2 against them locally. It is
+CPU- and memory-hungry (a full build is roughly 7 minutes on 24 cores / 128 GB) and it
+needs no TRACE database access -- only the parquet files Stage 1 produced.
+
+Processing knobs below are carried over verbatim from the reference implementation;
+each cites its source so a change is always a deliberate one.
+
+Author: Open Source Bond Asset Pricing
+"""
+
+from __future__ import annotations
+from pathlib import Path
+import os
+import sys
+
+# Import shared configuration from root-level config.py.
+# Stage 2 can also be run from a folder that has no config.py (e.g. a stand-alone
+# extract), so fall back to environment variables rather than failing at import.
+sys.path.insert(0, str(Path(__file__).parent.parent))
+try:
+    from config import WRDS_USERNAME, AUTHOR
+except ImportError:  # pragma: no cover - only hit outside the pipeline tree
+    WRDS_USERNAME = os.environ.get("WRDS_USERNAME", "")
+    AUTHOR = os.environ.get("AUTHOR", "Open Source Bond Asset Pricing")
+
+# ============================================================================
+# USER CONFIGURATION - EDIT THESE VALUES
+# ============================================================================
+
+# --- Paths Configuration ---
+# ROOT_PATH is the parent directory containing stage0/, stage1/ and stage2/.
+#
+# Option 1: AUTO-DETECT (recommended - leave blank or use "")
+# If you run from ~/proj/stage2, ROOT_PATH becomes ~/proj.
+ROOT_PATH = ""  # Auto-detect from current working directory
+
+# Option 2: MANUAL OVERRIDE (uncomment and edit if auto-detect doesn't work)
+# ROOT_PATH = Path("~/proj").expanduser()                          # Linux/Mac
+# ROOT_PATH = Path("C:\\Users\\YourName\\Documents\\trace_data")   # Windows
+
+# --- Stage 1 input ---
+# Leave as None to use the newest stage1/data/stage1_YYYYMMDD.parquet.
+# Set a path (or the STAGE2_DAILY_INPUT environment variable) to pin one explicitly.
+DAILY_INPUT = None
+
+# --- Factor panel source ---
+# "public"  = assemble the monthly factor matrix from public sources (Ken French,
+#             FRED, He-Kelly-Manela, Ludvigson, Policy Uncertainty) plus the published
+#             extended BBW series. Self-contained; this is the default.
+# "pinned"  = read a pre-built factors.parquet (set FACTORS_PINNED_FILE). Use this only
+#             to reproduce a specific published vintage exactly -- data vendors revise
+#             history (FRED re-seasonally-adjusts CPI, EPU back-renormalizes), so the
+#             two sources agree closely but do not match bit-for-bit.
+FACTOR_SOURCE = "public"
+FACTORS_PINNED_FILE = None
+
+# --- Execution settings ---
+# Worker processes and DuckDB threads. workers * threads should not exceed your cores.
+WORKERS = 6
+THREADS_PER = 2
+DUCKDB_THREADS = int(os.environ.get("STAGE2_DUCKDB_THREADS", "0")) or None
+DUCKDB_MEMORY_LIMIT = os.environ.get("STAGE2_DUCKDB_MEMORY_LIMIT", "")
+
+# ============================================================================
+# PROCESSING PARAMETERS
+# ============================================================================
+# Verbatim from the reference implementation's "Processing Parameters" block.
+# Changing any of these changes the published panel -- do so deliberately.
+
+IMP_GAP = 1                # business days between signal observation and portfolio formation
+BUSINESS_DAY_GAP = 5       # max NYSE-session gap for contiguous returns
+SIGNAL_LAG = 1             # min day gap between signal observation and month-end (adj signals)
+ADJ_WINDOW = 10            # max days back within the month for the adjusted month-end signal
+CALENDAR_NAME = "NYSE"     # market calendar for business-day math
+DEFAULT_METHOD = "event_based"   # default-return adjustment method
+SWAP_ADJ_SIGNALS = True    # replace month-end signals with adjusted versions in the final panel
+START_DATE = "2002-07-31"  # first month-end of the panel
+SIGNALS = ("ytm", "mod_dur", "convexity", "credit_spread")   # step-1 signals (lagged by IMP_GAP)
+
+# step 2 illiquidity
+ILLIQ_MIN_OBS = 5          # min valid obs per bond-month for estimated measures
+
+# step 3 BBW factor sorts
+N_PORTF_1 = 5              # single-sort quintiles
+N_PORTF_2 = 5              # double-sort 5x5
+INCLUDE_ICE = True         # published extended-BBW backfill for factor columns before 2002-08-31
+
+# step 4 rolling betas / systematic momentum
+BETA_WINDOW = 36           # rolling window (months)
+BETA_MIN_OBS = 12          # min obs within window
+
+# step 4 DEF / TERM factors (see stage2/DATA_DICTIONARY.md, "Model Specifications")
+#
+# The default premium is the difference between the total returns on long-term corporate
+# bonds and long-term government bonds (Fama-French 1993; Gebhardt, Hvidkjaer &
+# Swaminathan 2005):
+#     defb  = VW return of bonds with tmat >= DEF_CORP_MIN_MATURITY  -  DEF_GOVT_TENOR treasury return
+#     termb = DEF_GOVT_TENOR treasury return  -  risk-free rate
+DEF_CORP_MIN_MATURITY = 10.0   # years; the long-term corporate leg
+DEF_GOVT_TENOR = 20.0          # years; the long-term government leg (CRSP key-rate tenor)
+
+# step 5 value / d-spreads
+DSPREAD_LAGS = (6, 12)
+DSPREAD_BANDWIDTH = 1      # search +/- 1 month around the target lag month if missing
+DSPREAD_MU_WINDOW = 12
+
+# --- NYSE session calendar ---
+# Holidays are known in advance, so any end date at or beyond your data max behaves
+# identically. Fixed rather than date.today() so builds are deterministic.
+CAL_START = "2001-07-01"
+CAL_END = "2030-12-31"
+
+# --- Treasury series vintage cap ---
+# None = use every month available. Set a date only to reproduce an older published
+# vintage. A cap here silently truncates tret -> ret_vwx -> the BBW duration-adjusted
+# factors -> every rolling beta: 42 panel columns. Leave it None unless reproducing.
+TRET_MAX_DATE = None
+
+# --- Validation tolerances ---
+FLOAT_TOL = 1e-6           # prices / returns / most signals
+RATE_TOL = 1e-4            # rate-like winsorized float32 cols (ytm, cs, betas)
+
+# --- Parquet compression for the large writes ---
+PANEL_ZSTD_LEVEL = 3       # level 3 writes ~5x faster than 9 for ~7% larger files, identical values
+
+# ============================================================================
+# EXTERNAL DATA SOURCES
+# ============================================================================
+# Published inputs, downloaded once and cached under stage2/data/.
+
+# Pre-TRACE quote returns (1997-01 -> 2002-06). Lets rolling signals reach a common
+# 2002-08 start. Static content -- it never changes.
+QUOTE_URL = "https://openbondassetpricing.com/wp-content/uploads/2025/12/quote_returns_quantlib.zip"
+QUOTE_ZIPKEY = "quote_returns_quantlib.parquet"
+
+# Extended "modified" BBW factor series, used ONLY to backfill factor history before
+# 2002-08-31 (rows from 2002-08 on are recomputed from TRACE and overwritten).
+# Built from licensed Lehman/ICE data that cannot be redistributed; only the finished
+# factor series is published. Do not replace this with a longer file: the build asserts
+# that every date in it exists in the factor panel.
+BBW_EXTENDED_URL = "https://openbondassetpricing.com/wp-content/uploads/2026/07/bbw_factors_extended_1973_2023.zip"
+BBW_EXTENDED_ZIPKEY = "bbw_factors_extended_1973_2023.parquet"
+
+# Public factor sources (used when FACTOR_SOURCE == "public").
+FF5_URL = ("https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/"
+           "F-F_Research_Data_5_Factors_2x3_CSV.zip")
+HKM_URL = "https://zhiguohe.net/wp-content/uploads/2025/07/He_Kelly_Manela_Factors_monthly_250627.csv"
+# Ludvigson rotates the zip filename on every update, so the fetcher tries this URL and
+# then discovers the current link from the index page.
+LUDVIGSON_URL = "https://www.sydneyludvigson.com/s/MacroFinanceUncertainty_202508Update.zip"
+LUDVIGSON_INDEX = "https://www.sydneyludvigson.com/macro-and-financial-uncertainty-indexes"
+EPU_URL = "https://www.policyuncertainty.com/media/Categorical_EPU_Data.xlsx"
+FRED_CSV_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id={ids}"
+FRED_TSY_SERIES = ("DGS1", "DGS2", "DGS3", "DGS5", "DGS7", "DGS10", "DGS20", "DGS30")
+
+FACTORS_START_DATE = "1973-01-31"   # first factor month kept
+
+# WRDS tables fetched once and cached (treasury returns, FF5, VIX). These need your
+# WRDS credentials, but only on the first run.
+WRDS_TABLES = ("crsp.tfz_idx", "crsp.tfz_mth_ft", "ff.fivefactors_monthly", "cboe.cboe")
+
+# ============================================================================
+# DERIVED PATHS (DO NOT EDIT)
+# ============================================================================
+
+if not ROOT_PATH or ROOT_PATH == "":
+    current_dir = Path.cwd()
+    ROOT_PATH = current_dir.parent if current_dir.name == "stage2" else current_dir
+else:
+    ROOT_PATH = Path(ROOT_PATH)
+    if str(ROOT_PATH).startswith("~"):
+        ROOT_PATH = ROOT_PATH.expanduser()
+
+STAGE0_DIR = ROOT_PATH / "stage0"
+STAGE1_DIR = ROOT_PATH / "stage1"
+STAGE1_DATA = STAGE1_DIR / "data"
+STAGE2_DIR = ROOT_PATH / "stage2"
+STAGE2_DATA = STAGE2_DIR / "data"          # cached external inputs (gitignored)
+OUTPUT_DIR = STAGE2_DIR / "output"         # build artifacts (gitignored)
+CACHE_DIR = OUTPUT_DIR / "_cache"          # fingerprinted layer cache
+BLOCKS_DIR = OUTPUT_DIR / "blocks"         # per-step intermediate blocks
+PANEL_DIR = OUTPUT_DIR / "panel"           # final panels
+REPORT_DIR = STAGE2_DIR / "data_reports"   # LaTeX report + figures
+LOG_DIR = STAGE2_DIR / "logs"
+MANIFEST_DIR = STAGE2_DIR / "manifests"    # committed JSON run manifests
+FACTOR_CACHE_DIR = STAGE2_DATA / "factor_cache"
+
+# ============================================================================
+# INPUT RESOLUTION
+# ============================================================================
+
+
+def _latest_stamped(directory: Path, prefix: str, suffix: str = ".parquet") -> Path | None:
+    """Newest `<prefix>YYYYMMDD<suffix>` in `directory`, or None."""
+    if not directory.exists():
+        return None
+    best = None
+    for p in directory.glob(f"{prefix}*{suffix}"):
+        stem = p.name[len(prefix):-len(suffix)] if suffix else p.name[len(prefix):]
+        if len(stem) == 8 and stem.isdigit() and (best is None or stem > best[0]):
+            best = (stem, p)
+    return best[1] if best else None
+
+
+def daily_input() -> Path:
+    """The Stage 1 daily panel Stage 2 reads.
+
+    Precedence: STAGE2_DAILY_INPUT env var > DAILY_INPUT setting > newest
+    stage1/data/stage1_YYYYMMDD.parquet.
+    """
+    env = os.environ.get("STAGE2_DAILY_INPUT")
+    if env:
+        return Path(env)
+    if DAILY_INPUT:
+        return Path(DAILY_INPUT)
+    found = _latest_stamped(STAGE1_DATA, "stage1_")
+    if found is None:
+        # Return the expected path so validate_config can report it clearly.
+        return STAGE1_DATA / "stage1_YYYYMMDD.parquet"
+    return found
+
+
+def date_stamp() -> str:
+    """The YYYYMMDD stamp Stage 2 carries on its outputs, taken from the input filename.
+
+    Stage 2 outputs inherit the Stage 1 stamp so a panel is always traceable to the
+    daily file it was built from.
+    """
+    name = daily_input().stem
+    tail = name.split("_")[-1]
+    return tail if len(tail) == 8 and tail.isdigit() else "unstamped"
+
+
+def fisd_file() -> Path | None:
+    """Stage 0's FISD characteristics file (144a flag, domicile, SIC, issue_id)."""
+    return _latest_stamped(STAGE0_DIR / "enhanced", "trace_enhanced_fisd_")
+
+
+def call_dummy_file() -> Path | None:
+    """Stage 1's callable-flag file."""
+    return _latest_stamped(STAGE1_DATA, "call_dummy_")
+
+
+def ensure_dirs() -> None:
+    """Create the gitignored output tree (idempotent)."""
+    for d in (STAGE2_DATA, OUTPUT_DIR, CACHE_DIR, BLOCKS_DIR, PANEL_DIR,
+              REPORT_DIR, LOG_DIR, MANIFEST_DIR, FACTOR_CACHE_DIR):
+        d.mkdir(parents=True, exist_ok=True)
+
+
+# ============================================================================
+# CONFIGURATION ASSEMBLY
+# ============================================================================
+
+
+def get_config() -> dict:
+    """Return the full Stage 2 configuration dictionary."""
+    return {
+        # User settings
+        "wrds_username": WRDS_USERNAME,
+        "author": AUTHOR,
+
+        # Paths
+        "root_path": ROOT_PATH,
+        "stage0_dir": STAGE0_DIR,
+        "stage1_dir": STAGE1_DIR,
+        "stage1_data": STAGE1_DATA,
+        "stage2_dir": STAGE2_DIR,
+        "stage2_data": STAGE2_DATA,
+        "output_dir": OUTPUT_DIR,
+        "cache_dir": CACHE_DIR,
+        "blocks_dir": BLOCKS_DIR,
+        "panel_dir": PANEL_DIR,
+        "report_dir": REPORT_DIR,
+        "log_dir": LOG_DIR,
+        "manifest_dir": MANIFEST_DIR,
+        "factor_cache_dir": FACTOR_CACHE_DIR,
+
+        # Inputs
+        "daily_input": daily_input(),
+        "date_stamp": date_stamp(),
+        "fisd_file": fisd_file(),
+        "call_dummy_file": call_dummy_file(),
+
+        # Factor panel
+        "factor_source": FACTOR_SOURCE,
+        "factors_pinned_file": FACTORS_PINNED_FILE,
+        "factors_start_date": FACTORS_START_DATE,
+
+        # Execution
+        "workers": WORKERS,
+        "threads_per": THREADS_PER,
+        "duckdb_threads": DUCKDB_THREADS,
+        "duckdb_memory_limit": DUCKDB_MEMORY_LIMIT,
+
+        # Processing parameters
+        "imp_gap": IMP_GAP,
+        "business_day_gap": BUSINESS_DAY_GAP,
+        "signal_lag": SIGNAL_LAG,
+        "adj_window": ADJ_WINDOW,
+        "calendar_name": CALENDAR_NAME,
+        "default_method": DEFAULT_METHOD,
+        "swap_adj_signals": SWAP_ADJ_SIGNALS,
+        "start_date": START_DATE,
+        "signals": SIGNALS,
+        "illiq_min_obs": ILLIQ_MIN_OBS,
+        "n_portf_1": N_PORTF_1,
+        "n_portf_2": N_PORTF_2,
+        "include_ice": INCLUDE_ICE,
+        "beta_window": BETA_WINDOW,
+        "beta_min_obs": BETA_MIN_OBS,
+        "def_corp_min_maturity": DEF_CORP_MIN_MATURITY,
+        "def_govt_tenor": DEF_GOVT_TENOR,
+        "dspread_lags": DSPREAD_LAGS,
+        "dspread_bandwidth": DSPREAD_BANDWIDTH,
+        "dspread_mu_window": DSPREAD_MU_WINDOW,
+        "cal_start": CAL_START,
+        "cal_end": CAL_END,
+        "tret_max_date": TRET_MAX_DATE,
+
+        # Tolerances / output
+        "float_tol": FLOAT_TOL,
+        "rate_tol": RATE_TOL,
+        "panel_zstd_level": PANEL_ZSTD_LEVEL,
+
+        # External sources
+        "quote_url": QUOTE_URL,
+        "quote_zipkey": QUOTE_ZIPKEY,
+        "bbw_extended_url": BBW_EXTENDED_URL,
+        "bbw_extended_zipkey": BBW_EXTENDED_ZIPKEY,
+    }
+
+
+# Columns Stage 2 reads from the Stage 1 daily panel. Kept here (not buried in SQL) so a
+# missing upstream column is reported before a build starts rather than mid-run.
+REQUIRED_DAILY_COLUMNS = (
+    "cusip_id", "trd_exctn_dt", "pr", "prfull", "acclast", "accpmt", "accall",
+    "prc_vw_par", "prc_ew", "prc_first", "prc_last", "prc_hi", "prc_lo",
+    "prc_bid", "prc_ask", "bid_last",
+    "trade_count", "qvolume", "dvolume", "bond_amt_outstanding",
+    "ytm", "mod_dur", "mac_dur", "convexity", "credit_spread", "bond_maturity", "bond_age",
+    "sp_rating", "mdy_rating", "spc_rating", "mdc_rating",
+    "permno", "permco", "gvkey", "ff17num", "ff30num", "db_type",
+)
+
+# Stage 2 selects bond-days that carry at least one agency rating. The public DOWNLOAD of
+# the Stage 1 panel has these columns blanked for licensing reasons, which would silently
+# select zero rows -- so an all-null ratings column is a hard error, not an empty panel.
+RATING_COLUMNS = ("sp_rating", "mdy_rating")
+
+
+def validate_config(config: dict) -> None:
+    """Validate the configuration, reporting every problem at once.
+
+    Raises FileNotFoundError / ValueError with an actionable message.
+    """
+    problems: list[str] = []
+
+    # --- Stage 0 / Stage 1 trees -------------------------------------------
+    if not config["stage1_dir"].exists():
+        problems.append(
+            f"Stage 1 directory not found: {config['stage1_dir']}\n"
+            f"    Stage 2 runs on your own machine against the stage0/ and stage1/\n"
+            f"    folders produced on WRDS. Download them next to stage2/ first."
+        )
+    if not config["stage0_dir"].exists():
+        problems.append(f"Stage 0 directory not found: {config['stage0_dir']}")
+
+    # --- the daily panel ---------------------------------------------------
+    daily = config["daily_input"]
+    if not daily.exists():
+        problems.append(
+            f"Stage 1 daily panel not found: {daily}\n"
+            f"    Expected stage1/data/stage1_YYYYMMDD.parquet, or set DAILY_INPUT\n"
+            f"    in _stage2_settings.py (or the STAGE2_DAILY_INPUT environment variable)."
+        )
+
+    # --- auxiliary inputs from stage 0 / stage 1 ---------------------------
+    if config["fisd_file"] is None:
+        problems.append(
+            f"FISD characteristics file not found in {config['stage0_dir'] / 'enhanced'}\n"
+            f"    Expected trace_enhanced_fisd_YYYYMMDD.parquet (written by Stage 0)."
+        )
+    if config["call_dummy_file"] is None:
+        problems.append(
+            f"Callable-flag file not found in {config['stage1_data']}\n"
+            f"    Expected call_dummy_YYYYMMDD.parquet (written by Stage 1)."
+        )
+
+    # --- factor source -----------------------------------------------------
+    if config["factor_source"] not in ("public", "pinned"):
+        problems.append(
+            f"FACTOR_SOURCE={config['factor_source']!r} is not valid. "
+            f"Use 'public' (default) or 'pinned'."
+        )
+    if config["factor_source"] == "pinned":
+        pinned = config["factors_pinned_file"]
+        if not pinned:
+            problems.append(
+                "FACTOR_SOURCE='pinned' requires FACTORS_PINNED_FILE to name a factors parquet."
+            )
+        elif not Path(pinned).exists():
+            problems.append(f"FACTORS_PINNED_FILE not found: {pinned}")
+
+    # --- WRDS credentials (needed only for the first-run caches) -----------
+    cached = FACTOR_CACHE_DIR.exists() and any(FACTOR_CACHE_DIR.glob("*.parquet"))
+    if not config["wrds_username"] and not cached:
+        problems.append(
+            "WRDS_USERNAME not set, and the factor caches are empty.\n"
+            "    Stage 2's first run fetches Treasury returns, Fama-French factors and\n"
+            "    VIX from WRDS, then caches them. Set WRDS_USERNAME in config.py or as\n"
+            "    an environment variable. Later runs need no credentials."
+        )
+
+    if problems:
+        raise FileNotFoundError(
+            "Stage 2 configuration problems:\n\n  - " + "\n\n  - ".join(problems)
+        )
+
+    # --- schema + content checks on the daily panel ------------------------
+    # Deferred until the paths are known good so the messages stay clear.
+    _validate_daily_panel(daily)
+
+
+def _validate_daily_panel(daily: Path) -> None:
+    """Check the Stage 1 panel has the columns Stage 2 needs, with usable ratings."""
+    try:
+        import duckdb
+    except ImportError:  # pragma: no cover - duckdb is a hard requirement at build time
+        return
+
+    con = duckdb.connect()
+    try:
+        src = str(daily.as_posix())
+        present = {
+            r[0] for r in con.execute(
+                f"SELECT column_name FROM (DESCRIBE SELECT * FROM read_parquet('{src}'))"
+            ).fetchall()
+        }
+        missing = [c for c in REQUIRED_DAILY_COLUMNS if c not in present]
+        if missing:
+            raise ValueError(
+                f"The Stage 1 panel at {daily} is missing {len(missing)} column(s) "
+                f"Stage 2 needs:\n    {', '.join(missing)}\n"
+                f"    A panel produced by this repository's Stage 1 contains all of them."
+            )
+
+        # Ratings must actually carry values, not just exist.
+        blank = [
+            c for c in RATING_COLUMNS
+            if con.execute(
+                f"SELECT count(*) FROM (SELECT 1 FROM read_parquet('{src}') "
+                f"WHERE {c} IS NOT NULL LIMIT 1)"
+            ).fetchone()[0] == 0
+        ]
+        if len(blank) == len(RATING_COLUMNS):
+            raise ValueError(
+                f"Every agency rating column is empty in {daily.name} "
+                f"({', '.join(RATING_COLUMNS)} are all NULL).\n"
+                f"    Stage 2 keeps only bond-days carrying at least one agency rating, "
+                f"so this input would produce an EMPTY panel.\n"
+                f"    The Stage 1 file published for download has ratings removed for "
+                f"licensing reasons and cannot drive Stage 2.\n"
+                f"    Run Stage 0 and Stage 1 yourself on WRDS and use that output."
+            )
+    finally:
+        con.close()
+
+
+def print_config_summary(config: dict) -> None:
+    """Print a readable summary of the resolved configuration."""
+    line = "=" * 78
+    print(line)
+    print("STAGE 2 CONFIGURATION")
+    print(line)
+    print(f"  Root path            : {config['root_path']}")
+    print(f"  Daily input          : {config['daily_input']}")
+    print(f"  Output stamp         : {config['date_stamp']}")
+    print(f"  FISD characteristics : {config['fisd_file'] or '(not found)'}")
+    print(f"  Callable flags       : {config['call_dummy_file'] or '(not found)'}")
+    print(f"  Factor source        : {config['factor_source']}")
+    print(f"  Panel start          : {config['start_date']}")
+    print(f"  Beta window          : {config['beta_window']} months "
+          f"(min {config['beta_min_obs']} obs)")
+    print(f"  DEF / TERM legs      : corporate tmat >= {config['def_corp_min_maturity']:g}y, "
+          f"government {config['def_govt_tenor']:g}y")
+    print(f"  Workers x threads    : {config['workers']} x {config['threads_per']}")
+    print(f"  Output directory     : {config['output_dir']}")
+    print(f"  Reports              : {config['report_dir']}")
+    print(line)

@@ -165,3 +165,22 @@ wheels/
 
 # Smoke-test scratch root (run_smoke_test.sh)
 smoke/
+
+# ---------------------------------------------------------------------------
+# Stage 2 (monthly panel) -- runs on the user's own machine
+# ---------------------------------------------------------------------------
+# Build artifacts and cached downloads: never committed.
+stage2/data/
+stage2/output/
+stage2/data_reports/
+stage2/logs/
+
+# ...but stage 2's CODE lives in subpackages named lib/ and steps/, and the generic
+# Python rules above ignore any directory called "lib". Re-include them explicitly, or
+# 21 ported modules vanish from git without a word.
+!stage2/lib/
+!stage2/lib/**
+!stage2/steps/
+!stage2/steps/**
+!stage2/tests/
+!stage2/tests/**

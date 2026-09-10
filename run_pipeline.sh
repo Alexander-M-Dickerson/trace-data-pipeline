@@ -5,7 +5,7 @@
 #   - Pre-Stage: Download required data files (Liu-Wu yields, OSBAP linker, FF industries)
 #   - Stage 0: Data extraction (Enhanced, Standard, 144A TRACE) + Report building
 #   - Stage 1: Daily aggregation and analytics
-#   - Stage 2: (Future) Additional processing stages
+#   - Stage 2: Monthly panel (runs on your own machine -- see stage2/README_stage2.md)
 #
 # IMPORTANT: This script MUST be executed from the project ROOT directory.
 #            All paths are relative to ROOT and jobs are submitted with
@@ -216,12 +216,10 @@ echo "=== STAGE 1: Daily Aggregation & Analytics ==="
 echo "[submit] Stage 1 pipeline (waits for stage0 data; runs alongside the reports) ..."
 J5=$(qsub -terse -N stage1_pipeline -hold_jid "${HOLD_STAGE0}" stage1/run_stage1.sh)
 
-# Stage 2: (Future placeholder)
-# echo ""
-# echo "=== STAGE 2: Advanced Analytics ==="
-# echo "[submit] Stage 2 pipeline (waits for stage1) ..."
-# mkdir -p stage2/logs
-# J6=$(qsub -terse -wd "$PWD/stage2" -N stage2_pipeline -hold_jid ${J5} stage2/run_stage2.sh)
+# Stage 2 is deliberately NOT submitted here. It builds the monthly panel on the
+# USER'S OWN MACHINE, not on the grid: it needs more memory than a WRDS slot allows
+# and opens no database connection. Download stage0/ and stage1/ when this pipeline
+# finishes, then run ./run_stage2.sh locally. See stage2/README_stage2.md.
 
 # Summary
 echo ""
@@ -238,9 +236,9 @@ echo ""
 echo "  Stage 1 - Analytics (runs alongside the reports):"
 echo "    Daily Pipeline: ${J5}"
 echo ""
-# echo "  Stage 2 - Advanced (waits for stage1):"
-# echo "    Stage2 Pipeline: ${J6}"
-# echo ""
+echo "  Stage 2 - Monthly panel:"
+echo "    Runs on your own machine after this finishes -- see stage2/README_stage2.md"
+echo ""
 echo "Monitor jobs with: qstat"
 echo "Check logs in: stage0/logs/, stage1/logs/"
 echo "Downloaded data in: stage1/data/"
