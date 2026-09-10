@@ -72,6 +72,16 @@ DAILY_INPUT = None
 FACTOR_SOURCE = "public"
 FACTORS_PINNED_FILE = None
 
+# The factor panel each published vintage was built from, hosted so a published number can
+# be reproduced. Public sources revise -- Ken French restates SMB/HML, FRED
+# re-seasonally-adjusts CPI, Ludvigson re-estimates its history -- so a fresh build will
+# NOT reproduce an older release. Set FACTOR_SOURCE = "pinned" to fetch and use one of
+# these instead; it is cached under stage2/data/ like any other download.
+FACTORS_PINNED_URL = {
+    "2026": "https://openbondassetpricing.com/wp-content/uploads/2026/09/osbap_stage2_factors_2026.zip",
+}
+FACTORS_PINNED_ZIPKEY = "factors_{vintage}.parquet"
+
 # --- Execution settings ---
 # Worker processes and DuckDB threads. workers * threads should not exceed your cores.
 WORKERS = 6

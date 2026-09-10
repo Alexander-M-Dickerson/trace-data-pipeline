@@ -52,6 +52,49 @@ def build_public(force_fetch: bool = False) -> pd.DataFrame:
     return out
 
 
+def _pinned_factors(force_fetch: bool = False) -> Path:
+    """The published factor panel for a vintage, as a local parquet.
+
+    Precedence: an explicit FACTORS_PINNED_FILE, then a local copy already downloaded,
+    then the published zip for this vintage. Publishing these is what lets a released
+    number be reproduced -- the public sources revise, so a fresh build will not match an
+    older release.
+    """
+    explicit = cfg.GOLDEN_OUTPUTS.get("factors") or cfg.FACTORS_PINNED_FILE
+    if explicit:
+        return Path(explicit)
+
+    vintage = cfg.release_vintage()
+    cache = cfg.STAGE2_DATA / cfg.FACTORS_PINNED_ZIPKEY.format(vintage=vintage)
+    if cache.exists() and not force_fetch:
+        return cache
+
+    url = cfg.FACTORS_PINNED_URL.get(vintage)
+    if not url:
+        raise FileNotFoundError(
+            f"No published factor panel is registered for vintage {vintage}.\n"
+            f"    Known vintages: {sorted(cfg.FACTORS_PINNED_URL) or 'none'}.\n"
+            f"    Either use FACTOR_SOURCE = 'public' (the default, builds from live "
+            f"sources), or set FACTORS_PINNED_FILE to a factor parquet you already have.")
+
+    import io
+    import zipfile
+    import requests
+    print(f"[factors] fetching the published {vintage} factor panel: {url}")
+    blob = requests.get(url, timeout=300)
+    blob.raise_for_status()
+    member = cfg.FACTORS_PINNED_ZIPKEY.format(vintage=vintage)
+    with zipfile.ZipFile(io.BytesIO(blob.content)) as z:
+        names = z.namelist()
+        if member not in names:
+            raise FileNotFoundError(
+                f"{member} not found in {url}; the zip holds {names}")
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_bytes(z.read(member))
+    print(f"[factors] cached {cache}")
+    return cache
+
+
 def ensure(mode: str | None = None, source: str | None = None,
            force_fetch: bool = False) -> Path:
     """Materialize blocks/<mode>/factors.parquet from `source` ('pinned' | 'public'); returns its path."""
@@ -62,7 +105,7 @@ def ensure(mode: str | None = None, source: str | None = None,
 
     if source == "pinned":
         from lib import manifest as mf
-        src = cfg.GOLDEN_OUTPUTS["factors"]
+        src = _pinned_factors(force_fetch)
         if not dst.exists() or mf.sha256_file(dst) != mf.sha256_file(src):
             shutil.copy2(src, dst)
     elif source == "public":
