@@ -30,12 +30,10 @@ from lib.phase_timer import PhaseTimer
 # private-pin dependency for the BBW piece (HANDOFF W2). Post-cutoff stays our pure-TRACE G3 build.
 ICE_MAP = {"MKTB": "mktb", "DRF": "drf", "CRF": "crf",
            "MKTBx": "mktbx", "DRFx": "drfx", "CRFx": "crfx", "TERM": "term",
-           # DEFB/TERMB are spliced the same way IF the published extended series carries
-           # them. It does not yet -- the pre-2002 long-term-corporate return needed for a
-           # default premium lives in the private pre-TRACE panel and has never been
-           # published. Until it is, these two fall through the `if ... in factors.columns`
-           # guard below and b_defb/b_termb are TRACE-era only. Adding the column upstream
-           # is all that is needed; nothing here changes.
+           # DEFB/TERMB are spliced the same way. They were added to the published extended
+           # series alongside the DEF/TERM beta fix; a file published before that carries only
+           # the seven, and these two then fall through the `if ... in factors.columns` guard
+           # below, leaving b_defb/b_termb TRACE-era only. Either file builds.
            "DEFB": "defb", "TERMB": "termb"}
 ICE_CUTOFF = pd.Timestamp("2002-08-31")
 

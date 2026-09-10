@@ -23,6 +23,10 @@ import _stage2_settings as cfg
 
 CACHE = cfg.BBW_EXTENDED_CACHE
 COLS = ["MKTB", "DRF", "CRF", "MKTBx", "DRFx", "CRFx", "TERM"]
+# DEFB/TERMB were added to the published series after the first release. They are read when
+# present and skipped when not, so this module loads BOTH the seven-column file published
+# through 2026-07 and the nine-column file that supersedes it.
+OPTIONAL_COLS = ["DEFB", "TERMB"]
 
 
 def _normalize(df: pd.DataFrame) -> pd.DataFrame:
@@ -35,14 +39,15 @@ def _normalize(df: pd.DataFrame) -> pd.DataFrame:
     missing = [c for c in COLS if c not in df.columns]
     if missing:
         raise ValueError(f"extended-BBW series is missing factor columns {missing}")
-    df = df[["date"] + COLS].copy()
+    have = [c for c in OPTIONAL_COLS if c in df.columns]
+    df = df[["date"] + COLS + have].copy()
     df["date"] = pd.to_datetime(df["date"]) + pd.offsets.MonthEnd(0)
     return df
 
 
 def load_extended_bbw(force_fetch: bool = False) -> pd.DataFrame:
-    """The extended BBW factor series: ['date', MKTB, DRF, CRF, MKTBx, DRFx, CRFx, TERM], one row per
-    month-end (1973-02 .. 2023-01).
+    """The extended BBW factor series: ['date', MKTB, DRF, CRF, MKTBx, DRFx, CRFx, TERM] plus
+    DEFB/TERMB when the published file carries them, one row per month-end (1973-02 .. 2023-01).
 
     Reads the cached parquet under data/. If absent, corrupt, or `force_fetch`, downloads the published
     zip from `cfg.BBW_EXTENDED_URL` and caches the NORMALIZED frame. The cache is written only AFTER

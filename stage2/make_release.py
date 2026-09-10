@@ -115,12 +115,12 @@ below.
 | `cptl`, `cptlt` | 2025-05 | He-Kelly-Manela have not published beyond that date |
 | `dcpi`, `cpi_vol6` | see table | FRED's CPIAUCSL has **no 2025-10 observation**, so the CPI change is unavailable for the months either side, and the 6-month rolling volatility cannot clear the gap |
 
-❗**`mktb`, `mktbx`, `term`, `drf`, `crf`, `drfx`, `crfx` in THIS FILE are the published
-extended (pre-TRACE) series, ending 2023-01 -- they are not the bond-market factors the
-panel actually uses.** Stage 2 drops these columns on read and rebuilds them from its own
-TRACE data, keeping the extended series only before 2002-08. Pinning this file reproduces
-that exactly. Reading these columns out of this file directly does not give you the
-panel's market factor.
+❗**`mktb`, `mktbx`, `term`, `drf`, `crf`, `drfx`, `crfx`, `defb` and `termb` in THIS FILE
+are the published extended (pre-TRACE) series, ending 2023-01 -- they are not the
+bond-market factors the panel actually uses.** Stage 2 drops these columns on read and
+rebuilds them from its own TRACE data, keeping the extended series only before 2002-08.
+Pinning this file reproduces that exactly. Reading these columns out of this file directly
+does not give you the panel's market or default factor.
 
 ### Last month by column
 
@@ -145,7 +145,8 @@ corporate bond strategies.* Working Paper.
 
 COLUMN_GROUPS = [
     ("Equity factors (Fama-French)", ["mktrf", "smb", "hml", "rf"]),
-    ("Bond market (BBW)", ["mktb", "mktbx", "term", "drf", "crf", "drfx", "crfx"]),
+    ("Bond market (BBW)", ["mktb", "mktbx", "term", "drf", "crf", "drfx", "crfx",
+                           "defb", "termb"]),
     ("Volatility", ["vix", "dvix", "dvixlag"]),
     ("Inflation and credit", ["dcpi", "cpi_vol6", "credit", "dcredit", "lvl", "ysp"]),
     ("Intermediary capital (He-Kelly-Manela)", ["cptl", "cptlt"]),
