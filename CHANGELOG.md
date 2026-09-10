@@ -47,6 +47,38 @@ earlier work would have produced.
 
 ### Changed
 
+- ❗❗**`volume_filter_toggle` now defaults to `False`.** It shipped as `True` with a
+  `("dollar", 10000)` threshold, which does not match the data OSBAP publishes: the
+  published panels keep trades of **all** sizes. A user who cloned this repository and
+  ran it could not reproduce the published series, and would have had no way to tell --
+  nothing failed, the numbers were simply different.
+
+  The floor is not small. Measured against the previously published vintage on 27,136,631
+  overlapping bond-days:
+
+  | | no floor (published) | with the $10,000 floor |
+  |---|---|---|
+  | trades per Enhanced bond-day | 8.34 | 6.15 (−26%) |
+  | bond-days retained | — | ~93% in every year 2010-2024 |
+  | daily `pr` identical | — | 67.4% |
+  | daily `qvolume` identical | — | 65.8% |
+  | monthly `ret_vw` identical | — | 54.0% |
+
+  144A is barely touched (3.92 to 3.85 trades per bond-day, 95.4% identical) because its
+  denominations are institutional; the floor removes retail-sized Enhanced trades. The
+  bond universe is unchanged -- 538 of 68,140 CUSIPs -- so it removes trades, not
+  securities.
+
+  Confirmed against the raw tape rather than inferred: on the bond-days where a
+  floored build and the published data disagree most, the published trade count tracks
+  the RAW total and the floored one tracks the `>= $10,000` subset, ratios matching to a
+  few percent. `30219GAN8` on 2018-09-19 has 6,488 raw trades of which 418 clear the
+  floor; the published data reports 6,506 and a floored build reports 432.
+
+  `stage0/README_stage0.md` documented the default as `True`, matching the code and not
+  the data. Both are corrected, and the threshold is now documented as applying only when
+  the toggle is explicitly turned on.
+
 - ❗**`b_defb` is now a real default beta.** It was not one. The DEF model regressed on
   `mktbx` alone and `defb` was only an output rename of that loading — no `defb` series
   existed anywhere. In the duration-adjusted panel `FACTOR_SWAP` rewrites `mktb` to `mktbx`,

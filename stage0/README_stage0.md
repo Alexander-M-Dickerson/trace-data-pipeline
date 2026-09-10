@@ -570,7 +570,10 @@ All filters are boolean toggles:
 - `trading_time`: Filter by intraday time window (default: `False`)
 - `trading_calendar`: Keep only valid trading days (default: `True`)
 - `price_filters`: Remove negative prices and prices > 1000 (default: `True`)
-- `volume_filter_toggle`: Apply volume threshold (default: `True`)
+- `volume_filter_toggle`: Apply a minimum-size threshold to each trade (default: **`False`**)
+  - ❗Off by design. The published OSBAP data keeps trades of **all** sizes. Turning it
+    on removes ~26% of Enhanced trades per bond-day and changes every volume-weighted
+    price, so a panel built with it on will not reconcile against the published data.
 - `bounce_back_filter`: Flag price-change errors (default: `True`)
 - `yld_price_filter`: Remove rows where yield = price (default: `True`)
 - `amtout_volume_filter`: Remove trades > 50% of offering amount (default: `True`)
@@ -643,9 +646,10 @@ Settings applied to all runners:
   never set it for a production run. Override with `STAGE0_LIMIT_CHUNKS`.
 - `clean_agency`: Apply agency de-duplication - `True`
 - `out_dir`: Output directory - `""` (current directory)
-- `volume_filter`: Tuple of `(kind, threshold)`:
-  - `("dollar", 10000)`: Dollar volume >= $10,000
-  - `("par", 10000)`: Par volume >= $10,000
+- `volume_filter`: Tuple of `(kind, threshold)`, used **only** when
+  `volume_filter_toggle` is `True`:
+  - `("dollar", 10000)`: dollar volume (`entrd_vol_qt * rptd_pr / 100`) >= $10,000
+  - `("par", 10000)`: par volume >= $10,000
 - `trade_times`: Intraday window - `["00:00:00", "23:59:59"]` (effectively disabled)
 - `calendar_name`: Market calendar - `"NYSE"`
 
@@ -1072,10 +1076,10 @@ To disable any filter, set it to `False` in `_trace_settings.py`:
 FILTER_SWITCHES = dict(
     dick_nielsen              = True,
     decimal_shift_corrector   = False,  # Disable decimal shift correction
-    trading_time              = False,  # the one filter OFF by default
+    trading_time              = False,  # OFF by default
     trading_calendar          = True,
     price_filters             = True,
-    volume_filter_toggle      = True,
+    volume_filter_toggle      = True,   # OFF by default; ON here as an example
     bounce_back_filter        = False,  # Disable bounce-back filter
     yld_price_filter          = True,
     amtout_volume_filter      = True,

@@ -52,7 +52,10 @@ FILTER_SWITCHES =  dict(
     trading_time            = False, # 3: filter_by_trade_time()
     trading_calendar        = True,  # 4: filter_by_calendar()
     price_filters           = True,  # 5: > 0 (not neg) & <= 1000 price screens
-    volume_filter_toggle    = True,  # 6: dollar_vol >= threshold   [note: renamed key to disambiguate]
+    volume_filter_toggle    = False, # 6: dollar_vol >= threshold. OFF by default: the
+                                     #    published OSBAP data keeps trades of ALL sizes,
+                                     #    and a floor here silently makes a rebuild
+                                     #    irreproducible against it. See volume_filter.
     bounce_back_filter      = True,  # 7: flag_price_change_errors() [note:see bb_params]
     yld_price_filter        = True,  # 8: rptd_pr != yld_pt
     amtout_volume_filter    = True,  # 9: entrd_vol_qt < 0.5*offamt*1000
@@ -269,6 +272,11 @@ COMMON_KWARGS = dict(
                                     # change be checked in minutes rather than a ~4h run.
     clean_agency  = True,
     out_dir       = "",
+    # The threshold used only when volume_filter_toggle is True, which it is NOT by
+    # default. Turning it on removes about 26% of Enhanced trades per bond-day and moves
+    # every volume-weighted price, so a panel built with it on will not reconcile against
+    # the published OSBAP data. Measured: trades per Enhanced bond-day 8.34 -> 6.15, and
+    # monthly ret_vw matches the published series on only 54% of bond-months.
     volume_filter = ("dollar", 10000),
     trade_times   = ["00:00:00", "23:59:59"],  # Filter switched off as default
     calendar_name = "NYSE",
