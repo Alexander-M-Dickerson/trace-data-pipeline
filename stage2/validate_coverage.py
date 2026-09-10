@@ -42,8 +42,27 @@ def _month_diff(a: pd.Timestamp, b: pd.Timestamp) -> int:
     return (a.year - b.year) * 12 + (a.month - b.month)
 
 
-def check_coverage(panel: Path, max_lag: int = 1) -> tuple[bool, dict]:
-    """Return (ok, report). ok=False iff any healthy column ends > max_lag months before panel max."""
+# Columns whose sample legitimately ends early because the SOURCE data does, not because
+# anything here is wrong. Each entry names the upstream limit so it can be re-checked; a
+# column is only excused while the reason still holds.
+#
+# Keeping these out of the failure set matters: a guard that always reports FAIL is a
+# guard people stop reading, and then a REAL straggler goes unnoticed. Anything not listed
+# here still fails.
+UPSTREAM_LIMITED = {
+    "b_cptlt": "He-Kelly-Manela intermediary capital: published data ends 2025-05",
+    "b_dcpi": "FRED CPIAUCSL has no 2025-10 observation, so the CPI change is unavailable",
+    "b_cpi_vol6": "same CPI gap; the 6-month rolling window cannot clear it",
+}
+
+
+def check_coverage(panel: Path, max_lag: int = 1,
+                   allow_upstream: bool = True) -> tuple[bool, dict]:
+    """Return (ok, report). ok=False iff any healthy column ends > max_lag months before panel max.
+
+    Columns in UPSTREAM_LIMITED are reported separately and do not fail the check unless
+    `allow_upstream=False`.
+    """
     con = duckdb.connect()
     cols = con.execute(f"SELECT * FROM read_parquet('{panel}') LIMIT 0").df().columns.tolist()
     value_cols = [c for c in cols if c != DATE_COL]
@@ -77,12 +96,20 @@ def check_coverage(panel: Path, max_lag: int = 1) -> tuple[bool, dict]:
         (stragglers if frac >= HEALTHY_FRAC else sparse).append(rec)
 
     stragglers.sort(key=lambda r: (-r["lag_months"], r["col"]))
-    ok = len(stragglers) == 0
+    known, unexpected = [], []
+    for r in stragglers:
+        if allow_upstream and r["col"] in UPSTREAM_LIMITED:
+            r = {**r, "reason": UPSTREAM_LIMITED[r["col"]]}
+            known.append(r)
+        else:
+            unexpected.append(r)
+    ok = len(unexpected) == 0
     report = {
         "panel": str(panel), "panel_max_month": str(panel_max.date()), "max_lag": max_lag,
         "n_cols": len(value_cols), "n_ok": len(ok_cols),
-        "n_stragglers": len(stragglers), "n_sparse_ignored": len(sparse),
-        "stragglers": stragglers, "sparse_or_empty": sparse,
+        "n_stragglers": len(unexpected), "n_upstream_limited": len(known),
+        "n_sparse_ignored": len(sparse),
+        "stragglers": unexpected, "upstream_limited": known, "sparse_or_empty": sparse,
     }
     return ok, report
 
@@ -94,6 +121,11 @@ def format_report(report: dict) -> str:
         f"columns: {report['n_ok']}/{report['n_cols']} reach the frontier; "
         f"{report['n_stragglers']} stragglers; {report['n_sparse_ignored']} sparse/empty (ignored)",
     ]
+    if report.get("upstream_limited"):
+        lines.append("UPSTREAM-LIMITED (source data ends early -- not a pipeline problem):")
+        for r in report["upstream_limited"]:
+            lines.append(f"  {r['col']:24} last={r['last_month']}  lag={r['lag_months']}mo"
+                         f"  -- {r['reason']}")
     if report["stragglers"]:
         lines.append("STRAGGLERS (healthy mid-panel, then die early -- the pin-cap shape):")
         for r in report["stragglers"]:
@@ -109,8 +141,10 @@ def main() -> None:
                     help="max months a healthy column may end before the panel max (default 1: "
                          "allows forward-difference terminal-edge columns like lib/libd)")
     ap.add_argument("--json-out", type=Path, default=None)
+    ap.add_argument("--strict", action="store_true",
+                    help="also fail on columns limited by upstream data (UPSTREAM_LIMITED)")
     args = ap.parse_args()
-    ok, report = check_coverage(args.panel, args.max_lag)
+    ok, report = check_coverage(args.panel, args.max_lag, allow_upstream=not args.strict)
     print(format_report(report))
     if args.json_out:
         args.json_out.write_text(json.dumps(report, indent=1))
