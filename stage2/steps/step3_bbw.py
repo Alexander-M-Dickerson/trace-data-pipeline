@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 
 import _stage2_settings as cfg
-from lib import ff5, quote, var_es
+from lib import ff5, quote, treasury, var_es
 
 BBW_SIGNALS = ("var_95", "ilq_adj", "str1_adj")
 BBW_SIGNALS_X = ("var_95x", "ilq_adj", "str1_adjx")
@@ -64,7 +64,8 @@ def _prep_bbw_panel(blocks_dir: Path) -> pd.DataFrame:
     out["ret_vwx"] = out["ret_vw"] - out["tret"]
 
     sig = pd.read_parquet(blocks_dir / "end_signals.parquet",
-                          columns=["cusip", "date", "mcap_s", "mcap_e", "sp_rat", "mdy_rat"])
+                          columns=["cusip", "date", "mcap_s", "mcap_e", "sp_rat", "mdy_rat",
+                                   "tmat"])
     sig["cusip"] = sig["cusip"].astype(str)
     sig["date"] = pd.to_datetime(sig["date"])
     out = out.merge(sig, on=["cusip", "date"], how="outer")
@@ -176,10 +177,37 @@ def build(con=None, mode: str | None = None, limit_cusips: int | None = None) ->
     MKT_all = MKT_all.join(MKTBx_df, how="inner")
     MKT_all["TERM"] = MKT_all["MKTB_raw"] - MKT_all["MKTBx"]
 
+    # -- DEFB / TERMB: the default and term premia (Fama-French 1993; Gebhardt, Hvidkjaer &
+    #    Swaminathan 2005) ---------------------------------------------------------------------
+    #
+    #      DEFB  = long-term CORPORATE total return  -  long-term GOVERNMENT total return
+    #      TERMB = long-term government total return -  risk-free rate
+    #
+    # The corporate leg is the value-weighted return of panel bonds with at least
+    # DEF_CORP_MIN_MATURITY years to maturity; the government leg is the CRSP key-rate
+    # Treasury return at DEF_GOVT_TENOR. Both legs are TOTAL returns, so the difference is
+    # the credit premium a long-maturity bond earns over a matched government bond.
+    lt = (df.loc[df["tmat"] >= cfg.DEF_CORP_MIN_MATURITY, ["date", "ID", "mcap_s", "ret"]]
+            .dropna(subset=["ret", "mcap_s"]).copy())
+    lt["vw_w"] = lt["mcap_s"] / lt.groupby("date", observed=True)["mcap_s"].transform("sum")
+    lt["ret_w"] = lt["ret"] * lt["vw_w"]
+    LTCORP = lt.groupby("date", observed=True)["ret_w"].sum().to_frame(name="LTCORP")
+
+    tw = treasury.load_tret_wide(mode=mode)
+    if cfg.DEF_GOVT_TENOR not in tw.columns:
+        raise KeyError(f"Treasury tenor {cfg.DEF_GOVT_TENOR} not in {list(tw.columns)}")
+    LTGOVT = tw[cfg.DEF_GOVT_TENOR].rename("LTGOVT").to_frame()
+    LTGOVT.index = pd.to_datetime(LTGOVT.index) + pd.offsets.MonthEnd(0)
+
+    MKT_all = MKT_all.join(LTCORP, how="left").join(LTGOVT, how="left")
+    MKT_all["DEFB"] = MKT_all["LTCORP"] - MKT_all["LTGOVT"]
+    MKT_all["TERMB"] = MKT_all["LTGOVT"] - MKT_all["RF"]
+
     bbw = (core_std.join(CRF_std, how="inner").join(core_x, how="inner")
-           .join(CRF_x, how="inner").join(MKT_all[["MKTB", "MKTBx", "TERM"]], how="inner")
+           .join(CRF_x, how="inner").join(MKT_all[["MKTB", "MKTBx", "TERM", "DEFB", "TERMB"]], how="inner")
            .reset_index().rename(columns={"index": "date"}).set_index("date")
-           .loc[:, ["MKTB", "DRF", "CRF", "LRF", "MKTBx", "DRFx", "CRFx", "LRFx", "TERM"]]
+           .loc[:, ["MKTB", "DRF", "CRF", "LRF", "MKTBx", "DRFx", "CRFx", "LRFx", "TERM",
+                   "DEFB", "TERMB"]]
            .sort_index())
 
     out_path = out_dir / "bbw_factors.parquet"

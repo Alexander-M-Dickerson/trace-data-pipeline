@@ -387,10 +387,22 @@ def compute_all_betas(
         {"name": "coskew", "factors": ["mktb", "mktb_sq"], "keep": ["mktb_sq"], "sum": None, "ivol": False,
          "out": {"mktb_sq": "coskew"}, "iskew": True},
         # Univariate models
-        {"name": "def", "factors": ["mktbx"], "keep": None, "sum": None, "ivol": False,
-         "out": {"mktbx": "defb"}},
-        {"name": "term", "factors": ["term"], "keep": None, "sum": None, "ivol": False,
-         "out": {"term": "termb"}},
+        # DEF / TERM -- Gebhardt, Hvidkjaer & Swaminathan (2005); factors as in Fama-French
+        # (1993). One two-factor regression yields both loadings:
+        #
+        #     r = a + b_term * TERMB + b_def * DEFB + e
+        #
+        # TERMB = long-term government return - risk free; DEFB = long-term corporate
+        # return - long-term government return (built in step3_bbw).
+        #
+        # ! These were previously TWO UNIVARIATE models -- `def` on mktbx and `term` on
+        #   term -- and neither estimated what its name claimed. No `defb` series existed;
+        #   "defb" was only an output rename of the mktbx loading. Worse, in the
+        #   duration-adjusted world FACTOR_SWAP rewrites mktb -> mktbx, which made the
+        #   `def` and `mktb` models the SAME regression: b_defb and b_mktb came out
+        #   bit-identical on every row. See the DEF/TERM entry in DATA_DICTIONARY.md.
+        {"name": "defterm", "factors": ["termb", "defb"], "keep": ["termb", "defb"],
+         "sum": None, "ivol": False, "out": {"defb": "defb", "termb": "termb"}},
         {"name": "drf", "factors": ["drf"], "keep": None, "sum": None, "ivol": False,
          "out": {"drf": "drf"}},
         {"name": "crf", "factors": ["crf"], "keep": None, "sum": None, "ivol": False,
