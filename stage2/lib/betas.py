@@ -401,7 +401,10 @@ def compute_all_betas(
         #   duration-adjusted world FACTOR_SWAP rewrites mktb -> mktbx, which made the
         #   `def` and `mktb` models the SAME regression: b_defb and b_mktb came out
         #   bit-identical on every row. See the DEF/TERM entry in DATA_DICTIONARY.md.
-        {"name": "defterm", "factors": ["termb", "defb"], "keep": ["termb", "defb"],
+        # `keep` fixes the OUTPUT column order and `factors` the design matrix, so keeping
+        # defb first here preserves the panel's historical b_defb/b_termb ordering while
+        # leaving the regression itself untouched (bit-identical betas).
+        {"name": "defterm", "factors": ["termb", "defb"], "keep": ["defb", "termb"],
          "sum": None, "ivol": False, "out": {"defb": "defb", "termb": "termb"}},
         {"name": "drf", "factors": ["drf"], "keep": None, "sum": None, "ivol": False,
          "out": {"drf": "drf"}},

@@ -21,6 +21,7 @@ import pandas as pd
 
 import _stage2_settings as cfg
 from lib import wrangle
+from lib import contract
 from lib.phase_timer import PhaseTimer
 
 RUNNER_DROP_COLS = ["val_hz_wi", "val_ipr_wi", "trn"]   # deprecated/redundant (runner lines 1174+)
@@ -151,6 +152,10 @@ def build(con=None, mode: str | None = None, limit_cusips: int | None = None) ->
         main_panel_adj = wrangle.reorder_panel_cols(main_panel_adj, signal_order=signal_order,
                                                     verbose=True)
         main_panel["cusip"] = main_panel["cusip"].astype("category")
+
+    # The panel is published; its column names AND their order are part of the artifact.
+    # Fail here rather than shipping a silently permuted file (lib/contract.py).
+    contract.assert_panel_contract(main_panel, what=f"main_panel_{mode}")
 
     panel_path = cfg.PANEL_DIR / f"main_panel_{mode}.parquet"
     with pt("save_panel"):

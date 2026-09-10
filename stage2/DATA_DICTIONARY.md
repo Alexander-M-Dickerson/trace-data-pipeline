@@ -78,7 +78,9 @@ Our recommendation is to use the main panel data as provided with `ret_vw`. Howe
 
 ### Excess and Duration-Adjusted Return-Based Signals
 
-The main panel assumes researchers will form factors with excess returns (i.e., using $r^{x} = r - r^{f}$ where `ret_vwx = ret_vw - rfret`). If research designs rely on duration-adjusted returns (i.e., using $r^{x} = r - r^{Tsy}$ where `ret_vwx = ret_vw - tret`), we provide signals specifically computed with duration-adjusted returns. These include all factor betas in `betas_x_2025.parquet` and momentum/long-term reversal variables in `mom_retx_2025.parquet`.
+The main panel assumes researchers will form factors with excess returns, $r - r^{f}$, computed from the panel as `ret_vw - rfret`. If research designs instead rely on duration-adjusted returns, $r^{x} = r - r^{Tsy}$ — which is what **`ret_vwx` means throughout this document, namely `ret_vw - tret`** — we provide signals specifically computed with duration-adjusted returns. These include all factor betas in `betas_x_<YYYY>.parquet` and momentum/long-term reversal variables in `mom_retx_<YYYY>.parquet`, where `<YYYY>` is the vintage year of the release (see [Output Files](#output-files)).
+
+> `ret_vwx` is **only** the duration-adjusted return. There is no column for the excess return; subtract `rfret` from `ret_vw` yourself if that is what you want.
 
 The Treasury return `tret` is the U.S. Treasury bond return that is duration-matched to each corporate bond's modified duration (`md_dur`). For each bond $i$ in each month $t$, we linearly interpolate using key rate U.S. Treasury bond returns from WRDS and the bond's modified duration, following the method of Andreani, Palhares, and Richardson (2024).
 
@@ -86,7 +88,7 @@ The short-term reversal signal can be computed as the current `str` variable min
 
 ### Alternative Month-End Returns
 
-For researchers requiring alternative return measures, we provide `returns_alt_2025.parquet`, which includes:
+For researchers requiring alternative return measures, we provide `returns_alt_<YYYY>.parquet`, which includes:
 - `ret_vwp`: Returns computed using par-weighted prices on day $d$
 - `ret_ew`: Returns computed using equal-weighted prices on day $d$
 - `ret_1st`: Returns computed using the first available trade price on day $d$
@@ -101,9 +103,9 @@ where day $d$ is in the last 5 business days of months $t$ and $t+1$.
 
 The table below provides definitions for all signals in the database.
 
-**Return-based signals** (betas, momentum, reversals, VaR, ES): We compute both standard and duration-adjusted versions. The duration-adjusted variant uses $r^x = r - r^{Tsy}$ and is stored in `betas_x_2025.parquet` (for all factor betas) and `mom_retx_2025.parquet` (for momentum and long-term reversal signals).
+**Return-based signals** (betas, momentum, reversals, VaR, ES): We compute both standard and duration-adjusted versions. The duration-adjusted variant uses $r^x = r - r^{Tsy}$ and is stored in `betas_x_<YYYY>.parquet` (for all factor betas) and `mom_retx_<YYYY>.parquet` (for momentum and long-term reversal signals).
 
-**Price-based signals** (yields, spreads, value, book-to-market, prior 1-month return): All price-based signals in the main panel are market microstructure adjusted (MMN) by default, observed with a minimum 1-business-day gap before the month-end price used for returns. Researchers preferring unadjusted signals can download `mmn_price_based_signals_2025.parquet` from [openbondassetpricing.com](https://openbondassetpricing.com/); all variables in this file have the suffix `_mmn`.
+**Price-based signals** (yields, spreads, value, book-to-market, prior 1-month return): All price-based signals in the main panel are market microstructure adjusted (MMN) by default, observed with a minimum 1-business-day gap before the month-end price used for returns. Researchers preferring unadjusted signals can download `mmn_price_based_signals_<YYYY>.parquet` from [openbondassetpricing.com](https://openbondassetpricing.com/); all variables in this file have the suffix `_mmn`.
 
 For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month rolling window with a minimum of 12 observations, denoted 36(12). For long-term reversal signals requiring >12 months of history, we use an expanding window that starts at 12-3 and ramps up to the target horizon (e.g., 48-12 or 30-6) to preserve sample coverage.
 
@@ -812,13 +814,16 @@ where `tret` is the matched Treasury return based on bond duration.
 | MKT | mktrf, mktb | all | - | Yes |
 | BBW | mktb, drf, crf, lrf | - | - | Yes |
 | DCAPM | mktbx, term | all | - | No |
-| VOLAM | mktrf, smb, hml, vix, dvix, dvixlag, amd | dvix | dvix + dvixlag | No |
-| VOLPSB | mktrf, smb, hml, vix, dvix, dvixlag, psb | dvix | dvix + dvixlag | Yes |
+| VOLAM | mktrf, smb, hml, vix, dvix, dvixlag, amd | dvix | dvix | No |
+| VOLPSB | mktrf, smb, hml, vix, dvix, dvixlag, psb | dvix | dvix | Yes |
 | PSBm | mktrf, smb, hml, mktbx, term, psb | psb | - | No |
 | AMDM | mktrf, smb, hml, mktbx, term, amd | amd | - | No |
-| VIX | mktb, mktrf, dvix, dvixlag | dvix | dvix + dvixlag | No |
+| VIX | mktb, mktrf, dvix, dvixlag | dvix | dvix | No |
 | INFLV | mktb, cpi_vol6 | cpi_vol6 | - | No |
 | UNC | mktb, dunc | dunc | - | No |
+| UNCL | mktb, unc | unc | - | No |
+| UNC3 | mktb, dunc3 | dunc3 | - | No |
+| UNC6 | mktb, dunc6 | dunc6 | - | No |
 | UNCr | mktb, duncr | duncr | - | No |
 | UNCf | mktb, duncf | duncf | - | No |
 | CREDd | mktb, dcredit | dcredit | - | No |
@@ -829,14 +834,16 @@ where `tret` is the matched Treasury return based on bond duration.
 | RSJ | mktb, rsj | rsj | - | No |
 | PSB | mktb, psb | psb | - | No |
 | AMD | mktb, amd | amd | - | No |
-| DEF | mktbx, defb | defb | - | No |
-| TERM | mktb, termb | termb | - | No |
-| DRF | drf | drf | - | No |
-| CRF | crf | crf | - | No |
-| LRF | lrf | lrf | - | No |
-| MKTB | mktb | mktb | - | No |
-| LVL | mktb, lvl | lvl | - | No |
-| YSP | mktb, ysp | ysp | - | No |
+| ILLIQ | mktb, illiq | illiq | - | No |
+| DVIX_ASYM | mktrf, dvix_down, dvix_up | dvix_down, dvix_up | - | No |
+| COSKEW | mktb, mktb_sq | mktb_sq | - | No |
+| DEFTERM | termb, defb | defb, termb | - | No |
+| DRF | drf | all | - | No |
+| CRF | crf | all | - | No |
+| LRF | lrf | all | - | No |
+| MKTB | mktb | all | - | No |
+| LVL | lvl | all | - | No |
+| YSP | ysp | all | - | No |
 | MKTB_ASYM | mktb_down, mktb_up | all | - | No |
 | EPU | mktb, epu | epu | - | No |
 | EPUm | mktb, epum | epum | - | No |
@@ -1010,19 +1017,32 @@ $$r_{i,t} = \alpha + \beta^{dvix} \cdot \Delta VIX_t + \varepsilon_{i,t}$$
 
 **Outputs:** `b_vix`, `b_dvixd`
 
-#### DEF / TERM (Gebhardt, Hvidkjaer & Swaminathan, 2005)
+#### DEFTERM (Gebhardt, Hvidkjaer & Swaminathan, 2005; Fama & French, 1993)
 
-**DEF Model** — Default beta using duration-adjusted market:
+The default and term premia enter **one** two-factor regression, which yields both loadings:
 
-$$r_{i,t}^x = \alpha + \beta^{mx} \cdot MKTBX_t + \beta^{def} \cdot DEFB_t + \varepsilon_{i,t}$$
+$$r_{i,t} = \alpha + \beta^{term} \cdot TERMB_t + \beta^{def} \cdot DEFB_t + \varepsilon_{i,t}$$
 
-**Output:** `b_defb`
+**Outputs:** `b_defb`, `b_termb`
 
-**TERM Model** — Term premium beta:
+The two premia are constructed as in Fama and French (1993):
 
-$$r_{i,t} = \alpha + \beta^{b} \cdot MKTB_t + \beta^{term} \cdot TERMB_t + \varepsilon_{i,t}$$
+$$DEFB_t = r^{\text{LT corp}}_t - r^{\text{LT govt}}_t \qquad TERMB_t = r^{\text{LT govt}}_t - r^{f}_t$$
 
-**Output:** `b_termb`
+where the long-term corporate leg is the value-weighted return on panel bonds with at least
+10 years to maturity, and the long-term government leg is the CRSP 20-year key-rate Treasury
+total return. Before 2002-08 both series are spliced from the published extended (pre-TRACE)
+factor file, exactly as the other BBW factors are.
+
+The two premia are negatively correlated (−0.45 over the full extended history, −0.50 in the
+TRACE era), which is what makes them jointly estimable rather than two names for one series.
+
+> **Changed in 3.0.0.** These were previously two separate regressions — DEF on `mktbx`
+> alone, TERM on `mktb + termb`. No `defb` series existed anywhere: `defb` was only an output
+> rename of the `mktbx` loading. So `b_defb` was a *market* beta under another name, and in
+> the duration-adjusted panel it came out **bit-identical to `b_mktb`**, because `FACTOR_SWAP`
+> rewrites `mktb` to `mktbx` and made the two models the same regression. `b_defb` is now a
+> genuine default beta — its correlation with `b_mktb` is 0.94, not 1.00.
 
 #### Univariate Factor Betas (Dickerson, Mueller & Robotti, 2023)
 
@@ -1039,15 +1059,16 @@ $$r_{i,t} = \alpha + \beta \cdot F_t + \varepsilon_{i,t}$$
 
 #### LVL / YSP (Koijen, Lustig & Van Nieuwerburgh, 2017)
 
-Bond return decomposition into level and yield spread components:
+Bond return decomposition into level and yield spread components. Both are estimated
+**univariate**, with no market control:
 
 **LVL Model:**
-$$r_{i,t} = \alpha + \beta^{b} \cdot MKTB_t + \beta^{lvl} \cdot LVL_t + \varepsilon_{i,t}$$
+$$r_{i,t} = \alpha + \beta^{lvl} \cdot LVL_t + \varepsilon_{i,t}$$
 
 **Output:** `b_lvl`
 
 **YSP Model:**
-$$r_{i,t} = \alpha + \beta^{b} \cdot MKTB_t + \beta^{ysp} \cdot YSP_t + \varepsilon_{i,t}$$
+$$r_{i,t} = \alpha + \beta^{ysp} \cdot YSP_t + \varepsilon_{i,t}$$
 
 **Output:** `b_ysp`
 
@@ -1090,7 +1111,9 @@ $$r_{i,t} = \alpha + \beta^{b} \cdot MKTB_t + \beta^{epu} \cdot EPU_t + \varepsi
 | `drf` | Downside risk factor | BBW |
 | `crf` | Credit risk factor | BBW |
 | `lrf` | Liquidity risk factor | BBW |
-| `drfx`, `crfx`, `lrfx` | Duration-adjusted versions | BBW |
+| `drfx` | Downside risk factor, duration-adjusted | BBW |
+| `crfx` | Credit risk factor, duration-adjusted | BBW |
+| `lrfx` | Liquidity risk factor, duration-adjusted | BBW |
 | `term` | Term premium (MKTB - MKTBX) | Computed |
 | `vix` | VIX level (scaled: /100/sqrt(12)) | CBOE |
 | `dvix` | VIX first difference | Computed |
@@ -1103,17 +1126,28 @@ $$r_{i,t} = \alpha + \beta^{b} \cdot MKTB_t + \beta^{epu} \cdot EPU_t + \varepsi
 | `dcredit` | Credit spread change | Computed |
 | `unc` | Macro uncertainty index | JLN |
 | `dunc` | Macro uncertainty change | JLN |
-| `duncr`, `duncf` | Real/financial uncertainty changes | JLN |
-| `cptlt` | Intermediary capital ratio (traded) | HKM |
+| `duncr` | Real uncertainty change | JLN |
+| `duncf` | Financial uncertainty change | JLN |
+| `uncr` | Real uncertainty index (level) | JLN |
+| `uncf` | Financial uncertainty index (level) | JLN |
+| `dunc3` | Macro uncertainty, 3-month change: `unc.diff(3)` | Computed |
+| `dunc6` | Macro uncertainty, 6-month change: `unc.diff(6)` | Computed |
+| `cptlt` | Intermediary capital: the value-weighted investment return, in excess of `rf` | HKM |
+| `cptl` | Intermediary capital risk factor (the non-traded HKM factor) | HKM |
 | `rvol` | Realized volatility | Computed |
 | `rsj` | Realized skewness (scaled: /100) | Computed |
 | `psb` | Pastor-Stambaugh bond liquidity | Computed |
 | `amd` | Amihud illiquidity | Computed |
 | `illiq` | Aggregate illiquidity factor | Computed |
+| `ars` | Abdi-Ranaldo spread factor: monthly **change** in the equal-weighted mean of `ar_sprd` across USA-domiciled bonds | Computed |
+| `css` | Corwin-Schultz spread factor: monthly **change** in the equal-weighted mean of `cs_sprd` across USA-domiciled bonds | Computed |
+| `fhts` | FHT spread factor: monthly **change** in the equal-weighted mean of `p_fht` across USA-domiciled bonds | Computed |
+| `sprd` | Bid-ask spread factor: monthly **change** in the equal-weighted mean of `spd_rel` across USA-domiciled bonds | Computed |
 | `defb` | Default premium factor | GHS |
 | `termb` | Term premium factor | GHS |
 | `lvl` | Level factor (yield curve level) | KLN |
 | `ysp` | Yield spread factor | KLN |
+| `rf` | Risk-free rate, from the Ken French monthly factor file | Ken French |
 | `mktb_down` | Negative bond market return: min(mktb, 0) | Computed |
 | `mktb_up` | Positive bond market return: max(mktb, 0) | Computed |
 | `epu` | Economic policy uncertainty index level | BBD |
@@ -1444,15 +1478,146 @@ Based on squared returns (no mean adjustment).
 
 ---
 
+### Collinearity Notes
+
+None of the 140 columns duplicates another: across all 7,626 numeric pairs, **no two are
+bit-identical**, and the test suite asserts that. But several are near-substitutes, and
+anyone forming clusters, running a horse race or building a factor zoo should know which.
+Measured on the production panel (1.8 M bond-months):
+
+| pair | \|corr\| | why they are close |
+|---|---|---|
+| `mcap_e` / `sze` | 0.9998 | both are market value; `sze` is the panel's size variable and `mcap_e` the end-of-month market cap |
+| `mcap_s` / `sze` | 0.9980 | as above, `mcap_s` measured at the signal date |
+| `mcap_s` / `mcap_e` | 0.9978 | the same quantity a few business days apart |
+| `fce_val` / `mcap_e` | 0.9809 | face value against market value; they differ only through the price |
+| `dvol` / `dvol_idio` | 0.9797 | total daily volatility is mostly idiosyncratic for corporate bonds |
+| `b_mktbx_dcapm` / `b_defb` | **0.9744** | see below |
+| `ivol_mkt` / `ivol_bbw` | 0.9705 | residual volatility from two nested market models |
+
+❗**`b_defb` and `b_mktbx_dcapm`.** These correlate 0.97, which is high enough to matter if you
+put both in the same regression or treat them as separate cluster members. This is economically
+sensible — bonds with high market betas are bonds with high default betas — and it is a genuine
+0.97, not an artefact: before version 3.0.0 `b_defb` was *bit-identical* to `b_mktb` because the
+DEF model was degenerate. Its correlation with `b_mktb` is now 0.94.
+
+Within the Credit and Default Betas cluster the loadings are related but distinct:
+
+| | `b_drf` | `b_crf` | `b_lrf` | `b_defb` | `b_termb` |
+|---|---|---|---|---|---|
+| `b_drf` | 1.00 | 0.30 | 0.75 | 0.87 | 0.67 |
+| `b_crf` | | 1.00 | 0.31 | 0.48 | −0.13 |
+| `b_lrf` | | | 1.00 | 0.70 | 0.59 |
+| `b_defb` | | | | 1.00 | 0.63 |
+| `b_termb` | | | | | 1.00 |
+
+---
+
+### The MMN Sidecar
+
+`mmn_price_based_signals_<YYYY>.parquet` is published alongside the main panel and holds the
+**unadjusted twin** of every price-based signal. Two keys (`cusip`, `date`) and 38 signals.
+
+The distinction matters and is easy to get wrong:
+
+| | main panel | `_mmn` sidecar |
+|---|---|---|
+| the signal | market-microstructure-noise **adjusted**: observed with at least a one-business-day gap before the month-end price used for the return | **unadjusted**: signal and return share the same closing print |
+| the return to use with it | `ret_vw` | `ret_vw_bgn` |
+| in the three-approaches language | Approach 2, *Adjusted Signal* | Approach 3, *Adjusted Return* |
+
+❗**Do not mix them.** Pairing an unadjusted signal with `ret_vw` puts the same bid-ask bounce in
+both the signal and the return, and manufactures predictability that is not there. The effect is
+large, not marginal: for a short-term reversal signal built both ways, the bond-level AR(1) is
+−0.219 unadjusted against −0.046 adjusted — the gap removes about 79% of the apparent reversal.
+
+`str` is the one column where the naming inverts: `main_panel.str` is the MMN-**adjusted**
+reversal signal, while `str_mmn` in the sidecar equals `ret_vw`.
+
+To use the sidecar, merge it on `cusip` and `date` and switch the return column:
+
+```python
+panel = pd.read_parquet("main_panel_<YYYY>.parquet")
+mmn   = pd.read_parquet("mmn_price_based_signals_<YYYY>.parquet")
+df    = panel.merge(mmn, on=["cusip", "date"], how="left")
+# now sort on e.g. df["cs_mmn"] and hold df["ret_vw_bgn"], never df["ret_vw"]
+```
+
+Every mnemonic below is the panel column of the same name without the suffix, computed without
+the signal gap. The definitions are therefore the base signal's; see the tables above.
+
+| Mnemonic | Base signal | Name |
+|----------|-------------|------|
+| `ami_mmn` | `ami` | Amihud Illiquidity |
+| `ami_v_mmn` | `ami_v` | Amihud Volatility |
+| `ar_sprd_mmn` | `ar_sprd` | Abdi-Ranaldo Spread |
+| `b_dvixd_mmn` | `b_dvixd` | Daily VIX Innovation Beta |
+| `b_vix_mmn` | `b_vix` | VIX Level Beta |
+| `bbtm_mmn` | `bbtm` | Bond Book-to-Market |
+| `convx_mmn` | `convx` | Convexity |
+| `cs_mmn` | `cs` | Credit Spread |
+| `cs_mu12_1_mmn` | `cs_mu12_1` | 12-Month Average Spread |
+| `cs_sprd_mmn` | `cs_sprd` | Corwin-Schultz Spread |
+| `db_mkt_mmn` | `db_mkt` | Daily Market Beta |
+| `dcs6_mmn` | `dcs6` | 6-Month Spread Change |
+| `dkurt_mmn` | `dkurt` | Daily Kurtosis |
+| `dskew_mmn` | `dskew` | Daily Skewness |
+| `dvol_idio_mmn` | `dvol_idio` | Idiosyncratic Volatility |
+| `dvol_mmn` | `dvol` | Daily Volatility |
+| `dvol_sys_mmn` | `dvol_sys` | Systematic Volatility |
+| `ilq_mmn` | `ilq` | Roll Autocovariance |
+| `lix_mmn` | `lix` | LIX Liquidity |
+| `md_dur_mmn` | `md_dur` | Modified Duration |
+| `p_fht_mmn` | `p_fht` | FHT Spread |
+| `p_zro_mmn` | `p_zro` | Zero-Return Proportion |
+| `pi_mmn` | `pi` | Price Impact |
+| `rkt_mmn` | `rkt` | Realized Kurtosis |
+| `roll_mmn` | `roll` | Roll Spread |
+| `rsj_mmn` | `rsj` | Realized Signed Jump |
+| `rsk_mmn` | `rsk` | Realized Skewness |
+| `rvol_mmn` | `rvol` | Realized Volatility |
+| `spd_abs_mmn` | `spd_abs` | Absolute Bid-Ask Spread |
+| `spd_rel_mmn` | `spd_rel` | Relative Bid-Ask Spread |
+| `str_mmn` | `str` | Short-Term Reversal |
+| `sze_mmn` | `sze` | Bond Size |
+| `val_hz_dts_mmn` | `val_hz_dts` | Value (HZ, DtS-adjusted) |
+| `val_hz_mmn` | `val_hz` | Value (HZ) |
+| `val_ipr_dts_mmn` | `val_ipr_dts` | Value (IPR, DtS-adjusted) |
+| `val_ipr_mmn` | `val_ipr` | Value (IPR) |
+| `vov_mmn` | `vov` | Volatility of Volume |
+| `ytm_mmn` | `ytm` | Yield to Maturity |
+
+---
+
 ### Output Files
+
+Released artifacts carry the **vintage year** `<YYYY>` — the year the release is published
+under, not the last month of data. A build in progress writes files named for its Stage 1 date
+stamp instead; the release step renames them.
 
 | File | Description |
 |------|-------------|
-| `main_panel_2025.parquet` | Main panel with MMN-adjusted price-based signals |
-| `mmn_price_based_signals_2025.parquet` | Unadjusted price-based signals (with `_mmn` suffix) |
-| `betas_x_2025.parquet` | Betas from duration-adjusted returns |
-| `mom_retx_2025.parquet` | Momentum/LTR signals from duration-adjusted returns |
-| `returns_alt_2025.parquet` | Alternative return measures |
+| `main_panel_<YYYY>.parquet` | Main panel with MMN-adjusted price-based signals — the 140 columns defined in this document |
+| `mmn_price_based_signals_<YYYY>.parquet` | Unadjusted twins of the price-based signals, suffix `_mmn` (see below) |
+| `betas_x_<YYYY>.parquet` | Betas from duration-adjusted returns ($r^x = r - r^{Tsy}$) |
+| `mom_retx_<YYYY>.parquet` | Momentum/LTR signals from duration-adjusted returns |
+| `returns_alt_<YYYY>.parquet` | Alternative return measures |
+| `factors_<YYYY>.parquet` | The exogenous monthly factor panel every rolling beta was estimated on |
+
+**Why the factor panel is published.** Stage 2 assembles its factors from public sources at
+build time, and those sources revise: Ken French restates SMB/HML, FRED re-seasonally-adjusts
+CPI, and the Ludvigson uncertainty series is re-estimated each release. A panel built next month
+will not reproduce a panel published today. Shipping the exact factor file a release consumed is
+what lets a published number be checked — point Stage 2 at it with `FACTOR_SOURCE = "pinned"`.
+
+❗In `factors_<YYYY>.parquet` the columns `mktb`, `mktbx`, `term`, `drf`, `crf`, `drfx`, `crfx`,
+`defb` and `termb` are the **published extended (pre-TRACE) series**, which end in 2023-01. They
+are not the bond-market factors the panel uses: Stage 2 drops them on read and rebuilds them from
+its own TRACE data, keeping the extended values only before 2002-08.
+
+The panel's column names **and their order** are frozen in `lib/contract.py` and asserted at the
+end of every build. Adding, removing or moving a column is a public API change and a CHANGELOG
+entry, never a silent edit.
 
 ---
 

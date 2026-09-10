@@ -11,6 +11,10 @@ numba>=0.60; python_version<"3.14"
 
 # WRDS database access
 wrds>=3.3.0
+# `wrds` installs SQLAlchemy itself, but stage0/_wrds_pool.py imports it DIRECTLY to
+# recognise a dropped connection, so it is named here rather than relied on transitively.
+# (psycopg2 is imported the same way but is guarded by a try/except, so it stays optional.)
+SQLAlchemy>=2.0
 
 # Market calendars (Stage 0)
 pandas-market-calendars>=5.1.1
@@ -25,11 +29,38 @@ joblib>=1.4
 # Excel/Google Sheets reading (Stage 1)
 openpyxl
 
-# HTTP requests (Stage 1 - for downloading external data)
+# HTTP requests (Stages 1-2 - for downloading external data)
 requests
 
-# Plotting (optional, for report generation)
+# --- Stage 2: monthly panel -------------------------------------------------
+# Stage 2 runs on your own machine, not the WRDS grid.
+
+# The Stage 2 engine. Every step is DuckDB SQL; nothing in Stage 2 runs without it.
+duckdb>=1.5.0
+
+# Portfolio sorts behind the BBW bond factors (steps/step3_bbw.py).
+# PINNED, and the pin is load-bearing: the factor series -- and therefore roughly forty
+# beta columns -- come out of these double sorts. Verified 2026-09-10 that the published
+# 0.2.0 reproduces the factors this repository ships, bit for bit (max|d| = 0 on all
+# eleven BBW factors over 281 months). Do not float this to a newer release without
+# re-running that comparison.
+PyBondLab==0.2.0
+
+# Statistics: the illiquidity kernels (norm.ppf) and the report's Newey-West regressions.
+scipy>=1.11
+statsmodels>=0.14
+
+# Plotting -- required for the Stage 0/1/2 data reports, not optional if you build them.
 matplotlib>=3.8.0
 
-# Note: All other dependencies are from Python standard library
-# (logging, time, gc, functools, typing, pathlib, sys, os, datetime)
+# Optional. Stage 2 logs memory headroom when it is installed and skips the log when
+# it is not; nothing depends on it.
+# psutil>=5.9
+
+# Development only, to run the test suites:
+# pytest>=8.0
+
+# Verified 2026-09-10 by an AST sweep of every .py in the repo: everything else Stage 0-2
+# imports is either a repo-local module or the Python standard library
+# (logging, time, gc, functools, typing, pathlib, sys, os, datetime, hashlib,
+#  json, re, shutil, subprocess, zipfile, io, uuid, socket, contextlib).

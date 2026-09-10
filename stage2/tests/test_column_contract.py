@@ -22,9 +22,11 @@ The dictionary is deliberately BROADER than the panel: it also documents the exo
 factor series (`mktb`, `defb`, `epu`, ...), which live in factors_merged.parquet rather
 than the panel. So the contract is:
 
-    report definitions  ==  panel columns          (exactly)
-    dictionary          >=  panel columns          (everything shipped is documented)
-    dictionary - panel  ⊆   factors_merged columns (nothing documented is invented)
+    report definitions  ==  panel columns   (exactly)
+    dictionary          >=  panel columns   (everything shipped is documented)
+    dictionary - panel  ⊆   factor series + the _mmn sidecar (nothing invented)
+
+and, separately, that no two panel columns are bit-identical.
 
 Author: Open Source Bond Asset Pricing
 """
@@ -42,13 +44,10 @@ sys.path.insert(0, str(STAGE2))
 
 import _stage2_settings as cfg  # noqa: E402
 
-# Factor series carried by factors_merged that DATA_DICTIONARY.md does not yet define.
-# Documenting them is an open task; the test below asserts the list has not grown, so a
-# NEW undocumented factor fails immediately while the existing backlog stays visible.
-UNDOCUMENTED_FACTORS = {
-    "ars", "cptl", "crfx", "css", "drfx", "dunc3", "dunc6", "duncf", "duncr",
-    "fhts", "lrfx", "rf", "sprd", "uncf", "uncr",
-}
+# Factor series carried by factors_merged that DATA_DICTIONARY.md does not define.
+# Empty, and meant to stay that way: a new factor series added without a dictionary entry
+# fails the test below. If one genuinely cannot be documented, name it here with a reason.
+UNDOCUMENTED_FACTORS: set[str] = set()
 
 
 def _panel_path() -> Path | None:
@@ -115,18 +114,29 @@ def test_every_panel_column_is_in_the_data_dictionary():
 
 
 def test_the_dictionary_documents_nothing_that_does_not_exist():
-    """Dictionary entries beyond the panel must be real factor series, not inventions."""
+    """Every dictionary entry must be a real column of a real published artifact.
+
+    Three artifacts carry documented names: the panel, the factor series it was estimated
+    on, and the `_mmn` sidecar of unadjusted twins. Anything else is an invention or a
+    leftover from a column that has since been renamed or dropped.
+    """
     panel = _panel_path()
     if panel is None:
         pytest.skip("no built panel under output/panel/; run a build first")
-    fm = _blocks_for(panel) / "factors_merged.parquet"
+    blocks = _blocks_for(panel)
+    fm = blocks / "factors_merged.parquet"
     if not fm.exists():
         pytest.skip(f"no {fm.name} for this build")
-    extra = _dictionary_mnemonics() - _columns(panel)
-    orphans = sorted(extra - _columns(fm))
+
+    real = _columns(panel) | _columns(fm)
+    sidecars = sorted(blocks.glob("mmn_price_based_signals_*.parquet"))
+    if sidecars:
+        real |= _columns(sidecars[-1])
+
+    orphans = sorted(_dictionary_mnemonics() - real)
     assert not orphans, (
-        f"{len(orphans)} DATA_DICTIONARY.md entr(ies) match neither a panel column nor "
-        f"a factor series: {orphans}")
+        f"{len(orphans)} DATA_DICTIONARY.md entr(ies) match no column of the panel, the "
+        f"factor series or the _mmn sidecar: {orphans}")
 
 
 def test_the_undocumented_factor_backlog_has_not_grown():
@@ -146,3 +156,38 @@ def test_the_undocumented_factor_backlog_has_not_grown():
     assert not fixed, (
         f"{len(fixed)} factor series are now documented: {fixed}\n"
         f"  Remove them from UNDOCUMENTED_FACTORS so the list keeps shrinking.")
+
+
+def test_no_two_panel_columns_are_bit_identical():
+    """Two columns with identical bytes are one column shipped twice under two names.
+
+    That is not hypothetical either: before the DEF/TERM model was fixed, `b_defb` was
+    bit-identical to `b_mktb` in the duration-adjusted panel over 1.8 M rows -- a "default
+    beta" that was a market beta, and nothing caught it.
+
+    Hashing each column is O(columns), not O(pairs), so this stays fast on the full panel.
+    Near-duplicates are a separate question: DATA_DICTIONARY.md lists the pairs above 0.97
+    under "Collinearity Notes". This test only catches exact duplication.
+    """
+    import hashlib
+    import pandas as pd
+
+    panel = _panel_path()
+    if panel is None:
+        pytest.skip("no built panel under output/panel/; run a build first")
+    df = pd.read_parquet(panel)
+    seen: dict[str, str] = {}
+    dupes: list[tuple[str, str]] = []
+    for col in df.columns:
+        if not pd.api.types.is_numeric_dtype(df[col]):
+            continue
+        a = df[col].to_numpy()
+        digest = hashlib.sha256(a.tobytes()).hexdigest() + f":{a.dtype}"
+        if digest in seen:
+            dupes.append((seen[digest], col))
+        else:
+            seen[digest] = col
+    assert not dupes, (
+        f"{len(dupes)} pair(s) of panel columns are BIT-IDENTICAL: {dupes}\n"
+        f"  Two names for one column means one of the two is not the variable it claims "
+        f"to be.")
