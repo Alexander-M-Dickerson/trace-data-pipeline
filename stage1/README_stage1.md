@@ -49,7 +49,7 @@ Stage 1 takes the cleaned daily TRACE panels from Stage 0 and computes:
 5. **Ultra-distressed filters** to flag suspicious prices
 6. **Fama-French industry classifications**
 
-The result is a research-ready dataset with ~50+ variables per bond-day observation.
+The result is a research-ready dataset of 44 columns per bond-day observation.
 
 ---
 
@@ -177,12 +177,14 @@ ROOT_PATH = ""  # Auto-detects from current working directory
 # ROOT_PATH = Path("~/proj").expanduser()                          # Linux/Mac/WRDS
 # ROOT_PATH = Path("C:\\Users\\YourName\\Documents\\trace_data")   # Windows
 
-# Set the date stamp from your Stage 0 run
-STAGE0_DATE_STAMP = "20251022"  # Match your stage0 output files
-
-# Specify which TRACE datasets to include
-TRACE_MEMBERS = ["enhanced", "standard", "144a"]
+# Stage 0's date stamp is AUTO-DETECTED from its parquet filenames. Leave blank
+# unless detection fails, in which case set it to match your stage 0 output.
+STAGE0_DATE_STAMP = ""
 ```
+
+`TRACE_MEMBERS` is not here -- it is in the root `config.py`, defaults to
+`["enhanced", "144a"]`, and is overridable from the environment:
+`TRACE_MEMBERS="enhanced standard 144a" ./run_pipeline.sh`.
 
 To edit via command line using `nano`:
 
@@ -266,7 +268,10 @@ tail -f logs/stage1.err  # Check for errors
 
 ## What Stage 1 Does
 
-The pipeline executes 10 steps in sequence:
+`run_all_steps()` makes 13 calls in sequence. Two are easy to miss and both matter:
+`variable_drop()`, which removes `issuer_cusip`, `prclean`, `coupon`, `principal_amt`,
+`sp_naic`, `comp_rating` and `callable` and does the integer dtype casts; and
+`step8b_build_distressed_report()`.
 
 ### Step 1: Load Treasury Yields
 - Fetches Liu-Wu zero-coupon treasury yields (recommended) or FRED yields
@@ -340,28 +345,33 @@ Open `_stage1_settings.py` and adjust the following:
 ### User Configuration
 
 ```python
-# WRDS username
-WRDS_USERNAME = os.getenv("WRDS_USERNAME", "your_username_here")
+In the root `config.py` -- shared by every stage:
 
-# Root path (where stage0/ and stage1/ folders are located)
-# Leave blank for auto-detection (recommended)
-ROOT_PATH = ""  # Auto-detects from current working directory
-# Or manually specify:
-# ROOT_PATH = Path("~/proj").expanduser()                          # Linux/Mac/WRDS
-# ROOT_PATH = Path("C:\\Users\\YourName\\Documents\\trace_data")   # Windows
+```python
+WRDS_USERNAME = os.getenv("WRDS_USERNAME", "your_wrds_username")
+TRACE_MEMBERS = os.getenv("TRACE_MEMBERS", "enhanced 144a").split()
+```
 
-# Stage 0 output date stamp
-STAGE0_DATE_STAMP = "20251022"  # Must match your stage0 output files
+In `stage1/_stage1_settings.py`:
 
-# Which TRACE datasets to include
-TRACE_MEMBERS = ["enhanced", "standard", "144a"]  # Or ["enhanced"] only
+```python
+# Root path (where stage0/ and stage1/ live). Leave blank to auto-detect.
+ROOT_PATH = ""
 
-# Date filter
-DATE_CUT_OFF = "2025-03-31"  # Only include data on/before this date
+# Stage 0 output date stamp. AUTO-DETECTED from the stage0 parquet filenames; a
+# literal here is only the fallback for when detection fails.
+STAGE0_DATE_STAMP = ""
+
+# Date filter. The DEFAULT IS ROLLING, not a fixed date:
+#   "auto:-3mo"   last day of the month 3 months before the last trade date
+#   "2025-03-31"  a fixed date, used exactly as given
+# An auto cutoff is also CLAMPED to the last date the treasury curve covers, so the
+# published sample end can move between vintages without you changing anything.
+DATE_CUT_OFF = "auto:-3mo"
 
 # Parallel processing
-N_CORES = 10   # Number of CPU cores for bond analytics computation
-N_CHUNKS = 2   # Number of chunks for parallel operations
+N_CORES  = None   # resolves from $NSLOTS -- the slots actually granted (4 on WRDS)
+N_CHUNKS = 10     # MORE chunks = smaller peak memory
 ```
 
 ### Output Settings
@@ -963,14 +973,18 @@ Solutions:
 Stage 1 uses `joblib` for parallel processing of bond analytics. Tune these settings:
 
 ```python
-N_CORES = 10   # Number of CPU cores to use (adjust based on your machine)
-N_CHUNKS = 2   # Number of chunks (increase if memory issues)
+N_CORES  = None   # default: resolve from $NSLOTS, the slots Grid Engine granted
+N_CHUNKS = 10     # default
 ```
 
 **Guidelines:**
-- **WRDS Cloud**: Set `N_CORES = 10-20` (check `qstat -F` for available cores)
-- **Local machine**: Set to number of physical cores - 2
-- **Memory issues**: Increase `N_CHUNKS` to process smaller batches
+- **WRDS Cloud**: leave `N_CORES = None`. `run_stage1.sh` requests `-pe onenode 4`, and
+  the default resolution reads `$NSLOTS` and matches it. ❗Setting `N_CORES` explicitly
+  SKIPS that resolution, so `N_CORES = 20` would start 20 joblib workers inside a
+  4-slot, 40 GB allocation. `qstat -F` reports the node's cores, not your grant.
+- **Local machine**: physical cores minus two is a reasonable choice.
+- **Memory issues**: **raise** `N_CHUNKS` above 10 — more chunks means each one is
+  smaller. Lowering it makes the problem worse.
 
 ### Output Format
 
@@ -1034,4 +1048,4 @@ For questions, issues, or contributions:
 
 ---
 
-**Last updated:** November 2025
+**Last updated:** September 2026

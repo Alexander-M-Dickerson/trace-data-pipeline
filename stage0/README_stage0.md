@@ -1160,7 +1160,7 @@ For questions, issues, or contributions:
 
 ---
 
-**Last updated:** January 2025
+**Last updated:** September 2026
 
 
 

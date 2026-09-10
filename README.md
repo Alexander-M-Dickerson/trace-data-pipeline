@@ -1,7 +1,7 @@
 # TRACE Data Pipeline
 
-A comprehensive, pipeline for processing Enhanced, Standard and 144A TRACE (Trade Reporting and Compliance Engine) corporate bond transaction data. 
-It is apart of the [Open Bond Asset Pricing project](https://openbondassetpricing.com/).
+A comprehensive pipeline for processing Enhanced, Standard and 144A TRACE (Trade Reporting and Compliance Engine) corporate bond transaction data. 
+It is a part of the [Open Bond Asset Pricing project](https://openbondassetpricing.com/).
 This pipeline implements cleaning procedures and error-correction algorithms to produce *high-quality, reproducible* daily and monthly corporate bond panels from raw TRACE transaction data.
 The companion repository is [PyBondLab](https://github.com/GiulioRossetti94/PyBondLab/tree/main/examples) which can be used to form corporate bond asset pricing factors.
 
@@ -10,7 +10,7 @@ The companion repository is [PyBondLab](https://github.com/GiulioRossetti94/PyBo
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Stage 0](https://img.shields.io/badge/Stage%200-Public%20Beta-green)](stage0/)
 [![Stage 1](https://img.shields.io/badge/Stage%201-Public%20Beta-green)](stage1/)
-[![Stage 2](https://img.shields.io/badge/Stage%202-December%202025-orange)](stage2/)
+[![Stage 2](https://img.shields.io/badge/Stage%202-Coming%20Soon-orange)](stage2/)
 
 [📄 Link to paper](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4575879)
 ---
@@ -106,8 +106,8 @@ Please reach out to `alexander.dickerson1@unsw.edu.au` if you would like to coll
 - **External identifiers** 
 - **Ultra-distressed bond filters** to flag potentially erroneous prices
 - **Fama-French industry classifications** (12, 17 and 30 industry groups)
-- Produces comprehensive daily bond-level dataset with 50+ variables
-- Ultra-distressed filter catches suspiciupus "rounded" price numbers at very low prices often associated with issues trading under default. See [README_distressed_filter.md](stage1/README_distressed_filter.md)
+- Produces a daily bond-level dataset of 44 columns (Stage 2 is the 50+ signal product)
+- Ultra-distressed filter catches suspicious "rounded" price numbers at very low prices often associated with issues trading under default. See [README_distressed_filter.md](stage1/README_distressed_filter.md)
 
 ---
 
@@ -119,7 +119,7 @@ Please reach out to `alexander.dickerson1@unsw.edu.au` if you would like to coll
 - SSH access to WRDS Cloud (or local Python environment)
 - `.pgpass` configured for passwordless WRDS authentication
 
-### 3-Step Setup
+### Setup
 
 1. **Clone the repository:**
 ```bash

@@ -16,7 +16,7 @@ Transforms raw TRACE data into a research-ready bond dataset with:
 - 🚨 **Quality filters** (ultra-distressed bond detection)
 - 🏭 **Industry classifications** (Fama-French 12, 17 and 30)
 
-**Output:** A comprehensive parquet file with 50+ variables per bond-day.
+**Output:** A parquet file with 44 columns per bond-day (see [stage1/DATA_DICTIONARY.md](stage1/DATA_DICTIONARY.md)).
 
 ---
 

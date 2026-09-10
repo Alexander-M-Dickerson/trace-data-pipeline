@@ -21,7 +21,7 @@ Stage 1 enriches your cleaned TRACE data from Stage 0 with:
 - 🚨 **Ultra-distressed filters** to flag suspicious prices
 - 🏭 **Fama-French industry classifications**
 
-**Output:** A comprehensive research-ready dataset with ~50+ variables per bond-day.
+**Output:** A research-ready dataset of 44 columns per bond-day.
 
 **Runtime:** ~3-4 hours with 2 cores (4 cores with threading) on WRDS cloud. Potentially quicker on your home machine.
 
