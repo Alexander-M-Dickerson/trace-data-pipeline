@@ -365,8 +365,9 @@ Submit the complete automated pipeline:
    can use the whole connection budget rather than a slice of it.
 4. `build_reports` is held on every stage-0 job actually submitted.
 5. Stage 1 is held on **the same stage-0 jobs**, not on the report job. Since v2.2.2
-   the two run alongside each other, which takes the reports (~51 min) off the
-   critical path.
+   the two run alongside each other, so the report job is off the critical path
+   entirely. That release also parallelised the report's re-clean: it went from ~51
+   minutes to ~15 (14 min on the 2026-09-09 run).
 
 **Output from the script:**
 ```
@@ -380,7 +381,9 @@ Submit the complete automated pipeline:
 
 > **Tip:** Check status with `qstat`. The report job will show status `hqw` (hold) until the data jobs finish. Tail logs with `tail -f logs/01_enhanced.out` (or `.err`).
 
-**Total runtime:** ~5 hours for the complete pipeline (data processing + report generation)
+**Total runtime:** about 4.5-5 hours for the complete pipeline. The 2026-09-09 production
+run took 4.63 h end to end: Enhanced 2.01 h and 144A 0.70 h in parallel, then the reports
+(0.23 h) and Stage 1 (2.62 h) side by side.
 
 If you are having errors after attempting to debug, feel free to contact Alex Dickerson at `alexander.dickerson1@unsw.edu.au` for help.
 

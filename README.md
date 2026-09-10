@@ -507,15 +507,18 @@ Monthly panel with 50+ corporate bond signals ready for asset pricing research.
 
 Using `./run_pipeline.sh` (complete automated pipeline from ROOT):
 - **Stage 0 - Data processing** (Enhanced and 144A in parallel):
-  - Enhanced TRACE: ~4 hours before v2.2.0. It now pulls 5 CUSIP chunks at a time over
-    separate WRDS connections, so expect materially less -- how much depends on how
-    the fetch and the clean divide up on the day.
-  - 144A TRACE: ~30-60 minutes
+  - Enhanced TRACE: **~2 hours**. It was ~4 hours before v2.2.0; it now pulls 5 CUSIP
+    chunks at a time over separate WRDS connections. Measured 2026-09-09: 485 chunks in
+    2.01 h against a serial-equivalent 9.93 h, a **4.94x** speedup.
+  - 144A TRACE: **~45 minutes**
   - Standard TRACE: ~30-60 minutes, and OPT-IN since v2.2.0 (`TRACE_MEMBERS`). When
     requested it is scheduled after the other two, not beside them.
 - **Stage 0 - Report generation**: ~10-15 minutes since v2.2.2 (was ~50); waits for every
   member submitted, and runs ALONGSIDE Stage 1 rather than before it
-- **Stage 1 - Bond analytics**: ~2-3 hours (waits for the Stage 0 DATA jobs)
+- **Stage 1 - Bond analytics**: **~2.5-3 hours** (waits for the Stage 0 DATA jobs)
+
+**End to end: about 4.5-5 hours.** The 2026-09-09 production run took 4.63 h wall clock
+(20:41 -> 01:19) and produced a 28,662,808-row Stage 1 panel covering 2002-07 to 2025-12.
 
 **How it works:**
 The script uses SGE's `-hold_jid` to create automatic dependency chains:

@@ -24,15 +24,17 @@ Both Stage 0 and Stage 1 are designed for WRDS Cloud due to database access requ
 ### How long does processing take?
 Using `./run_pipeline.sh` (complete automated pipeline):
 - **Pre-stage (data downloads)**: ~5 minutes
-- **Stage 0 (Enhanced TRACE)**: was ~4 hours serial. Since v2.2.0 it pulls 5 CUSIP
-  chunks at once over separate WRDS connections -- measured 4.5x on the chunk loop
-  itself, so expect materially less, though how much depends on how fetch and clean
-  divide up on the day.
-- **Stage 0 (Rule 144A)**: ~30-60 minutes, running at the same time as Enhanced
+- **Stage 0 (Enhanced TRACE)**: **~2 hours**. It was ~4 hours serial; since v2.2.0 it
+  pulls 5 CUSIP chunks at once over separate WRDS connections. The 2026-09-09 run did
+  485 chunks in 2.01 h against a serial-equivalent 9.93 h -- a **4.94x** speedup.
+- **Stage 0 (Rule 144A)**: **~45 minutes**, running at the same time as Enhanced
 - **Stage 0 (Standard TRACE)**: ~30-60 minutes, and OPT-IN since v2.2.0. When requested
   it is scheduled after the other two rather than beside them.
-- **Stage 0 (Report generation)**: ~30-60 minutes
-- **Stage 1 (Bond analytics)**: ~2 hours
+- **Stage 0 (Report generation)**: **~15 minutes** since v2.2.2, and it no longer blocks
+  Stage 1 -- the two run side by side. It was ~50 minutes before that release.
+- **Stage 1 (Bond analytics)**: **~2.5-3 hours**
+
+**End to end: about 4.5-5 hours.** The 2026-09-09 production run took 4.63 h.
 
 ### What if I only want Enhanced TRACE?
 You can customize which datasets to process in `config.py` (applies to all stages):
@@ -532,8 +534,11 @@ DIRECTORY  USED / LIMIT
    Or raise `CONCURRENCY` to pull more chunks at once, within the WRDS connection
    ceiling of 7 held simultaneously (`tests/probe_wrds_connections.py` measures it).
 
-2. **Disable Stage 0 error plot generation** (saves 30-60 minutes):
+2. **Disable Stage 0 error plot generation**:
    - Set `STAGE0_OUTPUT_FIGURES = False` in `config.py`
+   - Worth much less than it used to be. The whole report job now takes ~15 minutes and
+     runs alongside Stage 1, so switching the figures off saves minutes and takes
+     nothing off the critical path.
 
 3. **Memory optimizations (automatic)**:
    - CUSIP columns use category dtype (~75% memory savings)

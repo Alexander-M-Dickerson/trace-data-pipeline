@@ -145,7 +145,7 @@ qsub run_smoke_test.sh      # result in smoke_test.out
    - Apply quality filters
    - Generate final dataset
 
-**Runtime:** ~4-6 hours total (WRDS Cloud with default settings)
+**Runtime:** about 4.5-5 hours total on the WRDS Cloud with default settings (measured 4.63 h on 2026-09-09)
 
 ---
 
