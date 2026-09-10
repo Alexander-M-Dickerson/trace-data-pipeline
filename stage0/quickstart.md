@@ -15,8 +15,11 @@
 ssh <your_wrds_id>@wrds-cloud.wharton.upenn.edu
 cd ~
 git clone https://github.com/Alexander-M-Dickerson/trace-data-pipeline.git
-cd trace-data-pipeline/stage0
+cd trace-data-pipeline
 ```
+
+❗Stay at the repo ROOT. `run_pipeline.sh` lives there, and it aborts unless `stage0/`
+and `stage1/` are both directly beneath the working directory.
 
 ---
 
@@ -65,11 +68,15 @@ echo 'export WRDS_USERNAME="<your_wrds_id>"' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-**Option B — default fallback in `_trace_settings.py`:**
+**Option B — the fallback in `config.py`** (the repo ROOT, not `_trace_settings.py`,
+which merely imports it):
 
 ```python
-WRDS_USERNAME = os.getenv("WRDS_USERNAME", "<your_wrds_id>")
+WRDS_USERNAME = os.getenv("WRDS_USERNAME", "your_wrds_username")
 ```
+
+❗`run_smoke_test.sh` reads the ENVIRONMENT, not `config.py`, and refuses to start
+without it -- so if you take Option B, still `export WRDS_USERNAME` before using it.
 
 You do **not** need to put the password in code; `.pgpass` supplies it.
 
@@ -77,19 +84,19 @@ You do **not** need to put the password in code; `.pgpass` supplies it.
 
 ## 4) Run the pipeline
 
-You have two equivalent ways to start the master script:
-
-**Method 1 — run via bash (no permission change needed):**
+From the repo ROOT (not `stage0/`):
 
 ```bash
-bash run_pipeline.sh
+./run_pipeline.sh
 ```
 
-**Method 2 — make it executable once, then run directly:**
+The scripts ship executable, so no `chmod` is needed on a fresh clone. If an older
+clone gives "Permission denied", either `bash run_pipeline.sh` or
+`chmod +x *.sh stage0/*.sh stage1/*.sh` once.
 
-```bash
-chmod +x ../*.sh *.sh           # one-time setup
-./run_pipeline.sh
+`run_pipeline.sh` fetches Stage 1's external inputs itself (on the login node, which is
+the only place with internet), then submits Stage 0 for each member in `TRACE_MEMBERS`,
+the data-report job, and Stage 1.
 ```
 
 What this does:

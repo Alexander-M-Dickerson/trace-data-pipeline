@@ -52,9 +52,9 @@ python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-3. Install dependencies:
+3. Install dependencies (no `--user` -- pip refuses it inside an active virtualenv):
 ```bash
-python -m pip install --user -r requirements.txt
+python -m pip install -r requirements.txt
 ```
 
 4. Create a branch for your changes:

@@ -101,8 +101,13 @@ def main():
     imports_it = "from config import" in ts and "WRDS_USERNAME" in ts.split("from config import")[1][:120]
     check("_trace_settings.py imports WRDS_USERNAME from config.py", imports_it)
     if imports_it:
-        bad = [f for f, t in docs.items()
-               if re.search(r"[Ee]dit `?_trace_settings\.py`?.{0,60}WRDS_USERNAME", t, re.S)]
+        # Any verb, not just "edit": two real instances said "Open `_trace_settings.py`"
+        # and "default fallback in `_trace_settings.py`" and slipped through a check
+        # written around the word "Edit".
+        near = re.compile(
+            r"`?_trace_settings\.py`?.{0,80}?WRDS_USERNAME"
+            r"|WRDS_USERNAME.{0,80}?`?_trace_settings\.py`?")
+        bad = [f for f, t in docs.items() if near.search(t)]
         check("no doc tells you to set WRDS_USERNAME in _trace_settings.py",
               not bad, str(bad))
 

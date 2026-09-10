@@ -128,10 +128,21 @@ stage1/
 On WRDS Cloud or your local machine:
 
 ```bash
-python -m pip install --user pandas==2.2.3 numpy==2.2.5 wrds pyarrow tqdm QuantLib==1.37 joblib==1.5.1 openpyxl requests matplotlib
+python -m pip install --user -r requirements.txt
 ```
 
-Or use `requirements.txt` (recommended):
+❗Do **not** pin these to exact versions on the WRDS Cloud. `--user` installs shadow the
+system packages, and WRDS already ships newer ones than any pin here (numpy 2.4.6,
+pyarrow 24.0.0 on Python 3.14) — pinning downgrades a working environment. Use
+`requirements.txt`, which states minimums.
+
+The equivalent by hand, if `requirements.txt` is unavailable:
+
+```bash
+python -m pip install --user pandas numpy wrds pyarrow tqdm QuantLib joblib openpyxl requests matplotlib
+```
+
+Using `requirements.txt` (recommended):
 
 ```bash
 python -m pip install --user -r requirements.txt
@@ -865,10 +876,10 @@ ls stage0/144a/trace_144a_*.parquet
 
 Solution:
 ```bash
-python -m pip install --user QuantLib==1.37
+python -m pip install --user QuantLib
 ```
 
-**IMPORTANT:** You must install QuantLib version 1.37 specifically for this code to work correctly.
+`requirements.txt` asks for `QuantLib>=1.36`; do not pin an exact version.
 
 **Error: "ModuleNotFoundError: No module named 'helper_functions'"**
 

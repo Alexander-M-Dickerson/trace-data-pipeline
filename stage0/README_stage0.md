@@ -385,13 +385,19 @@ If you run jobs individually and want to generate reports later, or if you want 
 qsub run_build_data_reports.sh
 ```
 
-**Important:** If running report generation separately, edit `_build_error_files.py` to specify which datasets to process by modifying the `DATA_TYPES` variable:
+**Important:** which datasets the report job processes comes from `TRACE_MEMBERS` in
+the root `config.py`, or from the `--data-type` flag. `DATA_TYPES` was moved out of
+`_build_error_files.py` (its source still carries the note "DATA_TYPES moved to config.py
+as TRACE_MEMBERS"), so adding it back there has no effect:
+
+```bash
+# One dataset, without touching config.py:
+python3 _build_error_files.py --data-type enhanced
+```
 
 ```python
-# In _build_error_files.py:
-DATA_TYPES = ['enhanced', 'standard', '144a']  # Process all three
-# Or:
-DATA_TYPES = ['enhanced']  # Process only Enhanced TRACE
+# In config.py -- applies to every stage:
+TRACE_MEMBERS = ["enhanced"]
 ```
 
 Change the filtering settings in `_trace_settings.py` if needed.
@@ -460,12 +466,9 @@ Both `create_daily_enhanced_trace.py` and `create_daily_standard_trace.py`:
 
 ## Configuration choices you can edit
 
-Open `_trace_settings.py` and adjust the following:
-
-### WRDS Username
-```python
-WRDS_USERNAME = os.getenv("WRDS_USERNAME", "your_username_here")
-```
+Open `_trace_settings.py` and adjust the following. (❗Not the WRDS username --
+that lives in the shared `config.py` at the repo ROOT; `_trace_settings.py` imports it,
+so editing it there does nothing. See "Quick start" above.)
 
 ### FISD Universe Parameters (`FISD_PARAMS`)
 
@@ -695,7 +698,7 @@ scp -r wrds_username@wrds-cloud.wharton.upenn.edu:~/proj/stage0/logs ./local_des
 
 ## Generating the TRACE Data Reports
 
-When you run `./run_pipeline.sh`, reports are automatically generated for all three datasets after data processing completes using SGE's `-hold_jid` dependency feature. However, you can also generate or regenerate reports separately.
+When you run `./run_pipeline.sh`, reports are generated automatically for the members in `TRACE_MEMBERS` (by default Enhanced and 144A) once their data jobs complete, using SGE's `-hold_jid`. Since v2.2.2 the report job runs alongside Stage 1 rather than before it. You can also generate or regenerate reports separately.
 
 ### Configuration
 
@@ -876,7 +879,8 @@ Or use your favorite LaTeX editor (TeXShop, TeXstudio, Overleaf, etc.).
 ### Memory issues
 
 - **Job killed due to memory**:
-  - Reduce `chunk_size` in `_trace_settings.py` (try 100 or 150)
+  - Lower `TARGET_ROWS_PER_CHUNK` in `_trace_settings.py` (try 400_000) -- this, not
+    `chunk_size`, sizes a Stage 0 chunk. Or lower `CONCURRENCY`; each worker holds one.
   - Request more memory in the shell scripts by adding:
     ```bash
     #$ -l m_mem_free=8G
@@ -933,10 +937,14 @@ If a job fails:
 To process a specific date range, modify the per-dataset overrides in `_trace_settings.py`:
 
 ```python
+# ❗Keep `n_workers` on every member. Dropping it returns that member to the serial
+# path (the engine default is n_workers=1) while run_pipeline.sh still requests 5 slots.
 PER_DATASET = {
-    "enhanced": dict(),
-    "standard": dict(start_date="2020-01-01", data_type="standard"),
-    "144a": dict(start_date="2020-01-01", data_type="144a"),
+    "enhanced": dict(n_workers=WORKERS_OVERRIDE or CONCURRENCY["enhanced"]),
+    "standard": dict(start_date="2020-01-01", data_type="standard",
+                     n_workers=WORKERS_OVERRIDE or CONCURRENCY["standard"]),
+    "144a":     dict(start_date="2020-01-01", data_type="144a",
+                     n_workers=WORKERS_OVERRIDE or CONCURRENCY["144a"]),
 }
 ```
 
@@ -959,17 +967,21 @@ COMMON_KWARGS = dict(
 To disable any filter, set it to `False` in `_trace_settings.py`:
 
 ```python
+# ALL ELEVEN keys must be present. They are read with a hard subscript
+# (`if f["flag_initial_price_errors"]:`), not .get(), so an omitted key is a
+# KeyError inside every chunk rather than a default.
 FILTER_SWITCHES = dict(
-    dick_nielsen            = True,
-    decimal_shift_corrector = False,  # Disable decimal shift correction
-    trading_time            = False,
-    trading_calendar        = True,
-    price_filters           = True,
-    volume_filter_toggle    = True,
-    bounce_back_filter      = False,  # Disable bounce-back filter
-    yld_price_filter        = True,
-    amtout_volume_filter    = True,
-    trd_exe_mat_filter      = True,
+    dick_nielsen              = True,
+    decimal_shift_corrector   = False,  # Disable decimal shift correction
+    trading_time              = False,  # the one filter OFF by default
+    trading_calendar          = True,
+    price_filters             = True,
+    volume_filter_toggle      = True,
+    bounce_back_filter        = False,  # Disable bounce-back filter
+    yld_price_filter          = True,
+    amtout_volume_filter      = True,
+    trd_exe_mat_filter        = True,
+    flag_initial_price_errors = True,
 )
 ```
 

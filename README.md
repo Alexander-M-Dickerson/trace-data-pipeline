@@ -262,10 +262,12 @@ trace-data-pipeline/
 ├── run_smoke_test.sh                 # Whole-chain validation in minutes
 ├── .gitignore
 │
-├── tests/                            # Run before committing; no WRDS needed for 2 of 4
+├── tests/                            # Run before committing; only the probe needs WRDS
 │   ├── smoke_assertions.py           # The 28 cross-stage invariants
 │   ├── test_chunk_plan.py            # Chunk-partition properties
 │   ├── test_chunk_scheduler.py       # Ordering + failure handling
+│   ├── test_merge_keys.py            # Lookups must be one row per key
+│   ├── test_docs.py                  # Docs vs the code they describe
 │   └── probe_wrds_connections.py     # Measures your account's connection ceiling
 │
 ├── stage0/                           # ✅ PUBLIC BETA - Intraday to daily processing
@@ -386,7 +388,7 @@ Stage 0 produces daily panels in dataset-specific subfolders with the following 
 
 **Data download:** Available in zipped parquet format on [Open Bond Asset Pricing](https://openbondassetpricing.com/data)
 
-**Column structure (43 columns):**
+**Column structure (44 columns):**
 
 #### Identifiers
 
@@ -467,6 +469,7 @@ All prices are in **percentage of par**.
 
 | Column | Type | Description |
 |--------|------|-------------|
+| `ff12num` | int8 | Fama-French 12 industry classification |
 | `ff17num` | int8 | Fama-French 17 industry classification |
 | `ff30num` | int8 | Fama-French 30 industry classification |
 
@@ -482,7 +485,13 @@ All prices are in **percentage of par**.
 | `comp_rating`* | float64 | Average of spc_rating and mdc_rating |
 
 **Notes:**
-- \*Columns marked with asterisk are not included in the output file but can be obtained by merging with FISD data in `stage0/enhanced/trace_enhanced_fisd_YYYYMMDD.parquet`
+- \*Columns marked with an asterisk are not in the main Stage 1 file. Where to get each:
+  - `coupon`, `principal_amt` -- merge `stage0/enhanced/trace_enhanced_fisd_YYYYMMDD.parquet`
+  - `callable` -- `stage1/data/call_dummy_YYYYMMDD.parquet`
+  - `sp_naic` -- as `sp_naic_numeric` in `stage1/data/sp_ratings_YYYYMMDD.parquet`
+  - `issuer_cusip` -- it is simply `cusip_id[:6]`; no merge needed
+  - `comp_rating` -- **not written anywhere**. It is computed and then dropped before
+    export; reconstruct it as the mean of `spc_rating` and `mdc_rating`.
 - †Columns marked with dagger are excluded from the public download due to proprietary data restrictions
 - ‡Columns marked with double dagger are excluded from the public download to reduce file size
 - All `prc_*` prices are in percentage of par (99 = 99% of $1,000 = $990)
@@ -504,24 +513,35 @@ Using `./run_pipeline.sh` (complete automated pipeline from ROOT):
   - 144A TRACE: ~30-60 minutes
   - Standard TRACE: ~30-60 minutes, and OPT-IN since v2.2.0 (`TRACE_MEMBERS`). When
     requested it is scheduled after the other two, not beside them.
-- **Stage 0 - Report generation**: ~30-60 minutes (waits for every member submitted)
-- **Stage 1 - Bond analytics**: ~2 hours (waits for Stage 0 reports)
+- **Stage 0 - Report generation**: ~10-15 minutes since v2.2.2 (was ~50); waits for every
+  member submitted, and runs ALONGSIDE Stage 1 rather than before it
+- **Stage 1 - Bond analytics**: ~2-3 hours (waits for the Stage 0 DATA jobs)
 
 **How it works:**
-The script uses SGE's `-hold_jid` feature to create automatic dependency chains:
-1. Stage 0: Three data extraction jobs run in parallel
-2. Stage 0: Report job waits until all three extraction jobs complete
-3. Stage 1: Analytics job waits until Stage 0 reports complete
-4. All jobs submitted with a single command from ROOT
+The script uses SGE's `-hold_jid` to create automatic dependency chains:
+1. Stage 0: the members in `TRACE_MEMBERS` are submitted — by default Enhanced and 144A,
+   which run at the same time. Standard, if requested, is held behind them.
+2. Stage 0: the report job waits until every submitted extraction job completes.
+3. Stage 1: also waits on the extraction jobs, then runs **in parallel with the reports**
+   — it reads only the member panels and the FISD file, nothing the reports produce.
+4. All jobs submitted with a single command from ROOT.
 
-**Resource Usage:**
-- **Stage 0:**
-  - Memory: ~4-8GB per job (with default chunk_size=250)
-  - Disk: ~1-2GB per dataset (Parquet format)
-  - Parallel execution: All three datasets can run simultaneously
-- **Stage 1:**
-  - Memory: 24GB RAM required in WRDS (specified in run_stage1.sh as `#$ -l m_mem_free=24G`)
-  - Processing time: 2-6 hours depending on dataset size and parallel cores
+**Resource Usage** (requested per member by `run_pipeline.sh`; `m_mem_free` is charged
+PER SLOT, so the total is `slots x mem` and must stay within the WRDS caps of 8 cores and
+48 GB per job):
+
+| job | request | total |
+|---|---|---|
+| Enhanced | `-pe onenode 5 -l m_mem_free=8G` | 40 GB |
+| 144A | `-pe onenode 1 -l m_mem_free=16G` | 16 GB |
+| Standard (opt-in) | `-pe onenode 6 -l m_mem_free=8G` | 48 GB |
+| Data reports | `-pe onenode 5 -l m_mem_free=8G` | 40 GB |
+| Stage 1 | `-pe onenode 4 -l m_mem_free=10G` | 40 GB |
+
+- **Disk**: ~1-2 GB per dataset (Parquet)
+- Tune with `CONCURRENCY`, `MEM_PER_SLOT_GB` and `TARGET_ROWS_PER_CHUNK` in
+  `stage0/_trace_settings.py` — not by editing the job scripts, whose directives the
+  command-line request overrides.
 
 ---
 
@@ -585,5 +605,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Last Updated:** September 2026
-**Stage 0 Version:** 2.2.0
-**Stage 1 Version:** 2.2.1
+**Version:** 2.2.2 — see [CHANGELOG.md](CHANGELOG.md) for what each release changed.

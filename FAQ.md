@@ -96,10 +96,15 @@ Most other settings are **auto-detected**:
 
 **Stage 0:** Edit `stage0/_trace_settings.py` and modify `PER_DATASET`:
 ```python
+# Keep each member's existing keys and add start_date -- do not replace the dict.
+# ❗Dropping `n_workers` from "enhanced" silently returns Stage 0 to the serial,
+# ~4-hour path, because the engine default is n_workers=1.
 PER_DATASET = {
-    "enhanced": dict(),  # Uses default full sample (2002-07-01 to present)
-    "standard": dict(start_date="2023-01-01", data_type="standard"),
-    "144a": dict(start_date="2023-01-01", data_type="144a"),
+    "enhanced": dict(n_workers=WORKERS_OVERRIDE or CONCURRENCY["enhanced"]),
+    "standard": dict(start_date="2024-10-01", data_type="standard",
+                     n_workers=WORKERS_OVERRIDE or CONCURRENCY["standard"]),
+    "144a":     dict(start_date="2002-07-01", data_type="144a",
+                     n_workers=WORKERS_OVERRIDE or CONCURRENCY["144a"]),
 }
 ```
 
@@ -109,18 +114,38 @@ DATE_CUT_OFF = "2023-12-31"  # Only include data through this date
 ```
 
 ### How do I adjust memory usage?
-If you encounter memory errors, reduce `chunk_size` in `stage0/_trace_settings.py`:
+
+Stage 0's memory is driven by two things: how big a chunk is, and how many workers hold
+one at a time.
+
+**Chunk size** — since v2.2.0 chunks are packed to a TRADE-ROW target, not a CUSIP count.
+Lower it in `stage0/_trace_settings.py`:
 
 ```python
-COMMON_KWARGS = {
-    chunk_size = 150,  # Reduce from default 250
-}
+TARGET_ROWS_PER_CHUNK = 400_000    # default 750_000
 ```
 
-Or request more memory in job scripts (`stage0/run_enhanced_trace.sh`, etc.):
-```bash
-#$ -l m_mem_free=16G  # Increase from default
+or for a single run, without editing anything: `STAGE0_TARGET_ROWS=400000 ./run_pipeline.sh`.
+
+(`chunk_size` still exists and still means CUSIPs-per-chunk, but it no longer sizes
+Stage 0's work — it is read by the data-report job for its own chunking. Changing it will
+not affect Stage 0 memory.)
+
+**Worker count** — each worker holds one chunk, so this multiplies the above. Lower
+`CONCURRENCY` in `stage0/_trace_settings.py`, or `STAGE0_WORKERS=3 ./run_pipeline.sh`
+for one run.
+
+**Requesting more memory** is not done in the job scripts. `run_pipeline.sh` computes the
+request per member and passes it on the `qsub` command line, which overrides anything in
+the `.sh`. Change `MEM_PER_SLOT_GB` in `stage0/_trace_settings.py`:
+
+```python
+MEM_PER_SLOT_GB = {"enhanced": 8, "standard": 8, "144a": 16}
 ```
+
+❗`m_mem_free` is charged PER SLOT, so the total is `slots x mem` and must stay within the
+WRDS caps of 8 cores and 48 GB per job. `qsub_resources()` refuses to emit anything over
+them, because an over-request does not error — the job pends forever, silently.
 
 ### Can I disable certain filters?
 Yes! Edit `FILTER_SWITCHES` in `stage0/_trace_settings.py`:
@@ -202,7 +227,7 @@ df <- read_parquet('enhanced/enhanced_20250120.parquet')
 ```
 
 ### What columns are in the output files?
-All datasets (Enhanced, Standard, 144A) have the same column structure:
+All datasets (Enhanced, Standard, 144A) share the same 21-column structure:
 
 **Identifiers**:
 - `cusip_id`: 9-character CUSIP identifier
@@ -217,18 +242,30 @@ All datasets (Enhanced, Standard, 144A) have the same column structure:
 - `prc_lo`: Low price of the day
 - `prc_hi`: High price of the day
 
+**Trade-time metrics** (seconds since midnight):
+- `time_ew`: Equal-weighted mean execution time
+- `time_last`: Execution time of the last trade
+
 **Volume metrics** (in millions):
 - `qvolume`: Par volume
 - `dvolume`: Dollar volume
 
-**Bid/Ask metrics**:
-- `prc_bid`: Customer-side bid (value-weighted)
-- `prc_ask`: Customer-side ask (value-weighted)
+**Bid/Ask metrics** (❗DEALER side -- see the note below):
+- `prc_bid`: Dealer bid, value-weighted (the dealer BUYS here, so the customer sells)
+- `prc_ask`: Dealer ask, value-weighted (the dealer SELLS here, so the customer buys)
+- `bid_last`: Last dealer-bid price of the day
+- `bid_time_ew`: Equal-weighted mean time of dealer-bid trades
+- `bid_time_last`: Time of the last dealer-bid trade
 
 **Count metrics**:
 - `trade_count`: Number of trades
-- `bid_count`: Number of customer buys
-- `ask_count`: Number of customer sells
+- `bid_count`: Number of dealer buys (= customer sells)
+- `ask_count`: Number of dealer sells (= customer buys)
+
+❗**TRACE reports the DEALER's side.** The bid/ask split is
+`rpt_side_cd == 'B'` (dealer buying) and `'S'` (dealer selling), both filtered to
+`cntra_mp_id == 'C'` (the counterparty is a customer). So a customer BUY appears as
+`rpt_side_cd == 'S'`. Getting this backwards is the single commonest TRACE bug.
 
 ### What do the audit files contain?
 Audit files track row counts at each filter stage:
@@ -329,12 +366,13 @@ For detailed instructions, see [QUICKSTART.md](QUICKSTART.md#download-results-to
 ## Troubleshooting
 
 ### My job keeps failing with memory errors
-**Solutions**:
-1. Reduce `chunk_size` in `_trace_settings.py` (try 100 or 150)
-2. Request more memory in shell scripts by adding:
-   ```bash
-   #$ -l m_mem_free=16G
-   ```
+**Solutions** (see "How do I adjust memory usage?" above for detail):
+1. Lower `TARGET_ROWS_PER_CHUNK` in `stage0/_trace_settings.py` — this, not `chunk_size`,
+   is what sizes a Stage 0 chunk.
+2. Lower `CONCURRENCY` for that member; each worker holds a chunk.
+3. Raise `MEM_PER_SLOT_GB`, keeping `slots x mem <= 48 GB`. Do NOT add `#$ -l m_mem_free`
+   to the job scripts — `run_pipeline.sh` passes the request on the command line, which
+   wins.
 
 ### I'm getting "Permission denied" errors
 **Solution**: Make scripts executable:
@@ -385,8 +423,9 @@ python -m pip install --user -r requirements.txt
 
 ### The report generation job (build_reports) never starts
 **Explanation**: This is normal. `./run_pipeline.sh` holds the report job until every
-stage-0 job it submitted completes, and holds Stage 1 until the reports are done. They
-start automatically.
+stage-0 job it submitted completes. Stage 1 does NOT wait for the reports — since v2.2.2
+it holds on the stage-0 data jobs and runs alongside the report job, because it reads
+only the member panels and the FISD file, never anything the reports produce.
 
 Not to be confused with `qw` **without** the `h`: that means the job is queued but not
 held, and if it stays there the resource request is the thing to check. Stage 0 asks for
@@ -474,13 +513,12 @@ DIRECTORY  USED / LIMIT
 ### How can I make processing faster?
 **Options**:
 
-1. **Increase chunk size** (if you have enough memory):
+1. **Increase chunk size** (if you have enough memory) — fewer, larger chunks:
    ```python
-   COMMON_KWARGS = {
-       chunk_size = 400,
-       ...
-   }
+   TARGET_ROWS_PER_CHUNK = 1_500_000   # default 750_000
    ```
+   Or raise `CONCURRENCY` to pull more chunks at once, within the WRDS connection
+   ceiling of 7 held simultaneously (`tests/probe_wrds_connections.py` measures it).
 
 2. **Disable Stage 0 error plot generation** (saves 30-60 minutes):
    - Set `STAGE0_OUTPUT_FIGURES = False` in `config.py`

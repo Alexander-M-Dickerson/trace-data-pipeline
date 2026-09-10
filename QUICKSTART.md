@@ -96,11 +96,15 @@ source venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
-**Required packages for Stage 1:**
-- pandas==2.2.3, numpy==2.2.5, wrds, pyarrow, tqdm
-- QuantLib==1.37 (required version)
-- joblib==1.5.1 (required version)
-- openpyxl, requests, matplotlib
+**Required packages for Stage 1** (minimums, from `requirements.txt`):
+- pandas>=2.2.3, numpy>=2.0, pyarrow>=20.0.0, wrds>=3.3.0, tqdm
+- QuantLib>=1.36, joblib>=1.4
+- openpyxl, requests, matplotlib>=3.8.0
+
+❗Do **not** pin these to exact versions on the WRDS Cloud. `--user` installs shadow the
+system packages, and WRDS already ships newer ones than any pin here (numpy 2.4.6,
+pyarrow 24.0.0 on Python 3.14) — pinning downgrades a working environment. Use
+`requirements.txt`, which states minimums.
 
 ---
 
@@ -335,9 +339,9 @@ chmod 600 ~/.pgpass
 
 ### "ModuleNotFoundError: No module named 'QuantLib'"
 
-**Fix:** Install QuantLib 1.37 specifically
+**Fix:** Install QuantLib (`requirements.txt` asks for `>=1.36`)
 ```bash
-pip install --user QuantLib==1.37
+pip install --user QuantLib
 ```
 
 ---
@@ -402,10 +406,14 @@ trace-data-pipeline/
 ├── README.md                        # Detailed documentation
 ├── QUICKSTART.md                    # This file
 │
+├── FAQ.md                           # Common questions
+│
 ├── tests/                           # Run before you commit
 │   ├── smoke_assertions.py          # The 28 cross-stage invariants
 │   ├── test_chunk_plan.py           # No WRDS needed
 │   ├── test_chunk_scheduler.py      # No WRDS needed
+│   ├── test_merge_keys.py           # No WRDS needed by default
+│   ├── test_docs.py                 # No WRDS needed
 │   └── probe_wrds_connections.py    # Measures your connection ceiling
 │
 ├── stage0/                          # TRACE data extraction

@@ -403,13 +403,14 @@ from _trace_settings import DS_PARAMS
 df_raw = pd.read_parquet("trace_enhanced_20240115_raw.parquet")
 
 # Apply decimal shift corrector (returns cleaned data + audit info)
+# DS_PARAMS already carries output_type="cleaned". Passing it explicitly AND
+# splatting the dict raises TypeError: got multiple values for 'output_type'.
 df_clean, n_corrected, affected_cusips = decimal_shift_corrector(
     df_raw,
     id_col="cusip_id",
     date_col="trd_exctn_dt",
     time_col="trd_exctn_tm",
     price_col="rptd_pr",
-    output_type="cleaned",
     **DS_PARAMS
 )
 
