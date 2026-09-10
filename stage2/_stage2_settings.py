@@ -157,7 +157,13 @@ BBW_EXTENDED_ZIPKEY = "bbw_factors_extended_1973_2023.parquet"
 # Public factor sources (used when FACTOR_SOURCE == "public").
 FF5_URL = ("https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/"
            "F-F_Research_Data_5_Factors_2x3_CSV.zip")
+# He-Kelly-Manela publish under a dated filename and change it each release. The fetcher
+# uses this URL while it is live and otherwise discovers the current one from HKM_INDEX.
+# Note: as of 2026-09-10 the authors had not published past 2025-05, so `b_cptlt`
+# legitimately stops there on a later panel -- that is upstream, not a broken link.
 HKM_URL = "https://zhiguohe.net/wp-content/uploads/2025/07/He_Kelly_Manela_Factors_monthly_250627.csv"
+HKM_INDEX = ("https://zhiguohe.net/data-and-empirical-patterns/"
+             "intermediary-capital-ratio-and-risk-factor/")
 # Ludvigson rotates the zip filename on every update, so the fetcher tries this URL and
 # then discovers the current link from the index page.
 LUDVIGSON_URL = "https://www.sydneyludvigson.com/s/MacroFinanceUncertainty_202508Update.zip"

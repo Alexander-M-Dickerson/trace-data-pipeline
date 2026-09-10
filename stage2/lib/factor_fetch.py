@@ -194,7 +194,39 @@ def fetch_intermediary_capital(force: bool = False) -> pd.DataFrame:
             "intermediary_capital_risk_factor": "cptl",
             "intermediary_value_weighted_investment_return": "cptlt"})
         return df[["date", "cptl", "cptlt"]].sort_values("date").reset_index(drop=True)
-    return _cached("hkm_intermediary", cfg.HKM_URL, build, force)
+    return _cached("hkm_intermediary", _hkm_url(), build, force)
+
+
+def _hkm_url() -> str:
+    """The current He-Kelly-Manela monthly-factor URL.
+
+    The authors publish under a DATED filename (..._250627.csv) and change it on each
+    release, so a hard-coded URL silently pins the panel to an old vintage -- and because
+    a factor series that stops short truncates every beta estimated on it, that shows up
+    as columns dying early rather than as an error. Same discovery approach as Ludvigson:
+    use the configured URL while it is live, otherwise find the current one on the data
+    page.
+
+    As of 2026-09-10 the configured URL IS the current one -- the authors have not
+    published past 2025-05, so `b_cptlt` legitimately lags a later frontier.
+    """
+    import requests
+    try:
+        r = requests.head(cfg.HKM_URL, timeout=60, allow_redirects=True)
+        if r.status_code == 200:
+            return cfg.HKM_URL
+    except requests.RequestException:
+        pass
+    from urllib.parse import urljoin
+    html = _get(cfg.HKM_INDEX).decode("utf-8", errors="replace")
+    m = re.search(r'href="([^"]*He_Kelly_Manela_Factors_monthly[^"]*\.csv[^"]*)"', html)
+    if not m:
+        raise FileNotFoundError(
+            f"He-Kelly-Manela monthly factor CSV not found on {cfg.HKM_INDEX}. "
+            f"The configured HKM_URL is also unreachable. Update HKM_URL by hand.")
+    url = urljoin(cfg.HKM_INDEX, m.group(1))
+    print(f"[factor_fetch] HKM vintage rotated; discovered {url}")
+    return url
 
 
 def _ludvigson_url() -> str:
