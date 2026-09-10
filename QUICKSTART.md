@@ -184,8 +184,8 @@ ls -lh stage0/144a/trace_144a_*.parquet
 ls -lh stage1/data/stage1_*.parquet
 
 # Data quality reports
-ls stage0/enhanced/reports/
-ls stage1/data/reports/
+ls stage0/data_reports/enhanced/
+ls stage1/data_reports/
 ```
 
 **Expected output structure:**
@@ -389,7 +389,7 @@ After the pipeline completes:
 
 1. **Explore your data**: Load `stage1_YYYYMMDD.parquet` into pandas/R
 2. **Read detailed docs**: See `README.md` for variable definitions
-3. **Check data quality**: Review reports in `stage1/data/reports/`
+3. **Check data quality**: Review reports in `stage1/data_reports/`
 4. **Customize filters**: Edit `stage1/_stage1_settings.py` for custom filters
 5. **Run incrementally**: Re-run Stage 1 with different settings without re-running Stage 0
 

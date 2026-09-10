@@ -240,7 +240,7 @@ sed -i 's/\r$//' run_stage1.sh
 
 **On WRDS Cloud (SGE):**
 ```bash
-qsub run_stage1.sh
+qsub stage1/run_stage1.sh   # from the repo ROOT
 ```
 
 **On local machine or Mac:**
@@ -329,7 +329,7 @@ The pipeline executes 10 steps in sequence:
 - Generates comprehensive LaTeX data quality report
 - Creates summary statistics tables
 - Produces time-series figures (if enabled)
-- Outputs saved to `data/reports/`
+- Outputs saved to `stage1/data_reports/` (the distressed report goes to `stage1/data/data_reports/`)
 
 ---
 
@@ -367,10 +367,16 @@ N_CHUNKS = 2   # Number of chunks for parallel operations
 ### Output Settings
 
 ```python
-OUTPUT_FORMAT = "parquet"      # Options: "parquet" (recommended), "csv"
-GENERATE_REPORTS = True        # Generate LaTeX data quality reports
-OUTPUT_FIGURES = True          # Generate time-series figures (can be slow)
+OUTPUT_FORMAT = "parquet"      # imported from the shared config.py
 ```
+
+❗**There are no `GENERATE_REPORTS` or `OUTPUT_FIGURES` knobs.** `_stage1_settings.py`
+says so directly: *"Stage 1 always generates comprehensive reports and figures. These
+outputs are essential for data quality assessment and cannot be disabled."* Setting
+either name does nothing.
+
+❗**`OUTPUT_FORMAT = "csv"` is accepted by `validate_config` and then ignored** --
+`save_outputs` always writes Parquet. Treat the format as fixed.
 
 ### Yield Data Configuration
 
@@ -431,7 +437,7 @@ Submit to Sun Grid Engine:
 
 ```bash
 cd ~/proj/stage1
-qsub run_stage1.sh
+qsub stage1/run_stage1.sh   # from the repo ROOT
 ```
 
 Monitor job:
@@ -586,7 +592,7 @@ fall into each scheme's "Other" bucket, so these are never null):
 
 ### Reports (if generated)
 
-**Location:** `data/reports/`
+**Location:** `stage1/data_reports/` -- figures and `time_series_data/*.csv` sit in that same directory, not a `figures/` subfolder
 
 **Files:**
 - `stage1_data_report.tex` - LaTeX source for data quality report
@@ -601,11 +607,11 @@ fall into each scheme's "Other" bucket, so these are never null):
 
 Compile the LaTeX report:
 ```bash
-cd data/reports
-pdflatex stage1_data_report.tex
+cd stage1/data_reports
+pdflatex stage1_data_report_<STAMP>.tex   # the file carries the run stamp
 bibtex stage1_data_report
-pdflatex stage1_data_report.tex
-pdflatex stage1_data_report.tex
+pdflatex stage1_data_report_<STAMP>.tex   # the file carries the run stamp
+pdflatex stage1_data_report_<STAMP>.tex   # the file carries the run stamp
 ```
 
 ---
@@ -799,7 +805,7 @@ WRDS_USERNAME = os.getenv("WRDS_USERNAME", "your_wrds_id")
 Submit with SGE from the `stage1/` directory:
 ```bash
 cd ~/proj/stage1
-qsub run_stage1.sh
+qsub stage1/run_stage1.sh   # from the repo ROOT
 ```
 
 ### Mac
@@ -929,19 +935,18 @@ Or request more memory on WRDS:
 **Pipeline is very slow**
 
 Solutions:
-1. Disable report generation:
-   ```python
-   GENERATE_REPORTS = False
-   ```
+1. Reports and figures cannot be disabled -- see Output Settings above. The knobs that
+   do exist are the chunk count and the worker count.
 
-2. Disable figure generation:
-   ```python
-   OUTPUT_FIGURES = False
-   ```
+2. Raise `N_CHUNKS` to lower peak memory (the default is 10; a SMALLER number makes each
+   chunk bigger, which is the opposite of what you want under memory pressure).
 
-3. Increase parallel cores (if you have memory):
+3. Leave `N_CORES` alone unless you know better. It defaults to `None`, which resolves
+   from `$NSLOTS` -- the slots Grid Engine actually granted, currently 4. Setting it
+   explicitly skips that resolution entirely, so `N_CORES = 20` would start 20 joblib
+   workers inside a 4-slot, 40 GB allocation:
    ```python
-   N_CORES = 20
+   N_CORES = None   # recommended: follow the grant
    ```
 
 4. Process fewer TRACE datasets:
@@ -976,21 +981,10 @@ OUTPUT_FORMAT = "parquet"  # Recommended: 10x smaller and faster than CSV
 
 ### Report Generation
 
-```python
-GENERATE_REPORTS = True   # Full LaTeX reports with all tables
-OUTPUT_FIGURES = True     # Time-series plots (can add 30+ minutes)
-```
-
-Disable reports for faster processing:
-```python
-GENERATE_REPORTS = False
-```
-
-Or generate reports without figures:
-```python
-GENERATE_REPORTS = True
-OUTPUT_FIGURES = False  # Tables only, no plots
-```
+Stage 1 always writes its LaTeX report, its tables and its time-series figures. This is
+deliberate and there is no switch -- `_stage1_settings.py` calls them *"essential for
+data quality assessment"*. (Stage 0's figures **can** be turned off, with
+`STAGE0_OUTPUT_FIGURES` in the root `config.py`; that is a different stage.)
 
 ---
 

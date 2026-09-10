@@ -443,24 +443,33 @@ Both `create_daily_enhanced_trace.py` and `create_daily_standard_trace.py`:
 
 1. **Connect to WRDS** and establish database connection
 2. **Filter FISD universe** based on configured parameters (USD only, fixed-rate, non-convertible, etc.)
-3. **Chunk CUSIPs** into batches (default 250 CUSIPs per chunk)
-4. **For each chunk:**
-   - Fetch intraday TRACE rows from WRDS
-   - Apply Dick-Nielsen filters (cancellations, corrections, reversals)
-   - Apply agency de-duplication (if enabled)
-   - Run decimal-shift corrector to fix multiplicative price errors
-   - Apply bounce-back filter to flag erroneous price spikes
-   - Filter by trading time (if enabled)
-   - Filter by trading calendar (if enabled)
-   - Apply price range filters (> 0, <= 1000)
-   - Apply volume filters (dollar or par-based)
-   - Filter yield != price trades
-   - Filter trades where volume exceeds 50% of offering amount
-   - Filter trades where execution date > maturity date
-   - Aggregate to daily (cusip_id, trd_exctn_dt) panels
-5. **Concatenate all chunks** and export to Parquet format
-6. **Generate audit logs** with row counts for each filter stage
-7. **Export CUSIP lists** of bonds affected by decimal-shift and bounce-back corrections
+3. **Plan the chunks** by packing CUSIPs to `target_rows_per_chunk` trade rows
+   (default 750,000). `chunk_size` (250 CUSIPs) is only the fallback, used when the
+   row-count query is unavailable.
+4. **For each chunk** — several at once, one WRDS connection per worker. The filters run
+   in this order, and the numbering matches the `# Filter N:` comments in the source:
+
+   | # | Filter | What it does |
+   |---|---|---|
+   | 0 | price-scale normalization | rescales unit-quoted bonds to percent of par (a no-op under the default FISD screen) |
+   | 1 | Dick-Nielsen | cancellations, corrections, reversals, and agency de-duplication |
+   | 2 | decimal-shift corrector | fixes multiplicative price errors (10x, 0.1x, 100x, 0.01x) |
+   | 3 | trading time | intraday window — **off by default** |
+   | 4 | trading calendar | drops non-session dates |
+   | 5 | price range | `> 0` and `<= 1000` |
+   | 6 | trading volume | dollar or par threshold |
+   | 7 | **bounce-back** | flags price spikes that revert — runs AFTER the volume filter, not before |
+   | 8 | yield != price | drops rows where the reported yield equals the price |
+   | 9 | amount outstanding | drops volume above 50% of the offering amount |
+   | 10 | execution date vs maturity | drops trades after maturity |
+   | 11 | **initial price error** | flags implausible opening prints |
+
+   then aggregate to a daily `(cusip_id, trd_exctn_dt)` panel.
+5. **Reassemble the chunks in order**, sort canonically by `(cusip_id, trd_exctn_dt)`,
+   and export to Parquet.
+6. **Generate audit logs** with row counts for each filter stage.
+7. **Export CUSIP lists** for the decimal-shift, bounce-back and initial-price-error
+   filters (three files, one per filter).
 
 ---
 
@@ -524,6 +533,11 @@ All filters are boolean toggles:
 - `yld_price_filter`: Remove rows where yield = price (default: `True`)
 - `amtout_volume_filter`: Remove trades > 50% of offering amount (default: `True`)
 - `trd_exe_mat_filter`: Remove trades after maturity date (default: `True`)
+- `flag_initial_price_errors`: Flag implausible opening prints (default: `True`)
+
+❗All ELEVEN keys must be present in any `FILTER_SWITCHES` you write. They are read with
+a hard subscript, so an omitted key is a `KeyError` inside every chunk, not a default.
+`trading_time` is the only one off by default.
 
 ### Decimal-Shift Corrector Parameters (`DS_PARAMS`)
 
@@ -539,6 +553,20 @@ Fine-tune the decimal shift correction algorithm:
 - `par_snap`: Enable relaxed acceptance near par=100 - `True`
 - `par_band`: Proximity band around par - `15.0`
 - `output_type`: `"cleaned"` to apply corrections, `"uncleaned"` for audit only
+
+### Initial-Price-Error Parameters (`INIT_ERROR`)
+
+The last filter in the cascade. It looks at each bond's FIRST few prints and flags them
+when the price then moves sharply — the pattern of a bond whose opening marks were
+placeholders rather than trades.
+
+- `abs_change`: the price move, in points of par, that marks the earlier prints as
+  errors — `50.0`
+- `n_transactions`: how many opening prints to examine — `3`
+
+Flagged rows are dropped, and the affected CUSIPs are written to
+`init_price_cusips_{dtype}_{stamp}.parquet` for the data report, which draws them as the
+`_ie` figure pages.
 
 ### Bounce-Back Filter Parameters (`BB_PARAMS`)
 
@@ -603,8 +631,8 @@ stage0/
 │   ├── 02_standard.err
 │   ├── 03_144a.out
 │   ├── 03_144a.err
-│   ├── 04_reports.out
-│   └── 04_reports.err
+│   ├── _data_reports.out
+│   └── _data_reports.err
 │
 ├── enhanced/                    # Enhanced TRACE data outputs
 │   ├── trace_enhanced_YYYYMMDD.parquet
@@ -657,7 +685,7 @@ data/
 - `01_enhanced.out`, `01_enhanced.err`: Enhanced TRACE job logs
 - `02_standard.out`, `02_standard.err`: Standard TRACE job logs
 - `03_144a.out`, `03_144a.err`: 144A TRACE job logs
-- `04_reports.out`, `04_reports.err`: Report generation logs (when using `run_pipeline.sh`)
+- `_data_reports.out`, `_data_reports.err`: Report generation logs
 - Logs contain timestamps, row counts, filter statistics, and any errors
 
 **Daily panels** (Parquet format, in respective subfolders):
@@ -676,9 +704,20 @@ All panels have identical column structure:
 - `drr_filters_audit_{dtype}_{date}.parquet`: Dickerson-Rossetti-Robotti filter audit
 - `fisd_filters_{dtype}_{date}.parquet`: FISD universe construction audit
 
-**CUSIP lists** (Parquet format, in respective subfolders):
-- `bounce_back_cusips_{dtype}_{date}.parquet`: CUSIPs with bounce-back flags
-- `decimal_shift_cusips_{dtype}_{date}.parquet`: CUSIPs with decimal-shift corrections
+**CUSIP lists** (Parquet format, in respective subfolders) -- one per corrector, and
+the data report draws a figure family from each:
+- `bounce_back_cusips_{dtype}_{date}.parquet`: CUSIPs with bounce-back flags (`_bb` pages)
+- `decimal_shift_cusips_{dtype}_{date}.parquet`: CUSIPs corrected by the decimal-shift
+  corrector (`_ds` pages)
+- `init_price_cusips_{dtype}_{date}.parquet`: CUSIPs with flagged opening prints
+  (`_ie` pages)
+
+**Also written, and easy to miss because they match neither wildcard above:**
+- `trace_enhanced_fisd_{date}.parquet` (Enhanced) / `trace_fisd_{dtype}_{date}.parquet`
+  -- the screened FISD universe. ❗**Stage 1 reads the Enhanced one**, so it is an input
+  to the next stage, not just an artifact.
+- `cusip_row_counts_{date}.parquet` -- the per-CUSIP row counts behind the chunk
+  packing, cached so a re-run does not repeat the ~93 s aggregate.
 
 ### Downloading outputs
 

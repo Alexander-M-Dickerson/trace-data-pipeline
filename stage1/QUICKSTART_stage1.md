@@ -143,15 +143,10 @@ pwd  # Verify your current location
 qsub stage1/run_stage1.sh
 ```
 
-**Option B - Run from stage1 directory:**
-
-```bash
-# Navigate to stage1 directory
-cd stage1
-
-# Submit the job
-qsub run_stage1.sh
-```
+❗**Submit from the repo ROOT, never from `stage1/`.** `run_stage1.sh` declares
+`#$ -o stage1/logs/stage1.out` and then does `cd stage1`, all resolved against `-cwd`.
+Submitted from inside `stage1/`, the log path becomes `stage1/stage1/logs/` — which does
+not exist, so Grid Engine parks the job in `Eqw` — and the `cd` fails too.
 
 **What happens:**
 1. Loads treasury yields (Liu-Wu zero-coupon curve)
@@ -362,8 +357,8 @@ Most settings are automatically configured. Only customize if needed.
 | `TRACE_MEMBERS` | TRACE datasets to include | `["enhanced", "standard", "144a"]` | Customizable |
 | `DATE_CUT_OFF` | Latest date to include | `"2025-03-31"` | Customizable |
 | `N_CORES` | CPU cores for parallel processing | Auto-detected | ✅ Auto-detected |
-| `GENERATE_REPORTS` | Create LaTeX reports | `True` | Customizable |
-| `OUTPUT_FIGURES` | Create time-series figures | `True` | Customizable |
+| ~~`GENERATE_REPORTS`~~ | does not exist -- reports always run | — | — |
+| ~~`OUTPUT_FIGURES`~~ | does not exist -- figures always run | — | — |
 
 **Notes:**
 - **WRDS_USERNAME**: Set in `config.py` (root directory)
@@ -393,21 +388,19 @@ Most settings are automatically configured. Only customize if needed.
 
 ### "Unable to read script file"
 
-**Problem:** `qsub run_stage1.sh` says "No such file or directory"
+**Problem:** `qsub stage1/run_stage1.sh` says "No such file or directory"
 
 **Solution:** You're in the wrong directory. Either:
 
 **Option 1 - Run from root directory:**
 ```bash
-cd ~/proj  # Your root directory
-qsub stage1/run_stage1.sh  # Specify full path
+cd ~/trace-data-pipeline          # the repo ROOT
+qsub stage1/run_stage1.sh
 ```
 
-**Option 2 - Navigate to stage1:**
-```bash
-cd ~/proj/stage1
-qsub run_stage1.sh
-```
+❗There is no "navigate into stage1" alternative. The script's `#$ -o stage1/logs/...`
+and its `cd stage1` are both resolved from the submit directory, so it only works from
+the root. `run_pipeline.sh` submits it exactly this way.
 
 ---
 
