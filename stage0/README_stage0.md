@@ -789,7 +789,8 @@ Or use your favorite LaTeX editor (TeXShop, TeXstudio, Overleaf, etc.).
   - `trace_enhanced` - running or queued, 5 slots
   - `trace_144a` - running or queued, 1 slot
   - `build_reports` - `hqw` until both finish
-  - `stage1_pipeline` - `hqw` until the reports finish
+  - `stage1_pipeline` - `hqw` until the DATA jobs finish, then runs alongside
+    `build_reports` (it does not read anything the reports produce)
 
   Add `standard` to `TRACE_MEMBERS` and a fifth appears, itself held behind the other
   two rather than running beside them.
@@ -804,7 +805,8 @@ Or use your favorite LaTeX editor (TeXShop, TeXstudio, Overleaf, etc.).
     day — measured 4.5x on the chunk loop itself.
   - Standard TRACE (from 2024): 30-60 minutes, and opt-in
   - Rule 144A (full sample): 30-60 minutes
-  - Data reports (with figures): 30-60 minutes per dataset
+  - Data reports (with figures): was ~50 minutes for Enhanced; since v2.2.2 its
+    re-clean pulls 5 chunks at once (~9 min), and the job no longer blocks stage 1
 
 - **Disk space**: Enhanced TRACE generates ~30M rows. Parquet files are compressed and typically 500MB-1GB per dataset. CSV files are much larger.
 

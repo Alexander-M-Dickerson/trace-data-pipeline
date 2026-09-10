@@ -79,6 +79,7 @@ PLOT_STYLE = HLP.PlotParams(
 # Imports
 # ---------------------------
 import argparse
+import os
 import sys
 import logging
 from datetime import datetime, timedelta
@@ -266,6 +267,17 @@ def _bootstrap_auditors(dtype: str):
             SDT.ct_audit_records = []
         if not hasattr(SDT, "fisd_audit_records"):
             SDT.fisd_audit_records = []
+
+def _reports_workers() -> int:
+    """How many chunks the Enhanced report re-clean pulls at once."""
+    try:
+        from _trace_settings import reports_workers
+        return reports_workers()
+    except Exception:
+        logging.warning("Could not read reports_workers() from _trace_settings; "
+                        "falling back to serial.")
+        return 1
+
 
 def _shift_date(tag: str, delta_days: int) -> str:
     # tag must be YYYYMMDD
@@ -618,7 +630,12 @@ def main():
                 if len(cusips_union) == 0:
                     logging.warning("[%s] No CUSIPs in union. Skipping figure build.", dtype)
                 else:
-                    chunk_size   = int(cfg.get("chunk_size", 250))
+                    # STAGE0_REPORT_CHUNK_SIZE exists so the smoke test can force the
+                    # flagged universe into SEVERAL chunks. Without it a small run yields
+                    # one chunk, run_chunks takes its serial path, and the concurrent
+                    # path is never executed -- a harness that goes green without ever
+                    # reaching the code it is meant to cover.
+                    chunk_size   = int(os.environ.get("STAGE0_REPORT_CHUNK_SIZE", "0"))                                    or int(cfg.get("chunk_size", 250))
                     cusip_chunks = _split_into_chunks(cusips_union, n=chunk_size)
 
                     # For Enhanced - avoid loading too much data
@@ -666,8 +683,30 @@ def main():
                     # Memory tracking: before error_checks
                     mem_before_error_checks = log_memory_usage(f"{dtype}_before_error_checks")
 
-                    logging.info("[%s] Starting clean_trace_data() on restricted CUSIP universe .", dtype)
+                    logging.info("[%s] Starting error_checks() on the restricted CUSIP universe .", dtype)
                     if dtype == 'enhanced':
+                        # Enhanced ONLY is parallelised. Measured on the 2026-09-09 run,
+                        # this loop was 45.5 of the report job's 50.9 minutes -- 83% of it
+                        # clean rather than fetch, and linear in rows (0.092 ms/row,
+                        # correlation 0.991). It is the same work stage 0 does, at the same
+                        # per-worker rate, done one chunk at a time. 144A's equivalent takes
+                        # 19 SECONDS, so its engine is deliberately left serial.
+                        n_workers = _reports_workers()
+                        if n_workers > 1:
+                            # Close the parent's connection BEFORE the pool forks: a
+                            # psycopg2 socket shared across a fork corrupts the protocol
+                            # quietly, and a connection the parent no longer needs is one a
+                            # worker cannot have. error_checks is the last thing that needs
+                            # it for this dtype; the lazy re-open above covers the next.
+                            try:
+                                db.close()
+                            except Exception:
+                                pass
+                            db = None
+                            logging.info("[%s] Closed the parent WRDS connection; "
+                                         "pulling %d chunks across %d workers.",
+                                         dtype, len(cusip_chunks), n_workers)
+
                         dfds, dfbb, dfie, bb_cusips_all, dec_shift_cusips_all, init_price_cusips_all = EDT.error_checks(
                             db=db,
                             cusip_chunks=cusip_chunks,
@@ -680,6 +719,8 @@ def main():
                             bb_params=cfg.get("bb_params", {}),
                             init_error_params=cfg.get("init_error_params", {}),
                             filters=filters,
+                            n_workers=n_workers,
+                            wrds_username=wrds_user_eff,
                         )
                     else:
                         dfds, dfbb, dfie, bb_cusips_all, dec_shift_cusips_all, init_price_cusips_all = SDT.error_checks(

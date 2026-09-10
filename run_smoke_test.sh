@@ -20,6 +20,7 @@
 #   ./run_smoke_test.sh --chunks 2           # faster
 #   ./run_smoke_test.sh --members "enhanced 144a"
 #   ./run_smoke_test.sh --with-reports       # also exercise the data-report job
+#   ./run_smoke_test.sh --with-figures       # ...INCLUDING its re-clean and figures
 #
 # On the WRDS Cloud this must be SUBMITTED, not run on the login node -- CPU- and
 # memory-intensive work is not permitted on the head nodes:
@@ -63,6 +64,7 @@ ROOT="${REPO}/smoke"
 CHUNKS=5
 MEMBERS=""
 WITH_REPORTS=0
+WITH_FIGURES=0
 # Production packs chunks to ~750k trade rows. That is the right size for a real run
 # and far too big for a smoke run, where the point is to exercise every code path
 # quickly. Pack small instead: the packing logic is still exercised, the volume is not.
@@ -75,6 +77,7 @@ while [[ $# -gt 0 ]]; do
         --root)         ROOT="$2";   shift 2 ;;
         --members)      MEMBERS="$2"; shift 2 ;;
         --with-reports) WITH_REPORTS=1; shift ;;
+        --with-figures) WITH_REPORTS=1; WITH_FIGURES=1; shift ;;
         -h|--help)      sed -n '13,34p' "${BASH_SOURCE[0]}"; exit 0 ;;
         *) echo "[error] unknown option: $1"; exit 2 ;;
     esac
@@ -98,8 +101,20 @@ export STAGE0_LIMIT_CHUNKS="${CHUNKS}"
 export STAGE0_TARGET_ROWS="${TARGET_ROWS}"
 [[ -n "${MEMBERS}" ]] && export TRACE_MEMBERS="${MEMBERS}"
 
-# Figures are the slowest part of stage0 and prove nothing about the cross-stage seams.
-export STAGE0_OUTPUT_FIGURES=0
+# Figures are the slowest part of stage0 and prove nothing about the cross-stage seams,
+# so they are off by default.
+#
+# ❗But the report job's error_checks -- the re-clean that this harness is otherwise
+# blind to -- sits INSIDE `if STAGE0_OUTPUT_FIGURES:`. With figures off, --with-reports
+# goes green having executed none of it. --with-figures turns it on AND forces the
+# flagged universe into several small chunks, so the concurrent path actually runs.
+if [[ ${WITH_FIGURES} -eq 1 ]]; then
+    export STAGE0_OUTPUT_FIGURES=1
+    export STAGE0_REPORT_CHUNK_SIZE="${STAGE0_REPORT_CHUNK_SIZE:-3}"
+    export STAGE0_REPORT_WORKERS="${STAGE0_REPORT_WORKERS:-3}"
+else
+    export STAGE0_OUTPUT_FIGURES=0
+fi
 
 MEMBER_LIST=$("${PY}" -c "import sys; sys.path.insert(0, '${REPO}'); from config import TRACE_MEMBERS; print(' '.join(TRACE_MEMBERS))") || {
     echo "[error] could not read TRACE_MEMBERS from config.py"; exit 1; }
@@ -113,6 +128,7 @@ echo " members       : ${MEMBER_LIST}"
 echo " chunks/member : ${CHUNKS}"
 echo " rows/chunk    : ${TARGET_ROWS} (production packs to 750000)"
 echo " data reports  : $([[ ${WITH_REPORTS} -eq 1 ]] && echo yes || echo 'skipped (--with-reports to include)')"
+echo " report figures: $([[ ${WITH_FIGURES} -eq 1 ]] && echo "yes (chunk_size=${STAGE0_REPORT_CHUNK_SIZE}, workers=${STAGE0_REPORT_WORKERS})" || echo 'skipped (--with-figures exercises error_checks)')"
 echo "================================================================"
 
 # ---------------------------------------------------------------- scratch root

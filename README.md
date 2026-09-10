@@ -175,7 +175,9 @@ This runs the real Stage 0 → Stage 1 code on a handful of CUSIP chunks and ass
    144A, which run at the same time. Standard is opt-in and, when requested, is held
    until the other two finish so it can use the whole WRDS connection budget.
 3. **Stage 0 Reports**: auto-generates when every submitted TRACE job completes.
-4. **Stage 1**: auto-starts after Stage 0 reports finish.
+4. **Stage 1**: auto-starts as soon as the Stage 0 *data* is ready, and runs
+   ALONGSIDE the report job rather than behind it — it reads the member panels and
+   the FISD file, nothing the reports produce.
 
 **Automated features:**
 - ✅ Data downloads (no manual wget required)

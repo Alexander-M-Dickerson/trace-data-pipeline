@@ -143,6 +143,23 @@ CONCURRENCY = {
 }
 
 
+# The data-report job re-runs the filters over the FLAGGED CUSIPs to draw the figures.
+# It runs AFTER the stage0 data jobs (which have released their connections) but now
+# ALONGSIDE stage 1, which holds one -- so 5 here plus stage 1's 1 is 6 against the
+# measured ceiling of 7, the same one spare the stage0 phase leaves.
+#
+# Only Enhanced is parallelised: measured 2026-09-09, its report loop was 45.5 of the
+# job's 50.9 minutes while 144A's took 19 seconds.
+REPORTS_CONCURRENCY = 5
+
+
+def reports_workers() -> int:
+    """Workers for the report job's Enhanced re-clean. STAGE0_REPORT_WORKERS overrides."""
+    import os as _os
+    n = int(_os.environ.get("STAGE0_REPORT_WORKERS", "0")) or REPORTS_CONCURRENCY
+    return max(1, min(int(n), MAX_WRDS_CONNECTIONS - 2))   # leave stage 1 one, plus a spare
+
+
 def validate_connection_budget(members) -> None:
     """Fail at submit time, not four hours into a run, if the budget is over the cap.
 

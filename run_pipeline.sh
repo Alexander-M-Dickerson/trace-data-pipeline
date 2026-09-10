@@ -198,11 +198,23 @@ HOLD_STAGE0=$(IFS=,; echo "${STAGE0_IDS[*]}")
 echo "[submit] Build data reports (waits for ${HOLD_STAGE0}) ..."
 J4=$(qsub -terse -N build_reports -hold_jid "${HOLD_STAGE0}" stage0/run_build_data_reports.sh)
 
-# Stage 1: daily aggregation, once the reports are ready.
+# Stage 1: daily aggregation, as soon as the stage-0 DATA is ready.
+#
+# It holds on the stage-0 jobs, NOT on the report job, so the reports and stage 1 run
+# side by side. Stage 1 does not read anything the reports produce -- it reads exactly
+# two paths, stage0/<member>/trace_<member>_<stamp>.parquet and
+# stage0/enhanced/trace_enhanced_fisd_<stamp>.parquet (stage1_pipeline.py:267 and :424).
+# The data_reports directory stage 1 refers to is its OWN. Chaining it behind the
+# reports put ~50 minutes of report generation on the critical path for nothing.
+#
+# The two overlap safely: the stage-0 jobs have released their WRDS connections by then,
+# so the reports (up to 5) plus stage 1 (1) sit at 6 against the measured ceiling of 7 --
+# the same one spare the stage-0 phase leaves. They write to separate trees and both read
+# stage 0's parquet read-only.
 echo ""
 echo "=== STAGE 1: Daily Aggregation & Analytics ==="
-echo "[submit] Stage 1 pipeline (waits for stage0 reports) ..."
-J5=$(qsub -terse -N stage1_pipeline -hold_jid "${J4}" stage1/run_stage1.sh)
+echo "[submit] Stage 1 pipeline (waits for stage0 data; runs alongside the reports) ..."
+J5=$(qsub -terse -N stage1_pipeline -hold_jid "${HOLD_STAGE0}" stage1/run_stage1.sh)
 
 # Stage 2: (Future placeholder)
 # echo ""

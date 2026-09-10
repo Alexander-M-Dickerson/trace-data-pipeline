@@ -18,6 +18,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.2.2] - 2026-09-10
+
+The data-report job took 50.9 minutes of the 2026-09-09 run. Investigating whether its
+WRDS pulls could be sped up found that the pulls were 17% of it, and that the job did
+not need to be on the critical path at all.
+
+### Changed
+- **Stage 1 no longer waits for the data reports.** It holds on the stage-0 data jobs,
+  so the reports run ALONGSIDE it instead of before it. Stage 1 never read anything the
+  report job produces -- it reads exactly two paths, the member panels and the FISD file
+  (`stage1_pipeline.py:267` and `:424`); the `data_reports` it refers to is its own. That
+  chain put ~51 minutes on the wall clock for nothing. The two overlap safely: the
+  stage-0 jobs have released their connections by then, so the reports (5) plus stage 1
+  (1) sit at 6 against the measured ceiling of 7.
+- **The Enhanced report re-clean now pulls 5 chunks at once**, on the same scheduler and
+  connection pool stage 0 uses (`REPORTS_CONCURRENCY`, `STAGE0_REPORT_WORKERS` to
+  override). Measured: that loop was 45.5 of the job's 50.9 minutes, 83% of it clean
+  rather than fetch, at 0.092 ms/row with a 0.991 correlation to row count -- the same
+  work stage 0 does at the same per-worker rate, done one chunk at a time. A packing
+  simulation over the 46 real chunk times gives 9.2 min at 5 workers (4.9x), matching
+  what stage 0 measured. **144A's report clean is left serial on purpose: it takes 19
+  seconds.**
+- `stage0/run_build_data_reports.sh` asks for `-pe onenode 5 -l m_mem_free=8G` (40 GB)
+  rather than 32 GB on one slot. Measured peak RSS on the serial run was 4.78 GB.
+
+### Fixed
+- ❗**An `IndexError` that would have killed the report run at the very end.** In
+  `create_daily_standard_trace.error_checks` the CUSIP check did
+  `chunk_index = 0 if len(cusip_chunks) == 1 else i` against a loop that is
+  `enumerate(cusip_chunks, start=1)`. With more than one chunk it validated every
+  iteration against the NEXT chunk's CUSIP set -- a meaningless `missing` count -- and
+  the last iteration indexed one past the end. It had never fired only because 144A's
+  flagged universe has fit in a single chunk. Both engines now validate against the
+  chunk actually being processed.
+- The decimal-shift re-application in `error_checks` sat outside its
+  `if f["decimal_shift_corrector"]:` block, so turning that filter off raised
+  `KeyError: 'dec_shift_flag'`; and the CUSIP check read `bb_cusips`/`ds_cusips`, which
+  exist only when their filters ran.
+- **The report loop logged two different chunk numbers for one iteration** --
+  "Processing chunk {i+1}" and "Chunk {i}: took". Pairing a log by the printed number
+  therefore mismatches rows against times, which sent this very investigation down a
+  false trail (an apparent 325k-row chunk taking 198 s next to a 1.7M-row chunk taking
+  64 s, suggesting a pathological per-CUSIP cost that does not exist). Now consistent.
+
+### Added
+- **`./run_smoke_test.sh --with-figures`**. `--with-reports` alone could not cover any
+  of the above: `error_checks` sits inside `if STAGE0_OUTPUT_FIGURES:` and the harness
+  sets that to 0, so it went green having executed none of it. Even with figures on, the
+  smoke's flagged universe is ~14 CUSIPs -- one chunk -- so the scheduler would take its
+  serial path. `--with-figures` turns figures on AND sets `STAGE0_REPORT_CHUNK_SIZE` so
+  the universe splits across several chunks and the concurrent path actually runs.
+
+### Verification
+`error_checks` run serially and across 4 workers over the same 6 chunks of real WRDS
+data returns identical `dfds`, `dfbb` and `dfie` (`DataFrame.equals`) and identical
+CUSIP lists -- those three frames are what draw every figure. The 276-line chunk body
+was moved verbatim, diffed mechanically. Smoke 28/28 with the pool exercised (3 workers,
+3 connections, 4 chunks), and all 18 stage-0 files still byte-identical to the reference
+banked before the concurrency work began.
+
+---
+
 ## [2.2.1] - 2026-09-10
 
 A stage-1 bug fix. The 2026-09-09 full run cleared stage 0 in 2 hours and then lost

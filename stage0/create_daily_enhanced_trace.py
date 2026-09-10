@@ -2695,59 +2695,73 @@ def build_fisd(db, params: dict | None = None):
 
     return fisd, fisd_off
 # -------------------------------------------------------------------------
-def error_checks(
-    db,
-    cusip_chunks,
-    fisd_off: pd.DataFrame,
-    clean_agency: bool = True,
-    volume_filter: float | tuple[str, float] = ("dollar", 10000.0),
-    trade_times: list[str] | None = None,
-    calendar_name: str | None = None,
-    *,
-    ds_params: dict | None = None,
-    bb_params: dict | None = None,
-    init_error_params: dict | None = None,
-    filters: dict | None = None
-                    ):
-    # --- Filter Defaults -----------------
-    FILTER_DEFAULTS = dict(
-        dick_nielsen            = True,
-        decimal_shift_corrector = True,
-        trading_time            = False,
-        trading_calendar        = True,
-        price_filters           = True,
-        volume_filter_toggle    = True,
-        bounce_back_filter      = True,
-        yld_price_filter        = True,
-        amtout_volume_filter    = True,
-        trd_exe_mat_filter      = True,
-        flag_initial_price_errors = True,
-    )
-    f = {**FILTER_DEFAULTS, **(filters or {})}
-    """
-    Slimline filtering function for the plots of filtered data
+# THE PER-CHUNK UNIT OF WORK FOR THE DATA REPORTS
+#
+# The twin of _process_one_chunk, for the report path. Same eleven filters in the same
+# order, but it KEEPS the flagged rows instead of dropping them, and returns three
+# frames -- decimal-shift, bounce-back, initial-price-error -- which drive the figures.
+#
+# Extracted so the reports can use the same scheduler stage 0 uses. That loop was the
+# whole cost of the report job: 45.5 of its 50.9 minutes, 83% of it clean rather than
+# fetch, at 0.092 ms per row with a 0.991 correlation to row count. Nothing anomalous --
+# just the same work stage 0 does, done one chunk at a time.
+#
+# Same two rules as the stage-0 twin. The audit helpers append to MODULE GLOBALS, so
+# this rebinds them to per-chunk lists and restores them; and an empty chunk returns
+# before the "start" audit row, contributing nothing.
+# -------------------------------------------------------------------------
+def _process_one_error_chunk(chunk_id, cusips, ctx, fetch_fn, n_chunks=None,
+                             defer_logs=False):
+    """Fetch and flag ONE CUSIP chunk for the reports. Returns a ChunkResult whose
+    `data` is the (traceds, trace_bb, trace_ie) triple."""
+    global audit_records, ct_audit_records, _LOG_LINES
 
-    """
+    f                 = ctx["filters"]
+    fisd_off          = ctx["fisd_off"]
+    clean_agency      = ctx["clean_agency"]
+    volume_filter     = ctx["volume_filter"]
+    trade_times       = ctx["trade_times"]
+    calendar_name     = ctx["calendar_name"]
+    ds_params         = ctx["ds_params"]
+    bb_params         = ctx["bb_params"]
+    init_error_params = ctx["init_error_params"]
 
-    all_super_list         = []
-    all_super_listbb       = []
-    all_super_list_ie      = []
-    bb_cusips_all          = []
-    dec_shift_cusips_all   = []
-    init_price_cusips_all  = []
-    
     sort_cols = ["cusip_id","trd_exctn_dt","trd_exctn_tm",
                  "trd_rpt_dt","trd_rpt_tm","msg_seq_nb"]
-      
-    for i in range(0, len(cusip_chunks)):  
-        start_time = time.time()  # Start timer
-        logging.info(f"Processing chunk {i+1} of {len(cusip_chunks)}")
-        temp_list = cusip_chunks[i] 
-        temp_tuple = tuple(temp_list)
+
+    # Per-chunk sinks. NEVER a shared list.
+    bb_cusips_all, dec_shift_cusips_all, init_price_cusips_all = [], [], []
+    my_audit, my_ct_audit = [], []
+    my_lines = [] if defer_logs else None
+    prev_audit    = globals().get("audit_records")
+    prev_ct_audit = globals().get("ct_audit_records")
+    prev_lines    = globals().get("_LOG_LINES")
+    audit_records, ct_audit_records = my_audit, my_ct_audit
+    _LOG_LINES = my_lines
+
+    def _result(data, elapsed, n_rows=0):
+        return _chunk_runner.ChunkResult(
+            chunk_id      = chunk_id,
+            data          = data,
+            audit_rows    = my_audit,
+            ct_audit_rows = my_ct_audit,
+            bb_cusips     = bb_cusips_all,
+            ds_cusips     = dec_shift_cusips_all,
+            ie_cusips     = init_price_cusips_all,
+            n_rows        = n_rows,
+            elapsed       = elapsed,
+            log_lines     = list(my_lines or []),
+        )
+
+    i = chunk_id                    # the body below is the original loop body verbatim
+    start_time = time.time()
+    try:
+        logging.info(f"Processing chunk {chunk_id+1} of {n_chunks}")
+        temp_tuple = tuple(cusips)
         parm = {'cusip_id': temp_tuple}
-        
+
         # Load data from WRDS per chunk
-        trace = db.raw_sql('''
+        trace = fetch_fn('''
             SELECT cusip_id, bond_sym_id, trd_exctn_dt, trd_exctn_tm, days_to_sttl_ct, 
                    lckd_in_ind, wis_fl, sale_cndtn_cd, msg_seq_nb, trc_st, 
                    trd_rpt_dt, trd_rpt_tm, entrd_vol_qt, rptd_pr, yld_pt, 
@@ -2755,14 +2769,16 @@ def error_checks(
             FROM trace.trace_enhanced 
             WHERE cusip_id in %(cusip_id)s
         ''', params=parm)
-        
+
         trace["rptd_pr"] = trace["rptd_pr"].astype("float64").round(6)
         trace = trace.drop(columns=["index"], errors="ignore").reset_index(drop=True)
                        
-        logging.info(f"Chunk {i+1}: Retrieved {len(trace)} rows from WRDS")
+        logging.info(f"Chunk {chunk_id+1}: Retrieved {len(trace)} rows from WRDS")
         
         if len(trace) == 0:
-            continue
+            # Return BEFORE the "start" audit row, so an empty chunk contributes no
+            # audit rows at all -- what the inline loop's `continue` did.
+            return _result(None, round(time.time() - start_time, 2))
         
         # Initial log for cleaning
         log_filter(trace, trace, "start", i)
@@ -2833,9 +2849,13 @@ def error_checks(
             log_filter(trace, trace, "decimal_shift (skipped)", i, replace=True, n_rows_replaced=0)
         gc.collect()
         
-        # Need to correct the prices now #
-        trace["rptd_pr"] = np.where(trace['dec_shift_flag'] == 1, trace['suggested_price'],
-                                    trace["rptd_pr"])
+        # Apply the correction the "cleaned" output_type would have applied internally.
+        # Guarded on the filter being ON: this sits outside the if/else above, so with
+        # decimal_shift_corrector switched off the flag columns do not exist and this
+        # raised KeyError: 'dec_shift_flag'.
+        if f["decimal_shift_corrector"]:
+            trace["rptd_pr"] = np.where(trace['dec_shift_flag'] == 1,
+                                        trace['suggested_price'], trace["rptd_pr"])
                        
         # Filter 3: Trading Time                
         if f["trading_time"]:
@@ -3029,49 +3049,128 @@ def error_checks(
         del trace
         gc.collect()
 
-        # Append here (now with minimal columns only)
-        all_super_list.append(traceds)
-        all_super_listbb.append(trace_bb)
-        all_super_list_ie.append(trace_ie)
-
-        del(traceds, trace_bb, trace_ie)
-
-        # CUSIP check (only for bb and ds - ie is checked separately)
-        merged_cusips = pd.unique(pd.Series(bb_cusips + ds_cusips)).tolist()
-        
-        # If cusip_chunks only has one list, always use index 0
-        chunk_index = 0 if len(cusip_chunks) == 1 else i
-        chunk_cusips = set(cusip_chunks[chunk_index])
+        # Validate against the chunk we ACTUALLY processed -- see the note on the
+        # stage-0 twin. bb_cusips/ds_cusips exist only when their filters ran.
+        _bb = bb_cusips if f["bounce_back_filter"] else []
+        _ds = ds_cusips if f["decimal_shift_corrector"] else []
+        merged_cusips = pd.unique(pd.Series(_bb + _ds, dtype="object")).tolist()
+        chunk_cusips = set(cusips)
         missing = [c for c in merged_cusips if c not in chunk_cusips]
-        
-        logging.info(f"[CUSIP CHECK] Chunk {i}: merged={len(merged_cusips)} | "
+        logging.info(f"[CUSIP CHECK] Chunk {chunk_id}: merged={len(merged_cusips)} | "
                      f"chunk_size={len(chunk_cusips)} | missing={len(missing)}")
         if missing:
-            logging.info(f"[CUSIP CHECK] Chunk {i}: missing (first {min(25, len(missing))}): "
-                         + ", ".join(missing[:25]))
-        
-        # Optionally log if we're using the single-chunk fallback
-        if len(cusip_chunks) == 1 and i > 0:
-            logging.info("[CUSIP CHECK] Note: Using single cusip_chunks[0] for all iterations")
-              
+            logging.info(f"[CUSIP CHECK] Chunk {chunk_id}: missing "
+                         f"(first {min(25, len(missing))}): " + ", ".join(missing[:25]))
+
         elapsed_time = round(time.time() - start_time, 2)
-        logging.info(f"Chunk {i}: took {elapsed_time} seconds")
-
-        # Memory tracking after each chunk
-        try:
-            import psutil
-            mem_gb = psutil.Process().memory_info().rss / (1024**3)
-            logging.info(f"[MEMORY] Chunk {i}: {mem_gb:.2f} GB")
-        except ImportError:
-            pass
-
+        # Chunk ids here are CONSISTENT. The old loop printed "Processing chunk {i+1}"
+        # and "Chunk {i}: took", i.e. two different numbers for one iteration -- which
+        # made the log unpairable and sent a performance investigation down a false
+        # trail before anyone noticed.
+        logging.info(f"Chunk {chunk_id+1}: took {elapsed_time} seconds")
         logging.info("-" * 50)
+        return _result((traceds, trace_bb, trace_ie), elapsed_time, n_rows=len(trace_ie))
+    finally:
+        audit_records, ct_audit_records = prev_audit, prev_ct_audit
+        _LOG_LINES = prev_lines
+
+
+def _pool_run_error_chunk(task):
+    chunk_id, cusips, n_chunks = task
+    return _process_one_error_chunk(chunk_id, cusips, _POOL_CTX, _wrds_pool.raw_sql,
+                                    n_chunks=n_chunks, defer_logs=True)
+
+
+# -------------------------------------------------------------------------
+def error_checks(
+    db,
+    cusip_chunks,
+    fisd_off: pd.DataFrame,
+    clean_agency: bool = True,
+    volume_filter: float | tuple[str, float] = ("dollar", 10000.0),
+    trade_times: list[str] | None = None,
+    calendar_name: str | None = None,
+    *,
+    fetch_fn=None,
+    ds_params: dict | None = None,
+    bb_params: dict | None = None,
+    init_error_params: dict | None = None,
+    filters: dict | None = None,
+    n_workers: int = 1,
+    wrds_username: str | None = None
+                    ):
+    """Re-run the filters over the FLAGGED CUSIPs, keeping the flags, for the figures.
+
+    Returns (final_df_ds, final_df_bb, final_df_ie, bb_cusips, ds_cusips, ie_cusips).
+
+    ds_params MUST carry output_type="uncleaned" -- _build_error_files.py sets it. With
+    the default "cleaned" the corrector returns a 3-tuple and this breaks; the caller
+    owns that contract.
+    """
+    # --- Filter Defaults -----------------
+    FILTER_DEFAULTS = dict(
+        dick_nielsen            = True,
+        decimal_shift_corrector = True,
+        trading_time            = False,
+        trading_calendar        = True,
+        price_filters           = True,
+        volume_filter_toggle    = True,
+        bounce_back_filter      = True,
+        yld_price_filter        = True,
+        amtout_volume_filter    = True,
+        trd_exe_mat_filter      = True,
+        flag_initial_price_errors = True,
+    )
+    f = {**FILTER_DEFAULTS, **(filters or {})}
+
+    if fetch_fn is None:
+        fetch_fn = lambda sql, params=None: db.raw_sql(sql, params=params)
+
+    ctx = dict(
+        filters           = f,
+        fisd_off          = fisd_off,
+        clean_agency      = clean_agency,
+        volume_filter     = volume_filter,
+        trade_times       = trade_times,
+        calendar_name     = calendar_name,
+        ds_params         = ds_params,
+        bb_params         = bb_params,
+        init_error_params = init_error_params,
+    )
+
+    results = _chunk_runner.run_chunks(
+        cusip_chunks,
+        lambda cid, cus, n: _process_one_error_chunk(cid, cus, ctx, fetch_fn, n_chunks=n),
+        n_workers        = n_workers,
+        pool_task        = _pool_run_error_chunk,
+        pool_initializer = _pool_init,
+        pool_initargs    = (ctx, wrds_username),
+        logger           = logging.getLogger(__name__),
+    )
+
+    all_super_list, all_super_listbb, all_super_list_ie = [], [], []
+    bb_cusips_all, dec_shift_cusips_all, init_price_cusips_all = [], [], []
+
+    # Reassemble in ASCENDING CHUNK ORDER, whatever order the chunks finished in.
+    for r in results:
+        for line in r.log_lines:
+            logging.info(line)
+        audit_records.extend(r.audit_rows)
+        ct_audit_records.extend(r.ct_audit_rows)
+        if r.data is not None:
+            traceds, trace_bb, trace_ie = r.data
+            all_super_list.append(traceds)
+            all_super_listbb.append(trace_bb)
+            all_super_list_ie.append(trace_ie)
+        bb_cusips_all.extend(r.bb_cusips)
+        dec_shift_cusips_all.extend(r.ds_cusips)
+        init_price_cusips_all.extend(r.ie_cusips)
 
     gc.collect()
 
-    final_df_ds = pd.concat(all_super_list,   ignore_index=True)
-    final_df_bb = pd.concat(all_super_listbb, ignore_index=True)
-    final_df_ie = pd.concat(all_super_list_ie, ignore_index=True)
+    final_df_ds = pd.concat(all_super_list,    ignore_index=True) if all_super_list    else pd.DataFrame()
+    final_df_bb = pd.concat(all_super_listbb,  ignore_index=True) if all_super_listbb  else pd.DataFrame()
+    final_df_ie = pd.concat(all_super_list_ie, ignore_index=True) if all_super_list_ie else pd.DataFrame()
 
     return final_df_ds, final_df_bb, final_df_ie, bb_cusips_all, dec_shift_cusips_all, init_price_cusips_all
 # -------------------------------------------------------------------------

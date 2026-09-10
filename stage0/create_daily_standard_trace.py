@@ -2525,9 +2525,13 @@ def error_checks(
             log_filter(trace, trace, "decimal_shift (skipped)", i, replace=True, n_rows_replaced=0)
         gc.collect()
         
-        # Need to correct the prices now #
-        trace["rptd_pr"] = np.where(trace['dec_shift_flag'] == 1, trace['suggested_price'],
-                                    trace["rptd_pr"])
+        # Apply the correction the "cleaned" output_type would have applied internally.
+        # Guarded on the filter being ON: this sits outside the if/else above, so with
+        # decimal_shift_corrector switched off the flag columns do not exist and this
+        # raised KeyError: 'dec_shift_flag'.
+        if f["decimal_shift_corrector"]:
+            trace["rptd_pr"] = np.where(trace['dec_shift_flag'] == 1,
+                                        trace['suggested_price'], trace["rptd_pr"])
                        
         # Filter 3: Trading Time                
         if f["trading_time"]:
@@ -2728,12 +2732,23 @@ def error_checks(
 
         del(traceds, trace_bb, trace_ie)
 
-        # CUSIP check (only for bb and ds - ie is checked separately)
-        merged_cusips = pd.unique(pd.Series(bb_cusips + ds_cusips)).tolist()
+        # CUSIP check (only for bb and ds - ie is checked separately).
+        # bb_cusips/ds_cusips are only bound when their filters ran, so read them
+        # defensively -- otherwise switching a filter off turns this diagnostic into a
+        # NameError, or worse, silently reuses the previous chunk's values.
+        _bb = bb_cusips if f["bounce_back_filter"] else []
+        _ds = ds_cusips if f["decimal_shift_corrector"] else []
+        merged_cusips = pd.unique(pd.Series(_bb + _ds, dtype="object")).tolist()
         
-        # If cusip_chunks only has one list, always use index 0
-        chunk_index = 0 if len(cusip_chunks) == 1 else i
-        chunk_cusips = set(cusip_chunks[chunk_index])
+        # Validate against the chunk we ACTUALLY processed. This used to index
+        # cusip_chunks[i], guarded by a "use index 0 if there is only one chunk"
+        # ternary -- which papered over an off-by-one rather than fixing it. The
+        # standard/144A loop is `enumerate(cusip_chunks, start=1)`, so with more than
+        # one chunk every iteration validated against the NEXT chunk's CUSIP set
+        # (producing a meaningless `missing` count) and the last one raised IndexError,
+        # killing the report run after all the work was done. It never fired only
+        # because 144A's flagged universe has fit in a single chunk.
+        chunk_cusips = set(temp_list)
         missing = [c for c in merged_cusips if c not in chunk_cusips]
         
         logging.info(f"[CUSIP CHECK] Chunk {i}: merged={len(merged_cusips)} | "
@@ -2742,9 +2757,6 @@ def error_checks(
             logging.info(f"[CUSIP CHECK] Chunk {i}: missing (first {min(25, len(missing))}): "
                          + ", ".join(missing[:25]))
         
-        # Optionally log if we're using the single-chunk fallback
-        if len(cusip_chunks) == 1 and i > 0:
-            logging.info("[CUSIP CHECK] Note: Using single cusip_chunks[0] for all iterations")
               
         elapsed_time = round(time.time() - start_time, 2)
         logging.info(f"Chunk {i}: took {elapsed_time} seconds")
