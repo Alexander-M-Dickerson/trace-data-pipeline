@@ -20,7 +20,7 @@ Given a time-ordered sequence of daily aggregated prices $\{P_1, P_2, \ldots, P_
 1. **Ultra-low anomaly**: Price $P_i$ is significantly lower than surrounding prices (downward outlier)
 2. **Upward spike**: Price $P_i$ is significantly higher than preceding prices and quickly recovers
 3. **Persistent plateau**: Sequence of identical ultra-low or round prices lasting multiple days
-4. **Intraday inconsistency**: Large discrepancies between different intraday price measures (first, last, min, max)
+4. **Intraday inconsistency**: an implausibly wide intraday HIGH/LOW range (`prc_hi` vs `prc_lo`)
 
 The algorithm must distinguish these errors from **genuine distressed pricing** (e.g., default events, bankruptcy) that persist consistently over time.
 
@@ -40,7 +40,8 @@ $$
 where:
 - $R_i$ = binary indicator (1 if price $P_i$ matches a suspicious round number, 0 otherwise)
 - $r$ = an individual round number from the set $\mathcal{R}$
-- $\mathcal{R} = \{0.001, 0.01, 0.05, 0.10, 0.25, 0.50, 0.75, 1.00\}$ = suspicious round numbers (in % of par)
+- $\mathcal{R} = \{0.001, 0.01, 0.05, 0.10, 0.25, 0.50, 1.00\}$ = suspicious round numbers (in % of par).
+  ❗**0.75 is deliberately NOT in this set** -- it is a plausible distressed price, not a placeholder.
 - $\epsilon_{\text{round}} = 0.0001$ = tolerance for round detection
 
 **Important: Price Units.** All prices in this filter are expressed as **% of par**. With par = $1,000:
@@ -53,7 +54,6 @@ where:
 | 0.10 | $1.00 |
 | 0.25 | $2.50 |
 | 0.50 | $5.00 |
-| 0.75 | $7.50 |
 | 1.00 | $10.00 |
 
 **Note on Round Numbers**: We are in contact with FINRA/TRACE to understand these odd rounded numbers that often occur in recognizable sequences. According to Colin Philipps (FINRA), it could be associated with dealers "cleaning-up" the books.
@@ -316,7 +316,7 @@ Days 3-5 are flagged because:
 
 ### Filter 4: Intraday Inconsistency Detection
 
-**Purpose**: Detect days where intraday price measures (first, last, high, low) show implausibly large discrepancies.
+**Purpose**: Detect days where the intraday HIGH/LOW range (`prc_hi`, `prc_lo`) is implausibly wide relative to their mean. This is a range test on two columns, not a comparison across price estimators.
 
 #### Price Range Analysis
 
@@ -389,13 +389,13 @@ def ultra_distressed_filter(
     enable_plateau_filter: bool = True,
     plateau_ultra_low_threshold: float = 0.15,
     min_plateau_days: int = 2,
-    suspicious_round_numbers: List[float] = [0.001, 0.01, 0.05, 0.10, 0.25, 0.50, 0.75, 1.00],
+    suspicious_round_numbers: List[float] = [0.001, 0.01, 0.05, 0.10, 0.25, 0.50, 1.00],
     round_tolerance: float = 0.0001,
     lookback: int = 5,
     lookforward: int = 5,
     pre_post_price_ratio: float = 3.0,
     enable_intraday_filter: bool = True,
-    price_cols: list = ["prc_ew", "prc_vw", "prc_first", "prc_last"],
+    price_cols: list = ["prc_hi", "prc_lo"],
     intraday_range_threshold: float = 0.75,
     intraday_price_threshold: float = 20.0,
     verbose: bool = False,
@@ -454,14 +454,14 @@ def ultra_distressed_filter(
 
 | Parameter | Type | Default | Mathematical Notation | Description |
 |-----------|------|---------|----------------------|-------------|
-| `suspicious_round_numbers` | `List[float]` | `[0.001, 0.01, 0.05, 0.10, 0.25, 0.50, 0.75, 1.00]` | $\mathcal{R}$ | List of suspicious round price levels (in % of par; see table above) |
+| `suspicious_round_numbers` | `List[float]` | `[0.001, 0.01, 0.05, 0.10, 0.25, 0.50, 1.00]` | $\mathcal{R}$ | List of suspicious round price levels (in % of par; see table above) |
 | `round_tolerance` | `float` | `0.0001` | $\epsilon_{\text{round}}$ | Numerical tolerance for round number matching |
 
 ### Intraday Inconsistency Parameters (Filter 4)
 
 | Parameter | Type | Default | Mathematical Notation | Description |
 |-----------|------|---------|----------------------|-------------|
-| `price_cols` | `list` | `["prc_ew", "prc_vw", "prc_first", "prc_last"]` | — | Intraday price columns to check for consistency |
+| `price_cols` | `list` | `["prc_hi", "prc_lo"]` | — | The two columns the range test reads. It is a HIGH/LOW RANGE test, not a cross-estimator test; `prc_vw` is not even a Stage 1 column. |
 | `intraday_range_threshold` | `float` | `0.75` | $\gamma_{\mathrm{range}}$ | Maximum intraday range as fraction of mean price (75%) |
 | `intraday_price_threshold` | `float` | `20.0` | $\tau_{\mathrm{intraday}}$ | Only check inconsistency if any price below this (20% of par = $200) |
 
@@ -801,7 +801,7 @@ Note: Individual filter flags and metadata are dropped to conserve memory.
 
 **Filter 1 (Anomaly)**: No candidates
 - None of the prices {65.0, 8.5, 7.8, 8.2, 7.5} are < τ_low = 0.10
-- None are round numbers from R = {0.001, 0.01, 0.05, 0.10, 0.25, 0.50, 0.75, 1.00}
+- None are round numbers from R = {0.001, 0.01, 0.05, 0.10, 0.25, 0.50, 1.00}
 - **No candidates opened** → Filter 1 passes all rows
 
 **Filter 2 (Spike)**: No candidates
@@ -896,24 +896,39 @@ ULTRA_DISTRESSED_CONFIG = {
 
 ## Typical Usage in Pipeline
 
+❗**In the pipeline this is not optional.** `step10a` applies `flag_refined_any != 1`
+as an unconditional row filter, so a flagged bond-day is DELETED from the published
+panel, not merely marked. Changing any parameter below moves the sample.
+
+❗**Do not splat `ULTRA_DISTRESSED_CONFIG`.** It contains `price_col`, which would
+collide with an explicit `price_col=`, and `target_rows_per_chunk`, which is not a
+parameter of this function -- either raises `TypeError`. `stage1_pipeline.py` passes the
+keys individually for exactly that reason, and this mirrors it:
+
 ```python
-from stage1.helper_functions import ultra_distressed_filter
-from stage1._stage1_settings import ULTRA_DISTRESSED_CONFIG
+import helper_functions as hf
+from _stage1_settings import ULTRA_DISTRESSED_CONFIG as cfg
 
-# Load daily aggregated TRACE data
-df_daily = pd.read_parquet("stage1_daily_aggregated.parquet")
-
-# Apply ultra-distressed filter
-df_flagged = ultra_distressed_filter(
+# The daily panel as it exists mid-pipeline; `pr` is the volume-weighted clean price.
+df_flagged = hf.ultra_distressed_filter(
     df_daily,
-    id_col="cusip_id",
-    date_col="trd_exctn_dt",
-    price_col="prc_vw",
-    **ULTRA_DISTRESSED_CONFIG
+    price_col=cfg['price_col'],
+    intraday_range_threshold=cfg['intraday_range_threshold'],
+    intraday_price_threshold=cfg['intraday_price_threshold'],
+    ultra_low_threshold=cfg['ultra_low_threshold'],
+    min_normal_price_ratio=cfg['min_normal_price_ratio'],
+    plateau_ultra_low_threshold=cfg['plateau_ultra_low_threshold'],
+    min_plateau_days=cfg['min_plateau_days'],
+    suspicious_round_numbers=cfg['suspicious_round_numbers'],
+    price_cols=cfg['price_cols'],
+    high_spike_threshold=cfg['high_spike_threshold'],
+    min_spike_ratio=cfg['min_spike_ratio'],
+    recovery_ratio=cfg['recovery_ratio'],
+    verbose=cfg['verbose'],
 )
 
-# Remove flagged rows
-df_clean = df_flagged[df_flagged["flag_refined_any"] == 0].copy()
+# What the pipeline then does, unconditionally:
+df_clean = df_flagged[df_flagged["flag_refined_any"] != 1].copy()
 
 n_flagged = df_flagged["flag_refined_any"].sum()
 n_total = len(df_flagged)
@@ -1034,7 +1049,8 @@ At function exit, individual flag columns are **dropped** to conserve RAM:
 
 ## See Also
 
-- `README_bounce_back_filter.md` — Documentation for the intraday bounce-back filter (Stage 0)
+- `../stage0/README_bounce_back_filter.md` — Documentation for the intraday bounce-back filter (Stage 0)
 - `_stage1_settings.py` — Default configuration parameters
-- `helper_functions.py:1003-1219` — Source code for `ultra_distressed_filter()`
-- `step_05_apply_ultra_distressed_filter.py` — Pipeline implementation
+- `stage1/helper_functions.py:1009-1249` — source of `ultra_distressed_filter()`
+- `stage1/stage1_pipeline.py::step8_ultra_distressed()` — where the pipeline calls it,
+  and `step10a_build_filter_tables()` — where flagged rows are DELETED

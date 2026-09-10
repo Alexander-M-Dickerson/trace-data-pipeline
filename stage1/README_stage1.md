@@ -517,12 +517,16 @@ reference; this is a summary.
 - `acclast` - Accrued interest since last coupon payment date
 - `accpmt` - Cumulative sum of all coupon payments made on or before settlement date
 - `accall` - Total accumulation (`acclast + accpmt`)
-- `ytm` - Yield to maturity, as a DECIMAL (0.045 = 4.5%), not a percentage
+- `ytm` - Yield to maturity, as a DECIMAL (0.045 = 4.5%), not a percentage.
+  ❗Winsorised at the 0.5/99.5 quantiles **within each date** — see
+  [DATA_DICTIONARY.md](DATA_DICTIONARY.md#sample-defining-operations).
 - `mod_dur` - Modified duration (years)
 - `mac_dur` - Macaulay duration (years)
 - `convexity` - Convexity
 - `bond_maturity` - Time to maturity (years)
-- `credit_spread` - Credit spread over the MATURITY-matched treasury, as a DECIMAL (0.012 = 120bp), not a percentage
+- `credit_spread` - Credit spread over the MATURITY-matched treasury, as a DECIMAL
+  (0.012 = 120bp), not a percentage. ❗Also winsorised per date — see
+  [DATA_DICTIONARY.md](DATA_DICTIONARY.md#sample-defining-operations).
 
 **TRACE pricing (from Stage 0):**
 - `prc_ew` - Equal-weighted price

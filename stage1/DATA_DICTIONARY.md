@@ -14,6 +14,11 @@ Stage 1 produces a single enriched daily bond dataset that combines:
 - Equity identifiers 
 - Fama-French industry classifications
 
+❗**Before using this data, read
+[Sample-defining operations](#sample-defining-operations).** Six row filters and a
+per-date winsorization are applied before the file is written. None of them is visible
+in the schema, and the largest drops ~9% of bond-days.
+
 ---
 
 ## File Information
@@ -263,18 +268,50 @@ output file.
 | 20 | Ca | High Yield |
 | 21 | C/D | Default |
 
-#### ❗Sample-defining operations you cannot see in the columns
+---
 
-The panel is not the raw join. Before it is written, Stage 1:
+## Sample-defining operations
 
-- **Winsorises `ytm` and `credit_spread` at the 0.5% / 99.5% quantiles WITHIN each
-  trade date.** Tail statistics on either column are computed on clipped data.
-- **Drops every bond-day with `bond_maturity < 1.0`** — inside one year of maturity.
-- **Drops rows with neither `spc_rating` nor `mdc_rating`.**
-- **Drops rows flagged by the ultra-distressed filter**, by the 2002-07 price-dip check,
-  and any with `pr > 300`.
+**The panel is not the raw join.** Six row filters and one transformation are applied
+before the file is written, in this order. None of them is visible in the schema, so
+this section is the only place they are recorded. All are in
+`stage1_pipeline.py::step10a_build_filter_tables`.
 
-Each is a sample choice, not a column, so none of them shows up in the schema.
+### Row filters (applied in order)
+
+| # | Filter | Rule | Removes |
+|---|---|---|---|
+| 1 | `valid_accrued_vars` | accrued-interest inputs must be present | ~0.0% |
+| 2 | `valid_rating` | `spc_rating` **or** `mdc_rating` must be non-null | ~1.5% |
+| 3 | `valid_maturity` | `bond_maturity >= 1.0` — **every bond-day inside one year of maturity is dropped** | ~9.4% |
+| 4 | `distressed_errors` | `flag_refined_any != 1` (the ultra-distressed filter) | ~0.0% |
+| 5 | `2002_07_filter` | `prc_dip != 1` — first price change in **July 2002** exceeding **35** points of par | ~0.0% |
+| 6 | `high_prc` | `prc_high != 1`, i.e. `pr <= 300` (% of par) | ~0.0% |
+
+The percentages are from a representative run and are of the pre-filter row count; the
+exact figures for **your** run are logged line by line, and land in Table 2 of the
+Stage 1 data report. Filter 3 is much the largest, and is a deliberate sample choice —
+bonds within a year of maturity behave differently and are conventionally excluded.
+
+Thresholds live in `FINAL_FILTER_CONFIG` (`_stage1_settings.py`):
+`price_threshold = 300`, `dip_threshold = 35`.
+
+### Winsorization
+
+**`ytm` and `credit_spread` are winsorised at the 0.5% and 99.5% quantiles WITHIN each
+`trd_exctn_dt`** — per-date, not pooled, and applied after the six filters:
+
+```python
+final_df[var] = final_df.groupby('trd_exctn_dt')[var].transform(winsorize_group)
+```
+
+❗Two consequences worth knowing before you use either column:
+
+- **Tail statistics are computed on clipped data.** Extreme yields and spreads have been
+  pulled to their per-date 0.5/99.5 bounds, not removed.
+- **The bounds depend on the cross-section on that date**, so the same bond-day can take
+  a different value in a run over a different universe. This is why a small test sample
+  will not reproduce a full run's `ytm` exactly at the tails.
 
 #### NAIC Categories (sp_naic)
 
