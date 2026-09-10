@@ -9,6 +9,8 @@
 - [Contributing](#contributing)
 - [Academic Use](#academic-use)
 
+- [Stage 1 & 2](#stage-1--2)
+- [Support](#support)
 ---
 
 ## Getting Started
@@ -67,7 +69,7 @@ Settings are organized hierarchically:
 
 1. **Shared settings** (`config.py` in root):
    - `WRDS_USERNAME`: Your WRDS username
-   - `OUTPUT_FORMAT`: Output file format (parquet/csv)
+   - `OUTPUT_FORMAT`: Output file format. `"parquet"` only -- see the FAQ entry below.
    - `AUTHOR`: Your name
    - `TRACE_MEMBERS`: Which datasets to process (enhanced, standard, 144a) - **shared across all stages**
    - `STAGE0_OUTPUT_FIGURES`: Control Stage 0 error plot generation (can be slow)
@@ -172,9 +174,19 @@ FISD_PARAMS = {
 ```
 
 ### Can I change the output format from Parquet to CSV?
-Yes! Edit `config.py` (applies to all stages):
+No. `OUTPUT_FORMAT` in `config.py` accepts only `"parquet"`, and `_trace_settings.py`
+raises at import if you set anything else.
+
+Stage 0 can technically write `.csv.gzip`, but Stage 1 and the report builder both call
+`pd.read_parquet` on a hard-coded `*.parquet` name, so a CSV run produces stage-0 files
+that nothing downstream can open. Before v2.2.3 that failed several hours in, with a
+misleading *"Expected: stage0/<member>/trace_<member>_<stamp>.parquet"*. It now fails
+immediately instead.
+
+To get a CSV copy of a finished dataset, convert it afterwards:
 ```python
-OUTPUT_FORMAT = "csv"  # Or "parquet" (recommended)
+import pandas as pd
+pd.read_parquet("stage1/data/stage1_YYYYMMDD.parquet").to_csv("stage1.csv.gz", index=False)
 ```
 
 ### How do I control Stage 0 error plot generation?

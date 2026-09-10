@@ -89,7 +89,7 @@ nano config.py
 WRDS_USERNAME = os.getenv("WRDS_USERNAME", "your_wrds_username")
 
 # Output format
-OUTPUT_FORMAT = "parquet"  # Options: "parquet" (recommended), "csv"
+OUTPUT_FORMAT = "parquet"  # The only supported value
 ```
 
 **Edit stage1 settings (if needed):**

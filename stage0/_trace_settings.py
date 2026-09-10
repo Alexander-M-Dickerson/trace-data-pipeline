@@ -9,6 +9,17 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from config import WRDS_USERNAME, AUTHOR, OUTPUT_FORMAT
 
+# Stage 0 honours output_format, but Stage 1 and _build_error_files.py both read a
+# hard-coded "*.parquet" name via pd.read_parquet. Writing CSV therefore produces a
+# stage-0 output that nothing downstream can open, and the run fails hours later with
+# "Expected: stage0/<member>/trace_<member>_<stamp>.parquet". Refuse it up front.
+if str(OUTPUT_FORMAT).lower() != "parquet":
+    raise ValueError(
+        f"OUTPUT_FORMAT={OUTPUT_FORMAT!r} in config.py is not supported. Only "
+        "'parquet' works end to end -- Stage 1 and the data reports read "
+        "'*.parquet' directly. Set OUTPUT_FORMAT = \"parquet\"."
+    )
+
 # --- FISD universe build params --------------------------------------
 FISD_PARAMS = {
     # Switches for each screen

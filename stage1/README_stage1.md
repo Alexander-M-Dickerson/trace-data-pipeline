@@ -32,6 +32,10 @@ If you want to get started quickly, see **[QUICKSTART_stage1.md](QUICKSTART_stag
 - [Performance Optimization](#performance-optimization)
 - [License & Citation](#license--citation)
 
+
+- [Version History](#version-history)
+
+- [Support](#support)
 ---
 
 ## Overview
@@ -385,8 +389,10 @@ says so directly: *"Stage 1 always generates comprehensive reports and figures. 
 outputs are essential for data quality assessment and cannot be disabled."* Setting
 either name does nothing.
 
-❗**`OUTPUT_FORMAT = "csv"` is accepted by `validate_config` and then ignored** --
-`save_outputs` always writes Parquet. Treat the format as fixed.
+❗**`OUTPUT_FORMAT` must be `"parquet"`.** Stage 1's `save_outputs` always writes
+Parquet regardless, and since v2.2.3 `stage0/_trace_settings.py` raises at import on any
+other value -- Stage 0 would otherwise write `.csv.gzip` files that Stage 1 and the
+report builder, which both read a hard-coded `*.parquet` name, cannot open.
 
 ### Yield Data Configuration
 
@@ -989,9 +995,9 @@ N_CHUNKS = 10     # default
 ### Output Format
 
 ```python
-OUTPUT_FORMAT = "parquet"  # Recommended: 10x smaller and faster than CSV
-# OUTPUT_FORMAT = "csv"    # Use only if you need human-readable output
+OUTPUT_FORMAT = "parquet"  # The only supported value; anything else raises at import
 ```
+Convert after the fact if you need CSV -- see the [FAQ](../FAQ.md).
 
 ### Report Generation
 

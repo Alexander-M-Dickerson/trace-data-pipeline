@@ -28,7 +28,11 @@ AUTHOR = "Open Source Bond Asset Pricing"
 # ============================================================================
 # SHARED OUTPUT SETTINGS
 # ============================================================================
-OUTPUT_FORMAT = "parquet"  # Options: "parquet" (recommended), "csv"
+# Stage 0 can write either, but ONLY "parquet" works end to end: Stage 1 and the
+# report builder both call pd.read_parquet on a hard-coded "*.parquet" name. Setting
+# "csv" here makes Stage 0 write .csv.gzip files that nothing downstream can read, so
+# _trace_settings.py rejects it at import rather than letting the run die hours later.
+OUTPUT_FORMAT = "parquet"  # Options: "parquet". "csv" is stage-0 only and not supported.
 
 # ============================================================================
 # TRACE DATABASE SELECTION

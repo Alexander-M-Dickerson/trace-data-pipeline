@@ -192,18 +192,42 @@ ls stage1/data_reports/
 ```
 trace-data-pipeline/
 ├── stage0/
-│   ├── enhanced/
-│   │   ├── trace_enhanced_YYYYMMDD.parquet          # ~500MB-2GB
-│   │   ├── trace_enhanced_fisd_YYYYMMDD.parquet
-│   │   └── reports/
-│   ├── standard/
+│   ├── enhanced/                                    # nine files per member
+│   │   ├── trace_enhanced_YYYYMMDD.parquet          # the cleaned tape, ~500MB-2GB
+│   │   ├── trace_enhanced_fisd_YYYYMMDD.parquet     # the FISD universe used
+│   │   ├── fisd_filters_enhanced_YYYYMMDD.parquet
+│   │   ├── dick_nielsen_filters_audit_enhanced_YYYYMMDD.parquet
+│   │   ├── drr_filters_audit_enhanced_YYYYMMDD.parquet
+│   │   ├── bounce_back_cusips_enhanced_YYYYMMDD.parquet
+│   │   ├── decimal_shift_cusips_enhanced_YYYYMMDD.parquet
+│   │   ├── init_price_cusips_enhanced_YYYYMMDD.parquet
+│   │   └── cusip_row_counts_YYYYMMDD.parquet        # the chunk plan's row census
+│   ├── 144a/                                        # same nine, named for the member
+│   │   └── trace_144a_YYYYMMDD.parquet
+│   ├── standard/                                    # only if you opt Standard in
 │   │   └── trace_standard_YYYYMMDD.parquet
-│   └── 144a/
-│       └── trace_144a_YYYYMMDD.parquet
+│   ├── data_reports/                                # NOT under the member folders
+│   │   ├── enhanced/
+│   │   │   ├── enhanced_data_report.tex
+│   │   │   └── enhanced_fig_page_NNN_{ds,bb}.pdf
+│   │   └── 144a/
+│   └── logs/                                        # NN_member.out / .err
 └── stage1/
-    └── data/
-        ├── stage1_YYYYMMDD.parquet                   # Final dataset
-        └── reports/
+    ├── data/
+    │   ├── stage1_YYYYMMDD.parquet                  # THE final dataset
+    │   ├── sp_ratings_YYYYMMDD.parquet
+    │   ├── moodys_ratings_YYYYMMDD.parquet
+    │   ├── call_dummy_YYYYMMDD.parquet
+    │   ├── ultra_distressed_cusips_YYYYMMDD.csv
+    │   ├── bond_firm_linker_2026/                   # from download_inputs.sh
+    │   ├── Siccodes{12,17,30}.txt                   # from download_inputs.sh
+    │   ├── liu_wu_yields.xlsx                       # from download_inputs.sh
+    │   └── data_reports/                            # the distressed-filter report
+    ├── data_reports/                                # the stage-1 data report
+    │   ├── stage1_data_report_YYYYMMDD.tex
+    │   ├── stage1_figures_YYYYMMDD*.pdf
+    │   └── time_series_data/
+    └── logs/
 ```
 
 ---

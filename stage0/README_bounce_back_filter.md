@@ -651,7 +651,7 @@ After flagging a par block, the baseline may be shifted by the flagged rows. Coo
 
 ## References
 
-**Dickerson, A., Robotti, C., & Rossetti, G. (2024)**. "Common pitfalls in the evaluation of corporate bond strategies." Working Paper.
+**Dickerson, A., Robotti, C., & Rossetti, G. (2025)**. "Common pitfalls in the evaluation of corporate bond strategies." Working Paper.
 
 ---
 

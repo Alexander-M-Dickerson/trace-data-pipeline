@@ -1,6 +1,6 @@
 # Stage 0 - TRACE Daily Processing (Enhanced, Standard, 144A)
 
-This stage fetches and cleans TRACE data (Enhanced, Standard, and Rule 144A) on the WRDS Cloud and aggregates to daily panels. Jobs are submitted to Sun Grid Engine (SGE) from a PuTTY session (Windows users); files can be moved to/from WRDS with [WinSCP](https://winscp.net/eng/download.php) (Windows users). Mac users can simply use their terminal once connected to the WRDS Cloud. Mac users might find [ForkLift](https://binarynights.com/GUI-based) useful -- allows uploads, edits, and the ability to manage WRDS Cloud files through a UI. 
+This stage fetches and cleans TRACE data (Enhanced, Standard, and Rule 144A) on the WRDS Cloud and aggregates to daily panels. Jobs are submitted to Sun Grid Engine (SGE) from a PuTTY session (Windows users); files can be moved to/from WRDS with [WinSCP](https://winscp.net/eng/download.php) (Windows users). Mac users can simply use their terminal once connected to the WRDS Cloud. Mac users might find [ForkLift](https://binarynights.com/) useful -- a GUI file manager that allows uploads, edits, and the ability to manage WRDS Cloud files through a UI. 
 
 Besides generating daily bond pricing panels, the code also generates highly detailed TRACE data reports which document the effect of the filters at the transaction level. It produces (potentially) hundreds of time-series plots of every bond `cusip_id` that is impacted by the decimal shift and bounce-back correctors of Dickerson, Rossetti and Robotti (2025). 
 
@@ -22,9 +22,21 @@ Please also see **Generating the TRACE Data Reports** for instructions on how to
 - [Configuration](#configuration-choices-you-can-edit)
 - [Outputs](#outputs)
 - [Generating TRACE Data Reports](#generating-the-trace-data-reports)
+
+- [Notes & tips](#notes--tips)
 - [Troubleshooting](#troubleshooting)
+
+- [Performance optimization](#performance-optimization)
+
+- [Advanced Usage](#advanced-usage)
+
+- [Monitoring](#monitoring)
 - [License & Citation](#license--citation)
 
+
+- [Version History](#version-history)
+
+- [Support](#support)
 ---
 
 ## Repo layout (key files)
@@ -66,8 +78,9 @@ stage0/
 **Important:** submission lives in `../run_pipeline.sh`, which reads `TRACE_MEMBERS` from
 `config.py` and submits exactly those members. Enhanced and 144A go in together;
 Standard, if requested, is held behind them with `-hold_jid`. The report job is then held
-on every stage-0 job actually submitted, and Stage 1 on the report job — so the whole
-thing still runs in one go.
+on every stage-0 job actually submitted, and Stage 1 on those same stage-0 jobs — so
+Stage 1 and the reports run alongside each other and the whole thing still goes in one
+submission.
 
 Each `run_*.sh` is a thin SGE wrapper that sets `-cwd` (current working directory),
 exports your environment (`-V`), and writes logs into `./logs/`. Cores and memory are
@@ -174,32 +187,40 @@ This code package assumes you have:
 
 From a PuTTY shell on your computer, choose one of the following:
 
+❗**Take the whole repository, not just `stage0/`.** Stage 0 does not stand alone:
+the root `config.py` is where `WRDS_USERNAME` is set and stage 0 imports it, the job wrappers
+`cd stage0` from the repository root and log to `stage0/logs/`, and `run_pipeline.sh`
+lives at the root. A `~/proj/stage0/` holding only the stage-0 files cannot be run.
+
 #### Option A - Download a ZIP (no git required)
 ```bash
 mkdir -p ~/proj && cd ~/proj
-wget -O stage0.zip \
+wget -O trace.zip \
   https://github.com/Alexander-M-Dickerson/trace-data-pipeline/archive/refs/heads/main.zip
-unzip stage0.zip
-mv trace-data-pipeline-main/stage0 ./stage0
+unzip trace.zip
+mv trace-data-pipeline-main trace-data-pipeline
+cd trace-data-pipeline
 ```
 
 #### Option B - Using `curl` (also no git)
 ```bash
 mkdir -p ~/proj && cd ~/proj
-curl -L -o stage0.zip \
+curl -L -o trace.zip \
   https://github.com/Alexander-M-Dickerson/trace-data-pipeline/archive/refs/heads/main.zip
-unzip stage0.zip
-mv trace-data-pipeline-main/stage0 ./stage0
+unzip trace.zip
+mv trace-data-pipeline-main trace-data-pipeline
+cd trace-data-pipeline
 ```
 
 #### Option C - Clone (if `git` is available on your WRDS node)
 ```bash
 mkdir -p ~/proj && cd ~/proj
 git clone https://github.com/Alexander-M-Dickerson/trace-data-pipeline.git
-cp -r trace-data-pipeline/stage0 ./stage0
+cd trace-data-pipeline
 ```
 
-You should now have `~/proj/stage0/` with the scripts listed above. 
+You should now have `~/proj/trace-data-pipeline/` holding `config.py`,
+`run_pipeline.sh`, `stage0/` and `stage1/`. Run everything from that directory. 
 
 **Note:** `proj` is the directory you have created on your WRDS file system - call it anything you like. Perhaps `trace` is an apt name.
 
@@ -343,7 +364,9 @@ Submit the complete automated pipeline:
 3. Standard, if requested, is held behind them with `-hold_jid`, so it runs alone and
    can use the whole connection budget rather than a slice of it.
 4. `build_reports` is held on every stage-0 job actually submitted.
-5. Stage 1 is held on the report job.
+5. Stage 1 is held on **the same stage-0 jobs**, not on the report job. Since v2.2.2
+   the two run alongside each other, which takes the reports (~51 min) off the
+   critical path.
 
 **Output from the script:**
 ```
@@ -367,10 +390,26 @@ If you are having errors after attempting to debug, feel free to contact Alex Di
 
 If you prefer submitting by dataset, run:
 
+Submit **from the repository root** -- the wrappers `cd stage0` themselves and write
+their logs to `stage0/logs/`, so a bare `qsub run_enhanced_trace.sh` from inside
+`stage0/` fails before it runs a line.
+
+❗**Pass the resource request yourself.** The wrappers carry no `-pe`/`-l` directives;
+`run_pipeline.sh` supplies them on the qsub command line from `qsub_resources()`. Submit
+one by hand without them and SGE gives the job a single slot with default memory, while
+the code still opens `CONCURRENCY[member]` connections -- they contend for one core.
+
 ```bash
-qsub run_enhanced_trace.sh
-qsub run_standard_trace.sh
-qsub run_144a_trace.sh
+qsub -pe onenode 5 -l m_mem_free=8G  stage0/run_enhanced_trace.sh    # enhanced
+qsub -pe onenode 6 -l m_mem_free=8G  stage0/run_standard_trace.sh    # standard
+qsub -pe onenode 1 -l m_mem_free=16G stage0/run_144a_trace.sh        # 144a
+```
+
+Those are the current values; print them rather than copying if you have changed
+`CONCURRENCY` or `MEM_PER_SLOT_GB`:
+
+```bash
+cd stage0 && python3 -c "from _trace_settings import qsub_resources; print(qsub_resources('enhanced'))"
 ```
 
 Each wrapper uses SGE's `-cwd` so outputs/logs land under the current folder, and `-V` to pass your Python environment variables.
@@ -382,7 +421,7 @@ Each wrapper uses SGE's `-cwd` so outputs/logs land under the current folder, an
 If you run jobs individually and want to generate reports later, or if you want to regenerate reports with different settings:
 
 ```bash
-qsub run_build_data_reports.sh
+qsub stage0/run_build_data_reports.sh
 ```
 
 **Important:** which datasets the report job processes comes from `TRACE_MEMBERS` in
@@ -634,20 +673,38 @@ stage0/
 │   ├── _data_reports.out
 │   └── _data_reports.err
 │
-├── enhanced/                    # Enhanced TRACE data outputs
+├── enhanced/                    # Enhanced TRACE data outputs (nine files)
 │   ├── trace_enhanced_YYYYMMDD.parquet
-│   ├── *_audit_*.parquet
-│   └── *_cusips_*.parquet
+│   ├── trace_enhanced_fisd_YYYYMMDD.parquet
+│   ├── fisd_filters_enhanced_YYYYMMDD.parquet
+│   ├── dick_nielsen_filters_audit_enhanced_YYYYMMDD.parquet
+│   ├── drr_filters_audit_enhanced_YYYYMMDD.parquet
+│   ├── bounce_back_cusips_enhanced_YYYYMMDD.parquet
+│   ├── decimal_shift_cusips_enhanced_YYYYMMDD.parquet
+│   ├── init_price_cusips_enhanced_YYYYMMDD.parquet
+│   └── cusip_row_counts_YYYYMMDD.parquet
 │
-├── standard/                    # Standard TRACE data outputs
+├── standard/                    # Standard TRACE data outputs (nine files)
 │   ├── trace_standard_YYYYMMDD.parquet
-│   ├── *_audit_*.parquet
-│   └── *_cusips_*.parquet
+│   ├── trace_fisd_standard_YYYYMMDD.parquet
+│   ├── fisd_filters_standard_YYYYMMDD.parquet
+│   ├── dick_nielsen_filters_audit_standard_YYYYMMDD.parquet
+│   ├── drr_filters_audit_standard_YYYYMMDD.parquet
+│   ├── bounce_back_cusips_standard_YYYYMMDD.parquet
+│   ├── decimal_shift_cusips_standard_YYYYMMDD.parquet
+│   ├── init_price_cusips_standard_YYYYMMDD.parquet
+│   └── cusip_row_counts_YYYYMMDD.parquet
 │
-├── 144a/                        # Rule 144A data outputs
+├── 144a/                        # Rule 144A data outputs (nine files)
 │   ├── trace_144a_YYYYMMDD.parquet
-│   ├── *_audit_*.parquet
-│   └── *_cusips_*.parquet
+│   ├── trace_fisd_144a_YYYYMMDD.parquet
+│   ├── fisd_filters_144a_YYYYMMDD.parquet
+│   ├── dick_nielsen_filters_audit_144a_YYYYMMDD.parquet
+│   ├── drr_filters_audit_144a_YYYYMMDD.parquet
+│   ├── bounce_back_cusips_144a_YYYYMMDD.parquet
+│   ├── decimal_shift_cusips_144a_YYYYMMDD.parquet
+│   ├── init_price_cusips_144a_YYYYMMDD.parquet
+│   └── cusip_row_counts_YYYYMMDD.parquet
 │
 └── data_reports/                # Quality reports for ALL datasets
     ├── enhanced/
@@ -965,7 +1022,7 @@ wc -l logs/*.out         # Count lines in log files
 If a job fails:
 1. Review the error log: `cat logs/01_enhanced.err`
 2. Fix the issue in configuration or code
-3. Resubmit: `qsub run_enhanced_trace.sh` (or `./run_pipeline.sh`)
+3. Resubmit from the repo root: `qsub -pe onenode 5 -l m_mem_free=8G stage0/run_enhanced_trace.sh` (or just `./run_pipeline.sh`)
 
 ---
 

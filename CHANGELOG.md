@@ -18,6 +18,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.2.3] - 2026-09-10
+
+A documentation audit run against the code rather than by reading. The gate added in
+2.2.0 (`tests/test_docs.py`) checks that files named in the docs exist and that quoted
+numbers match the code; it cannot tell whether a sentence is TRUE. This round is that
+gap. Two of the nine worked examples in the filter READMEs taught the opposite of what
+the code does, and re-deriving them turned up a real bug.
+
+### Fixed
+- **Cross-bond leak in `flag_price_change_errors`.** In the
+  `use_unique_trailing_median=False` branch the `.shift(1)` sat OUTSIDE the groupby, so
+  the first print of each bond took the previous bond's rolling median as its anchor
+  (measured: 201.5 instead of NaN, a 150-point phantom displacement that would flag the
+  row). Fixed in both engines. **Production output is unchanged** -- all three call
+  sites pass `True`, and an A/B against the previous commit over 519,590 real trades
+  showed 0 diffs in every filter column, on both engines.
+- **`OUTPUT_FORMAT = "csv"` now fails at import instead of hours later.** Stage 0
+  honours the setting and writes `.csv.gzip`, but Stage 1 and `_build_error_files.py`
+  both call `pd.read_parquet` on a hard-coded `*.parquet` name, so the run died late
+  with a misleading *"Expected: stage0/<member>/trace_<member>_<stamp>.parquet"*.
+  `stage0/_trace_settings.py` now raises on any value but `"parquet"`, and the four
+  docs that advertised the CSV option say so.
+- **Worked examples re-derived by executing the filters.** Every number in
+  `README_bounce_back_filter.md` and `README_decimal_shift_corrector.md` now comes from
+  a run, not from reasoning. Bounce-back Example 4 described a lookahead that
+  `par_only=True` skips entirely; Example 5 was titled "Blame Reassignment" and narrated
+  a branch that never executes (the candidate opens at the row the doc reassigns FROM).
+  All four decimal-shift examples were 4-5 prints long, below the centered anchor's
+  `min_periods = w+1 = 6`, so each silently used the forward fallback -- **Example 3's
+  verdict flipped from ACCEPT to REJECT**, and Examples 2 and 4 rejected at Gate 1 with
+  a raw error of exactly 0.0000, never reaching the gate they claimed to illustrate.
+- **Decimal-shift anchor documented correctly.** It is not a median of unique values in
+  the window; it is a plain median over a frame de-duplicated on `(id, date, price)`.
+  Both fallbacks INCLUDE the point itself, so a bad print contaminates its own anchor.
+  Condition 5 misstated the search: only the plausibility condition filters candidates,
+  and the remaining gates apply to the argmin winner alone.
+- **`anchor` is not "rolling only"** -- the `else` branch is live and gives a
+  per-`(id, date)` median.
+- **Neither filter sorts.** Both READMEs and both engines' docstrings claimed a sort by
+  `[id_col, date_col, time_col]`. Verified by AST: no `sort_values`, no `reset_index`,
+  and `time_col` never reaches executable code. They use the row order they are given.
+- **Individual `qsub` submission was unrunnable as documented** -- the wrappers live in
+  `stage0/`, `cd stage0` themselves and log to `stage0/logs/`, so they must be submitted
+  from the repository root; and they carry no `-pe`/`-l` directives, so a bare `qsub`
+  gives one slot while the code still opens `CONCURRENCY[member]` connections.
+- **"Getting the code onto WRDS" built a tree that cannot run.** All three options
+  extracted `stage0/` alone, without the root `config.py` it imports or
+  `run_pipeline.sh`. They now keep the whole repository.
+- **Output trees corrected against a real run.** QUICKSTART showed a
+  `stage0/<member>/reports/` folder that does not exist (reports go to
+  `stage0/data_reports/<member>/`) and listed 2 of the 9 files each member writes; the
+  stage-0 README used `*_audit_*` globs that missed three more.
+- Two more instances of the pre-2.2.2 "Stage 1 is held on the report job" claim.
+- Ten `## ` sections missing from three tables of contents; a dead `ForkLift` URL; the
+  filter READMEs' citation year (2024 -> 2025); a factor set missing `0.01`.
+
+### Notes
+- No numeric path changed. Gates green: `test_docs`, `test_chunk_plan`,
+  `test_chunk_scheduler`, 0 broken in-page anchors across 13 docs.
+
+---
+
 ## [2.2.2] - 2026-09-10
 
 The data-report job took 50.9 minutes of the 2026-09-09 run. Investigating whether its
