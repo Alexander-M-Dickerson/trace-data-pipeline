@@ -435,6 +435,46 @@ pip install --user wrds pandas numpy pandas-market-calendars
 python -m pip install --user -r requirements.txt
 ```
 
+### My `stage1.err` is full of ValueError tracebacks -- did the run fail?
+
+Almost certainly not. On the WRDS Cloud (Python 3.14) a completed Stage 1 leaves a large
+`stage1/logs/stage1.err` containing progress bars and roughly a hundred copies of this:
+
+```
+Traceback (most recent call last):
+  File ".../python3.14/multiprocessing/resource_tracker.py", line 446, in main
+    raise ValueError(
+ValueError: Cannot register /dev/shm/joblib_memmapping_folder_... for automatic cleanup:
+            unknown resource type folder
+```
+
+This comes from Python's `resource_tracker`, which does not recognise the `folder`
+resource type that `joblib` registers when it memory-maps arrays between workers. It is
+raised in the tracker process, not in the pipeline, and it appears once per joblib
+worker pool -- so the count scales with how many parallel passes Stage 1 ran, not with
+anything about your data. joblib cleans up its own temporary folders regardless.
+
+**How to confirm your run was fine** -- check the output rather than the log:
+
+```bash
+python3 - <<'PY'
+import pandas as pd, glob
+f = sorted(glob.glob("stage1/data/stage1_*.parquet"))[-1]
+df = pd.read_parquet(f, columns=["cusip_id", "trd_exctn_dt", "sp_rating"])
+print(f, len(df), "rows,", df.cusip_id.nunique(), "cusips,",
+      df.trd_exctn_dt.min(), "->", df.trd_exctn_dt.max())
+PY
+```
+
+A healthy full run is tens of millions of rows spanning 2002-07 to your data frontier.
+For reference, the 2026-09-09 production run produced 28,662,808 rows over 70,189 CUSIPs
+covering 2002-07-01 to 2025-12-31, and its `stage1.err` held 683 lines that were *all*
+this one harmless pattern.
+
+**What WOULD indicate a real failure:** a non-zero exit status from the job, a `stage1.out`
+that stops mid-step, or a missing/short `stage1_YYYYMMDD.parquet`. Stage 0's `.err` files
+should be empty; if one is not, read it.
+
 ### The report generation job (build_reports) never starts
 **Explanation**: This is normal. `./run_pipeline.sh` holds the report job until every
 stage-0 job it submitted completes. Stage 1 does NOT wait for the reports — since v2.2.2
