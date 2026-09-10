@@ -1100,6 +1100,25 @@ $$r_{i,t} = \alpha + \beta^{b} \cdot MKTB_t + \beta^{epu} \cdot EPU_t + \varepsi
 
 ### Factor Definitions
 
+❗**A characteristic and a factor are different objects, and five of them share a name.**
+`lix`, `roll`, `rsj`, `rvol` and `vov` each appear **twice** in this document: once as a
+bond-level characteristic in the main panel, and once as a monthly factor series in the
+table below. They are not the same number.
+
+| | characteristic (main panel) | factor (this table) |
+|---|---|---|
+| grain | one value per bond-month | one value per month |
+| construction | measured on the bond's own trades | equal-weighted mean across **USA-domiciled** bonds |
+| units | a **level** — e.g. `roll` averages 0.79, `vov` 0.13, `spd_rel` 0.0068 | for ten of the twelve illiquidity factors, the monthly **CHANGE** in that mean — `ROLL` averages −0.009 and is positive only 45% of the time |
+
+The differenced factors are `AMD`, `LIX`, `ILLIQ`, `ROLL`, `SPRD`, `CSS`, `ARS`, `FHTS`,
+`VOV` and `RVOL`. The two that are **not** differenced, and are levels of the mean, are
+`PSB` and `RSJ`. (Verified against the build: `max|factor − diff(level)| = 0` for the ten,
+and `max|factor − level| = 0` for the two.)
+
+Differencing is deliberate. An illiquidity level is highly persistent, so a beta estimated
+on the level would load mostly on the trend; the innovation is the priced quantity.
+
 | Factor | Description | Source |
 |--------|-------------|--------|
 | `mktrf` | Equity market excess return | FF |
