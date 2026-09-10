@@ -166,7 +166,8 @@ HKM_INDEX = ("https://zhiguohe.net/data-and-empirical-patterns/"
              "intermediary-capital-ratio-and-risk-factor/")
 # Ludvigson rotates the zip filename on every update, so the fetcher tries this URL and
 # then discovers the current link from the index page.
-LUDVIGSON_URL = "https://www.sydneyludvigson.com/s/MacroFinanceUncertainty_202508Update.zip"
+# Current vintage as of 2026-09-10 (data through 2026-06); the previous 202508 link 404s.
+LUDVIGSON_URL = "https://www.sydneyludvigson.com/s/MacroFinanceUncertainty_202608Update-3.zip"
 LUDVIGSON_INDEX = "https://www.sydneyludvigson.com/macro-and-financial-uncertainty-indexes"
 EPU_URL = "https://www.policyuncertainty.com/media/Categorical_EPU_Data.xlsx"
 FRED_CSV_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id={ids}"
