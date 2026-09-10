@@ -25,6 +25,20 @@ CHANGELOG.md is deliberately EXEMPT from the file-existence check. Its old entri
 record what was true at the time -- an entry naming a since-deleted script is correct
 history, not drift.
 
+WHAT THIS FILE DOES NOT DO
+--------------------------
+It cannot tell whether a sentence is TRUE. The 2.2.3 audit found nine worked examples
+whose arithmetic was reasoned out rather than run; two taught the OPPOSITE of what the
+code does, and one example's stated verdict flipped when the real function was executed
+on its own input. Every check here passed throughout. Prose about behaviour is verified
+by RUNNING the function on the documented input and reading the output -- there is no
+substitute, and no check below attempts one.
+
+The structural checks added in 2.2.3 cover the classes that came back twice: output
+trees vs what the writer actually writes, `qsub <script>` paths, TOC completeness,
+in-page anchors, and OUTPUT_FORMAT. They are deliberately narrow. Each was
+mutation-tested -- break the thing it guards and the suite must go red.
+
 Author: Open Source Bond Asset Pricing
 """
 
@@ -69,8 +83,112 @@ BANNED = {
 }
 
 
+def check_output_trees(docs):
+    """Every basename stage 0 writes must appear in the docs' output trees.
+
+    These trees were corrected in 2.2.0 and had drifted again within days; 2.2.3 found
+    QUICKSTART advertising a `stage0/<member>/reports/` folder that does not exist and
+    listing 2 of the 9 files a member actually produces. Reading cannot catch that --
+    only comparing the tree against the dict the writer loops over.
+    """
+    import ast
+    src = (ROOT / "stage0" / "create_daily_enhanced_trace.py").read_text(encoding="utf-8")
+    names = []
+    for node in ast.walk(ast.parse(src)):
+        if isinstance(node, ast.AnnAssign) and getattr(node.target, "id", "") == "files":
+            names += [k.value for k in node.value.keys if isinstance(k, ast.Constant)]
+    check("found the stage-0 output filename table in the code", len(names) >= 8,
+          f"{len(names)} basenames")
+
+    # Checked PER FILE. Pooling the docs lets one tree cover another's omission --
+    # which is how QUICKSTART kept passing while listing 2 of the 9 files.
+    missing, trees = [], ""
+    for f in ("QUICKSTART.md", "stage0/README_stage0.md"):
+        blocks = [m for m in re.findall(r"```(?:\w+)?\n(.*?)```", docs_all[f], re.S)
+                  if "\u251c" in m or "\u2514" in m]
+        this = "\n".join(blocks)
+        trees += this + "\n"
+        # only files that show a stage-0 member panel are claiming to be output trees
+        if "trace_enhanced_YYYYMMDD.parquet" not in this:
+            continue
+        missing += [f"{f}: {n}" for n in names if n not in this]
+    check("output trees name every file stage 0 writes", not missing, str(missing))
+
+    # A member folder never holds a reports/ subfolder -- reports live in data_reports/.
+    bad = re.findall(r"^\W*(enhanced|standard|144a)/.*\n(?:^\W*\w[^\n]*\n){0,10}?^\W*reports/",
+                     trees, re.M)
+    check("no output tree puts reports/ under a member folder", not bad, str(bad))
+
+
+def check_qsub_paths(docs):
+    """A `qsub <script>` in the docs must name a path that exists from the repo root.
+
+    2.2.3: every individual-submission example said `qsub run_enhanced_trace.sh`. The
+    wrappers live in stage0/ and `cd stage0` themselves, so that command works from
+    neither the repository root nor stage0/.
+    """
+    bad = []
+    for fname, text in docs_all.items():
+        for m in re.finditer(r"^\s*qsub\b([^\n]*)", text, re.M):
+            script = next((tok for tok in m.group(1).split() if tok.endswith(".sh")), None)
+            if script and not (ROOT / script).exists():
+                bad.append(f"{fname}: qsub {script}")
+    check("every 'qsub <script>' in the docs resolves from the repo root",
+          not bad, str(bad))
+
+
+def check_toc(docs):
+    """Every `## ` section must appear in its file's table of contents, and every
+    in-page anchor must resolve. Both drifted silently across three releases."""
+    def slug(h):
+        return re.sub(r"[^\w\s-]", "", h.strip().lower()).replace(" ", "-")
+    SKIP = {"Table of Contents", "Contents"}
+    missing_all, dead_all = [], []
+    for fname, text in docs_all.items():
+        toc = re.findall(r"^\s*(?:[-*]|\d+\.)\s*\[([^\]]+)\]\(#([^)]+)\)", text, re.M)
+        heads = [(len(m.group(1)), m.group(2).strip())
+                 for m in re.finditer(r"^(#{1,6})\s+(.+?)\s*$", text, re.M)]
+        allslugs = {slug(h) for _, h in heads}
+        dead_all += [f"{fname}#{m.group(1)}"
+                     for m in re.finditer(r"\[[^\]]*\]\(#([^)]+)\)", text)
+                     if m.group(1) not in allslugs]
+        if len(toc) < 4:
+            continue
+        have = {a for _, a in toc}
+        missing_all += [f"{fname}: {h}" for lvl, h in heads
+                        if lvl == 2 and slug(h) not in have and h not in SKIP]
+    check("every H2 appears in its file's table of contents", not missing_all,
+          str(missing_all))
+    check("every in-page anchor resolves", not dead_all, str(dead_all))
+
+
+def check_output_format(docs):
+    """OUTPUT_FORMAT accepts only 'parquet'. No doc may offer csv as a working option.
+
+    Stage 0 writes .csv.gzip happily; Stage 1 and the report builder read a hard-coded
+    '*.parquet'. The run then failed hours in. _trace_settings.py refuses it at import
+    since 2.2.3, and the docs must not contradict that.
+    """
+    ts = (ROOT / "stage0" / "_trace_settings.py").read_text(encoding="utf-8")
+    check("_trace_settings.py rejects a non-parquet OUTPUT_FORMAT",
+          'OUTPUT_FORMAT).lower() != "parquet"' in ts)
+    bad = [f for f, t in docs_all.items()
+           if re.search(r'OUTPUT_FORMAT\s*=\s*"csv"', t)
+           and "not supported" not in t and "only supported value" not in t]
+    check("no doc presents OUTPUT_FORMAT='csv' as usable", not bad, str(bad))
+
+
 def main():
+    global docs_all
     docs = {f: (ROOT / f).read_text(encoding="utf-8") for f in DOC_FILES}
+    # A wider set for the structural checks: they apply to every doc that
+    # carries a tree, a TOC, a qsub line or a config snippet.
+    docs_all = dict(docs)
+    for extra in ("stage0/README_bounce_back_filter.md",
+                  "stage0/README_decimal_shift_corrector.md",
+                  "stage1/README_distressed_filter.md",
+                  "CONTRIBUTING.md"):
+        docs_all[extra] = (ROOT / extra).read_text(encoding="utf-8")
     prose = "\n".join(docs.values())
 
     # --- numbers quoted in prose must match the code ------------------
@@ -133,6 +251,11 @@ def main():
     for token in ("run_smoke_test.sh", "download_inputs.sh", "_chunk_runner",
                   "_wrds_pool", "CONCURRENCY", "target_rows_per_chunk"):
         check(f"'{token}' is documented outside the CHANGELOG", token in prose)
+
+    check_output_trees(docs)
+    check_qsub_paths(docs)
+    check_toc(docs)
+    check_output_format(docs)
 
     print()
     if FAILURES:

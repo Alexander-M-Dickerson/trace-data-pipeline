@@ -825,7 +825,7 @@ chmod +x run_build_data_reports.sh
 
 Submit the job:
 ```bash
-qsub run_build_data_reports.sh
+qsub stage0/run_build_data_reports.sh
 ```
 
 ### Output structure
