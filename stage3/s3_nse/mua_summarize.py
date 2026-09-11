@@ -41,6 +41,7 @@ for _p in (str(Path(__file__).resolve().parents[1]), str(Path(__file__).resolve(
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
+import _stage3_settings as S   # noqa: E402
 import clusters as C        # noqa: E402
 import paths                # noqa: E402
 
@@ -154,7 +155,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--windows", nargs="+", default=["paper", "full"],
                     choices=("paper", "full"))
-    ap.add_argument("--workers", type=int, default=6)
+    ap.add_argument("--workers", type=int, default=S.N_WORKERS,
+                    help="fresh processes to fan out over (default: from cpu_count)")
     ap.add_argument("--chunk", type=int, default=9, help="signals per worker process")
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
@@ -162,7 +164,7 @@ def main() -> int:
 
     import drrlib as D          # noqa: E402
     from bench import Bench     # noqa: E402
-    from fastrun import pmap    # noqa: E402
+    from fastrun import pmap, sized    # noqa: E402
 
     d = grid_dir()
     missing = [s_ for s_ in C.ALL_SIGNALS if not (d / f"{s_}.parquet").exists()]
@@ -179,8 +181,9 @@ def main() -> int:
         results = {}
         for w in args.windows:
             with b.phase(f"stats-{w}"):
+                n_w, n_t = sized(len(chunks), args.workers, None, min_threads=2)
                 parts = pmap(summarize_chunk, [(c, w) for c in chunks],
-                             workers=min(args.workers, len(chunks)), threads=2)
+                             workers=min(n_w, len(chunks)), threads=n_t)
                 summary = pd.concat([p["summary"] for p in parts], ignore_index=True)
                 nbonds = pd.concat([p["nbonds"] for p in parts], ignore_index=True)
                 assert len(summary) == 108 * 216, len(summary)
@@ -201,6 +204,8 @@ def main() -> int:
             section="s3_nse", inputs=[paths.BBW], t0=t0,
             extra={"nbonds_convention": "realised"})
 
+    D.mark_complete(out / "_complete.json", ok,
+                    {"windows": list(args.windows), "rows_per_window": 108 * 216})
     for w, s_ in results.items():
         print(f"  {w}: T_max={int(s_['n_obs'].max())}, "
               f"{int(s_['mean_ret'].notna().sum()):,} non-NaN of {len(s_):,}")

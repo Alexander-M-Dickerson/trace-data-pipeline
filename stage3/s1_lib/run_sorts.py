@@ -246,14 +246,29 @@ def main() -> int:
         bench.note(signals=args.signals, ret=args.ret, rating=args.rating,
                    sets=args.sets, sorts=args.sorts, fast=args.fast,
                    n_written=len(written))
-        # the run's own check: every (sort, set) asked for exists afterwards, whether
-        # this run made it or a previous one did. A partial sort set is the failure
-        # mode that matters -- every later exhibit reads these by name.
+        # The run's own check, on TWO things. Every (sort, set) asked for must exist
+        # afterwards, whether this run made it or a previous one did.
         want = [out_name(ret_type=args.ret, sort=s_, rating=args.rating, set_name=n_)
                 for s_ in args.sorts for n_ in args.sets]
         have = [n_ for n_ in want if (root / n_).exists()]
-        ok = bench.check(len(have) == len(want),
-                         f"{len(have)}/{len(want)} sort CSVs present in {root.name}/")
+        # ❗And each must carry the WHOLE signal set. The filename does not encode the
+        # signal list, so `--signals cs` would otherwise write a canonically-named file
+        # holding 1 of 12 signals, report PASS, and be skipped for ever after. Count the
+        # factors inside the file, not the files on disk.
+        short = []
+        for n_ in have:
+            try:
+                got = int(pd.read_csv(root / n_, usecols=["factor"])["factor"]
+                          .map(D.base_mnemonic).nunique())
+            except Exception:                 # noqa: BLE001 -- unreadable counts as short
+                got = -1
+            if got != len(DEFAULT_SIGNALS):
+                short.append(f"{n_} ({got} of {len(DEFAULT_SIGNALS)})")
+        ok = bench.check(
+            len(have) == len(want) and not short,
+            f"{len(have)}/{len(want)} sort CSVs in {root.name}/, each carrying all "
+            f"{len(DEFAULT_SIGNALS)} signals"
+            + ("; SHORT: " + ", ".join(short) if short else ""))
 
     manifest = {"signals": args.signals, "ret": args.ret, "rating": args.rating,
                 "sets": args.sets, "sorts": args.sorts, "date_cutoff": DATE_CUTOFF,

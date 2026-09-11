@@ -28,6 +28,29 @@ def plan(n_items: int, total_cores: int = CPU, min_threads: int = 2):
     return workers, threads
 
 
+def sized(n_items: int, workers: int | None = None, threads: int | None = None,
+          *, min_threads: int = 2, cap_workers: int | None = None) -> tuple[int, int]:
+    """Resolve (workers, threads), filling in whichever the caller did not pin.
+
+    ❗This exists because fixed defaults do not travel. 4 workers x 5 threads is sensible
+    on 24 cores and 5x oversubscribed on 4 -- and oversubscribed numba kernels are slower
+    than running the same work with fewer. Callers pass whatever the user asked for on
+    the command line; this fills in the rest from the machine actually running it.
+
+    `cap_workers` bounds the automatic answer where memory, not cores, is the limit.
+    """
+    auto_w, auto_t = plan(n_items, min_threads=min_threads)
+    if cap_workers:
+        auto_w = min(auto_w, cap_workers)
+        auto_t = max(min_threads, max(2, CPU - 2) // max(1, auto_w))
+    w = max(1, workers or auto_w)
+    t = max(1, threads or auto_t)
+    if w * t > CPU:
+        print(f"[fastrun] workers x threads = {w * t} on {CPU} core(s) -- oversubscribed; "
+              "lower --workers or --threads if this runs slowly", flush=True)
+    return w, t
+
+
 def pmap(task_fn, items, workers: int | None = None, threads: int | None = None,
          total_cores: int = CPU):
     """Process-parallel map. `task_fn` (TOP-LEVEL, picklable) gets one item and returns its result.

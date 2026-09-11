@@ -205,12 +205,29 @@ def sha256_file(path: Path) -> str:
     return cache[key]
 
 
+def portable(p: Path) -> str:
+    """A path as it should be RECORDED: relative to the pipeline, if it sits inside it.
+
+    ❗A manifest is meant to travel -- in a zip, on OSF, in a replication archive. An
+    absolute path records one machine's home directory and tells a reader nothing they
+    can act on. Anything genuinely outside the pipeline tree keeps its absolute form,
+    because there a relative path would be a lie.
+    """
+    p = Path(p)
+    for base in (paths.PIPELINE, paths.STAGE3):
+        try:
+            return p.resolve().relative_to(Path(base).resolve()).as_posix()
+        except ValueError:
+            continue
+    return str(p)
+
+
 def fingerprint(path: Path) -> dict:
     p = Path(path)
     if not p.exists():
-        return {"path": str(p), "exists": False}
+        return {"path": portable(p), "exists": False}
     st = p.stat()
-    return {"path": str(p), "exists": True, "bytes": st.st_size,
+    return {"path": portable(p), "exists": True, "bytes": st.st_size,
             "sha256_16": sha256_file(p)[:16]}
 
 
@@ -222,6 +239,24 @@ def _git(*args: str) -> str | None:
     except Exception:
         return None
 
+
+
+def mark_complete(where: Path, ok: bool, what: dict) -> Path:
+    """Write (or remove) a completion marker.
+
+    ❗The orchestrator decides whether to skip a producer by looking for ONE file. If
+    that file is an early artifact, a grid that dies two thirds of the way through
+    leaves it behind, gets skipped for ever, and no amount of re-running helps. So the
+    marker is written LAST and only when the run actually passed its own check.
+    """
+    import json as _json
+    marker = Path(where)
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    if ok:
+        marker.write_text(_json.dumps(what, indent=1, default=str), encoding="utf-8")
+    elif marker.exists():
+        marker.unlink()          # a previously-complete grid is no longer complete
+    return marker
 
 def write_result(name: str, payload: dict, *, section: str, inputs: list[Path],
                  t0: float | None = None, extra: dict | None = None) -> Path:

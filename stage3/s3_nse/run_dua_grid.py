@@ -270,8 +270,9 @@ def run_stats(args, root: Path, signals: list[str], b) -> dict:
     out = {}
     for window in ("paper", "full"):
         with b.phase(f"stats-{window}"):
+            s_w, s_t = sized(len(chunks), args.workers, None, min_threads=2)
             parts = pmap(stats_chunk, [(c, window, str(root)) for c in chunks],
-                         workers=min(args.workers, len(chunks)), threads=2)
+                         workers=min(s_w, len(chunks)), threads=s_t)
             for name in ("premia", "alpha", "baselines"):
                 df = pd.concat([p[name] for p in parts], ignore_index=True)
                 df.to_parquet(root / f"dua_{name}_{window}.parquet", index=False)
@@ -283,10 +284,13 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--signals", nargs="+", default=None, help="default: all 108")
     ap.add_argument("--ratings", nargs="+", default=list(RATINGS), choices=RATINGS)
-    ap.add_argument("--workers", type=int, default=S.N_WORKERS or 4,
-                    help="a fit holds 10-20 GB, so size this against RAM, not cores")
-    ap.add_argument("--threads", type=int, default=5,
-                    help="numba threads per worker (workers*threads <= cores)")
+    ap.add_argument("--workers", type=int, default=S.N_WORKERS,
+                    help="fresh processes to fan out over (default: from cpu_count). "
+                         "Measured peak is well under 1 GB per worker, so cores rather "
+                         "than RAM is normally the limit")
+    ap.add_argument("--threads", type=int, default=None,
+                    help="numba threads per worker (default: from cpu_count, keeping "
+                         "workers*threads within the core count)")
     ap.add_argument("--chunk", type=int, default=4, help="signals per fit")
     ap.add_argument("--stats", action="store_true",
                     help="recompute the per-path statistics (both windows) from the "
@@ -312,7 +316,7 @@ def main() -> int:
 
     import drrlib as D          # noqa: E402
     from bench import Bench     # noqa: E402
-    from fastrun import pmap    # noqa: E402
+    from fastrun import pmap, sized    # noqa: E402
 
     signals = args.signals or list(C.ALL_SIGNALS)
     root = out_root()
@@ -344,11 +348,12 @@ def main() -> int:
             items = [(r, c, str(root)) for r in args.ratings for c in chunks
                      if args.force or not all(
                          (root / "series" / r / f"{s_}.parquet").exists() for s_ in c)]
+            n_w, n_t = sized(len(items) or 1, args.workers, args.threads,
+                             min_threads=2)
             with b.phase("grid"):
                 if items:
                     results = pmap(run_one, items,
-                                   workers=min(args.workers, len(items)),
-                                   threads=args.threads)
+                                   workers=min(n_w, len(items)), threads=n_t)
                 else:
                     results = []
                     print("all series parquets present -- skipping (--force to redo)")
@@ -358,7 +363,7 @@ def main() -> int:
             slow = max((r["wall_s"] for r in results), default=0.0)
             rss = max((r["rss_gb"] or 0 for r in results), default=0.0)
             b.note(n_signals=len(signals), n_ratings=len(args.ratings),
-                   n_units=len(items), workers=args.workers, threads=args.threads,
+                   n_units=len(items), workers=n_w, threads=n_t,
                    chunk=args.chunk, max_unit_wall_s=slow, max_worker_rss_gb=rss)
             ok = b.check(present == n_expected,
                          f"{present}/{n_expected} (rating, signal) series present")
@@ -367,6 +372,11 @@ def main() -> int:
             {"summary": {"n_signals": len(signals), "stats": args.stats}},
             section="s3_nse", inputs=[Path(paths.PANEL), Path(paths.BBW)],
             t0=t0, extra={"pybondlab": prov})
+    # The grid and its statistics layer each get their own marker: they are separate
+    # orchestrator steps, and one can be complete while the other is not.
+    D.mark_complete(root / ("_stats_complete.json" if args.stats else "_complete.json"),
+                    ok, {"n_signals": len(signals), "ratings": list(args.ratings),
+                         "stats": args.stats})
     return 0 if ok else 1
 
 

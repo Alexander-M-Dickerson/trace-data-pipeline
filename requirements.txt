@@ -53,9 +53,12 @@ statsmodels>=0.14
 # Plotting -- required for the Stage 0/1/2 data reports, not optional if you build them.
 matplotlib>=3.8.0
 
-# Optional. Stage 2 logs memory headroom when it is installed and skips the log when
-# it is not; nothing depends on it.
-# psutil>=5.9
+# Stage 2 logs memory headroom when this is installed. Stage 3 needs it for two things
+# that are not optional in practice: sizing DuckDB's memory limit against free RAM in the
+# data appendix, and recording each grid worker's peak RSS. Without it Stage 3 falls back
+# to a conservative fixed limit and records a peak of 0.0, which reads as "measured zero"
+# rather than "not measured".
+psutil>=5.9
 
 # --- Stage 3: sorts, uncertainty grids, and the paper's exhibits -------------
 # Stage 3 runs on your own machine, like Stage 2, and adds nothing to the list above:

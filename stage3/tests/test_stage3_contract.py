@@ -56,6 +56,47 @@ PRIVATE_MARKERS = [
 MARKER_EXEMPT = re.compile(r"(?:tab|fig):[a-z0-9_]*")
 
 
+def _artifacts() -> list[Path]:
+    """The files a RUN produces: manifests and the assembled report source.
+
+    ❗These are gitignored, so they never reach a reviewer through `git diff` -- but they
+    are exactly what travels in a zip, on OSF, or in a replication archive. The code
+    gates below were blind to them until a leak was found in one.
+    """
+    out = list((STAGE3 / "data").rglob("*.json"))
+    out += list((STAGE3 / "reports").glob("*.tex"))
+    return [p for p in out if p.is_file()]
+
+
+@pytest.mark.skipif(not (STAGE3 / "data").exists(),
+                    reason="nothing produced yet -- run the pipeline first")
+def test_produced_artifacts_carry_no_absolute_paths():
+    """A manifest records provenance. An absolute path records someone's home directory."""
+    bad = re.compile(r"[A-Za-z]:\\\\Users|[A-Za-z]:/Users|/home/|/Users/")
+    hits = []
+    for p in _artifacts():
+        for i, line in enumerate(p.read_text(encoding="utf-8",
+                                             errors="replace").splitlines(), 1):
+            if bad.search(line):
+                hits.append(f"{p.relative_to(STAGE3)}:{i}: {line.strip()[:100]}")
+    assert not hits, ("absolute user paths in produced artifacts:\n"
+                      + "\n".join(hits[:20]))
+
+
+@pytest.mark.skipif(not (STAGE3 / "data").exists(),
+                    reason="nothing produced yet -- run the pipeline first")
+@pytest.mark.parametrize("marker", PRIVATE_MARKERS)
+def test_produced_artifacts_carry_no_private_references(marker):
+    """The same markers, applied to what a run writes rather than to the code."""
+    hits = []
+    for p in _artifacts():
+        for i, line in enumerate(p.read_text(encoding="utf-8",
+                                             errors="replace").splitlines(), 1):
+            if marker.lower() in MARKER_EXEMPT.sub("", line).lower():
+                hits.append(f"{p.relative_to(STAGE3)}:{i}: {line.strip()[:100]}")
+    assert not hits, (f"{marker!r} in produced artifacts:\n" + "\n".join(hits[:20]))
+
+
 @pytest.mark.parametrize("marker", PRIVATE_MARKERS)
 def test_no_private_artifact_references(marker):
     """Stage 3 must not name a file, repository or module a public user cannot have."""

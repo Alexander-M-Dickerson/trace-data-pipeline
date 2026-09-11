@@ -1,4 +1,4 @@
-r"""run_mua_grid.py -- the 18,144-spec method-uncertainty grid.
+r"""run_mua_grid.py -- the method-uncertainty grid: 108 signals x 216 specs.
 
 108 signals x 216 method choices (see `mua_engines.py` for what the 216 are), through
 `assay_anomaly_fast`, one fresh process per signal.
@@ -8,7 +8,7 @@ own seven-column slice of the panel through DuckDB. The panel is never pickled i
 worker: on Windows every argument is re-pickled per worker, so shipping a 1.2 GB panel
 twelve times costs far more than the parallelism returns.
 
-Output: `data/s3_nse/mua_grid/<signal>.parquet`, long format --
+Output: `data/grids/mua/<signal>.parquet`, long format --
 (date, signal, spec_id, leg L/S/LS, return, nbonds).
 
 ❗Needs a PyBondLab build carrying `anomaly_assay_fast`; `pblenv.require_fast` checks
@@ -105,7 +105,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--signals", nargs="+", default=None,
                     help="default: all 108")
-    ap.add_argument("--workers", type=int, default=S.N_WORKERS or 6)
+    ap.add_argument("--workers", type=int, default=S.N_WORKERS,
+                    help="fresh processes to fan out over (default: from cpu_count)")
     ap.add_argument("--threads", type=int, default=3,
                     help="numba threads per worker (workers*threads <= cores)")
     ap.add_argument("--force", action="store_true",
@@ -120,7 +121,7 @@ def main() -> int:
 
     import drrlib as D          # noqa: E402  (after pblenv)
     from bench import Bench     # noqa: E402
-    from fastrun import pmap    # noqa: E402
+    from fastrun import pmap, sized    # noqa: E402
 
     signals = args.signals or list(C.ALL_SIGNALS)
     d = out_dir()
@@ -131,14 +132,17 @@ def main() -> int:
         with b.phase("grid"):
             if todo:
                 items = [(s, d / f"{s}.parquet") for s in todo]
-                results = pmap(run_one, items, workers=min(args.workers, len(items)),
-                               threads=args.threads)
+                n_w, n_t = sized(len(items), args.workers, args.threads,
+                                 min_threads=2)
+                results = pmap(run_one, items, workers=min(n_w, len(items)),
+                               threads=n_t)
             else:
+                n_w = n_t = 0
                 results = []
                 print(f"all {len(signals)} signal parquets present -- "
                       "skipping compute (--force to redo)")
         b.note(n_signals=len(signals), n_computed=len(todo),
-               workers=args.workers, threads=args.threads)
+               workers=n_w, threads=n_t)
         # Completeness, on what is READABLE on disk rather than on what this run
         # computed: a re-run over a finished grid must still report the grid as
         # complete, and a truncated file must not count as present.
@@ -155,6 +159,8 @@ def main() -> int:
             section="s3_nse", inputs=[Path(paths.PANEL)], t0=t0,
             extra={"pybondlab": prov})
 
+    D.mark_complete(d / "_complete.json", ok,
+                    {"n_signals": len(signals), "n_present": len(present)})
     print(f"\n{len(present)}/{len(signals)} signals in {d}")
     return 0 if ok else 1
 

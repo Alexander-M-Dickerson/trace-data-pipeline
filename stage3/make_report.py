@@ -233,15 +233,24 @@ def title_page(window: str, prov: dict) -> str:
         L.append(r"\bottomrule\end{tabular}}")
 
     if prov["inputs"]:
+        # The DATA inputs are what a reader needs to see. The intermediate sort CSVs an
+        # exhibit happens to read are Stage 3's own output, listed in the manifests.
+        # Show every data input; count the rest rather than silently truncating.
+        data_in = [i for i in prov["inputs"]
+                   if not str(i["path"]).replace("\\", "/").startswith("stage3/")]
+        derived = len(prov["inputs"]) - len(data_in)
         L.append(r"\subsection*{Inputs}")
         L.append(r"{\footnotesize\begin{tabular}{lrl}\toprule")
         L.append(r"File & Size & sha256 \\ \midrule")
-        for i in prov["inputs"][:12]:
-            name = Path(i["path"]).name
+        for i in data_in:
             mb = i.get("bytes", 0) / 1e6
-            L.append(f"{latex_escape(name)} & {mb:,.0f} MB & "
+            L.append(f"{latex_escape(str(i['path']))} & {mb:,.0f} MB & "
                      f"\\texttt{{{i.get('sha256_16', '')}}} \\\\")
         L.append(r"\bottomrule\end{tabular}}")
+        if derived:
+            L.append(rf"{{\footnotesize A further {derived} intermediate file(s) that "
+                     r"Stage 3 produced itself are recorded in the per-result "
+                     r"manifests under \texttt{data/}.}")
 
     L.append(r"\vfill")
     L.append(r"{\footnotesize " + NOT_DATA_FIGURES + r" of the paper are schematics drawn "

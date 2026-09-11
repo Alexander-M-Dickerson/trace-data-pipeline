@@ -112,7 +112,15 @@ FIRM_ID_COL = "permno"
 # The uncertainty grids fan out over fresh processes. On Windows the panel is re-pickled
 # into every worker, so returns flatten well before the core count does; the grids read
 # their own column slice per worker instead of inheriting the panel.
-N_WORKERS = int(os.environ.get("STAGE3_WORKERS", "0")) or None   # None = choose from cpu_count
+#
+# None means "decide from this machine": `fastrun.sized()` resolves it against
+# os.cpu_count() at the point of use, keeping workers x threads inside the core count.
+# Pin it with STAGE3_WORKERS, or per-run with each grid's --workers.
+N_WORKERS = int(os.environ.get("STAGE3_WORKERS", "0")) or None
+
+# DuckDB's ceiling for the daily-panel scans in the data appendix. None means "derive it
+# from free RAM at connection time" -- see s0_data/data_engine._con.
+MEMORY_LIMIT = os.environ.get("STAGE3_MEMORY_LIMIT") or None
 
 
 def missing_inputs() -> list[str]:

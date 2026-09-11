@@ -106,12 +106,33 @@ _QNAMES = ["P1", "P5", "P95", "P99"]
 
 
 def _con():
-    """An in-memory DuckDB connection sized to this machine -- nothing is written."""
+    """An in-memory DuckDB connection sized to this machine.
+
+    ❗This is the heaviest read in Stage 3 -- a full scan of a 31-million-row daily panel,
+    once pooled and once grouped by date, for each of nineteen variables. It is also the
+    SECOND step of forty, so a machine that cannot take it fails before anything else has
+    run.
+
+    So the limit is explicit and a spill directory is given. An uncapped connection takes
+    DuckDB's default share of RAM with nowhere to spill, which on a small machine is the
+    difference between slow and killed. Override with STAGE3_MEMORY_LIMIT (e.g. "6GB").
+    """
     import os
 
     import duckdb
     con = duckdb.connect()
     con.execute(f"SET threads={max(2, (os.cpu_count() or 4))}")
+    limit = os.environ.get("STAGE3_MEMORY_LIMIT")
+    if not limit:
+        try:                                   # psutil is optional; fall back politely
+            import psutil
+            limit = f"{max(2, int(psutil.virtual_memory().available / 2**30 * 0.6))}GB"
+        except Exception:                      # noqa: BLE001
+            limit = "4GB"
+    con.execute(f"SET memory_limit='{limit}'")
+    spill = paths.CACHE / "duckdb"
+    spill.mkdir(parents=True, exist_ok=True)
+    con.execute(f"SET temp_directory='{spill.as_posix()}'")
     con.execute("SET preserve_insertion_order=false")
     return con, paths.DAILY.as_posix()
 

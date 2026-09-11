@@ -161,6 +161,9 @@ def main() -> int:
     ap.add_argument("--n-jobs", type=int, default=6)
     ap.add_argument("--fast", action="store_true",
                     help="use PyBondLab's sort kernels (needs a build that has them)")
+    ap.add_argument("--force", action="store_true",
+                    help="accepted for symmetry with the other producers. This one has "
+                         "no skip-if-exists branch, so it always recomputes anyway")
     args = ap.parse_args()
 
     sys.stdout.reconfigure(encoding="utf-8")

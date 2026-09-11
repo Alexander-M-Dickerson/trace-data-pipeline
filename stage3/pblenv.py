@@ -34,6 +34,17 @@ from pathlib import Path
 import _stage3_settings as S
 
 _ACTIVE: dict | None = None
+_LOCATION: str | None = None
+
+# Where PyBondLab lives. Named here once so every message that needs it says the same
+# thing.
+#
+# ❗There is deliberately no minimum VERSION here. The released 0.2.0 does not carry the
+# fast kernels, and at the time of writing the build that does also reports 0.2.0 -- so a
+# version test would be wrong in both directions. `has_fast_kernels()` asks the question
+# that actually matters, by looking for the modules. Once a release carrying them is
+# published under its own version, state it here and in README_stage3.md.
+PYBONDLAB_URL = "https://github.com/GiulioRossetti94/PyBondLab"
 
 
 def _git(root: Path, *args: str) -> str | None:
@@ -99,10 +110,13 @@ def use(build_dir: str | Path | None = None, *, quiet: bool = False) -> dict:
             "  Something else on sys.path is shadowing the requested build.")
 
     pkg = resolved.parent
+    # ❗The RECORD is the build's identity -- version, git sha, content hash -- and
+    # deliberately not where it happens to sit on this disk. A manifest travels; a
+    # local path in it names someone's home directory and tells a reader nothing they
+    # can act on. `_LOCATION` keeps the path for the console line and for error
+    # messages, where it is exactly what you want, and never reaches a manifest.
     _ACTIVE = {
         "version": getattr(pbl, "__version__", "?"),
-        "path": str(root) if root else str(pkg.parent),
-        "module_file": str(resolved),
         "pinned": root is not None,
         "git_branch": _git(root, "rev-parse", "--abbrev-ref", "HEAD") if root else None,
         "git_sha": _git(root, "rev-parse", "HEAD") if root else None,
@@ -110,14 +124,21 @@ def use(build_dir: str | Path | None = None, *, quiet: bool = False) -> dict:
         "tree_sha256": tree_sha256(pkg)[:16],
         "has_fast_kernels": has_fast_kernels(),
     }
+    global _LOCATION
+    _LOCATION = str(root) if root else str(pkg.parent)
     if not quiet:
         a = _ACTIVE
         git = (f" {a['git_branch']}@{(a['git_sha'] or '')[:7]}"
                f"{'+dirty' if a['git_dirty'] else ''}") if a["git_sha"] else ""
         fast = "fast kernels: yes" if a["has_fast_kernels"] else "fast kernels: NO"
         print(f"[pblenv] PyBondLab v{a['version']} tree={a['tree_sha256']}{git}"
-              f"  {fast}  <- {a['path']}", flush=True)
+              f"  {fast}  <- {_LOCATION}", flush=True)
     return dict(_ACTIVE)
+
+
+def location() -> str:
+    """Where the active build was loaded from. For humans, never for a manifest."""
+    return _LOCATION or "(not selected)"
 
 
 def active() -> dict:
@@ -144,10 +165,14 @@ def require_fast(what: str) -> None:
     raise SystemExit(
         f"{what} needs PyBondLab's fast kernels (PyBondLab.fast_sorts and\n"
         "  PyBondLab.anomaly_assay_fast), and the build on sys.path does not have them.\n"
-        f"  Active build: {active().get('path') if _ACTIVE else '(not selected)'}\n"
-        "  Set PYBONDLAB_DIR to a checkout that carries them -- see README_stage3.md,\n"
-        "  section 'PyBondLab'. The sort and bias sections (--section lib/lab/zoo) run\n"
-        "  on the released PyBondLab without them.")
+        f"  Active build: {location()}"
+        + (f" (v{_ACTIVE['version']})" if _ACTIVE else "") + "\n"
+        f"  Get a build that does from {PYBONDLAB_URL}\n"
+        "  and either install it or point PYBONDLAB_DIR at the checkout.\n"
+        "\n"
+        "  Only the uncertainty grids (--section nse) need them. Sections 3 and 4 and\n"
+        "  the zoo run without: `python _run_stage3.py` detects their absence and takes\n"
+        "  the slow path automatically.")
 
 
 if __name__ == "__main__":
