@@ -9,7 +9,7 @@
 - [Contributing](#contributing)
 - [Academic Use](#academic-use)
 
-- [Stage 1 & 2](#stage-1--2)
+- [Stage 1, 2 & 3](#stage-1-2--3)
 - [Support](#support)
 ---
 
@@ -26,6 +26,7 @@ This is a **two-machine pipeline**, and the hand-off is a file you copy yourself
 | Stages 0 and 1 | **WRDS Cloud** | they read the raw TRACE tape, which is a WRDS database |
 | the hand-off | you | zip on WRDS, `scp` down (~6 GB) |
 | Stage 2 | **your own computer** | it reads only Stage 1's output file; no WRDS connection needed |
+| Stage 3 | **your own computer** | it reads only Stage 2's panel; optional, and no WRDS connection needed |
 
 ### Can I run Stages 0 and 1 on my own machine?
 Technically yes, with a working WRDS connection -- but you would be pulling hundreds of
@@ -53,6 +54,11 @@ Using `./run_pipeline.sh` (complete automated pipeline):
 
 **End to end: about 4.5-5 hours.** The 2026-09-09 production run took 4.63 h.
 
+Then, on your own machine: **Stage 2 about 8 minutes**, and **Stage 3 about 14 minutes**
+on 24 cores with a PyBondLab build carrying the fast kernels. Without those kernels Stage
+3 still runs, and the two uncertainty grids become the long part; see
+[stage3/README_stage3.md](stage3/README_stage3.md).
+
 ### What if I only want Enhanced TRACE?
 You can customize which datasets to process in `config.py` (applies to all stages):
 ```python
@@ -78,6 +84,11 @@ For Stage 0, you need:
 - SSH access to WRDS Cloud
 - `.pgpass` file configured for password-less authentication
 - Required Python packages (installed via `requirements.txt`)
+
+For Stage 3, one non-Python thing: **pdflatex** (TeX Live or MiKTeX), used by the last
+step to compile every exhibit into one PDF. `stage3/tools/check_inputs.py` warns when it
+is missing rather than failing -- without it you still get every table and figure as a
+file, you just do not get `reports/exhibits.pdf`.
 
 ---
 
@@ -703,7 +714,7 @@ Yes! For collaboration or complex use cases, email alexander.dickerson1@unsw.edu
 
 ---
 
-## Stage 1 & 2
+## Stage 1, 2 & 3
 
 ### Is Stage 1 available?
 **Yes!** Stage 1 is now in **public beta**. It enriches Stage 0 daily panels with:
@@ -739,6 +750,45 @@ rather than the TRACE tape. Every column is defined in
 
 **Status:** complete. The code is in this repository, and published vintages are available
 at [openbondassetpricing.com](https://openbondassetpricing.com).
+
+### What is Stage 3, and do I need it?
+Stage 3 is what the data was built for, and it is **optional**: Stages 0-2 build the
+panel, and the panel is useful on its own.
+
+It turns the Stage-2 monthly panel into portfolio sorts, two uncertainty grids, and
+**32 table files and 11 figures** reproducing *The Corporate Bond Factor Replication
+Crisis* -- main text, appendix and Internet Appendix -- ending in a single compiled
+`stage3/reports/exhibits.pdf`. Twenty-eight of the tables are the paper's; the other four
+are Stage 3's own.
+
+```bash
+cd stage3
+python tools/check_inputs.py     # are the five inputs there and the right shape?
+bash run_stage3.sh               # everything, ending in reports/exhibits.pdf
+```
+
+Like Stage 2, it runs on your own machine and opens no WRDS connection. 833 s -- just
+under 14 minutes -- on 24 cores, measured on a cold run. See [stage3/QUICKSTART_stage3.md](stage3/QUICKSTART_stage3.md).
+
+### Are Stage 3's numbers the paper's printed numbers?
+**No, and nothing in Stage 3 compares them to the paper's.** It produces exhibits from
+whatever panel Stage 2 built for you; the title page of `exhibits.pdf` says so. A PDF of
+tables under familiar captions is exactly the kind of artifact that gets mistaken for the
+original, so the document states it rather than leaving you to work it out.
+
+Two exhibits ship in **two variants**, because the published table and the paper's own
+definitions differ -- Table B.1 and Table IA.IX. Both are produced; neither is silently
+corrected.
+
+### Why does Stage 3 refuse to run Section 5?
+Section 5's two uncertainty grids need a PyBondLab build carrying `fast_sorts` and
+`anomaly_assay_fast`. The 0.2.0 release the repository pins does not have them, and Stage
+3 says so before fanning out rather than letting 108 workers each fail on an import.
+Point `PYBONDLAB_DIR` at a build that has them.
+
+Everything else runs on the pinned release: Stage 3 asks the installed engine once at
+startup and takes the slow path automatically, with the same numbers. The pin is not
+floated to fix this -- Stage 2's factor series depend on it exactly.
 
 ### What is redacted in the published panel?
 `permco` and `gvkey` are set to null, and `spc_rat`/`mdc_rat` are collapsed to investment

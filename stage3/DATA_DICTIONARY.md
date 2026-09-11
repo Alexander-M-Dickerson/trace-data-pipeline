@@ -103,7 +103,20 @@ One row per (date, spec, leg). 216 specs per signal: 2 weightings × 3 portfolio
 | `nbonds` | **realised** bonds held — how many were in the portfolio that earned the return, not how many were selected at formation |
 
 24 of the 216 are infeasible (an investment-grade breakpoint universe crossed with a
-high-yield rating filter) and are all-NaN rather than absent, so the frame is a rectangle.
+high-yield rating filter) and are all-NaN rather than absent.
+
+❗**Which cells are populated is not stable run to run.** `assay_anomaly_fast` is
+called with `skip_invalid=False`, so it always returns all 216 columns -- but a small
+number of restricted-breakpoint-universe cells (`ig_bp`, `lg_bp`) come back ALL-NaN in
+one run and fully populated in the next, over identical data, always in EW/VW pairs.
+Roughly 0.1-0.5% of the grid. **Values are bit-identical wherever a cell is populated**;
+it is presence that moves, and with it every count Section 5 prints.
+
+`s3_nse/run_mua_grid.py` measures this every run as `n_unstable_empty_cells` in its manifest.
+`mua_summarize` reindexes onto the full 216 -- derived from `mua_engines.all_spec_ids()`,
+not typed out -- so the SUMMARY is a rectangle regardless. An empty cell arrives there
+with `n_obs = 0` and no statistics, and `nse_engine._degenerates` excludes it. See
+README_stage3.md for what is fixed here and what is not.
 
 ### Data uncertainty — `data/grids/dua/series/<rating>/<signal>.parquet`
 

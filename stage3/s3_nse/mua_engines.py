@@ -82,8 +82,13 @@ def load_panel(signals: list[str], end: str | None = None) -> pd.DataFrame:
     where = f"WHERE date >= DATE '{DATE_START}'"
     if end:
         where += f" AND date <= DATE '{end}'"
+    # ❗ORDER BY is not cosmetic. DuckDB scans parquet in parallel and guarantees NO
+    # row order without one -- three consecutive loads of this panel come back in three
+    # different orders. PyBondLab's fast path takes the frame positionally, so an
+    # unordered panel makes the grid differ run to run.
     df = duckdb.sql(
-        f"SELECT {cols} FROM read_parquet('{p}') {where}").df()
+        f"SELECT {cols} FROM read_parquet('{p}') {where} "
+        "ORDER BY date, cusip").df()
     df["date"] = pd.to_datetime(df["date"])
     df["spc_rat"] = df["spc_rat"].astype("float64")        # nullable Int breaks numba
     dup = df.duplicated(["date", "cusip"]).sum()
@@ -171,10 +176,40 @@ def fast_specs() -> dict:
     }
 
 
+def all_spec_ids() -> list[str]:
+    """Every canonical spec id in the grid, in sorted order -- all 216 of them.
+
+    ❗Derived from `fast_specs()` rather than typed out. `run_fast` passes
+    `skip_invalid=False` so the engine returns all 216 columns every time, but a cell
+    it cannot form still comes back ALL-NaN, and which cells those are is not stable
+    run to run (see the note in `run_fast`). This is the fixed grid the summarizer
+    reindexes onto, so an absent or empty cell becomes a row with no observations
+    rather than a row that is simply missing.
+    """
+    g = fast_specs()
+    out = []
+    for w in g["weighting"]:
+        for n, q, _ in g["portfolio_structures"]:
+            for bp in g["bp_universes"]:
+                for rat in g["rating_filters"]:
+                    for mat in g["maturity_filters"]:
+                        out.append(f"{w}_{NPORT_CODE[n]}_{q}_{bp}_{rat}_{mat}")
+    assert len(out) == len(set(out)) == 216, len(out)
+    return sorted(out)
+
+
 def run_fast(data: pd.DataFrame, signal: str, verbose: bool = False,
              return_legs: bool = False, return_counts: bool = False,
              return_formation_counts: bool = False):
     """assay_anomaly_fast over the identical grid.
+
+    ❗`skip_invalid=False`, deliberately. With it True, PyBondLab's spec validator
+    drops cells it judges unformable and the returned COLUMN SET varies from run to
+    run over the same data -- measured on 12 signals, two runs, 36 cells appearing in
+    one and not the other. With it False the engine runs all 216 every time and hands
+    back an all-NaN column where it cannot form a portfolio, which is a fixed grid and
+    is what every exhibit downstream assumes. Verified on shared cells: the two
+    settings return bit-identical values (max|d| = 0).
 
     Returns (wide LS frame with canonical tuple columns, canon map, the result
     object). `return_legs` / `return_counts` add the long and short legs and their
@@ -192,7 +227,7 @@ def run_fast(data: pd.DataFrame, signal: str, verbose: bool = False,
         extra["return_formation_counts"] = True
     res = assay_anomaly_fast(
         data, signal, fast_specs(), holding_period=1, dynamic_weights=True,
-        validate=False, skip_invalid=True, verbose=verbose,
+        validate=False, skip_invalid=False, verbose=verbose,
         IDvar="cusip", DATEvar="date", RETvar="ret_vw", VWvar="mcap_e",
         RATINGvar="spc_rat", **extra)
     wide = res.returns_df.copy()

@@ -86,6 +86,59 @@ needs no WRDS connection.
   zip or on OSF, which is how a replication package normally travels, and a leak was found in
   one before the gate existed.
 
+### Reproducibility of Section 5
+
+Two defects were found by running the whole chain cold twice and diffing the grids.
+
+- **The panel reached PyBondLab in a different row order every run.** Both Section-5
+  producers read it through DuckDB, which scans parquet in parallel and guarantees no
+  order without an `ORDER BY` -- three consecutive loads came back in three different
+  orders. The engine's own contract depends on that order (its stable-sort argument is
+  what makes tied signal values land in the same portfolio twice running), so this was
+  a real defect on our side. Both loaders now sort by `(date, cusip)`.
+
+- **`skip_invalid=True` made the returned COLUMN SET vary.** The spec validator dropped
+  cells it judged unformable, and which ones differed run to run: on 12 signals, two
+  runs, 36 cells appeared in one and not the other. `assay_anomaly_fast` is now called
+  with `skip_invalid=False`, so it returns all 216 columns every time and hands back an
+  all-NaN column where it cannot form a portfolio. Verified on shared cells: the two
+  settings return **bit-identical** values. The grid is now a fixed rectangle, which is
+  what every exhibit downstream already assumed -- and `mua_summarize` reindexes onto
+  `mua_engines.all_spec_ids()` so the statistics frame is a rectangle regardless.
+
+❗**What remains is in the engine, and Stage 3 reports it rather than hiding it.** After
+both fixes, running the identical grid twice over identical data still flips a small
+number of restricted-breakpoint-universe cells (`ig_bp`, `lg_bp`) between a full
+279-month series and nothing at all, always in EW/VW pairs -- 6 of 2,592 cells on a
+12-signal A/B, 42 of 23,328 on the full grid. **Every populated cell is bit-identical
+between runs** (max|d| = 0 on every comparison run): no printed VALUE moves. What moves
+is how many construction paths there are, and so every count Section 5 reports.
+
+It is not the spec validator, not the numba cache, not the thread count, and not the
+panel's row order. It does not reproduce when the engine is called repeatedly inside
+one process -- only across the spawned workers.
+
+`s3_nse/run_mua_grid.py` therefore counts the affected cells every run, prints a warning
+and records `n_unstable_empty_cells` in its manifest so two runs can be compared; and
+`s3_nse/t06_mua_nse.py` **fails** its twin-invariance check when it bites, rather than
+printing a number as though nothing had happened. On the 2026-09-11 cold run, 39 of the
+40 steps pass and that one fails.
+
+### What it costs
+
+A cold run -- `data/` and `reports/` wiped first -- took **833 s (13.9 minutes)** on
+24 cores / 128 GB with a build carrying the fast kernels, 2026-09-11: Section 5 438 s
+(56%), Section 3 215 s, the data appendix 57 s, the zoo 55 s, Section 4 23 s. Inputs
+3.9 GB, outputs 348 MB, peak 0.7 GB per grid worker. `README_stage3.md` carries the
+per-step table, the recommended minimum (8 cores / 32 GB / ~5 GB disk, **derived from
+these measurements rather than tested**), and what to lower first on a smaller machine.
+
+`fastrun.sized()` now FITS whichever of workers/threads you did not pin around the one
+you did, instead of warning about the result. An argparse default is indistinguishable
+from a value the user typed, so the MUA grid's 3-thread default was taken beside an
+automatic worker count and gave 11 x 3 = 33 on a 24-core machine -- a warning printed on
+every run, on the machine the defaults were chosen for.
+
 ### Notes for anyone reading the output
 
 - ❗**Two exhibits ship in two variants**, because the published table and the paper's own

@@ -84,8 +84,9 @@ statistics layer, tables and figures:
 python _run_stage3.py --section lib
 ```
 
-About four minutes. You should end up with `reports/tables/table01.tex` and
-`reports/figures/fig03_cumret.pdf`.
+About four minutes on 24 cores with the kernels — 215 s of benched work in the cold
+run of 2026-09-11, most of it the four 108-signal sorts. You should end up with
+`reports/tables/table01.tex` and `reports/figures/fig03_cumret.pdf`.
 
 ## 4. Everything
 
@@ -93,8 +94,11 @@ About four minutes. You should end up with `reports/tables/table01.tex` and
 bash run_stage3.sh
 ```
 
-Roughly 25 minutes on 24 cores with the fast kernels. The two uncertainty grids are
-most of it.
+**833 s — just under 14 minutes** on 24 cores with the fast kernels, measured on a
+cold run (`data/` and `reports/` wiped first) on 2026-09-11. The two uncertainty grids
+are 56% of it. See **What it costs** in
+[README_stage3.md](README_stage3.md) for the per-section split, the disk and memory
+figures, and what to lower first on a smaller machine.
 
 A producer whose output already exists is **skipped**, so if a run stops you can simply
 run it again and it resumes. `--force` recomputes from scratch. `--keep-going` runs the

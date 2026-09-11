@@ -128,14 +128,16 @@ implementation bias the paper is about.
 **skipped when its output already exists**, so re-running after a crash resumes rather
 than restarting; `--force` recomputes.
 
-| section | producer | rough cost |
+Measured on the cold run of 2026-09-11, 24 cores with the kernels:
+
+| section | producer | cost |
 |---|---|---|
-| `lib` | the three approaches, all bonds and both rating splits | ~30 s each with the kernels |
-| `lib` | the 108-signal month-end/month-begin sorts, x4 | ~35 s each |
-| `lab` | the winsorization sweep, 2 tails x 3 ratings | ~15 s |
-| `nse` | the **MUA grid** — 108 signals x 216 method choices | ~3 min |
-| `nse` | the **DUA grid** — 108 signals x 120 filters x 3 ratings | ~6 min, then ~1 min for its statistics |
-| `zoo` | all 108 signals, single and within-firm | ~2 min |
+| `lib` | the three approaches, all bonds and both rating splits | 25–28 s each |
+| `lib` | the 108-signal month-end/month-begin sorts, x4 | 27–28 s each |
+| `lab` | the winsorization sweep, 2 tails x 3 ratings | 19 s |
+| `nse` | the **MUA grid** — 108 signals x 216 method choices | 142 s |
+| `nse` | the **DUA grid** — 108 signals x 120 filters x 3 ratings | 241 s, then 32 s for its statistics |
+| `zoo` | all 108 signals, single and within-firm | 49 s |
 
 **Exhibits** read those series and render. Seconds each, always re-rendered. The final
 step compiles them all into one PDF.
@@ -160,6 +162,51 @@ grids from minutes into hours — and is what the kernels are for.
 
 ---
 
+## What it costs
+
+Measured on a **cold run** — `data/` and `reports/` wiped first — on 24 cores / 128 GB, Windows, with a PyBondLab build carrying the fast kernels, 2026-09-11:
+
+**833 s = 13.9 minutes** end to end, `tools/check_inputs.py` through `reports/exhibits.pdf`.
+
+| section | `--section` | wall | share |
+|---|---|---|---|
+| Section 5 -- the two uncertainty grids | `nse` | 438 s | 56% |
+| Section 3 -- latent implementation bias | `lib` | 215 s | 27% |
+| data appendix | `data` | 57 s | 7% |
+| the factor zoo | `zoo` | 55 s | 7% |
+| Section 4 -- look-ahead bias | `lab` | 23 s | 3% |
+
+Those are the benched steps (787 s of the 833 s); the rest is process start-up, the 40 subprocess launches and the LaTeX compile. `reports/timings.jsonl` carries one line per step, and the run prints its own five slowest at the end.
+
+### Disk and memory
+
+- **Inputs**: 3.9 GB, of which the Stage-1 daily panel is most. They are read, never copied.
+- **Outputs**: about 348 MB under `data/` and `reports/` together. Both are gitignored.
+- **Peak per grid worker**: 0.7 GB, recorded by the grid itself as `max_worker_rss_gb` (needs `psutil`, which `requirements.txt` installs). The grids are bounded by cores, not by memory.
+
+### If your machine is smaller
+
+**Recommended minimum: 8 cores, 32 GB RAM, about 5 GB free disk.**
+
+❗That figure is **derived from the measurements above, not tested** — we have not run Stage 3 on an 8-core machine. It comes from the two numbers that actually bind: a producer holds the panel plus its own columns (3–4 GB), and a grid worker peaks well under 1 GB, so eight workers and the parent fit inside 32 GB with room to spare. Treat it as a starting point and watch the first grid.
+
+Everything scales down through flags rather than edits. Lower them in this order:
+
+1. **`--workers`** on `s3_nse/run_dua_grid.py` and `s3_nse/run_mua_grid.py`. Both now size themselves from `os.cpu_count()` and fit whichever of workers/threads you did not pin around the one you did, so on a smaller machine the defaults are already smaller. Pin it lower if memory, not cores, is your limit.
+2. **`--threads`** — numba threads per worker. Fewer, larger workers beat more, thinner ones once you are oversubscribed.
+3. **`--chunk`** on the DUA grid — signals per fit. Smaller chunks hold less at once and checkpoint more often.
+
+Two more knobs worth knowing:
+
+- `STAGE3_MEMORY_LIMIT` caps DuckDB in the data appendix, which is the step that scans the 31-million-row daily panel. Left unset it takes a share of free RAM; set it (`STAGE3_MEMORY_LIMIT=8GB`) if something else on the machine needs the memory.
+- `STAGE3_WORKERS` sets the default worker count for every fan-out at once, without touching a flag.
+
+**On 16 GB**, run section by section (`--section lib`, then `lab`, and so on) rather than the whole chain, and pin `--workers 4 --threads 2` on both grids. Section 5 is the one that will hurt; it is also the only section that needs the fast kernels.
+
+Without the fast kernels every sort takes roughly fourteen times as long (43.8 s against 3.2 s, measured on one), so the two grids become hours rather than minutes — which is why Stage 3 refuses to start them rather than letting you find out.
+
+---
+
 ## Conventions that will bite
 
 - Portfolio outputs are indexed by the **return realisation date (t+1)**, not the
@@ -181,6 +228,28 @@ grids from minutes into hours — and is what the kernels are for.
 - A duplicate `(cusip, date)` silently corrupts the sort rather than raising. Every
   producer checks.
 - Do not filter to `ret_type == 'standard'`: the published factors keep defaulted bonds.
+- ❗**Section 5's PATH COUNTS are not reproducible run to run, and the reason is in
+  PyBondLab.** Running the identical MUA grid twice over identical data flips a small
+  number of restricted-breakpoint-universe cells (`ig_bp`, `lg_bp`) between a full
+  279-month series and nothing at all, always in EW/VW pairs -- measured at roughly
+  0.1-0.5% of the 23,328 cells. **Every cell that is populated is bit-identical
+  between runs**: the arithmetic is stable, and no printed VALUE moves. What moves is
+  how many paths there are, and therefore every count Section 5 reports.
+
+  Two contributing causes are fixed here, and both were real: the panel was handed to
+  the engine in whatever order DuckDB's parallel scan produced (three consecutive
+  loads, three different orders -- now pinned with `ORDER BY date, cusip`), and
+  `skip_invalid` let the validator return a different COLUMN SET each run (now off, so
+  the grid is a fixed 216 columns). Together they halve it. The remainder is the
+  engine's own: it does not reproduce when `assay_anomaly_fast` is called repeatedly
+  inside one process, only across the spawned workers, and it is not the numba cache
+  or the thread count.
+
+  What Stage 3 does about it: `s3_nse/run_mua_grid.py` counts the affected cells every run,
+  prints a warning and records `n_unstable_empty_cells` in the manifest, so two runs
+  can be compared; `mua_summarize` reindexes onto the full 216 so the statistics frame
+  is a rectangle either way; and `s3_nse/t06_mua_nse.py` **fails** its twin-invariance check
+  when it bites, rather than printing a number as though nothing happened.
 - Three sample windows coexist. Section 3 and Section 5 run on a fixed T = 268 and
   assert it. Section 4's window **spans** 269 months, but its series are not all that
   long — each is its own length, T 257 to 268 in this build — so there is no single T to

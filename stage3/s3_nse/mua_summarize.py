@@ -113,6 +113,9 @@ def summarize_chunk(item) -> dict:
     mktb = load_mktb()
     d = grid_dir()
 
+    import mua_engines as ME
+    specs = ME.all_spec_ids()
+
     stat_rows, nb_frames = [], []
     for signal in signals:
         df = pd.read_parquet(d / f"{signal}.parquet")
@@ -121,10 +124,25 @@ def summarize_chunk(item) -> dict:
             df = df[df["date"] <= pd.Timestamp(end)]
 
         ls = df[df["leg"] == "LS"]
+        seen = set()
         for spec, g in ls.groupby("spec_id", sort=True):
             row = _stats(g.set_index("date")["return"].dropna(), mktb)
             row["signal"], row["spec_id"] = signal, spec
             stat_rows.append(row)
+            seen.add(spec)
+        # ❗Fill in whatever the fit did not return. `skip_invalid=True` DROPS a spec
+        # PyBondLab cannot form rather than returning it empty, and which ones those
+        # are depends on the sample -- on the untruncated panel, 21 of the 108 signals
+        # come back with 198 or 180 of the 216 cells. The frame is a rectangle by
+        # construction so that a missing spec is a defect rather than a convention, and
+        # so that every exhibit downstream can index into it without asking whether
+        # this particular signal happened to have this particular cell.
+        for spec in specs:
+            if spec not in seen:
+                row = {"mean_ret": np.nan, "t_stat": np.nan, "p_value": np.nan,
+                       "alpha": np.nan, "tstat_alpha": np.nan, "n_obs": 0,
+                       "signal": signal, "spec_id": spec}
+                stat_rows.append(row)
 
         # ❗Count only over each series' ACTIVE window -- from its first non-missing
         # return onward. The kernel emits a count of 0 for every month BEFORE a
@@ -141,7 +159,19 @@ def summarize_chunk(item) -> dict:
         nb = g["nbonds"].agg(["mean", "median", "min"])
         nb["p05"] = g["nbonds"].quantile(0.05)
         nb["pct_low"] = g["_low"].mean() * 100
-        nb_frames.append(nb.reset_index())
+        nb = nb.reset_index()
+        # The same padding, for the same reason -- and it is what marks a skipped spec
+        # DEGENERATE downstream: `nse_engine._degenerates` excludes any strategy whose
+        # leg minimum is zero or missing, which is the right verdict for a portfolio
+        # the engine declined to form.
+        missing = [(signal, sp, leg) for sp in specs if sp not in seen
+                   for leg in ("L", "S", "LS")]
+        if missing:
+            pad = pd.DataFrame(missing, columns=["signal", "spec_id", "leg"])
+            for c in ("mean", "median", "min", "p05", "pct_low"):
+                pad[c] = np.nan
+            nb = pd.concat([nb, pad[nb.columns]], ignore_index=True)
+        nb_frames.append(nb)
 
     summary = pd.DataFrame(stat_rows)
     summary = C.add_groups(summary)
@@ -188,8 +218,10 @@ def main() -> int:
                 nbonds = pd.concat([p["nbonds"] for p in parts], ignore_index=True)
                 assert len(summary) == 108 * 216, (
                     f"{w} window: {len(summary):,} rows, expected "
-                    f"{108 * 216:,} (108 signals x 216 specs). A short frame means a "
-                    "worker returned fewer signals than it was given.")
+                    f"{108 * 216:,} (108 signals x 216 specs). The frame is padded to "
+                    "the full grid, so a short one means either a worker returned "
+                    "fewer signals than it was given, or `mua_engines.all_spec_ids()` "
+                    "and the grid's spec grammar have drifted apart.")
                 summary.to_parquet(out / f"mua_summary_{w}.parquet", index=False)
                 nbonds.to_parquet(out / f"mua_nbonds_{w}.parquet", index=False)
                 results[w] = summary

@@ -37,17 +37,33 @@ def sized(n_items: int, workers: int | None = None, threads: int | None = None,
     than running the same work with fewer. Callers pass whatever the user asked for on
     the command line; this fills in the rest from the machine actually running it.
 
+    \u2757Pinning ONE of the two fits the OTHER around it. This matters because an
+    argparse default is indistinguishable from a value the user typed: the MUA grid
+    defaults to 3 threads, and taking the automatic worker count beside it gave 11 x 3
+    = 33 on a 24-core machine -- a warning printed on every run, on the machine the
+    defaults were chosen for. Fitting the free side is the fix; warning is not.
+
     `cap_workers` bounds the automatic answer where memory, not cores, is the limit.
     """
-    auto_w, auto_t = plan(n_items, min_threads=min_threads)
-    if cap_workers:
-        auto_w = min(auto_w, cap_workers)
-        auto_t = max(min_threads, max(2, CPU - 2) // max(1, auto_w))
-    w = max(1, workers or auto_w)
-    t = max(1, threads or auto_t)
+    usable = max(2, CPU - 2)                          # leave headroom, as plan() does
+    if workers and threads:
+        w, t = max(1, workers), max(1, threads)       # both pinned: the caller's call
+    elif threads:                                     # threads pinned -> fit workers
+        t = max(1, threads)
+        w = max(1, min(n_items, usable // t))
+    elif workers:                                     # workers pinned -> fit threads
+        w = max(1, workers)
+        t = max(min_threads, usable // w)
+    else:
+        w, t = plan(n_items, min_threads=min_threads)
+    if cap_workers and w > cap_workers:
+        w = max(1, cap_workers)
+        if not threads:
+            t = max(min_threads, usable // w)
+    w = max(1, min(w, n_items or 1))
     if w * t > CPU:
         print(f"[fastrun] workers x threads = {w * t} on {CPU} core(s) -- oversubscribed; "
-              "lower --workers or --threads if this runs slowly", flush=True)
+              "both were pinned, so nothing was adjusted", flush=True)
     return w, t
 
 

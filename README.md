@@ -26,7 +26,7 @@ Getting this straight first will save you an afternoon.
 | **1** | **WRDS Cloud** | Stages 0 and 1 build the daily bond panel from the raw TRACE tape | ~5 hours, mostly waiting |
 | **2** | **In between** | You zip the output on WRDS and copy it down to your own computer | ~15 min for ~6 GB |
 | **3** | **Your own computer** | Stage 2 turns that daily panel into the monthly asset-pricing panel | ~8 minutes |
-| **4** | **Your own computer** | Stage 3 turns the monthly panel into sorted portfolios and the paper's exhibits | ~25 minutes |
+| **4** | **Your own computer** | Stage 3 turns the monthly panel into sorted portfolios and the paper's exhibits | ~14 minutes |
 
 **Why the split?** Stages 0 and 1 read the raw TRACE transaction tape, which is a WRDS
 database — so they have to run where the data is, submitted to the WRDS job grid. Stage 2
@@ -410,19 +410,43 @@ trace-data-pipeline/
 │
 ├── smoke/                            # Scratch root for run_smoke_test.sh (auto-created)
 │
-└── stage2/                           # Monthly asset-pricing panel (runs on YOUR machine)
-    ├── _run_stage2.py                # Entry point
-    ├── _stage2_settings.py           # Settings + fail-loud input contract
-    ├── _build_data_report.py         # LaTeX/PDF data report
-    ├── make_release.py               # Packages a vintage for publication
-    ├── lib/                          # Engine: returns, illiquidity, betas, value, ...
-    │   └── contract.py               # The panel's frozen 140-column contract
-    ├── steps/                        # step1..step7 + the factor build
-    ├── tests/                        # Contract, parity and boundary gates
-    ├── DATA_DICTIONARY.md            # Every column, every factor model
-    ├── data/  output/  data_reports/ # Gitignored build artifacts
-    └── logs/
+├── stage2/                           # Monthly asset-pricing panel (runs on YOUR machine)
+│   ├── _run_stage2.py                # Entry point
+│   ├── _stage2_settings.py           # Settings + fail-loud input contract
+│   ├── _build_data_report.py         # LaTeX/PDF data report
+│   ├── make_release.py               # Packages a vintage for publication
+│   ├── lib/                          # Engine: returns, illiquidity, betas, value, ...
+│   │   └── contract.py               # The panel's frozen 140-column contract
+│   ├── steps/                        # step1..step7 + the factor build
+│   ├── tests/                        # Contract, parity and boundary gates
+│   ├── DATA_DICTIONARY.md            # Every column, every factor model
+│   ├── data/  output/  data_reports/ # Gitignored build artifacts
+│   └── logs/
+│
+└── stage3/                           # Sorts and the paper's exhibits (runs on YOUR machine)
+    ├── _run_stage3.py                # Entry point: 40 steps, producers then exhibits
+    ├── run_stage3.sh                 # Input contract, then the above
+    ├── _stage3_settings.py           # Every path and constant
+    ├── paths.py                      # Paths derived from the settings
+    ├── pblenv.py                     # Which PyBondLab, asserted and fingerprinted
+    ├── drrlib.py                     # Newey-West, CAPM_B alpha, paired difference, manifests
+    ├── fastrun.py                    # Process-parallel fan-out for the grids
+    ├── make_report.py                # Assembles every exhibit into one compiled PDF
+    ├── captions.py  bench.py  latex_format.py  helper_functions.py
+    ├── s0_data/                      # The data appendix
+    ├── s1_lib/                       # The paper's Section 3 - latent implementation bias
+    ├── s2_lab/                       # The paper's Section 4 - look-ahead bias
+    ├── s3_nse/                       # The paper's Section 5 - non-standard errors
+    ├── s4_zoo/                       # The factor zoo
+    ├── spec/inputs.json              # The five-file input contract
+    ├── tools/check_inputs.py         # Enforces it
+    ├── tests/                        # Contract, purge and structure gates
+    ├── README_stage3.md  QUICKSTART_stage3.md  DATA_DICTIONARY.md
+    └── data/  reports/               # Gitignored build artifacts
 ```
+
+> ⚠ **`s1_lib/` is the paper's Section 3 and `s3_nse/` its Section 5.** The folder
+> numbers are the order the sections were built, not the section numbers.
 
 ---
 

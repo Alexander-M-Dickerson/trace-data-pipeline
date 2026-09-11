@@ -96,7 +96,11 @@ def run_one(item) -> dict:
     root = Path(root_s)
     p = Path(paths.PANEL).as_posix()
     cols = ", ".join(f'"{c}"' for c in PANEL_BASE_COLS + list(signals))
-    data = duckdb.sql(f"SELECT {cols} FROM read_parquet('{p}')").df()
+    # ❗ORDER BY, for the same reason as in mua_engines.load_panel: DuckDB scans
+    # parquet in parallel and guarantees no row order without one, and PyBondLab's
+    # fast path consumes the frame positionally.
+    data = duckdb.sql(
+        f"SELECT {cols} FROM read_parquet('{p}') ORDER BY date, cusip").df()
     data["date"] = pd.to_datetime(data["date"])
     # the price the filters screen on. `bbtm` is 100/price, so this inverts it --
     # NOT a multiply, which would give a price of 100*100/price and screen nothing.
@@ -256,7 +260,7 @@ def stats_chunk(item) -> dict:
 
 def run_stats(args, root: Path, signals: list[str], b) -> dict:
     """Both windows from the saved series + the concatenated configs table."""
-    from fastrun import pmap
+    from fastrun import pmap, sized
 
     cfg_parts = sorted((root / "configs").glob("*.parquet"))
     cfg = pd.concat([pd.read_parquet(p) for p in cfg_parts], ignore_index=True)

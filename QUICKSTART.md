@@ -38,7 +38,7 @@ Before you start, know where you will be:
 | Stages 0 and 1 | **WRDS Cloud** | build the daily bond panel from the raw TRACE tape (~5 h) |
 | The hand-off | you | zip it on WRDS, `scp` it to your own computer (~6 GB) |
 | Stage 2 | **your own computer** | build the monthly panel from that file (~8 min) |
-| Stage 3 | **your own computer** | sorts, uncertainty grids and the paper's exhibits (~25 min, optional) |
+| Stage 3 | **your own computer** | sorts, uncertainty grids and the paper's exhibits (~14 min, optional) |
 
 Steps 1-3 below are all **on WRDS**. The switch to your own computer happens at
 [Download Results](#download-results-to-your-local-machine), and Stage 2 follows it.

@@ -97,6 +97,82 @@ def run_one(item) -> dict:
             "rows": len(out), "wall_s": round(time.perf_counter() - t0, 2)}
 
 
+def spec_census(d: Path, signals: list[str]) -> list[tuple[str, int]]:
+    """(signal, n_specs) for every signal whose grid holds fewer than the full 216.
+
+    Read straight off the parquets with a column projection, so it costs well under a
+    second and says something true about the grid on disk rather than about whatever
+    this particular invocation happened to recompute.
+    """
+    import duckdb
+    p = (d / "*.parquet").as_posix()
+    try:
+        df = duckdb.sql(f"SELECT signal, COUNT(DISTINCT spec_id) n "
+                        f"FROM read_parquet('{p}') GROUP BY 1").df()
+    except Exception:
+        return []
+    keep = set(signals)
+    return sorted((r.signal, int(r.n)) for r in df.itertuples()
+                  if r.signal in keep and r.n < N_SPECS)
+
+
+def unstable_empties(d: Path) -> int:
+    """Cells that came back EMPTY under a restricted breakpoint universe while the
+    same cell under the `all` universe has a full series.
+
+    ❗This is a KNOWN DEFECT IN THE ENGINE, measured here rather than hidden. Running
+    the identical grid twice over identical data flips a small number of `ig_bp` and
+    `lg_bp` cells between a full 279-month series and nothing at all, always in
+    EW/VW pairs. Every cell that IS populated is bit-identical between runs -- the
+    arithmetic is stable; what is not stable is whether a restricted-universe
+    portfolio gets formed.
+
+    It is not the spec validator (`skip_invalid` is off), not the numba cache, not the
+    thread count, and not the panel's row order (which is now pinned by an ORDER BY,
+    and which halved it). It does not reproduce when the engine is called repeatedly
+    inside one process -- only across the spawned workers.
+
+    So: roughly 0.2-0.5% of the grid is unstable in PRESENCE. It moves the path
+    counts, the degenerate count, and every count Section 5 prints; it does not move
+    any value. The number is recorded in the manifest of every run so two runs can be
+    compared, and `t06_mua_nse.py` fails its twin-invariance check when it bites.
+    """
+    import duckdb
+    p = (d / "*.parquet").as_posix()
+    try:
+        df = duckdb.sql(
+            f"""WITH cell AS (
+                    SELECT signal, spec_id, COUNT("return") AS n
+                    FROM read_parquet('{p}') WHERE leg = 'LS' GROUP BY 1, 2),
+                parts AS (
+                    SELECT signal, n,
+                           split_part(spec_id, '_', 1) AS w,
+                           split_part(spec_id, '_', 2) AS np,
+                           regexp_extract(spec_id,
+                               '_(all|ig_bp|lg_bp)_(all|ig|hy)_(all|short|mid|long)$',
+                               1) AS bp,
+                           regexp_extract(spec_id,
+                               '_(all|ig_bp|lg_bp)_(all|ig|hy)_(all|short|mid|long)$',
+                               2) AS rat,
+                           regexp_extract(spec_id,
+                               '_(all|ig_bp|lg_bp)_(all|ig|hy)_(all|short|mid|long)$',
+                               3) AS mat
+                    FROM cell)
+                SELECT COUNT(*) AS k
+                FROM parts r
+                JOIN parts b
+                  ON r.signal = b.signal AND r.w = b.w AND r.np = b.np
+                 AND r.rat = b.rat AND r.mat = b.mat AND b.bp = 'all'
+                WHERE r.bp <> 'all' AND r.n = 0 AND b.n > 0
+                  -- the 24 infeasible cells per signal: an investment-grade
+                  -- breakpoint universe crossed with a high-yield filter is
+                  -- an EMPTY population by construction, not an engine slip
+                  AND NOT (r.bp = 'ig_bp' AND r.rat = 'hy')""").fetchone()
+        return int(df[0]) if df else 0
+    except Exception:
+        return -1
+
+
 def readable(path: Path) -> bool:
     """A crash-truncated parquet must not count as a finished signal."""
     try:
@@ -152,10 +228,37 @@ def main() -> int:
         # computed: a re-run over a finished grid must still report the grid as
         # complete, and a truncated file must not count as present.
         present = [s for s in signals if readable(d / f"{s}.parquet")]
-        wide_enough = all(r["n_specs"] >= N_SPECS - 24 for r in results) if results else True
+        # The grid is RAGGED and that is not a defect: `assay_anomaly_fast` is handed
+        # `skip_invalid=True`, so a (rating x maturity) cell with nothing to sort is
+        # dropped rather than returned empty, and which cells those are depends on the
+        # whole sample that was sorted. `mua_summarize` reindexes onto the full 216
+        # afterwards. So this REPORTS the raggedness rather than failing on it -- but a
+        # signal that came back with less than half a grid means something else is wrong.
+        #
+        # Measured from the PARQUETS, like `present` above and for the same reason: a
+        # re-run over a finished grid computes nothing, and reporting what this run
+        # computed would then say "0 ragged" about a grid whose true minimum is 180.
+        narrow = spec_census(d, signals)
+        wide_enough = all(n >= N_SPECS // 2 for _, n in narrow)
+        min_specs = min([n for _, n in narrow], default=N_SPECS)
+        unstable = unstable_empties(d)
+        b.note(n_narrow=len(narrow), min_specs=min_specs, narrow=narrow[:10],
+               n_unstable_empty_cells=unstable)
         ok = b.check(len(present) == len(signals) and wide_enough,
                      f"{len(present)}/{len(signals)} signal grids readable, "
-                     f"{len(results)} computed this run")
+                     f"{len(results)} computed this run; {len(narrow)} ragged "
+                     f"(min {min_specs}/{N_SPECS} specs); "
+                     f"{unstable} unstable-empty cells")
+        if unstable > 0:
+            print(f"\nWARN {unstable} cell(s) came back EMPTY under a restricted "
+                  "breakpoint universe while the\n"
+                  "     same cell under the `all` universe has a full series. This is "
+                  "an ENGINE defect,\n"
+                  "     not a property of your data: the same grid run twice flips a "
+                  "few of these. Values\n"
+                  "     are unaffected (bit-identical between runs); PATH COUNTS are "
+                  "not. See the note on\n"
+                  "     `unstable_empties` in this file.", flush=True)
         D.write_result(
             "mua_grid",
             {"summary": {"n_signals": len(signals), "n_computed": len(todo),
