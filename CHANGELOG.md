@@ -7,44 +7,102 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Nothing pending.
+
+---
+
+## [3.1.0] - 2026-09-11
+
+**Public-readiness.** Stages 0-2 were complete but the repository was not something to hand a
+stranger: it named a private repository, carried a personal WRDS account, cited three dozen
+documents that do not exist here, and shipped two scripts that fail on a fresh clone. This
+release is that clean-up, plus the sample-end fix the 2026 vintage needed.
+
+### Added
+
+- **`stage0/DATA_DICTIONARY.md`** -- Stage 0 had no data dictionary. The only complete column
+  list lived in the FAQ; `README.md` documented 16 of the 21 panel columns and
+  `stage0/README_stage0.md` 14. The new dictionary covers the 21-column bond-day panel and the
+  **23-column FISD attribute file**, which was undocumented anywhere despite being an input to
+  both Stage 1 and Stage 2.
+- **Column-input classification** in `stage2/lib/contract.py` -- every panel column is now
+  classified by what it is computed FROM: signed trade prints, within-month daily returns,
+  trade dates, or factors that are themselves built from the trade tape. 51 of the 140 need
+  something beyond a month-end price. `column_input()` answers it for one column.
+- **`contract.assert_mmn_twins`** -- every price-based signal must have its unadjusted
+  `<col>_mmn` twin in the sidecar. Both forms are published, and pairing them the wrong way
+  round is the mistake it exists to stop: on short-term reversal the unadjusted form has
+  AR(1) -0.22 against the adjusted form's -0.05. Called by step 7 against the sidecar it just
+  wrote.
+- **`stage2/tests/test_propagation_drill.py`** -- skips each step of adding a column and proves
+  the matching gate fires.
+
 ### Changed
 
-- **`DATE_CUT_OFF` now defaults to `"auto:complete"`** — the last month for which every
-  source has data through the month's final trading session. The previous default,
-  `"auto:-3mo"`, existed because TRACE is revised after the fact and the newest months
-  are unsettled, but it measures three whole months back from a date that is itself
-  mid-month, so it discards complete months. Measured on the 2026-09-10 run: Enhanced
-  ends 2025-12-04, so `auto:-3mo` cut at 2025-09-30 and threw away October and November.
-  Both are ordinary months — 11,848 and 11,612 Enhanced bonds at 10.9 and 11.1 trades per
-  bond-day, against a 2025 range of 11.3–11.9k bonds and 10–12 trades. Only December is
-  unusable: Enhanced stops on the 4th and no bond trades in its last seven days.
-  `auto:complete` returns 2025-11-30 on that run, which is exactly the usable frontier.
-
-  The month's final trading session is taken from the data, not from an exchange
-  calendar, so a month whose last session is the 28th is not mistaken for a short one. A
-  month is only a candidate if it has at least 80% of the trailing median number of
-  trading days, which stops a frontier month where every source happens to stop on the
-  same mid-month day from passing as complete. `auto:-Nmo` still works and still resolves
-  against the least current source; use it to reproduce an older vintage.
+- **`DATE_CUT_OFF` now defaults to `"auto:complete"`** -- the last month for which every source
+  has data through its final trading session. `"auto:-3mo"` measures three whole months back
+  from a date that is itself mid-month, so it discards complete months: on the 2026-09-10 run
+  Enhanced ends 2025-12-04, so it cut at 2025-09-30 and threw away October and November. Both
+  are ordinary months -- 11,848 and 11,612 Enhanced bonds at 10.9 and 11.1 trades per bond-day,
+  against a 2025 range of 11.3-11.9k bonds and 10-12 trades. Only December is unusable:
+  Enhanced stops on the 4th and no bond trades in its last seven days. `auto:complete` returns
+  2025-11-30 there. The month's final session is taken from the data, not an exchange calendar,
+  so a month whose last session is the 28th is not mistaken for a short one, and a month needs
+  at least 80% of the trailing median number of trading days to qualify. `auto:-Nmo` still
+  works, for reproducing an older vintage.
+- **Provenance of the pre-2002 factor backfill is now stated precisely.** It is estimated on
+  the **Lehman Brothers Fixed Income Data** (also known as the Warga Fixed Income data) and the
+  investment-grade and high-yield **Bank of America (BAML) constituent bonds** distributed by
+  the **Intercontinental Exchange (ICE)**. Those bond data are licensed and cannot be
+  redistributed; the finished factor series can be, and is published.
+- **`stage2/DATA_DICTIONARY.md` documents the redaction.** It described full identifiers and a
+  1..22 rating scale while the release README told downloaders those columns were nulled and
+  collapsed -- the two disagreed about the file in the user's hands.
+- **`returns_alt`'s five columns** moved from prose bullets to dictionary rows, and
+  `test_column_contract.py` now checks that file. Adding a column to it previously failed
+  nothing, anywhere.
+- **`QUICKSTART.md` covers Stage 2**, which it had never mentioned, and its file tree carries
+  `stage2/`. **`CONTRIBUTING.md`** names pytest and the one command that runs ~110 tests, and
+  states that five of six `stage2/tests/test_column_contract.py` tests skip without a built
+  panel -- so that gate passes vacuously on a fresh clone.
 
 ### Fixed
 
-- **The `auto:-Nmo` basis was the POOLED last trade date**, which is 144A's. TRACE
-  Enhanced and 144A/BTDS are different populations on different reporting lags. From the
-  2026-09-10 run's log: pooled last trade `2026-06-05`, Enhanced max `2025-12-04`,
-  `auto:-3mo` resolved to `2026-03-31` — every month from 2025-12 on is one in which no
-  Enhanced bond can have a month-end price, so the monthly panel emitted months that are
-  not cross-sections (the last held 1,914 bonds, 100% 144A, against a trailing median of
-  ~10,700 at ~22%). The spec is now measured from the least current source. Standard
-  (db_type 2) is not a separate population — Stage 1 clips it to start where Enhanced
-  ends — so it is taken together with Enhanced. New: `_stage1_settings.cut_off_basis` /
-  `last_complete_month` / `resolve_cut_off_from_data` / `source_frontiers`,
-  `tests/test_cut_off_basis.py` (19 tests), and per-population frontiers in the Stage 1 log.
-- **`stage2/validate_stage2.py --help` raised `KeyError: 'returns'`.** The CLI built
-  argparse's `choices` from `_specs()`, which indexed `GOLDEN_OUTPUTS` unguarded; that dict
-  is empty in a public clone, so the exception fired before argparse could print anything.
-  Steps without a configured golden are now skipped, and `--step all` with none configured
-  says so and exits 1. Covered by `stage2/tests/test_validate_cli.py`.
+- ❗**`stage2/check_external_data.py` raised `KeyError` on a fresh clone.** It indexed
+  `AUX["moody"]` and `AUX["sp"]`, which this configuration does not define, while building its
+  source list at import time -- so it failed before `main()` ran, for exactly the people it is
+  for. `AUX` and `GOLDEN_OUTPUTS` are now read as the optional things they are.
+- **`stage2/tests/test_pin_golden.py` used `cfg.GOLDEN_DAILY_INPUT`**, which is defined
+  nowhere. It is `cfg.daily_input()`.
+- **The `auto:-Nmo` basis was the POOLED last trade date**, which is 144A's. From the
+  2026-09-10 log: pooled last trade `2026-06-05`, Enhanced max `2025-12-04`, `auto:-3mo`
+  resolved to `2026-03-31` -- every month from 2025-12 on is one in which no Enhanced bond can
+  have a month-end price. The spec is now measured from the least current source; Standard
+  (db_type 2) is not a separate population, since Stage 1 clips it to start where Enhanced
+  ends. New: `_stage1_settings.cut_off_basis` / `last_complete_month` /
+  `resolve_cut_off_from_data` / `source_frontiers`, and `tests/test_cut_off_basis.py`.
+- **`stage2/validate_stage2.py --help` raised `KeyError: 'returns'`** -- the CLI built
+  argparse's `choices` from a dict that is empty in a public clone, so the exception fired
+  before argparse could print anything. Covered by `stage2/tests/test_validate_cli.py`.
+- **Documentation that told a reader something false**: the version footer said 2.2.3 against
+  a 3.0.0 CHANGELOG; Stage 2 was badged `IN DEVELOPMENT` nine lines above "Code complete";
+  `stage2/README_stage2.md` said "the build engine lands next" after the engine shipped and was
+  released; the FAQ invited people to email for beta access to code already in the repository.
+  The row counts in `README.md` and `FAQ.md` quoted the run the cut-off bug produced
+  (28,662,808 rows to 2025-12-31) rather than the shipped 31,344,732 to 2025-11-28; "50+
+  signals" against the actual 108; and the repository tree pointed at a Stage 1 reports
+  directory that does not exist.
+
+### Removed
+
+- **The private-panel registry left `stage2/lib/contract.py`.** It described two panels this
+  repository cannot build -- their external filenames, a frontier pin and a pre-2002 coverage
+  gate with no code path here. What replaced it is more useful to a public reader: the
+  column-input classification above.
+- **Pointers a reader cannot follow** -- a private repository and two files inside it, an
+  internal handover document, an assumptions ledger, a debug log, line-number citations into a
+  reference implementation that is not distributed, and the internal gate IDs. The substance
+  stays; the coordinates do not. Also a personal WRDS account and login hostname.
 
 ---
 
@@ -70,8 +128,21 @@ earlier work would have produced.
 - **The data report** — `_build_data_report.py` + `run_build_data_reports.sh`: 14 tables and
   11 figures, and a PDF where `pdflatex` exists. Comparison suites against the DFPS and
   WRDS bond databases are on by default; `--no-external` drops them and needs no network.
-- **`make_release.py`** — packages a vintage with provenance, deriving the year from the
-  data rather than hard-coding it.
+- ❗**`make_release.py` REDACTS the panel before publishing it, and refuses to package one
+  that is not redacted.** This is the most consequential fact about the published file and it
+  was missing from these notes. `permco` and `gvkey` are set to null and `spc_rat`/`mdc_rat`
+  are collapsed to investment grade (1) against non-investment-grade and default (11);
+  `permno` is kept. The identifiers are proprietary and the agency ratings are licensed, so
+  **REDISTRIBUTION** is restricted -- a panel you build from your own WRDS subscription keeps
+  every identifier and the full 1..22 scale. `assert_publishable` refuses a frame that still
+  carries them, and `stage2/tests/test_release_redaction.py` (10 tests) pins both halves.
+  The packager also derives the vintage year from the data rather than hard-coding it.
+- **`lib/frontier.py`** -- refuses to publish a final month that is not a real cross-section.
+  Stage 1 pools TRACE Enhanced with 144A, which report on different lags; when the cut-off
+  lands where Enhanced has a few days and 144A has the full month, the panel still emits that
+  month but only 144A bonds have a month-end price. Measured on the 2026-09-09 run: 1,914
+  bonds, 100% 144A, against a trailing median of ~10,700 at ~22%. `make_release` stops unless
+  `--truncate-frontier` is given. `stage2/tests/test_frontier.py`, 9 tests.
 - **Published factor panel** — `factors_<YYYY>.parquet` ships with each vintage, so
   `--factor-source pinned` reproduces a released number exactly. Public factor sources
   revise; without the pin, next month's build would not match this month's release.
