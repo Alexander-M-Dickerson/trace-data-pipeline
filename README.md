@@ -44,17 +44,17 @@ Enriches Stage 0 daily panels with comprehensive bond analytics and characterist
 **Execution:** WRDS Cloud or your home machine (WRDS subscription required)
 **Documentation:** See [stage1/README_stage1.md](stage1/README_stage1.md) and [stage1/QUICKSTART_stage1.md](stage1/QUICKSTART_stage1.md)
 
-### Stage 2: Monthly Panel with Factor Signals  **IN DEVELOPMENT**
+### Stage 2: Monthly Panel with Factor Signals
 Produces a clean, error-corrected monthly panel with dozens of corporate bond signals for asset pricing research:
-- 50+ bond characteristic signals
+- 108 bond characteristic signals across 140 panel columns
 - Credit risk factors
 - Liquidity measures
 - Momentum and reversal signals
 - Carry and value signals
 - Ready-to-use for monthly portfolio construction -- see [PyBondLab](https://github.com/GiulioRossetti94/PyBondLab/tree/main/examples)
 
-**Status:** Code complete and in this repository -- builds, tested, gated
-**Release:** First published data vintage pending
+**Status:** Complete -- builds, tested, gated, and released
+**Release:** Published vintages at [openbondassetpricing.com](https://openbondassetpricing.com)
 **Execution:** Your own machine, NOT the WRDS grid (a WRDS subscription is still required)
 
 ---
@@ -66,7 +66,7 @@ Produces a clean, error-corrected monthly panel with dozens of corporate bond si
 - **Stage 2**: 🔨 **Code available** - Builds the monthly panel from your Stage 1 output; the first published data vintage is still to come
 
 **This project is under active development and any feedback is greatly appreciated.**
-Please reach out to `alexander.dickerson1@unsw.edu.au` if you would like to collaborate or beta test.
+Please reach out to `alexander.dickerson1@unsw.edu.au` if you would like to collaborate.
 
 ---
 
@@ -325,8 +325,9 @@ trace-data-pipeline/
 │   │   ├── Siccodes12.txt            # FF12 industry file
 │   │   ├── Siccodes17.txt            # FF17 industry file
 │   │   ├── Siccodes30.txt            # FF30 industry file
-│   │   └── reports/                  # Data quality reports
+│   │   └── data_reports/             # Ultra-distressed filter report
 │   │
+│   ├── data_reports/                 # Stage 1 data-quality report (LaTeX/PDF)
 │   └── logs/                         # Execution logs (auto-created)
 │
 ├── smoke/                            # Scratch root for run_smoke_test.sh (auto-created)
@@ -363,7 +364,7 @@ Stage 0 produces daily panels in dataset-specific subfolders with the following 
 - `data_reports/standard/` - Standard TRACE reports
 - `data_reports/144a/` - Rule 144A reports
 
-**Column structure:**
+**Column structure** (21 columns; every one defined in [stage0/DATA_DICTIONARY.md](stage0/DATA_DICTIONARY.md)):
 
 | Column | Description |
 |--------|-------------|
@@ -381,7 +382,7 @@ Stage 0 produces daily panels in dataset-specific subfolders with the following 
 | `prc_ask` | Dealer ask (value-weighted) |
 | `prc_lo` | Low price of the day |
 | `prc_hi` | High price of the day |
-| `bid_count` | Number of buys |
+| `bid_count` | Number of dealer buys (= customer sells) |
 | `ask_count` | Number of sells |
 
 **Expected output size:**
@@ -513,7 +514,8 @@ All prices are in **percentage of par**.
 - All `prc_*` prices are in percentage of par (99 = 99% of $1,000 = $990)
 
 ### Stage 2 Output
-Monthly panel with 50+ corporate bond signals ready for asset pricing research.
+Monthly panel of 140 columns carrying 108 corporate bond signals, ready for asset pricing
+research, plus the unadjusted `_mmn` twins and the factor time series.
 
 ---
 
@@ -533,8 +535,10 @@ Using `./run_pipeline.sh` (complete automated pipeline from ROOT):
   member submitted, and runs ALONGSIDE Stage 1 rather than before it
 - **Stage 1 - Bond analytics**: **~2.5-3 hours** (waits for the Stage 0 DATA jobs)
 
-**End to end: about 4.5-5 hours.** The 2026-09-09 production run took 4.63 h wall clock
-(20:41 -> 01:19) and produced a 28,662,808-row Stage 1 panel covering 2002-07 to 2025-12.
+**End to end: about 4.5-5 hours.** The 2026-09-10 production run took 4.6 h wall clock and
+produced a 31,344,732-row Stage 1 panel over 70,684 CUSIPs, covering 2002-07-01 to
+2025-11-28 -- the sample end being set by `DATE_CUT_OFF = "auto:complete"`, the last month
+every source covers through its final trading session.
 
 **How it works:**
 The script uses SGE's `-hold_jid` to create automatic dependency chains:
@@ -624,4 +628,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Last Updated:** September 2026
-**Version:** 2.2.3 — see [CHANGELOG.md](CHANGELOG.md) for what each release changed.
+**Version:** 3.1.0 — see [CHANGELOG.md](CHANGELOG.md) for what each release changed.

@@ -116,9 +116,9 @@ def test_every_panel_column_is_in_the_data_dictionary():
 def test_the_dictionary_documents_nothing_that_does_not_exist():
     """Every dictionary entry must be a real column of a real published artifact.
 
-    Three artifacts carry documented names: the panel, the factor series it was estimated
-    on, and the `_mmn` sidecar of unadjusted twins. Anything else is an invention or a
-    leftover from a column that has since been renamed or dropped.
+    Four artifacts carry documented names: the panel, the factor series it was estimated
+    on, the `_mmn` sidecar of unadjusted twins, and returns_alt. Anything else is an
+    invention or a leftover from a column that has since been renamed or dropped.
     """
     panel = _panel_path()
     if panel is None:
@@ -132,6 +132,9 @@ def test_the_dictionary_documents_nothing_that_does_not_exist():
     sidecars = sorted(blocks.glob("mmn_price_based_signals_*.parquet"))
     if sidecars:
         real |= _columns(sidecars[-1])
+    alt = blocks / "returns_alt_final.parquet"
+    if alt.exists():
+        real |= _columns(alt)
 
     orphans = sorted(_dictionary_mnemonics() - real)
     assert not orphans, (
@@ -191,3 +194,21 @@ def test_no_two_panel_columns_are_bit_identical():
         f"{len(dupes)} pair(s) of panel columns are BIT-IDENTICAL: {dupes}\n"
         f"  Two names for one column means one of the two is not the variable it claims "
         f"to be.")
+
+
+def test_every_published_alternative_return_is_documented():
+    """`returns_alt_<YYYY>.parquet` is published, so its columns need dictionary rows.
+
+    They used to exist only as prose bullets, which put them outside every gate: adding a
+    column to that file failed nothing, anywhere.
+    """
+    panel = _panel_path()
+    if panel is None:
+        pytest.skip("no built panel under output/panel/; run a build first")
+    alt = _blocks_for(panel) / "returns_alt_final.parquet"
+    if not alt.exists():
+        pytest.skip(f"no {alt.name} for this build")
+    undocumented = sorted(_columns(alt) - _dictionary_mnemonics())
+    assert not undocumented, (
+        f"{len(undocumented)} returns_alt column(s) have no DATA_DICTIONARY.md row: "
+        f"{undocumented}")

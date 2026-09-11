@@ -469,8 +469,8 @@ PY
 ```
 
 A healthy full run is tens of millions of rows spanning 2002-07 to your data frontier.
-For reference, the 2026-09-09 production run produced 28,662,808 rows over 70,189 CUSIPs
-covering 2002-07-01 to 2025-12-31, and its `stage1.err` held 683 lines that were *all*
+For reference, the 2026-09-10 production run produced 31,344,732 rows over 70,684 CUSIPs
+covering 2002-07-01 to 2025-11-28, and its `stage1.err` held 683 lines that were *all*
 this one harmless pattern.
 
 **What WOULD indicate a real failure:** a non-zero exit status from the job, a `stage1.out`
@@ -720,11 +720,14 @@ It runs on **your own machine**, not the WRDS grid, because it reads Stage 1's o
 rather than the TRACE tape. Every column is defined in
 [stage2/DATA_DICTIONARY.md](stage2/DATA_DICTIONARY.md).
 
-**Status:** the code is in this repository and builds. The first published data vintage
-is still to come.
+**Status:** complete. The code is in this repository, and published vintages are available
+at [openbondassetpricing.com](https://openbondassetpricing.com).
 
-### Can I beta test Stage 2?
-Yes! Email alexander.dickerson1@unsw.edu.au to express interest in beta testing Stage 2.
+### What is redacted in the published panel?
+`permco` and `gvkey` are set to null, and `spc_rat`/`mdc_rat` are collapsed to investment
+grade (1) versus non-investment-grade and default (11). `permno` is kept. This applies to the
+REDISTRIBUTED file only -- a panel you build yourself from your own WRDS subscription keeps
+every identifier and the full 1-22 rating scale.
 
 ---
 

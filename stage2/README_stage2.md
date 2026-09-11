@@ -3,9 +3,10 @@
 Stage 2 turns Stage 1's daily bond-day panel into the **monthly asset-pricing panel**:
 returns, bond characteristics, ~100 signals, factor time series, and rolling factor betas.
 
-> **Status:** under construction. The configuration layer (`_stage2_settings.py`,
-> `_run_stage2.py`, `run_stage2.sh`) is in place and `--dry-run` works today. The build
-> engine lands next.
+> **Status:** complete. Seven steps, a frozen 140-column contract asserted at the end of
+> every build, and a release packager that refuses to publish an unredacted panel.
+> `python _run_stage2.py --dry-run` resolves and validates the configuration without
+> building anything.
 
 ---
 

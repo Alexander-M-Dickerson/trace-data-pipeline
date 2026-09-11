@@ -24,7 +24,8 @@ This document describes the variables computed in the Stage 2 bond data pipeline
    - [Cluster VIII: Volatility & Liquidity Betas](#cluster-viii-volatility--liquidity-betas)
    - [Cluster IX: Macro & Other Betas](#cluster-ix-macro--other-betas)
 
-3. [Bond Returns](#bond-returns)
+3. [Redaction: the file you download is not the file the pipeline builds](#redaction-the-file-you-download-is-not-the-file-the-pipeline-builds)
+4. [Bond Returns](#bond-returns)
    - [Month-End Return (`ret_vw`)](#month-end-return-ret_vw)
    - [Month-Begin Return (`ret_vw_bgn`)](#month-begin-return-ret_vw_bgn)
    - [Implementation Gap (`igap_bgn`)](#implementation-gap-igap_bgn)
@@ -34,13 +35,13 @@ This document describes the variables computed in the Stage 2 bond data pipeline
    - [Feasibility Bias](#feasibility-bias)
    - [Excess and Duration-Adjusted Returns](#excess-and-duration-adjusted-returns)
 
-4. [Defaulted Bond Returns](#defaulted-bond-returns)
+5. [Defaulted Bond Returns](#defaulted-bond-returns)
    - [Default Identification](#default-identification)
    - [Standard Return (Non-Default)](#standard-return-non-default)
    - [Default Event Return](#default-event-return)
    - [Trading Under Default (Flat Return)](#trading-under-default-flat-return)
 
-5. [Technical Appendix](#technical-appendix)
+6. [Technical Appendix](#technical-appendix)
    - [Factor Models](#factor-models)
    - [Duration-Adjusted Factor Substitution](#duration-adjusted-factor-substitution)
    - [Estimation Methodology](#estimation-methodology)
@@ -52,7 +53,7 @@ This document describes the variables computed in the Stage 2 bond data pipeline
    - [Within-Month Risk Statistics](#within-month-risk-statistics)
    - [Output Files](#output-files)
 
-6. [References](#references)
+7. [References](#references)
 
 ---
 
@@ -88,14 +89,26 @@ The short-term reversal signal can be computed as the current `str` variable min
 
 ### Alternative Month-End Returns
 
-For researchers requiring alternative return measures, we provide `returns_alt_<YYYY>.parquet`, which includes:
-- `ret_vwp`: Returns computed using par-weighted prices on day $d$
-- `ret_ew`: Returns computed using equal-weighted prices on day $d$
-- `ret_1st`: Returns computed using the first available trade price on day $d$
-- `ret_lst`: Returns computed using the last available trade price on day $d$
-- `ret_bid`: Returns computed using the volume-weighted average bid price on day $d$
+For researchers requiring alternative return measures, we publish
+`returns_alt_<YYYY>.parquet`. It is keyed on `cusip` + `date` like the main panel, and each
+column differs from `ret_vw` only in which price is used at each month end:
+
+| Column | Type | Definition |
+|---|---|---|
+| `cusip` | string | 9-character bond CUSIP. Panel key with `date`. |
+| `date` | datetime | Calendar month end. Panel key with `cusip`. |
+| `ret_vwp` | float32 | Return computed from **par-weighted** prices on day $d$. |
+| `ret_ew` | float32 | Return computed from **equal-weighted** prices on day $d$. |
+| `ret_1st` | float32 | Return computed from the **first** available trade price on day $d$. |
+| `ret_lst` | float32 | Return computed from the **last** available trade price on day $d$. |
+| `ret_bid` | float32 | Return computed from the volume-weighted average **bid** price on day $d$. |
+| `tret` | float32 | Duration-matched Treasury return, as in the main panel. |
 
 where day $d$ is in the last 5 business days of months $t$ and $t+1$.
+
+All five return measures use the same total-return construction as `ret_vw` -- the coupon is
+carried through accrued interest, not inferred from a dirty-price ratio -- so they differ from
+each other and from `ret_vw` only in the price input.
 
 ---
 
@@ -119,8 +132,8 @@ For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month r
 | `date` | Date | True month-end date (YYYY-MM-DD). |
 | `issuer_cusip` | Issuer CUSIP | 6-digit firm identifier (first 6 digits of CUSIP). |
 | `permno` | CRSP PERMNO | CRSP permanent security identifier. |
-| `permco` | CRSP PERMCO | CRSP permanent company identifier. |
-| `gvkey` | Compustat GVKEY | Compustat global company key. |
+| `permco` | CRSP PERMCO | CRSP permanent company identifier. **Null in the published file** -- see *Redaction* below. |
+| `gvkey` | Compustat GVKEY | Compustat global company key. **Null in the published file** -- see *Redaction* below. |
 | `hprd` | Holding Period | Month-end holding period in calendar days. |
 | `lib` | Latent Implementation Bias | Clean price return from month-end to month-begin: $\text{LIB} = P_{t+1}^{bgn} / P_t^{end} - 1$. |
 | `libd` | LIB (Dirty) | LIB computed using dirty prices (includes accrued interest and coupon). |
@@ -148,8 +161,8 @@ For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month r
 
 | Mnemonic | Name | Description |
 |----------|------|-------------|
-| `spc_rat` | S&P Composite Rating | Composite credit rating: S&P rating if available, otherwise Moody's rating. Scale: 1 (AAA) to 21 (CCC-), 22 = Default. |
-| `mdc_rat` | Moody's Composite Rating | Composite credit rating: Moody's rating if available, otherwise S&P rating. Scale: 1 (AAA) to 21 (CCC-), 22 = Default. |
+| `spc_rat` | S&P Composite Rating | Composite credit rating: S&P rating if available, otherwise Moody's rating. Scale: 1 (AAA) to 21 (CCC-), 22 = Default. **Collapsed to {1, 11} in the published file** -- see *Redaction* below. |
+| `mdc_rat` | Moody's Composite Rating | Composite credit rating: Moody's rating if available, otherwise S&P rating. Scale: 1 (AAA) to 21 (CCC-), 22 = Default. **Collapsed to {1, 11} in the published file** -- see *Redaction* below. |
 | `call` | Callable Indicator | Indicator for embedded call option (1 = callable, 0 = non-callable). |
 | `fce_val` | Face Value | Bond amount outstanding (face value); units of the bond outstanding. |
 | `144a` | Rule 144A Indicator | Dummy variable: 1 if bond is Rule 144A, 0 otherwise. |
@@ -327,6 +340,28 @@ For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month r
 | `b_eput` | Trade Policy Uncertainty Beta | Beta on trade policy uncertainty index level. |
 
 ---
+
+
+## Redaction: the file you download is not the file the pipeline builds
+
+Four columns differ between a panel **you build** from your own WRDS subscription and the panel
+**published** at openbondassetpricing.com. The identifiers are proprietary and the agency ratings
+are licensed, so redistribution is restricted -- building them yourself is not.
+
+| column | in your build | in the published file |
+|---|---|---|
+| `permno` | populated | **populated** (kept) |
+| `permco` | populated | null |
+| `gvkey` | populated | null |
+| `spc_rat` | 1..22 | 1 = investment grade, 11 = non-investment grade and default |
+| `mdc_rat` | 1..22 | 1 = investment grade, 11 = non-investment grade and default |
+
+A bond with no rating stays missing in both -- it is never silently labelled investment grade.
+
+This is applied by `make_release.redact_for_publication`, and `make_release.assert_publishable`
+refuses to package a frame that still carries full identifiers or raw ratings. Measured against
+the released vintage: `permco` and `gvkey` are 100% null there, ratings take only {1, 11}, while
+the raw build has them 86.6% / 86.4% populated on the 1..22 scale.
 
 ## Bond Returns
 

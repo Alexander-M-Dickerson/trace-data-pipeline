@@ -29,7 +29,7 @@ in the schema, and the largest drops ~9% of bond-days.
 | **Format** | Apache Parquet (columnar, compressed) |
 | **Structure** | Panel data: one row per (cusip_id, trd_exctn_dt) |
 | **Size** | ~500MB - 2GB (depending on time period) |
-| **Rows** | ~30 million (full sample 2002-present) |
+| **Rows** | ~31 million (full sample 2002-present; 31,344,732 in the 2026 vintage) |
 | **Columns** | 44 |
 | **Download** | Available in zipped parquet format on [Open Bond Asset Pricing](https://openbondassetpricing.com/data) |
 

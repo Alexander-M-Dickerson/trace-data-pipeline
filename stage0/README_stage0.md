@@ -753,13 +753,16 @@ data/
 - Logs contain timestamps, row counts, filter statistics, and any errors
 
 **Daily panels** (Parquet format, in respective subfolders):
-- `enhanced/trace_enhanced_YYYYMMDD.parquet`: Enhanced TRACE daily panel (~30 million rows for full sample)
+- `enhanced/trace_enhanced_YYYYMMDD.parquet`: Enhanced TRACE daily panel (~31 million rows for the full sample)
 - `standard/trace_standard_YYYYMMDD.parquet`: Standard TRACE daily panel
 - `144a/trace_144a_YYYYMMDD.parquet`: Rule 144A daily panel
 
-All panels have identical column structure:
+All panels have identical column NAMES -- 21 of them, every one defined in
+[DATA_DICTIONARY.md](DATA_DICTIONARY.md). Column ORDER is not part of the contract and does
+differ between members.
 - **Keys**: `cusip_id`, `trd_exctn_dt`
-- **Prices**: `prc_ew`, `prc_vw`, `prc_vw_par`, `prc_first`, `prc_last`, `trade_count`
+- **Prices**: `prc_ew`, `prc_vw`, `prc_vw_par`, `prc_first`, `prc_last`, `prc_hi`, `prc_lo`
+- **Trade timing**: `time_ew`, `time_last`
 - **Volumes** (millions): `qvolume`, `dvolume`
 - **Bid/Ask**: `prc_bid`, `prc_ask`, `bid_count`, `ask_count`
 
