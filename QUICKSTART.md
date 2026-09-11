@@ -251,11 +251,17 @@ ssh {wrds_username}@wrds-cloud.wharton.upenn.edu
 
 **Create the zip file in scratch space:**
 ```bash
-cd /scratch/{institution}/
-zip -r trace-data-pipeline.zip ~/trace-data-pipeline/
+cd ~
+zip -r /scratch/{institution}/trace-data-pipeline.zip trace-data-pipeline/
 ```
 
 This compresses the folder and stores it in scratch space, avoiding home directory quota issues.
+
+> ❗`zip` stores whatever path you hand it. Given the absolute `~/trace-data-pipeline/`,
+> it strips the leading `/` and stores `home/{institution}/{wrds_username}/trace-data-pipeline/...`,
+> so the archive extracts four directories deep. Run it from `~` on a **relative** path,
+> as above, and the archive extracts to a single clean `trace-data-pipeline/` folder.
+
 
 ### Step 2: Download the Zip File to Your Local Machine
 
@@ -513,7 +519,7 @@ ls -lh stage1/data/stage1_*.parquet
 # Download (from local machine) - see "Download Results" section above
 # Step 1: SSH to WRDS and zip to scratch
 ssh {wrds_username}@wrds-cloud.wharton.upenn.edu
-cd /scratch/{institution}/ && zip -r trace-data-pipeline.zip ~/trace-data-pipeline/
+cd ~ && zip -r /scratch/{institution}/trace-data-pipeline.zip trace-data-pipeline/
 
 # Step 2: Download zip (from LOCAL machine)
 scp {wrds_username}@wrds-cloud.wharton.upenn.edu:/scratch/{institution}/trace-data-pipeline.zip ./

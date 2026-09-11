@@ -335,9 +335,11 @@ The pipeline generates a large folder (~6 GB) with hundreds of files. **Zip the 
 # Connect to WRDS
 ssh {wrds_username}@wrds-cloud.wharton.upenn.edu
 
-# Zip to scratch space (your home directory has limited quota)
-cd /scratch/{institution}/
-zip -r trace-data-pipeline.zip ~/trace-data-pipeline/
+# Zip to scratch space (your home directory has limited quota).
+# Run from ~ on a RELATIVE path: zip stores the path you give it, so an absolute
+# ~/trace-data-pipeline/ makes the archive extract four directories deep.
+cd ~
+zip -r /scratch/{institution}/trace-data-pipeline.zip trace-data-pipeline/
 ```
 
 **Step 2: Download the zip file (from your LOCAL machine)**
