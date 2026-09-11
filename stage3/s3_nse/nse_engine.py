@@ -239,21 +239,71 @@ def dua_baseline_values(baselines_df: pd.DataFrame, col: str) -> dict[str, float
 MUA_SUMMARY_DIR = paths.DATA / "s3_nse" / "mua_summary"
 
 
-def _degenerates(window: str) -> set[str]:
-    """Strategies that are degenerate: a leg that is EMPTY in some month inside its
-    active window, so the "portfolio" return for that month is not a portfolio return.
+def load_ledger(window: str) -> pd.DataFrame:
+    """The status ledger: one row per (signal, spec_id), all 23,328 of them.
 
-    Derived from the realised bond counts rather than declared, so it follows the
-    data. Excluded from every printed MUA statistic.
+    ❗THE single source of truth about which construction paths exist. Every
+    denominator Section 5 prints is derived from this frame and nowhere else, because
+    the alternative -- each exhibit inferring the answer from whichever artifact it
+    happened to read -- is what let Table 6 print 18,064, Table IA.XVIII print 18,038,
+    and Table IA.XIX build a pool on the first while IA.XVIII used the second.
+
+    Written by `mua_summarize.py`. See its STATUSES for the vocabulary.
     """
-    nb = pd.read_parquet(MUA_SUMMARY_DIR / f"mua_nbonds_{window}.parquet")
-    nb = C.exclude_redundant(nb, twin="feb")   # twin choice cannot matter: the
-    # dropped twin's counts are identical to its kept partner's
-    mins = nb.pivot_table(index=["signal", "spec_id"], columns="leg",
-                          values="min", aggfunc="first")
-    bad = mins[(mins.get("L") == 0) | (mins.get("S") == 0)
-               | mins.get("L").isna() | mins.get("S").isna()].index
-    return {f"{s}__{sp}" for s, sp in bad}
+    f = MUA_SUMMARY_DIR / f"mua_status_{window}.parquet"
+    if not f.exists():
+        raise SystemExit(
+            f"the MUA status ledger is not at {f}.\n"
+            "  Run `python s3_nse/mua_summarize.py` (it writes the ledger beside the "
+            "summary).")
+    led = pd.read_parquet(f)
+    assert len(led) == 23_328, (
+        f"the ledger has {len(led):,} rows, expected 23,328 (108 signals x 216 specs). "
+        "Every cell of the grid gets exactly one status; a short ledger means the "
+        "summarizer did not see the whole grid.")
+    return led
+
+
+def usable(window: str, twin: str) -> pd.Index:
+    """The (signal, spec_id) pairs that are well-defined factor return series.
+
+    The twin pair is a LABELLING choice -- `feb` keeps `all_ig` (the paper's printed
+    labels), `mar14` keeps `ig_bp_ig` -- so the ledger stores both an applied `status`
+    (feb) and an `intrinsic_status` (twin-agnostic), and this picks the right one.
+    """
+    led = load_ledger(window)
+    if twin == "feb":
+        keep = led["status"] == "ok"
+    elif twin == "mar14":
+        keep = (led["intrinsic_status"] == "ok") & (led["twin_member"] != "all_ig")
+    else:
+        raise ValueError(f"unknown twin convention: {twin!r} (mar14|feb)")
+    return pd.MultiIndex.from_frame(led.loc[keep, ["signal", "spec_id"]])
+
+
+def twin_asymmetry(window: str) -> list[str]:
+    """Twin pairs where one member is usable and the other is not.
+
+    The two conventions are supposed to be a relabelling: `all_ig` and `ig_bp_ig` are
+    the same portfolio reached two ways, so which one you keep cannot move a number.
+    That holds only while BOTH members exist. When the engine forms one and not the
+    other (AF14), the conventions select different data and every cluster statistic
+    moves -- which is what `t06_mua_nse.py`'s invariance check detects.
+
+    Returns the `signal__spec_id` of the usable member of each broken pair, so a failure
+    can name the cause instead of just a tolerance.
+    """
+    led = load_ledger(window).set_index(["signal", "spec_id"])
+    out = []
+    for (sig, spec), row in led[led["twin_member"] == "all_ig"].iterrows():
+        partner = spec.replace("_all_ig_", "_ig_bp_ig_")
+        if (sig, partner) not in led.index:
+            continue
+        a_ok = row["intrinsic_status"] == "ok"
+        b_ok = led.loc[(sig, partner), "intrinsic_status"] == "ok"
+        if a_ok != b_ok:
+            out.append(f"{sig}__{spec if a_ok else partner}")
+    return sorted(out)
 
 
 def load_mua_paths(twin: str, window: str = "paper") -> pd.DataFrame:
@@ -274,27 +324,47 @@ def load_mua_paths(twin: str, window: str = "paper") -> pd.DataFrame:
         f"the MUA summary has {len(df)} rows, expected 23,328 (108 signals x 216 "
         "specs). Re-run `python s3_nse/mua_summarize.py`; a short frame means the "
         "grid behind it is incomplete.")
-    degen = _degenerates(window)
-    sid = df["signal"] + "__" + df["spec_id"]
-    df = df[~sid.isin(degen)]
-    df = C.exclude_redundant(df, twin=twin)
+    led = load_ledger(window)
+    keep = usable(window, twin)
+    df = df.set_index(["signal", "spec_id"])
+    df = df.loc[df.index.isin(keep)].reset_index()
     assert 17_000 < len(df) <= 18_144, f"analysis set {len(df)}"
+    # ❗Nothing without a series may be counted as a construction path. The old rule
+    # could not see these at all: a cell with no return never reached the bond-count
+    # frame the check read, so 26 all-NaN cells sat inside n_paths, contributing nothing
+    # to any statistic while inflating every denominator built on it.
+    assert int((df["n_obs"] == 0).sum()) == 0, (
+        f"{int((df['n_obs'] == 0).sum())} cells with no observations are in the analysis "
+        "set. The ledger classifies those `no_series`; they must never reach here.")
     df = df.copy()
     for c in ("mean_ret", "alpha"):
         df[c] = df[c] * 100.0                      # decimals -> percent, once
     df = C.parse_spec_id_cols(df)
     df = C.add_groups(df)
-    df.attrs.update({"window": window, "n_degenerate": len(degen),
-                     "n_paths": len(df)})
+    hist = led["status"].value_counts().astype(int).to_dict()
+    df.attrs.update({"window": window, "twin": twin,
+                     "n_degenerate": hist.get("empty_leg", 0),
+                     "n_no_series": hist.get("no_series", 0),
+                     "n_by_status": hist, "n_paths": len(df)})
     return df
 
 
 def mua_cluster_summary(paths_df: pd.DataFrame) -> pd.DataFrame:
-    """Table 6: NSE by cluster over all 18,128 paths (baseline specs INCLUDED).
+    """Table 6: NSE by cluster over every usable path (baseline specs INCLUDED).
 
     Sign-corrected on VW_Qp_Q_all_all_all. ❗Ratio uses INDEPENDENT skipna on
     std(value) and mean(SE) -- the OPPOSITE of the DUA cluster table's pairwise
     rule (convention 2).
+
+    ❗`n_paths` here is `len(sub)`, while the DUA table's is `len(premia.dropna())`.
+    Both print under the same `$N$` header and they now agree, because the analysis set
+    can no longer contain a path with no series -- the ledger classifies those
+    `no_series` and they never arrive. Before that they did, and this column printed 26
+    more than the sample its own means and quantiles were computed over.
+
+    The path count is NOT pinned to a constant. It follows the data, and while AF14 is
+    open it moves between runs; `df.attrs["n_by_status"]` records the whole histogram so
+    two runs can be compared.
     """
     signed = C.apply_sign_correction(paths_df, TABLE_BASELINE)
     signed = signed[signed["group"].notna()].copy()
@@ -333,6 +403,11 @@ def mua_improvement_counts(paths_df: pd.DataFrame,
     single baseline spec, so the other five *_all_all_all twins can count as
     improvements; the DENOMINATOR excludes all six per signal. Using one pool for
     both undercounts.
+
+    ❗The pool is whatever the ledger says is usable, less the six `*_all_all_all`
+    per signal. It is DERIVED, not pinned: while the engine's restricted-universe cells
+    flip between runs (AF14) the absolute size moves, but the relationship to Table 6's
+    N does not -- and that relationship is what the tests check.
 
     `expected_denominator` pins the pool size when you know it; pass None to record
     it instead, which is what you want whenever the degenerate set can differ.
@@ -374,30 +449,23 @@ def load_mua_nbonds(twin: str, window: str = "paper") -> pd.DataFrame:
     ❗108 x 216 x 3 legs is 69,984, which is also the DUA path count. They are
     unrelated numbers that happen to coincide; do not read one as a check on the other.
 
-    Degenerates are re-derived from the counts themselves -- a leg whose minimum is
-    zero or missing -- rather than declared anywhere.
+    ❗Its strategy set is THE SAME SET Table 6 reports, taken from the same ledger.
+    It used to re-derive the degeneracy rule from this frame -- a second copy of the
+    same nine lines -- which is how the two tables came to print different totals for
+    the same quantity (18,038 here against 18,064 there). The frame the rule was
+    derived from could not contain a cell with no series, so it silently agreed with
+    the right answer for the wrong reason.
     """
     nb = pd.read_parquet(MUA_SUMMARY_DIR / f"mua_nbonds_{window}.parquet")
-    # the summarizer's active-window mask drops never-active series (at minimum the
-    # 24 infeasible ig_bp x hy per signal): 108 x 192 x 3 = 62,208 when nothing else
-    # is dead, fewer only if a leg never activates at all
-    assert 60_000 < len(nb) <= 108 * 192 * 3, (
-        f"the MUA bond-count frame has {len(nb):,} rows, expected between 60,000 and "
-        f"{108 * 192 * 3:,}. Below the floor means the grid is incomplete; above "
-        "the ceiling means the infeasible ig_bp x hy cells were not dropped.")
-    nb = C.exclude_redundant(nb, twin=twin)
-    mins = nb.pivot_table(index=["signal", "spec_id"], columns="leg",
-                          values="min", aggfunc="first")
-    degen_keys = mins[(mins.get("L") == 0) | (mins.get("S") == 0)
-                      | mins.get("L").isna() | mins.get("S").isna()].index
-    derived = {f"{s}__{sp}" for s, sp in degen_keys}
+    keep = usable(window, twin)
     ls = nb[nb["leg"] == "LS"].set_index(["signal", "spec_id"])
-    ls = ls[~ls.index.isin(degen_keys)].reset_index()
+    ls = ls.loc[ls.index.isin(keep)].reset_index()
     assert 17_000 < len(ls) <= 18_144, f"strategy set {len(ls)}"
     ls = C.parse_spec_id_cols(ls)
     ls["tailbin"] = pd.cut(ls["mean"], bins=[-np.inf, 200, 600, np.inf],
                            labels=["<200", "200-600", ">600"])
-    ls.attrs.update({"window": window, "n_degenerate": len(derived),
+    hist = load_ledger(window)["status"].value_counts().astype(int).to_dict()
+    ls.attrs.update({"window": window, "n_degenerate": hist.get("empty_leg", 0),
                      "n_strategies": len(ls)})
     return ls
 

@@ -41,7 +41,9 @@ from bench import Bench     # noqa: E402
 LABEL = "tab:mua_portfolio_size"
 COLS = [("avg", "Average", 1), ("med", "Median", 1), ("min", "Min", 1),
         ("p05", "5th pct.", 1), ("pct_low", r"\%Low", 1), ("n_spec", r"$N$", 0)]
-LOW_THRESHOLD = 20
+from mua_summarize import LOW_BOND_THRESHOLD as LOW_THRESHOLD   # noqa: E402
+# ❗Imported, not restated. The printed footnote below quotes this number and the
+# `pct_low` column is COMPUTED from it -- two copies could disagree silently.
 
 
 def render_latex(df: pd.DataFrame) -> str:
@@ -114,6 +116,10 @@ def main() -> int:
             "maturity": ["Maturity: All", "Maturity: Short",
                          "Maturity: Intermediate", "Maturity: Long"],
             "bp": ["BP: Full universe", "BP: IG bonds", "BP: Large bonds"],
+            # ❗The tail bins partition the strategies too, and were the one grouping
+            # nothing checked. In the printed paper all five groupings sum to the same
+            # 18,128; that identity is the property worth enforcing.
+            "tailbin": ["Tail bin: <200", "Tail bin: 200-600", "Tail bin: >600"],
         }
         sums = {k: int(ours[ours["row"].isin(v)]["n_spec"].sum())
                 for k, v in partitions.items()}

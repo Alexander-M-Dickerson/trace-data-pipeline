@@ -106,12 +106,27 @@ def main() -> int:
                               "window": args.window, "twin": args.twin})
         b.note(window=args.window, twin=args.twin, n_paths=mua.attrs["n_paths"],
                n_signals_flipped=len(flips), twin_invariance=twin_max_d)
-        # The two label conventions cover the same portfolios, so a cell can only
-        # differ by float reassociation -- not by content.
+        # The two label conventions are supposed to cover the same portfolios, so a
+        # cell could only differ by float reassociation. That holds while BOTH members
+        # of each twin pair exist; when the engine forms one and not the other, the
+        # conventions select different DATA and the statistics genuinely move.
+        broken = E.twin_asymmetry(args.window)
+        if broken:
+            print(f"\nWARN the twin conventions disagree, and the reason is in the data:"
+                  f"\n     {len(broken)} twin pair(s) have one member usable and the "
+                  "other with no series at all,"
+                  "\n     so `feb` and `mar14` select different data, not different "
+                  "labels."
+                  "\n     Examples: " + ", ".join(broken[:3])
+                  + "\n     This is the engine defect AF14. No VALUE is wrong; the "
+                    "cluster statistics move"
+                    "\n     because the two sets are not the same set.", flush=True)
         ok = b.check(len(ours) == 10 and twin_max_d <= TWIN_TOL,
                      f"{len(ours)} rows over {mua.attrs['n_paths']:,} paths; "
                      f"twin convention moves no cell (max|d|={twin_max_d:.2e}, "
-                     f"tolerance {TWIN_TOL:g})")
+                     f"tolerance {TWIN_TOL:g})"
+                     + (f"; {len(broken)} twin pair(s) asymmetric" if broken
+                        else ""))
 
     print(f"\nTable 6 ({LABEL}), window={args.window}: "
           f"{mua.attrs['n_paths']:,} paths, {len(flips)} signals flipped")
