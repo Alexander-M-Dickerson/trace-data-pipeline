@@ -166,7 +166,7 @@ join key for the previous issuer-month linker and is no longer used; derive it a
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `db_type` | Int8 | Source TRACE database: 1=Enhanced, 2=Standard, 3=144A. ❗**2 never appears.** Standard is opt-in and, when run, survives only for dates after the last Enhanced date — which the trailing `DATE_CUT_OFF` always precedes. Filtering `db_type == 2` returns zero rows by construction. |
+| `db_type` | Int8 | Source TRACE database: 1=Enhanced, 2=Standard, 3=144A. ❗**2 does not appear in the default configuration.** Standard is opt-in (`TRACE_MEMBERS` is `enhanced 144a`), and when it is run it survives only for dates after the last Enhanced date. Under the old trailing `DATE_CUT_OFF` that window was always cut away, so `db_type == 2` returned zero rows by construction; under `auto:complete` it can survive, because Standard extends the same public tape rather than being a separate population. |
 
 ---
 

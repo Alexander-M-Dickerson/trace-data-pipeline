@@ -81,15 +81,24 @@ if N_CORES is None:
 #                 in the stage0 data. Resolved at run time, so the sample end
 #                 tracks the data instead of needing an edit every vintage.
 #
-# The default keeps a three-month trailing buffer. TRACE is revised after the
-# fact -- cancellations, corrections and reversals arrive for weeks -- so the
-# most recent months are not yet settled and are held out of the sample.
+#   "auto:complete" the last month for which EVERY source has data through the
+#                 month's final trading session. This is the default.
+#
+# Why "auto:complete" rather than a trailing buffer. The buffer existed because
+# TRACE is revised after the fact -- cancellations, corrections and reversals
+# arrive for weeks -- but a WRDS pull is a settled historical file, and stepping
+# back three whole months from a date that is itself mid-month throws away
+# complete months. Measured on the 2026-09-10 run: Enhanced ends 2025-12-04, so
+# "auto:-3mo" cut at 2025-09-30 and discarded October and November, both of which
+# are ordinary months -- 11,848 and 11,612 bonds, 10.9 and 11.1 trades per
+# bond-day, against a 2025 range of 11.3-11.9k bonds and 10-12 trades. Only
+# December is unusable, and "auto:complete" is exactly what excludes it.
 #
 # Note this buffer means Standard TRACE (db_type=2) never survives: step 2 keeps
 # Standard only for dates AFTER the last Enhanced date, and any trailing cutoff
 # falls before that, so the two conditions cannot both hold. That was already
 # true of the previous fixed date; it is stated here so it is not a surprise.
-DATE_CUT_OFF = "auto:-3mo"
+DATE_CUT_OFF = "auto:complete"
 
 # --- Output Settings ---
 # OUTPUT_FORMAT is imported from shared config.py
@@ -352,6 +361,66 @@ def cut_off_basis(df, db_type_col="db_type", date_col="trd_exctn_dt"):
     """
     fr = source_frontiers(df, db_type_col=db_type_col, date_col=date_col)
     return min(fr.values()) if fr else df[date_col].max()
+
+
+def last_complete_month(df, db_type_col="db_type", date_col="trd_exctn_dt",
+                        min_days_share=0.8, trailing=12):
+    """The last month-end every population covers to the end of the month.
+
+    A month is COMPLETE for a population when that population has a trade on or after the
+    month's last trading day. The last trading day is taken from the data itself -- the
+    maximum trade date observed in that month across all sources -- so no exchange calendar
+    is needed and a month whose last session is the 28th is not mistaken for a short one.
+
+    A month is only a candidate if it has at least `min_days_share` of the trailing median
+    number of trading days. That is what stops a frontier month in which EVERY source
+    happens to stop on the same mid-month day from being called complete.
+
+    Returns a "YYYY-MM-DD" string, or None if no month qualifies.
+    """
+    import pandas as pd
+
+    d = df[[db_type_col, date_col]].copy()
+    d[date_col] = pd.to_datetime(d[date_col])
+    month = d[date_col].values.astype("datetime64[M]")
+    by_month = pd.DataFrame({"m": month, "dt": d[date_col].values})
+    last_session = by_month.groupby("m")["dt"].max()
+    n_sessions = by_month.groupby("m")["dt"].nunique()
+
+    # Drop months that are short against their own recent history (a partial frontier month).
+    med = n_sessions.shift(1).rolling(trailing, min_periods=3).median()
+    full = n_sessions[(med.isna()) | (n_sessions >= min_days_share * med)]
+
+    pop_max = {label: d.loc[d[db_type_col].isin(types), date_col].max()
+               for label, types in CUT_OFF_POPULATIONS.items()}
+    pop_max = {k: v for k, v in pop_max.items() if pd.notna(v)}
+    if not pop_max:
+        return None
+
+    covered = [m for m in full.index
+               if all(mx >= last_session[m] for mx in pop_max.values())]
+    if not covered:
+        return None
+    return (pd.Timestamp(max(covered)) + pd.offsets.MonthEnd(0)).date().isoformat()
+
+
+def resolve_cut_off_from_data(value, df, db_type_col="db_type",
+                              date_col="trd_exctn_dt"):
+    """Resolve any DATE_CUT_OFF spec against the loaded tape.
+
+    "auto:complete"  the last month every source covers to its final session -- the
+                     default, because it keeps every usable month and no unusable one.
+    "auto:-Nmo"      N whole months back from the least current source's last trade date.
+                     Kept for reproducing an older vintage; note it measures from a date
+                     that is itself mid-month, so it discards complete months.
+    anything else    returned unchanged (a literal date, or None).
+    """
+    if not (isinstance(value, str) and value.startswith("auto")):
+        return value
+    if value.strip() == "auto:complete":
+        return last_complete_month(df, db_type_col=db_type_col, date_col=date_col)
+    return resolve_date_cut_off(value, cut_off_basis(df, db_type_col=db_type_col,
+                                                     date_col=date_col))
 
 
 def resolve_date_cut_off(value, raw_max):

@@ -366,11 +366,14 @@ ROOT_PATH = ""
 STAGE0_DATE_STAMP = ""
 
 # Date filter. The DEFAULT IS ROLLING, not a fixed date:
-#   "auto:-3mo"   last day of the month 3 months before the last trade date
-#   "2025-03-31"  a fixed date, used exactly as given
+#   "auto:complete"  the last month EVERY source covers through its final trading
+#                    session -- the default
+#   "auto:-3mo"      last day of the month 3 months before the least current
+#                    source's last trade date
+#   "2025-03-31"     a fixed date, used exactly as given
 # An auto cutoff is also CLAMPED to the last date the treasury curve covers, so the
 # published sample end can move between vintages without you changing anything.
-DATE_CUT_OFF = "auto:-3mo"
+DATE_CUT_OFF = "auto:complete"
 
 # Parallel processing
 N_CORES  = None   # resolves from $NSLOTS -- the slots actually granted (4 on WRDS)

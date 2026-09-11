@@ -7,20 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`DATE_CUT_OFF` now defaults to `"auto:complete"`** — the last month for which every
+  source has data through the month's final trading session. The previous default,
+  `"auto:-3mo"`, existed because TRACE is revised after the fact and the newest months
+  are unsettled, but it measures three whole months back from a date that is itself
+  mid-month, so it discards complete months. Measured on the 2026-09-10 run: Enhanced
+  ends 2025-12-04, so `auto:-3mo` cut at 2025-09-30 and threw away October and November.
+  Both are ordinary months — 11,848 and 11,612 Enhanced bonds at 10.9 and 11.1 trades per
+  bond-day, against a 2025 range of 11.3–11.9k bonds and 10–12 trades. Only December is
+  unusable: Enhanced stops on the 4th and no bond trades in its last seven days.
+  `auto:complete` returns 2025-11-30 on that run, which is exactly the usable frontier.
+
+  The month's final trading session is taken from the data, not from an exchange
+  calendar, so a month whose last session is the 28th is not mistaken for a short one. A
+  month is only a candidate if it has at least 80% of the trailing median number of
+  trading days, which stops a frontier month where every source happens to stop on the
+  same mid-month day from passing as complete. `auto:-Nmo` still works and still resolves
+  against the least current source; use it to reproduce an older vintage.
+
 ### Fixed
 
-- **Stage 1's `auto:-Nmo` cut-off is now measured from the least current SOURCE, not from
-  the pooled last trade date.** TRACE Enhanced and 144A/BTDS are different populations on
-  different reporting lags, and 144A runs months ahead. From the 2026-09-10 run's log:
-  pooled last trade `2026-06-05` (144A), Enhanced max `2025-12-04`, `auto:-3mo` resolved to
-  `2026-03-31`. Every month from 2025-12 on is therefore one in which no Enhanced bond can
-  have a month-end price, so the monthly panel emitted months that are not cross-sections
-  -- the last held 1,914 bonds, 100% 144A, against a trailing median of ~10,700 at ~22%.
-  The same spec measured from Enhanced gives `2025-09-30`. Standard (db_type 2) is not a
-  separate population -- Stage 1 clips it to start where Enhanced ends -- so it is taken
-  together with Enhanced. An explicit `"YYYY-MM-DD"` cut-off is still the user's choice and
-  is left alone. New: `_stage1_settings.cut_off_basis` / `source_frontiers`,
-  `tests/test_cut_off_basis.py`, and per-population frontiers in the Stage 1 log.
+- **The `auto:-Nmo` basis was the POOLED last trade date**, which is 144A's. TRACE
+  Enhanced and 144A/BTDS are different populations on different reporting lags. From the
+  2026-09-10 run's log: pooled last trade `2026-06-05`, Enhanced max `2025-12-04`,
+  `auto:-3mo` resolved to `2026-03-31` — every month from 2025-12 on is one in which no
+  Enhanced bond can have a month-end price, so the monthly panel emitted months that are
+  not cross-sections (the last held 1,914 bonds, 100% 144A, against a trailing median of
+  ~10,700 at ~22%). The spec is now measured from the least current source. Standard
+  (db_type 2) is not a separate population — Stage 1 clips it to start where Enhanced
+  ends — so it is taken together with Enhanced. New: `_stage1_settings.cut_off_basis` /
+  `last_complete_month` / `resolve_cut_off_from_data` / `source_frontiers`,
+  `tests/test_cut_off_basis.py` (19 tests), and per-population frontiers in the Stage 1 log.
 - **`stage2/validate_stage2.py --help` raised `KeyError: 'returns'`.** The CLI built
   argparse's `choices` from `_specs()`, which indexed `GOLDEN_OUTPUTS` unguarded; that dict
   is empty in a public clone, so the exception fired before argparse could print anything.

@@ -102,8 +102,9 @@ nano stage1/_stage1_settings.py
 # Which TRACE datasets to include
 TRACE_MEMBERS = ["enhanced", "144a"]  # the default; add "standard" to opt in
 
-# Date cutoff
-DATE_CUT_OFF = "2025-03-31"  # Only include data through this date
+# Date cutoff. The default rolls with the data: "auto:complete" is the last month
+# every source covers through its final trading session. A literal date overrides it.
+DATE_CUT_OFF = "auto:complete"
 
 # Parallel processing (adjust based on your machine)
 N_CORES = None  # Auto-detects available cores
@@ -354,8 +355,8 @@ Most settings are automatically configured. Only customize if needed.
 |---------|-------------|---------|-------|
 | `ROOT_PATH` | Parent directory | `""` | ✅ Auto-detected |
 | `STAGE0_DATE_STAMP` | Stage 0 output date | Auto-detected | ✅ Auto-detected from files |
-| `TRACE_MEMBERS` | TRACE datasets to include | `["enhanced", "standard", "144a"]` | Customizable |
-| `DATE_CUT_OFF` | Latest date to include | `"2025-03-31"` | Customizable |
+| `TRACE_MEMBERS` | TRACE datasets to include | `["enhanced", "144a"]` | Customizable; `"standard"` is opt-in |
+| `DATE_CUT_OFF` | Latest date to include | `"auto:complete"` | ✅ Rolls with the data |
 | `N_CORES` | CPU cores for parallel processing | Auto-detected | ✅ Auto-detected |
 | ~~`GENERATE_REPORTS`~~ | does not exist -- reports always run | — | — |
 | ~~`OUTPUT_FIGURES`~~ | does not exist -- figures always run | — | — |

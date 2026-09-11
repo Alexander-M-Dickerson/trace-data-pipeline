@@ -101,3 +101,77 @@ def test_an_unknown_db_type_falls_back_to_the_pooled_max():
 def test_an_explicit_cut_off_is_the_users_choice(spec):
     tape = _tape([(ENHANCED, "2025-12-04"), (A144, "2026-06-05")])
     assert st.resolve_date_cut_off(spec, st.cut_off_basis(tape)) == spec
+
+
+# ---------------------------------------------------------------------------
+# auto:complete -- the default. See `last_complete_month` in _stage1_settings.py.
+#
+# `auto:-3mo` measures back from a date that is itself mid-month, so it discards
+# complete months. On the 2026-09-10 run it cut at 2025-09-30 and threw away October
+# and November, both ordinary months: 11,848 and 11,612 Enhanced bonds at 10.9 and 11.1
+# trades per bond-day, against a 2025 range of 11.3-11.9k bonds and 10-12 trades. Only
+# December is unusable, because Enhanced stops on the 4th and no bond trades in its last
+# seven days. `auto:complete` keeps exactly the usable months.
+# ---------------------------------------------------------------------------
+
+
+def _sessions(start: str, end: str) -> pd.DatetimeIndex:
+    return pd.bdate_range(start, end)
+
+
+def _tape_with_sessions(spans: dict[int, tuple[str, str]]) -> pd.DataFrame:
+    """One row per (db_type, session) for each population's span."""
+    rows = []
+    for db, (a, b) in spans.items():
+        for dt in _sessions(a, b):
+            rows.append((db, dt))
+    return pd.DataFrame(rows, columns=["db_type", "trd_exctn_dt"])
+
+
+def test_auto_complete_on_the_production_frontier():
+    """Enhanced stops 2025-12-04; 144A runs to month end. November is the answer."""
+    tape = _tape_with_sessions({ENHANCED: ("2024-01-01", "2025-12-04"),
+                                A144: ("2024-01-01", "2025-12-31")})
+    assert st.last_complete_month(tape) == "2025-11-30"
+    assert st.resolve_cut_off_from_data("auto:complete", tape) == "2025-11-30"
+
+
+def test_the_old_spec_would_have_discarded_two_good_months():
+    tape = _tape_with_sessions({ENHANCED: ("2024-01-01", "2025-12-04"),
+                                A144: ("2024-01-01", "2025-12-31")})
+    assert st.resolve_cut_off_from_data("auto:-3mo", tape) == "2025-09-30"
+
+
+def test_a_month_whose_last_session_is_the_28th_still_counts():
+    """November 2025's last trading day is the 28th. A calendar-free rule must see that."""
+    tape = _tape_with_sessions({ENHANCED: ("2025-01-01", "2025-11-28"),
+                                A144: ("2025-01-01", "2025-11-28")})
+    assert st.last_complete_month(tape) == "2025-11-30"
+
+
+def test_a_partial_frontier_month_is_not_called_complete():
+    """Both sources stopping on the same mid-month day must not pass as a whole month."""
+    tape = _tape_with_sessions({ENHANCED: ("2024-01-01", "2025-12-05"),
+                                A144: ("2024-01-01", "2025-12-05")})
+    assert st.last_complete_month(tape) == "2025-11-30"
+
+
+def test_the_least_current_source_still_decides():
+    tape = _tape_with_sessions({ENHANCED: ("2024-01-01", "2025-08-15"),
+                                A144: ("2024-01-01", "2025-12-31")})
+    assert st.last_complete_month(tape) == "2025-07-31"
+
+
+def test_a_single_source_run_keeps_its_last_whole_month():
+    tape = _tape_with_sessions({ENHANCED: ("2024-01-01", "2025-12-04")})
+    assert st.last_complete_month(tape) == "2025-11-30"
+
+
+@pytest.mark.parametrize("spec", [None, "2024-12-31"])
+def test_an_explicit_cut_off_passes_through_the_data_resolver(spec):
+    tape = _tape_with_sessions({ENHANCED: ("2024-01-01", "2025-12-04")})
+    assert st.resolve_cut_off_from_data(spec, tape) == spec
+
+
+def test_the_default_is_auto_complete():
+    assert st.DATE_CUT_OFF == "auto:complete"

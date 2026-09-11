@@ -297,12 +297,6 @@ def step2_load_trace_data():
     # see `cut_off_basis` in _stage1_settings.py for the failure it prevents.
     for _label, _dt in source_frontiers(final_df).items():
         logger.info("  frontier, %-26s %s", _label + ":", _dt)
-    cut_off_basis_dt = cut_off_basis(final_df)
-    if cut_off_basis_dt != raw_max:
-        logger.info(
-            "Auto cut-off measured from %s (the least current source), not the pooled "
-            "max %s -- otherwise the final month is one source alone.",
-            cut_off_basis_dt, raw_max)
 
     # Handle overlaps: Only clip STANDARD to be after Enhanced max date
     # Keep ALL 144a data (do not clip)
@@ -336,10 +330,10 @@ def step2_load_trace_data():
     # report, the log lines) sees the concrete date rather than the spec.
     global DATE_CUT_OFF
     spec = DATE_CUT_OFF
-    resolved = resolve_date_cut_off(spec, cut_off_basis_dt)
+    resolved = resolve_cut_off_from_data(spec, final_df)
     if resolved != spec:
-        logger.info("Resolved DATE_CUT_OFF %s -> %s (basis %s, pooled last trade %s)",
-                    spec, resolved, cut_off_basis_dt, raw_max)
+        logger.info("Resolved DATE_CUT_OFF %s -> %s (pooled last trade %s)",
+                    spec, resolved, raw_max)
 
         # The sample end is bounded by EVERY input's frontier, not just TRACE's.
         # credit_spread needs a treasury yield for the trade date, and the Liu-Wu
