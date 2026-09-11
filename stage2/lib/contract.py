@@ -49,6 +49,92 @@ PANEL_COLUMNS: tuple[str, ...] = (
 )
 
 
+# ---------------------------------------------------------------------------
+# The three shipped panels: what each is called, and where each one ENDS
+# ---------------------------------------------------------------------------
+# Three panels are produced from this contract. They do not share a frontier, and treating
+# them as if they did is a mistake with a specific shape: panel 3 ends when ICE ends, so
+# waiting for it to extend with a new TRACE vintage means waiting for ever.
+#
+#   tracks_trace_vintage -- moves every year with the WRDS pull (panels 1 and 2)
+#   fixed_source_end     -- pinned; its source stopped and is not coming back (panel 3)
+#
+# ❗A `fixed_source_end` panel still REBUILDS. Its trigger is a change to the factor panel or
+# to its own inputs, never a new TRACE vintage. Those are different questions and conflating
+# them is how a panel gets rebuilt for no reason, or not rebuilt when it should be.
+
+PRE_TRACE_FIXED_END = "2023-01-31"      # ICE/BAML ends here. Moving this is a deliberate act.
+
+TRACKS_TRACE_VINTAGE = "tracks_trace_vintage"
+FIXED_SOURCE_END = "fixed_source_end"
+
+DATASETS: dict[str, dict] = {
+    "trace": dict(
+        n=1,
+        what="TRACE-era monthly panel",
+        stem="osbap_trace",
+        published=True,                 # OSBAP, and REDACTED -- see make_release.redact_for_publication
+        frontier=TRACKS_TRACE_VINTAGE,
+        fixed_end=None,
+    ),
+    "combined": dict(
+        n=2,
+        what="Lehman-ICE joined to TRACE",
+        stem="lehman_ice_trace",
+        published=False,                # collaborators only: its firm ids derive from private data
+        frontier=TRACKS_TRACE_VINTAGE,
+        fixed_end=None,
+    ),
+    "pre_trace": dict(
+        n=3,
+        what="Lehman-ICE only",
+        stem="lehman_ice",
+        published=False,
+        frontier=FIXED_SOURCE_END,
+        fixed_end=PRE_TRACE_FIXED_END,
+    ),
+}
+
+RETURN_TAGS = ("std", "dur_adj")
+
+
+def external_name(dataset: str, return_type: str, first, last) -> str:
+    """The delivered filename: dataset, coverage, return type.
+
+    The span comes from the DATA, so it rolls on its own each vintage. Before this, the two
+    private panels' external names existed only as labels in make_data_dictionary.py and no
+    file with either name was ever written -- the dictionary described files nobody received.
+
+        external_name("combined", "standard", 1973-01-31, 2025-11-30)
+            -> "lehman_ice_trace_1973_2025_std.parquet"
+    """
+    import pandas as pd
+
+    if dataset not in DATASETS:
+        raise ValueError(f"unknown dataset {dataset!r}; known: {sorted(DATASETS)}")
+    tag = "dur_adj" if return_type in ("duration_adj", "dur_adj") else "std"
+    y0, y1 = pd.Timestamp(first).year, pd.Timestamp(last).year
+    return f"{DATASETS[dataset]['stem']}_{y0}_{y1}_{tag}.parquet"
+
+
+def assert_frontier_policy(df, dataset: str, *, date_col: str = "date") -> None:
+    """A fixed-end panel must still end where its source stopped."""
+    import pandas as pd
+
+    spec = DATASETS[dataset]
+    if spec["frontier"] != FIXED_SOURCE_END:
+        return
+    got = pd.Timestamp(pd.to_datetime(df[date_col]).max()).normalize()
+    want = pd.Timestamp(spec["fixed_end"])
+    if got != want:
+        raise AssertionError(
+            f"{dataset}: the frontier moved to {got.date()}, expected {want.date()}.\n"
+            "  This panel ends where its source ends; it does not extend with a TRACE\n"
+            "  vintage. If a genuinely new source vintage extends it, change\n"
+            "  contract.PRE_TRACE_FIXED_END deliberately, in the same commit, and say why."
+        )
+
+
 def assert_panel_contract(df, *, what: str = "main panel") -> None:
     """Raise unless `df` carries exactly PANEL_COLUMNS, in exactly that order."""
     actual = list(df.columns)
