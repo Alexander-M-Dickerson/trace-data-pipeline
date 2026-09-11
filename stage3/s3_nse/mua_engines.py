@@ -214,8 +214,9 @@ def run_fast(data: pd.DataFrame, signal: str, verbose: bool = False,
     Returns (wide LS frame with canonical tuple columns, canon map, the result
     object). `return_legs` / `return_counts` add the long and short legs and their
     realised bond counts; `return_formation_counts` adds the counts as of FORMATION,
-    so formation minus realised is the month's attrition -- which is what Table IA
-    on portfolio size reports.
+    so formation minus realised would be the month's attrition. ❗No producer requests
+    it: nothing in Stage 3 computes or stores formation counts, and Table IA.XVIII
+    reports REALISED counts, as its own docstring and every manifest say.
     """
     pblenv.use()
     from PyBondLab.anomaly_assay_fast import assay_anomaly_fast

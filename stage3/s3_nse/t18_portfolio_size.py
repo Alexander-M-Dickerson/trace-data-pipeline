@@ -74,7 +74,10 @@ def main() -> int:
                     help="which member of the redundant twin pair to keep. ❗Unlike "
                          "Table 6, this DOES move cells here: the two members carry "
                          "different breakpoint-universe labels, so the BP rows "
-                         "re-attribute. The strategy count is conserved.")
+                         "re-attribute. ❗The strategy count is NOT conserved "
+                         "when the engine forms one twin member and not the "
+                         "other: feb 18,038 vs mar14 18,024 on the 2026-09-11 "
+                         "build. See nse_engine.twin_asymmetry.")
     ap.add_argument("--no-bench", action="store_true")
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")

@@ -7,10 +7,11 @@ Every artifact Stage 3 writes, and what its columns mean.
 0. [The compiled report](#the-compiled-report) — `reports/exhibits.pdf`
 1. [Long-format sort panels](#long-format-sort-panels) — `data/sorts/`
 2. [The uncertainty grids](#the-uncertainty-grids) — `data/grids/`
-3. [Statistics frames](#statistics-frames) — `data/<section>/`
-4. [Result manifests](#result-manifests) — `data/<section>/*.json`
-5. [Sample windows](#sample-windows)
-6. [Conventions that decide what a number means](#conventions-that-decide-what-a-number-means)
+3. [The degeneracy ledger](#the-degeneracy-ledger) — `data/s3_nse/mua_summary/`
+4. [Statistics frames](#statistics-frames) — `data/<section>/`
+5. [Result manifests](#result-manifests) — `data/<section>/*.json`
+6. [Sample windows](#sample-windows)
+7. [Conventions that decide what a number means](#conventions-that-decide-what-a-number-means)
 
 ---
 
@@ -120,9 +121,26 @@ README_stage3.md for what is fixed here and what is not.
 
 ### Data uncertainty — `data/grids/dua/series/<rating>/<signal>.parquet`
 
-One row per (date, weighting, filter_config): the ex-ante monthly return under each of
-120 cleaning filters — 48 return-trim thresholds, 30 price screens, 30 bounce-back
-screens, 12 winsorization levels — plus the baseline.
+One row per (date, weighting, filter_config): the ex-ante monthly **long-short return
+and both legs** under each of 108 cleaning filters — 48 return-trim thresholds, 30 price
+screens, 30 bounce-back screens — plus the baseline.
+
+| column | meaning |
+|---|---|
+| `ret` | the long-short return, decimal |
+| `long`, `short` | the two legs, so a leg that held nothing is visible |
+
+❗**108 filters, not 120.** 216 per tail location × 3 locations = the paper's **648 filter
+configurations per signal**, and × 108 signals = its 69,984 factor paths; the arithmetic
+closes exactly. A fourth family of 12 winsorization filters used to be requested and never
+reached a statistic — the fit returned every one all-NaN, and the guard meant to skip them
+matched nothing. Winsorization is Section 4's subject.
+
+❗**The DUA has no bond counts.** `DataUncertaintyAnalysis` exposes none, so unlike the MUA
+— where degeneracy is decided on realised counts — the only available evidence here is a
+leg with no return. That is a weaker test, and no DUA path is excluded on it: the legs are
+saved and the status histogram is reported, but every Table 5 / IA.XVII denominator is
+still the full grid.
 
 `data/grids/dua/dua_{premia,alpha,baselines}_{paper,full}.parquet` hold the per-path
 statistics computed from those series; `dua_config_locations.parquet` records each
@@ -132,6 +150,85 @@ filter's tail location as the fit itself reported it.
 > layer, by truncating the series and recomputing — a stored statistic is never
 > truncated. The one exception is the Section-4 winsorization sweep, where the threshold
 > is a full-sample quantile by construction, so the window is a producer argument there.
+
+---
+
+## The degeneracy ledger
+
+`data/s3_nse/mua_summary/mua_status_{paper,full}.parquet` — **one row per (signal,
+spec_id), all 23,328 of them, every one carrying a status.** This is the single source of
+truth about which construction paths exist, and every denominator Section 5 prints is
+derived from it.
+
+### Why it exists
+
+The paper counts its grid down in one ladder, and every Section-5 denominator it prints is
+the same number at the bottom of it:
+
+```
+216   candidate constructions per signal   (2 wtg x 3 nport x 3 bp x 3 rating x 4 mat)
+-24   not admissible   "breakpoints computed on IG bonds cannot sort NIG bonds"
+-24   redundant        "IG-based breakpoints coincide with full-universe breakpoints"
+=168  economically distinct constructions per signal
+x108  signals
+=18,144  factor return series
+-16   degenerate       "produce months with empty long or short legs"
+=18,128  well-defined factor return series
+```
+
+Before this ledger, Stage 3 arrived at that answer three different ways and got three
+different numbers — Table 6 printed 18,064, Table IA.XVIII printed 18,038 for the same
+quantity, and Table IA.XIX built its pool on the first while IA.XVIII used the second.
+Each exhibit had inferred the answer from whichever artifact it happened to read.
+
+### The statuses
+
+Assigned by first match, so the counts are disjoint and sum to 23,328. Three of the names
+are the paper's own.
+
+| status | rule | source |
+|---|---|---|
+| `inadmissible` | the breakpoint universe and the rating filter are disjoint (`ig_bp` x `hy`) | the paper |
+| `redundant` | one member of the `all_ig` ≡ `ig_bp_ig` twin pair | the paper |
+| `no_series` | no portfolio was ever formed — no month has a return | ours |
+| `short_sample` | a series exists but is too short to fit | ours |
+| `empty_leg` | a leg empty in some month **inside the signal's coverage** | the paper |
+| `ok` | a well-defined factor return series | the paper |
+
+`no_series` and `short_sample` are additions, not reinterpretations: the paper's rule is
+about a leg being empty in some month, which presupposes a series. A series that was never
+formed cannot be a "well-defined factor return series", so it is excluded.
+
+### The columns
+
+| column | meaning |
+|---|---|
+| `status` | the verdict, under the default (`feb`) twin convention |
+| `intrinsic_status` | the same verdict ignoring the twin rule, so `mar14` is derivable |
+| `twin_member` | `all_ig`, `ig_bp_ig`, or empty |
+| `n_obs` | months in the MKTB-joined sample — what the statistics used |
+| `n_months_grid` | months the series itself has, before that join |
+| `first_month`, `last_month`, `n_months_active` | the span it was judged over |
+| `min_long`, `min_short` | the realised bond counts the `empty_leg` rule reads |
+| `pct_low` | share of active months with fewer than 20 bonds — reported, never excluded |
+
+❗**A signal's coverage is not degeneracy.** Signals do not all span the panel: twelve of
+the 108 start late, and three end early. The active window is therefore **two-sided**, and
+its upper bound is the **signal's** last return, never the cell's own — a cell that sets
+its own bound can delete the very months that prove it empty. Judging a signal's
+post-coverage months as empty portfolios once removed an entire factor (`b_cptlt`, 166
+paths) from every full-window exhibit.
+
+### Who consumes it
+
+`nse_engine.usable(window, twin)` is the only function that answers "which paths exist".
+Table 6's `N`, Table IA.XVIII's `n_spec` and Table IA.XIX's pool all come from it, so they
+agree by construction: the first two are `|ok|` and the third is `|ok| − 648`.
+
+❗**The counts are not fixed.** While the engine's restricted-universe instability is open
+(see below) the absolute numbers move between runs; the *relationships* do not, which is
+what the tests check. Every run records the whole histogram in its manifest, so two runs
+can be compared.
 
 ---
 

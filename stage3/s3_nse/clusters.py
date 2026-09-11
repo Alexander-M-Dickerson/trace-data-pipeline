@@ -84,15 +84,22 @@ def add_groups(df: pd.DataFrame, signal_col: str = "signal") -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 def exclude_redundant(df: pd.DataFrame, twin: str, col: str = "spec_id") -> pd.DataFrame:
     """The FULL redundancy rule: drop one member of the all_ig == ig_bp_ig twin pair
-    AND the 24 infeasible ig_bp x hy specs (PyBondLab emits those as all-NaN rows,
-    invisible to the degenerate check -- this mask is the only thing removing them).
+    AND the 24 infeasible ig_bp x hy specs. ❗This is no longer the only thing removing
+    them: `mua_summarize` classifies every cell of the grid and `nse_engine.usable`
+    selects on that, so an all-NaN cell is `no_series` or `inadmissible` by name rather
+    than by whichever mask happened to catch it.
 
     The twin pair is the same portfolio reached two ways: filtering to investment
     grade, or drawing the breakpoints on an investment-grade universe that is then
-    filtered to investment grade. Which member to keep is a LABELLING choice and
-    nothing else -- both give 168 specs per signal with identical content.
-    `twin='mar14'` keeps ig_bp_ig; `twin='feb'` keeps all_ig, which is the labelling
-    the paper prints.
+    filtered to investment grade. `twin='mar14'` keeps ig_bp_ig; `twin='feb'` keeps
+    all_ig, which is the labelling the paper prints.
+
+    ❗Which member to keep is a LABELLING choice ONLY WHILE BOTH MEMBERS EXIST. When
+    the engine forms one and not the other (AF14), the two conventions select different
+    DATA and every statistic built on them moves -- measured at 14 broken pairs and
+    max|d| = 1.9e-03 on the 2026-09-11 build, against a 1e-12 tolerance.
+    `nse_engine.twin_asymmetry` lists them; `t06_mua_nse.py` fails when it bites. Do not
+    read the old claim that the two give "identical content": it is false on this data.
     """
     s = df[col]
     if twin == "mar14":
@@ -132,9 +139,15 @@ def apply_sign_correction(df: pd.DataFrame, baseline_spec: str,
     """Flip ALL statistics of signals whose baseline-spec mean return is negative.
 
     ❗There are TWO baseline specs in this section and that is deliberate, not a slip:
-    the premium tables sign off VW_Qp_Q_all_all_all (42 signals flip), while the
-    figures and the sign-flip discussion sign off VW_Dp_Q_all_all_all. Pass the one
-    the exhibit uses; do not assume a default.
+    the premium tables sign off VW_Qp_Q_all_all_all, while the figures and the sign-flip
+    discussion sign off VW_Dp_Q_all_all_all. Pass the one the exhibit uses; do not assume
+    a default. (41 signals flip on each, in the 2026-09-11 build -- the count follows the
+    data and is reported by each run, not fixed.)
+
+    ❗A signal whose baseline mean is NaN is silently NOT flipped. That is safe only
+    while the baselines themselves are never empty: both are `all`-breakpoint-universe
+    specs, and a test asserts that no empty cell ever reaches that universe. If one did,
+    a whole signal's row would change sign and no gate below would notice.
     """
     df = df.copy()
     base = df[df["spec_id"] == baseline_spec].set_index("signal")["mean_ret"]

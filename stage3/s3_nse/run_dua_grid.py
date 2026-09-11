@@ -4,10 +4,9 @@ Where the MUA grid varies the METHOD, this varies the DATA: every signal is re-s
 after each of 120 defensible ways of cleaning the return panel, and the spread of the
 resulting premia is the data-uncertainty the section reports.
 
-The 120 filters (see `filters_all`): 48 return-trim thresholds, 30 price screens,
-30 bounce-back screens, and 12 winsorization levels. Crossed with 3 rating universes
-and 108 signals, with both weightings saved, that is 69,984 filter paths plus their
-baselines.
+The 108 filters (see `filters_all`): 48 return-trim thresholds, 30 price screens and
+30 bounce-back screens. Crossed with 3 rating universes and 108 signals, with both
+weightings saved, that is the paper's 69,984 filter paths plus their baselines.
 
 A unit of work is one (rating x signal-chunk). Each worker reads its OWN column slice
 of the panel through DuckDB -- the panel is never pickled into a worker -- fits
@@ -55,9 +54,20 @@ PANEL_BASE_COLS = ["cusip", "date", "ret_vw", "mcap_e", "spc_rat", "bbtm"]
 
 
 def filters_all() -> dict:
-    """The 120-filter grid: 48 trim + 30 price + 30 bounce + 12 winsorization."""
-    wins_levels = [(w, loc) for w in np.arange(98.0, 99.8, 0.5)
-                   for loc in ["right", "left", "both"]]
+    """The 108-filter grid: 48 trim + 30 price + 30 bounce, each on three tail locations.
+
+    ❗216 filters per tail location x 3 locations = the paper's **648 filter
+    configurations per signal**, and x 108 signals = its 69,984 factor paths. The
+    arithmetic closes exactly, which is how we know nothing else belongs here.
+
+    Winsorization used to be requested as a fourth family (12 configs). It never reached
+    a statistic: PyBondLab returned every one of them all-NaN, and the statistics layer
+    carried a guard meant to skip them that matched nothing (the configs are named
+    `wins_98.0_right`, with no leading underscore, so `"_wins_" in fc` was always False).
+    Two mechanisms pointed at the same 12 filters and neither did anything; they were
+    excluded only because the fit returned no data. Winsorization is Section 4's subject
+    and has no place in the data-uncertainty grid.
+    """
     price_up = list(np.arange(150, 300, 15))
     price_down = list(np.arange(20, 0, -2))
     trim_up = list(np.arange(0.20, 1.00, 0.05))
@@ -70,8 +80,46 @@ def filters_all() -> dict:
     bounce_sym = [[round(-w, 4), round(w, 4)] for w in np.arange(0.01, 0.11, 0.01)]
     return {"trim": trim_levels + trim_sym,
             "price": [price_down, price_up, "zip"],
-            "bounce": bounce_levels + bounce_sym,
-            "wins": wins_levels}
+            "bounce": bounce_levels + bounce_sym}
+
+
+def degeneracy_census(root: Path) -> dict:
+    """How many DUA paths are degenerate. A MEASUREMENT -- nothing is excluded on it.
+
+    ❗The MUA half screens its paths on realised bond counts. This half cannot:
+    `DataUncertaintyAnalysis` exposes no counts at all, so the strongest available
+    evidence that a leg held nothing is that the leg has no return. That is a weaker
+    test, and the asymmetry is deliberate and reported rather than papered over.
+
+    Measured 2026-09-11 on all three ratings: 23,544 paths each, and **zero** with a
+    missing series, a missing leg, or a gap in either leg. The data-uncertainty grid
+    varies cleaning filters, not portfolio structure, so every path sorts the whole
+    universe into deciles -- there is nothing thin enough to empty a leg. That is why
+    no Table 5 or IA.XVII denominator changes.
+    """
+    import duckdb
+    out = {}
+    for r in RATINGS:
+        p = (root / "series" / r / "*.parquet").as_posix()
+        try:
+            df = duckdb.sql(f"""
+                WITH s AS (SELECT filename, weighting, filter_config,
+                                  COUNT(ret) AS n_ls, COUNT("long") AS n_l,
+                                  COUNT("short") AS n_s
+                           FROM read_parquet('{p}', filename=true)
+                           GROUP BY 1, 2, 3)
+                SELECT COUNT(*) AS paths,
+                       SUM(CASE WHEN n_ls = 0 THEN 1 ELSE 0 END) AS no_series,
+                       SUM(CASE WHEN n_ls > 0 AND (n_l = 0 OR n_s = 0)
+                                THEN 1 ELSE 0 END) AS leg_missing,
+                       SUM(CASE WHEN n_ls > 0 AND (n_l < n_ls OR n_s < n_ls)
+                                THEN 1 ELSE 0 END) AS leg_gaps
+                FROM s""").df()
+        except Exception:
+            return {}
+        out[r] = {k: int(df[k].iloc[0]) for k in
+                  ("paths", "no_series", "leg_missing", "leg_gaps")}
+    return out
 
 
 def out_root() -> Path:
@@ -122,6 +170,12 @@ def run_one(item) -> dict:
         result = dua.fit(IDvar="cusip", RETvar="ret_vw", VWvar="mcap_e",
                          RATINGvar="spc_rat", PRICEvar="PRICE")
 
+    # ❗The LEGS are saved as well as the long-short. `fit()` populates them
+    # unconditionally and we used to read only `{w}_ex_ante` and discard the rest -- which
+    # left no way to ask whether a DUA portfolio was ever empty. There are still no bond
+    # COUNTS here (`DataUncertaintyAnalysis` exposes none; that would be a PyBondLab
+    # change), so a missing leg return is the best available evidence that a leg held
+    # nothing. It is a weaker test than the MUA's count-based rule, and the docs say so.
     n_cols_saved = 0
     for sig in signals:
         frames = []
@@ -133,7 +187,18 @@ def run_one(item) -> dict:
             long["filter_config"] = long["col"].str.replace(
                 f"{sig}_hp1_", "", regex=False)
             long["weighting"] = w
-            frames.append(long[["date", "weighting", "filter_config", "ret"]])
+            for leg, attr in (("long", f"{w}_long_ex_ante"),
+                              ("short", f"{w}_short_ex_ante")):
+                lf = getattr(result, attr, None)
+                if lf is None or not len(lf):
+                    long[leg] = np.nan
+                    continue
+                have = [c for c in sig_cols if c in lf.columns]
+                melted = (lf[have].reset_index(names="date")
+                          .melt("date", var_name="col", value_name=leg))
+                long = long.merge(melted, on=["date", "col"], how="left")
+            frames.append(long[["date", "weighting", "filter_config",
+                                "ret", "long", "short"]])
             n_cols_saved += len(sig_cols)
         pd.concat(frames, ignore_index=True).to_parquet(
             root / "series" / rating_label / f"{sig}.parquet", index=False)
@@ -224,8 +289,6 @@ def stats_chunk(item) -> dict:
                 assert baseline_fc in sub.columns, (signal, r, w, baseline_fc)
                 sign_mult = -1 if sub[baseline_fc].mean() < 0 else 1
                 for fc in sub.columns:
-                    if "_wins_" in fc:
-                        continue
                     series = sub[fc]
                     returns = series.dropna()
                     if len(returns) >= MIN_OBS:
@@ -336,8 +399,9 @@ def main() -> int:
                     f"  missing, first: {missing[:4]}\n"
                     "  Run the grid first (this file with no --stats).")
             counts = run_stats(args, root, signals, b)
-            # 654 = (120 filters x 2 weightings x 3 ratings) minus the wins columns,
-            # plus baselines -- pinned so a short grid cannot pass quietly.
+            # 654 = 216 filters x 3 tail locations, plus the 6 baselines
+            # (2 weightings x 3 ratings) -- pinned so a short grid cannot pass quietly.
+            # x 108 signals = the paper's 69,984 paths + 648 baselines = 70,632.
             exp = {"premia": len(signals) * 654, "baselines": len(signals) * 6}
             ok = all(counts[f"premia_{w}"] == exp["premia"]
                      and counts[f"baselines_{w}"] == exp["baselines"]
@@ -369,8 +433,18 @@ def main() -> int:
             b.note(n_signals=len(signals), n_ratings=len(args.ratings),
                    n_units=len(items), workers=n_w, threads=n_t,
                    chunk=args.chunk, max_unit_wall_s=slow, max_worker_rss_gb=rss)
+            census = degeneracy_census(root)
+            degen = sum(c["no_series"] + c["leg_missing"] + c["leg_gaps"]
+                        for c in census.values())
+            b.note(degeneracy_census=census, n_degenerate_paths=degen)
             ok = b.check(present == n_expected,
-                         f"{present}/{n_expected} (rating, signal) series present")
+                         f"{present}/{n_expected} (rating, signal) series present; "
+                         f"{degen} degenerate path(s) across "
+                         f"{sum(c['paths'] for c in census.values()):,}")
+            if degen:
+                print(f"\nWARN {degen} DUA path(s) have a missing series or leg. "
+                      "Nothing is excluded on this\n     -- the census is a "
+                      "measurement. See `degeneracy_census`.", flush=True)
         D.write_result(
             "dua_grid" + ("_stats" if args.stats else ""),
             {"summary": {"n_signals": len(signals), "stats": args.stats}},

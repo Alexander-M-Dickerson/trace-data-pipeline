@@ -136,7 +136,7 @@ Measured on the cold run of 2026-09-11, 24 cores with the kernels:
 | `lib` | the 108-signal month-end/month-begin sorts, x4 | 27–28 s each |
 | `lab` | the winsorization sweep, 2 tails x 3 ratings | 19 s |
 | `nse` | the **MUA grid** — 108 signals x 216 method choices | 142 s |
-| `nse` | the **DUA grid** — 108 signals x 120 filters x 3 ratings | 241 s, then 32 s for its statistics |
+| `nse` | the **DUA grid** — 108 signals x 108 filters x 3 ratings | 241 s, then 32 s for its statistics |
 | `zoo` | all 108 signals, single and within-firm | 49 s |
 
 **Exhibits** read those series and render. Seconds each, always re-rendered. The final
@@ -228,6 +228,28 @@ Without the fast kernels every sort takes roughly fourteen times as long (43.8 s
 - A duplicate `(cusip, date)` silently corrupts the sort rather than raising. Every
   producer checks.
 - Do not filter to `ret_type == 'standard'`: the published factors keep defaulted bonds.
+- ❗**One denominator, derived in one place.** Section 5 counts "construction paths",
+  and the paper counts its grid down in a single ladder whose bottom line is every
+  denominator it prints: 216 candidates per signal, less 24 inadmissible (an IG
+  breakpoint universe cannot sort high-yield bonds), less 24 redundant (forming within
+  IG, IG breakpoints *are* the full-universe ones), = 168 x 108 = 18,144, less those
+  that "produce months with empty long or short legs", = well-defined factor return
+  series.
+
+  Stage 3 reproduces that ladder explicitly in a **status ledger**
+  (`data/s3_nse/mua_summary/mua_status_{window}.parquet`, one row for every one of the
+  23,328 cells) and `nse_engine.usable()` is the only thing that reads it. Table 6's
+  `N`, Table IA.XVIII's `n_spec` and Table IA.XIX's pool are therefore the same number
+  by construction rather than by coincidence. See
+  [DATA_DICTIONARY.md](DATA_DICTIONARY.md#the-degeneracy-ledger).
+
+- ❗**A signal's own start or end date is NOT degeneracy.** Signals do not all span the
+  panel -- twelve of the 108 start late, and three end early because the underlying data
+  does. Every month after a signal's data ends has no bonds, so every leg minimum is
+  zero, so a one-sided window reads the whole signal as degenerate. The active window is
+  two-sided, and its upper bound comes from the **signal**, never from the cell being
+  judged: a cell that sets its own bound can delete the months that prove it empty.
+
 - ❗**Section 5's PATH COUNTS are not reproducible run to run, and the reason is in
   PyBondLab.** Running the identical MUA grid twice over identical data flips a small
   number of restricted-breakpoint-universe cells (`ig_bp`, `lg_bp`) between a full

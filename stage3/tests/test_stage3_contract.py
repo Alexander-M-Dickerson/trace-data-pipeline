@@ -267,3 +267,141 @@ def test_no_unimported_shared_module():
                                       src, re.M))
     assert not orphans, ("shared modules nothing imports: " + ", ".join(orphans)
                          + " -- use them or delete them")
+
+
+# ---------------------------------------------------------------------------
+# The degeneracy ledger: one classification, one denominator.
+#
+# ❗These are the tests that would have caught the defects of 2026-09-11: a signal's
+# own end date read as degeneracy (an entire factor vanishing from the full window),
+# and cells with no series at all counted as construction paths in two of the three
+# Section-5 denominators.
+# ---------------------------------------------------------------------------
+LEDGER_DIR = STAGE3 / "data" / "s3_nse" / "mua_summary"
+STATUSES = ("inadmissible", "redundant", "no_series", "short_sample",
+            "empty_leg", "ok")
+WINDOWS = ("paper", "full")
+
+
+def _ledger(window: str):
+    pd = pytest.importorskip("pandas")
+    f = LEDGER_DIR / f"mua_status_{window}.parquet"
+    if not f.exists():
+        pytest.skip(f"no ledger yet -- run s3_nse/mua_summarize.py ({f.name})")
+    return pd.read_parquet(f)
+
+
+@pytest.mark.parametrize("window", WINDOWS)
+def test_ledger_is_a_rectangle(window):
+    """Every cell of the 108 x 216 grid gets exactly one status, and they sum."""
+    led = _ledger(window)
+    assert len(led) == 23_328, f"{window}: {len(led):,} rows, expected 23,328"
+    assert not led.duplicated(["signal", "spec_id"]).any(), \
+        f"{window}: duplicate (signal, spec_id) in the ledger"
+    unknown = sorted(set(led["status"]) - set(STATUSES))
+    assert not unknown, f"{window}: statuses outside the vocabulary: {unknown}"
+    counts = led["status"].value_counts()
+    assert int(counts.sum()) == 23_328, f"{window}: statuses sum to {int(counts.sum()):,}"
+
+
+@pytest.mark.parametrize("window", WINDOWS)
+def test_no_strategy_is_degenerate_on_tail_months_alone(window):
+    """A signal's coverage is not a defect.
+
+    Three of the 108 signals stop before the panel does. Every month after that has no
+    bonds, and judging those months made the whole signal degenerate -- 168 of b_cptlt's
+    168 strategies on the full window, which removed the factor from every exhibit. A
+    cell flagged `empty_leg` must have an empty month INSIDE its own active span.
+    """
+    led = _ledger(window)
+    bad = led[(led["status"] == "empty_leg") & (led["n_months_active"] <= 0)]
+    assert bad.empty, (
+        f"{window}: {len(bad)} strategies flagged degenerate with no active months at "
+        f"all -- e.g. {bad['signal'].iloc[0]}/{bad['spec_id'].iloc[0]}. That is a "
+        "coverage window being read as degeneracy.")
+
+
+def test_the_degenerate_set_does_not_depend_on_the_reporting_window():
+    """Degeneracy is a property of a strategy, not of the window you print.
+
+    Before the window rule was made two-sided this was 80 on the paper window and 246
+    on the full one, the difference being one signal whose data ends early.
+    """
+    a, b = _ledger("paper"), _ledger("full")
+    ca = a["status"].value_counts().reindex(STATUSES, fill_value=0)
+    cb = b["status"].value_counts().reindex(STATUSES, fill_value=0)
+    assert int(ca["empty_leg"]) == int(cb["empty_leg"]), (
+        f"empty_leg differs by window: paper {int(ca['empty_leg'])}, "
+        f"full {int(cb['empty_leg'])} -- a longer window should not create degeneracy")
+    assert int(ca["ok"]) == int(cb["ok"]), (
+        f"usable paths differ by window: paper {int(ca['ok']):,}, "
+        f"full {int(cb['ok']):,}")
+
+
+@pytest.mark.parametrize("window", WINDOWS)
+def test_no_cell_without_a_series_is_counted_as_a_path(window):
+    """`ok` means a well-defined factor return series. A cell with none is not one."""
+    led = _ledger(window)
+    ok = led[led["status"] == "ok"]
+    assert int((ok["n_obs"] == 0).sum()) == 0, (
+        f"{window}: {int((ok['n_obs'] == 0).sum())} cells marked `ok` have no "
+        "observations")
+    assert int((ok["n_months_grid"] == 0).sum()) == 0, (
+        f"{window}: cells marked `ok` with no months in the grid at all")
+
+
+@pytest.mark.parametrize("window", WINDOWS)
+def test_empty_cells_never_reach_the_all_breakpoint_universe(window):
+    """❗The line between "a count moves" and "a value moves".
+
+    Both sign-correction baselines are `all`-universe specs, and
+    `clusters.apply_sign_correction` silently declines to flip a signal whose baseline
+    mean is NaN. While the engine's instability stays confined to the restricted
+    universes it can only move counts. If it ever reaches `all`, a whole signal's row
+    changes sign and the printed numbers are wrong.
+    """
+    led = _ledger(window)
+    empty = led[led["status"] == "no_series"]["spec_id"]
+    reached = [sp for sp in empty if "_ig_bp_" not in sp and "_lg_bp_" not in sp]
+    assert not reached, (
+        f"{window}: {len(reached)} cell(s) with no series in the `all` breakpoint "
+        f"universe, e.g. {reached[:3]}. A baseline spec can now be NaN, which silently "
+        "un-flips a signal -- this moves VALUES, not just counts.")
+
+
+@pytest.mark.parametrize("window", WINDOWS)
+def test_every_printed_denominator_comes_from_the_ledger(window):
+    """Table 6, IA.XVIII and IA.XIX must agree, and agree with the ledger.
+
+    They did not: 18,064 / 18,038 / a pool built on 18,064. Each had inferred the answer
+    from whichever artifact it happened to read.
+    """
+    pd = pytest.importorskip("pandas")
+    led = _ledger(window)
+    n_ok = int((led["status"] == "ok").sum())
+
+    j = STAGE3 / "data" / "s3_nse" / f"table06_{window}.json"
+    c = STAGE3 / "data" / "s3_nse" / f"table_ia18_portfolio_size_{window}.csv"
+    k = STAGE3 / "data" / "s3_nse" / f"table_ia19_{window}.json"
+    if not (j.exists() and c.exists() and k.exists()):
+        pytest.skip("Section-5 exhibits not built yet")
+
+    t6 = json.loads(j.read_text(encoding="utf-8"))["summary"]["n_paths"]
+    assert t6 == n_ok, f"{window}: Table 6 prints {t6:,}, ledger says {n_ok:,}"
+
+    ia18 = pd.read_csv(c)
+    tot = int(ia18.loc[ia18["row"] == "All specifications", "n_spec"].iloc[0])
+    assert tot == n_ok, f"{window}: IA.XVIII prints {tot:,}, ledger says {n_ok:,}"
+
+    pool = json.loads(k.read_text(encoding="utf-8"))["summary"]["n_denominator_pool"]
+    assert pool == n_ok - 648, (
+        f"{window}: IA.XIX pool {pool:,}, expected {n_ok - 648:,} "
+        "(usable paths less the six *_all_all_all per signal)")
+
+
+def test_the_low_bond_threshold_has_one_definition():
+    """The printed footnote quotes it; the `pct_low` column is computed from it."""
+    src = (STAGE3 / "s3_nse" / "t18_portfolio_size.py").read_text(encoding="utf-8")
+    assert "from mua_summarize import LOW_BOND_THRESHOLD" in src, (
+        "t18_portfolio_size.py restates the low-bond threshold instead of importing it "
+        "-- two copies drift and the footnote stops describing the column")
