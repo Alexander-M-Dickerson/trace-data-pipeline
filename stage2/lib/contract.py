@@ -135,6 +135,125 @@ def assert_frontier_policy(df, dataset: str, *, date_col: str = "date") -> None:
         )
 
 
+# ---------------------------------------------------------------------------
+# Per-column AVAILABILITY: which columns can exist before TRACE starts
+# ---------------------------------------------------------------------------
+# The combined 1973-> panel takes its pre-2002 half from monthly Lehman/Warga quotes and
+# ICE/BAML. That source has NO trade prints, NO within-month daily returns and NO trade dates,
+# so a whole family of columns is empty before 2002-08 and always will be. Another family is
+# empty only because nobody carried it across -- and the two look identical in the data.
+#
+# Classifying them is what makes a coverage gate possible. Without it the gate either flags
+# every illiquidity column on every run (noise, so it gets muted) or flags nothing (useless).
+#
+# Measured on the shipped 2026 panel: 89 of the 140 have pre-2002 values, 51 do not, and every
+# one of those 51 is below for a stated reason.
+
+TRACE_ONLY: dict[str, tuple[str, ...]] = {
+    "needs trade prints (spreads, price impact, zero-days)": (
+        "ami", "ami_v", "ar_sprd", "cs_sprd", "ilq", "lix", "p_fht", "p_zro", "pi", "roll",
+        "spd_abs", "spd_rel"),
+    "needs within-month DAILY returns (realized moments)": (
+        "db_mkt", "dkurt", "dskew", "dvol", "dvol_idio", "dvol_sys", "rkt", "rsj", "rsk",
+        "rvol", "vov"),
+    "needs TRADE DATES (holding periods, begin-timed returns, signal timing)": (
+        "dt_e", "dt_e_bgn", "dt_s", "dt_s_bgn", "hprd", "hprd_bgn", "igap_bgn", "lib", "libd",
+        "ret_vw_bgn", "sig_dt", "sig_gap"),
+    "betas / ivol on factors that are themselves TRACE-derived": (
+        "b_amd", "b_amd_m", "b_dvix_va", "b_dvix_vp", "b_dvixd", "b_illiq", "b_lrf", "b_psb",
+        "b_psb_m", "b_rsj", "b_rvol", "b_vix", "ivol_bbw", "ivol_vp"),
+    "TRACE-era identifiers and flags": ("144a", "country"),
+}
+
+TRACE_ONLY_COLUMNS = frozenset(c for g in TRACE_ONLY.values() for c in g)
+ALL_PANEL_COLUMNS = tuple(c for c in PANEL_COLUMNS if c not in TRACE_ONLY_COLUMNS)
+
+
+def availability(col: str) -> str:
+    """"trace_only" if the column cannot exist before TRACE, else "all_panels"."""
+    return "trace_only" if col in TRACE_ONLY_COLUMNS else "all_panels"
+
+
+def trace_only_reason(col: str) -> str | None:
+    for reason, cols in TRACE_ONLY.items():
+        if col in cols:
+            return reason
+    return None
+
+
+# ---------------------------------------------------------------------------
+# ❗The MMN split does not exist before TRACE
+# ---------------------------------------------------------------------------
+# In the TRACE era a price/return signal is built TWICE: the MMN-adjusted form in the main
+# panel (used with ret_vw) and the unadjusted twin in the `_mmn` sidecar (used with
+# ret_vw_bgn). That split needs MONTH-BEGIN TIMED returns, and `ret_vw_bgn`, `hprd_bgn` and
+# `igap_bgn` do not exist pre-TRACE -- they require trade dates.
+#
+# Measured in the pre-TRACE panel: `str` and `str1_adj` are the SAME series (corr 1.0,
+# max|d| 1.1e-07 over 3,104,049 rows), `str1_adj` is the only `_adj` column there, and there
+# are zero `_mmn` columns. So the pre-TRACE side has ONE form of any reversal-style signal and
+# it is NOT MMN-adjusted.
+#
+# Two consequences, both easy to get wrong:
+#   - a new reversal / yield / spread signal gets two forms in TRACE and ONE pre-TRACE;
+#   - the combined panel's `str` is a DIFFERENT CONSTRUCT either side of 2002-08. Say so in
+#     the dictionary rather than letting a user assume one series.
+MMN_SPLIT_IS_TRACE_ONLY = True
+
+# The main-panel signals that MUST have an unadjusted `_mmn` twin in the sidecar. Measured off
+# the shipped sidecar: 38 twins, every one named `<col>_mmn`. A price/return signal added to the
+# main panel without its twin is the `basrev` v1 failure -- the adjusted form gets used with
+# ret_vw and the noisy form has nowhere to live, so someone reaches for ret_vw in the main panel
+# and imports bid-ask bounce (AR(1) -0.05 adjusted vs -0.22 unadjusted).
+MMN_TWINNED: frozenset[str] = frozenset((
+    "ytm", "md_dur", "convx", "cs", "str", "bbtm", "sze", "val_hz", "val_hz_dts", "val_ipr",
+    "val_ipr_dts", "dcs6", "cs_mu12_1", "pi", "ami", "ami_v", "lix", "ilq", "roll", "spd_abs",
+    "spd_rel", "cs_sprd", "ar_sprd", "p_zro", "p_fht", "vov", "dvol", "dskew", "dkurt",
+    "db_mkt", "dvol_sys", "dvol_idio", "rvol", "rsj", "rsk", "rkt", "b_vix", "b_dvixd",
+))
+
+
+def assert_mmn_twins(sidecar_columns, *, what: str = "mmn sidecar") -> None:
+    """Every MMN_TWINNED signal must have its `<col>_mmn` twin in the sidecar."""
+    have = set(sidecar_columns)
+    missing = sorted(c for c in MMN_TWINNED if f"{c}_mmn" not in have)
+    if not missing:
+        return
+    raise AssertionError(
+        f"{what}: {len(missing)} signal(s) have no unadjusted twin:\n    "
+        + ", ".join(f"{c}_mmn" for c in missing) + "\n\n"
+        "  The main panel carries the MMN-ADJUSTED form, used with ret_vw. The unadjusted form\n"
+        "  belongs in this sidecar, used with ret_vw_bgn. Shipping one without the other is how\n"
+        "  a noisy return signal ends up in the main panel."
+    )
+
+
+def assert_pre_trace_coverage(df, *, date_col: str = "date", seam: str = "2002-07-31",
+                              what: str = "combined panel") -> None:
+    """Every `all_panels` column must have SOME pre-TRACE value.
+
+    An `all_panels` column that is empty before the seam means the transplant did not happen,
+    or happened and produced nothing. In the data that is indistinguishable from a column that
+    legitimately has no pre-TRACE history -- which is why the classification above exists.
+    """
+    import pandas as pd
+
+    pre = df[pd.to_datetime(df[date_col]) <= pd.Timestamp(seam)]
+    if pre.empty:
+        return
+    have = [c for c in ALL_PANEL_COLUMNS if c in df.columns]
+    empty = [c for c in have if pre[c].notna().sum() == 0]
+    if not empty:
+        return
+    raise AssertionError(
+        f"{what}: {len(empty)} column(s) are classified all_panels but have NO value before "
+        f"{seam}:\n    " + ", ".join(empty) + "\n\n"
+        "  Either the variable was not carried across to the pre-TRACE engine (see\n"
+        "  provenance/engine_drift.py), or it was and produced nothing. If it genuinely\n"
+        "  cannot exist pre-TRACE, add it to contract.TRACE_ONLY with a reason."
+    )
+
+
 def assert_panel_contract(df, *, what: str = "main panel") -> None:
     """Raise unless `df` carries exactly PANEL_COLUMNS, in exactly that order."""
     actual = list(df.columns)
