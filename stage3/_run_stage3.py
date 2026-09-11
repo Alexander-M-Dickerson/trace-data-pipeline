@@ -31,7 +31,7 @@ sys.path.insert(0, str(HERE))
 
 import _stage3_settings as S  # noqa: E402
 
-SECTIONS = ("data", "lib", "lab", "nse", "zoo")
+SECTIONS = ("data", "lib", "lab", "nse", "zoo", "report")
 
 # (section, kind, script, args, what it writes -- relative to data/ or reports/)
 STEPS = [
@@ -112,6 +112,12 @@ STEPS = [
      "reports/tables/table_ia11.tex"),
     ("zoo", "exhibit", "s4_zoo/t_inline.py", [],
      "reports/tables/inline_counts_alpha.tex"),
+
+    # -- the report ------------------------------------------------------------
+    # Last, and deliberately part of the run: the exhibits are LaTeX fragments, and a
+    # fragment that will not compile looks perfectly fine sitting on disk. Compiling
+    # is what catches it.
+    ("report", "exhibit", "make_report.py", [], "reports/exhibits.pdf"),
 ]
 
 

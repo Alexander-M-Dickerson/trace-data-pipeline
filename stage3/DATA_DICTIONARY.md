@@ -4,12 +4,28 @@ Every artifact Stage 3 writes, and what its columns mean.
 
 ## Contents
 
+0. [The compiled report](#the-compiled-report) — `reports/exhibits.pdf`
 1. [Long-format sort panels](#long-format-sort-panels) — `data/sorts/`
 2. [The uncertainty grids](#the-uncertainty-grids) — `data/grids/`
 3. [Statistics frames](#statistics-frames) — `data/<section>/`
 4. [Result manifests](#result-manifests) — `data/<section>/*.json`
 5. [Sample windows](#sample-windows)
 6. [Conventions that decide what a number means](#conventions-that-decide-what-a-number-means)
+
+---
+
+## The compiled report
+
+`reports/exhibits.pdf` — every exhibit in one document, built by `make_report.py`.
+
+The exhibit numbers in it are **the paper's** (Table IA.XII, Figure IA.3), announced by
+each heading. LaTeX's own sequential numbering is suppressed, so a reference to "Table 4"
+means the same table it does in the paper.
+
+Its title page records what produced it: the sample windows, the PyBondLab build with its
+content hash and whether the fast kernels were present, and every input with its size and
+sha256 prefix. `reports/exhibits.tex` is the assembled source, and
+`reports/exhibits.build.log` the pdflatex transcript.
 
 ---
 

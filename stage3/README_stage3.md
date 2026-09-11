@@ -9,9 +9,14 @@ It runs on your own computer, like Stage 2. It needs no WRDS connection.
 ```bash
 cd stage3
 python tools/check_inputs.py     # are the five inputs there and the right shape?
-python _run_stage3.py --list     # the 39 steps, and what is already built
-bash run_stage3.sh               # everything
+python _run_stage3.py --list     # the 40 steps, and what is already built
+bash run_stage3.sh               # everything, ending in reports/exhibits.pdf
 ```
+
+The last step compiles every exhibit into **`reports/exhibits.pdf`** — 49 pages. That
+is deliberately part of the run and not an afterthought: the exhibits are LaTeX
+fragments, and a fragment that will not compile looks perfectly fine sitting on disk.
+Compiling is what catches it.
 
 ---
 
@@ -22,8 +27,9 @@ bash run_stage3.sh               # everything
 | `data/sorts/` | long-format long-short panels: `date, factor, freq, leg, weighting, return, turnover` |
 | `data/grids/` | the two uncertainty grids, one parquet per signal |
 | `data/<section>/` | the tidy statistics frames the exhibits format, plus a manifest per result |
-| `reports/tables/` | the paper's tables, as LaTeX |
+| `reports/tables/` | the paper's tables, as LaTeX fragments |
 | `reports/figures/` | the paper's figures, as PDF |
+| **`reports/exhibits.pdf`** | **all 43 of them compiled into one document**, in the paper's order and under the paper's exhibit numbers, with a provenance page |
 | `reports/timings.jsonl` | one line per run: phases, wall clock, and the run's own check |
 
 Nothing downstream of a statistics frame recomputes a regression. Each section computes
@@ -110,7 +116,17 @@ than restarting; `--force` recomputes.
 | `nse` | the **DUA grid** — 108 signals x 120 filters x 3 ratings | ~6 min, then ~1 min for its statistics |
 | `zoo` | all 108 signals, single and within-firm | ~2 min |
 
-**Exhibits** read those series and render. Seconds each, always re-rendered.
+**Exhibits** read those series and render. Seconds each, always re-rendered. The final
+step compiles them all into one PDF.
+
+❗`reports/exhibits.pdf` carries **your** numbers, from whatever panel Stage 2 built.
+Nothing in it compares them to the paper's printed ones, and its title page says so -- a
+PDF of tables under familiar captions is exactly the kind of artifact that gets mistaken
+for the original.
+
+Figures 1, 2 and 5 of the paper are schematics drawn in LaTeX -- a research framework, a
+return timeline, a look-ahead illustration. They have no data behind them, so Stage 3
+does not produce them, and the document says so rather than leaving a gap.
 
 Those timings are with the fast kernels, on 24 cores. Without them the grids are hours
 rather than minutes — that is what the kernels are for.
@@ -171,6 +187,7 @@ stage3/
   bench.py                phase timings + each run's own completeness check
   fastrun.py              process-parallel fan-out for the grids
   latex_format.py         house number formatting ($-$ minus, {,} thousands)
+  make_report.py          assembles every exhibit into one compiled PDF
   s0_data/                the data appendix
   s1_lib/                 Section 3 — latent implementation bias
   s2_lab/                 Section 4 — look-ahead bias

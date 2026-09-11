@@ -42,7 +42,12 @@ from bench import Bench     # noqa: E402
 LABEL = "tab:mua_improvement"
 KEYS = [f"{dim}:{val}" for dim, vals in E.MUA_COLUMN_GROUPS for _, val in vals]
 HEADERS = [h for _, vals in E.MUA_COLUMN_GROUPS for h, _ in vals]
-GROUP_SPANS = [(dim.capitalize(), len(vals)) for dim, vals in E.MUA_COLUMN_GROUPS]
+# Display names for the three dimensions. ❗Not `dim.capitalize()`: that leaves
+# "Bp_universe", and a bare underscore is a subscript in LaTeX, not a character.
+GROUP_LABEL = {"rating": "Rating", "maturity": "Maturity",
+               "bp_universe": "Breakpoint universe"}
+GROUP_SPANS = [(GROUP_LABEL.get(dim, dim.replace("_", " ").capitalize()), len(vals))
+               for dim, vals in E.MUA_COLUMN_GROUPS]
 PANELS = [("Panel A", "np", "Improving specifications, count (share)"),
           ("Panel B", "N", "Specifications in the pool"),
           ("Panel C", "n", "Improving specifications")]

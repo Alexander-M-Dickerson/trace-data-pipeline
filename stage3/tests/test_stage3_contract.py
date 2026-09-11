@@ -218,7 +218,7 @@ def test_no_unimported_shared_module():
     folders reaches for one, it is dead weight in a package meant to be read. (Entry
     points and drivers are exempt -- they are run, not imported.)
     """
-    entry = {"_run_stage3", "_stage3_settings", "paths", "conftest"}
+    entry = {"_run_stage3", "_stage3_settings", "paths", "conftest", "make_report"}
     shared = {p.stem for p in STAGE3.glob("*.py")} - entry
     src = "\n".join(p.read_text(encoding="utf-8") for p in PY_FILES)
     orphans = sorted(m for m in shared
