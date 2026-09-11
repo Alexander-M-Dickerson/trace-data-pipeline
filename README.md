@@ -11,6 +11,7 @@ The companion repository is [PyBondLab](https://github.com/GiulioRossetti94/PyBo
 [![Stage 0](https://img.shields.io/badge/Stage%200-Public%20Beta-green)](stage0/)
 [![Stage 1](https://img.shields.io/badge/Stage%201-Public%20Beta-green)](stage1/)
 [![Stage 2](https://img.shields.io/badge/Stage%202-Public%20Beta-green)](stage2/)
+[![Stage 3](https://img.shields.io/badge/Stage%203-Public%20Beta-green)](stage3/)
 
 [📄 Link to paper](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4575879)
 ---
@@ -25,6 +26,7 @@ Getting this straight first will save you an afternoon.
 | **1** | **WRDS Cloud** | Stages 0 and 1 build the daily bond panel from the raw TRACE tape | ~5 hours, mostly waiting |
 | **2** | **In between** | You zip the output on WRDS and copy it down to your own computer | ~15 min for ~6 GB |
 | **3** | **Your own computer** | Stage 2 turns that daily panel into the monthly asset-pricing panel | ~8 minutes |
+| **4** | **Your own computer** | Stage 3 turns the monthly panel into sorted portfolios and the paper's exhibits | ~25 minutes |
 
 **Why the split?** Stages 0 and 1 read the raw TRACE transaction tape, which is a WRDS
 database — so they have to run where the data is, submitted to the WRDS job grid. Stage 2
@@ -57,8 +59,19 @@ faster on your own machine and needs no WRDS connection at all.
 9. `cd stage2 && python _run_stage2.py`
 10. You now have `stage2/output/panel/main_panel_<mode>.parquet` — 140 columns per bond-month.
 
+**Still on your own computer, if you want the research output too:**
+
+11. `cd stage3 && python tools/check_inputs.py` — confirms Stage 3 can see what Stage 2 made.
+12. `bash run_stage3.sh` — portfolio sorts, the uncertainty grids, and 32 tables and
+    11 figures into `stage3/reports/`.
+
+Stages 0-2 build the DATA. Stage 3 is what the data was built for: it reproduces every
+exhibit of *The Corporate Bond Factor Replication Crisis* from the panel you just made.
+It is optional — the panel is useful on its own.
+
 Full detail: [QUICKSTART.md](QUICKSTART.md) for stages 0-1,
-[stage2/QUICKSTART_stage2.md](stage2/QUICKSTART_stage2.md) for stage 2.
+[stage2/QUICKSTART_stage2.md](stage2/QUICKSTART_stage2.md) for stage 2,
+[stage3/QUICKSTART_stage3.md](stage3/QUICKSTART_stage3.md) for stage 3.
 
 > ❗**You cannot skip stages 0 and 1 by downloading the published Stage 1 file.** The public
 > download has its rating columns removed, because agency ratings are licensed. Stage 2 keeps
@@ -117,6 +130,7 @@ Produces a clean, error-corrected monthly panel with dozens of corporate bond si
 - **Stage 0**: ✅ **Now available** - Public beta, ready for testing
 - **Stage 1**: ✅ **Now available** - Public beta, ready for testing
 - **Stage 2**: 🔨 **Code available** - Builds the monthly panel from your Stage 1 output; the first published data vintage is still to come
+- **Stage 3**: 🔨 **Code available** - Turns that monthly panel into portfolio sorts, uncertainty grids and the paper's 32 tables and 11 figures
 
 **This project is under active development and any feedback is greatly appreciated.**
 Please reach out to `alexander.dickerson1@unsw.edu.au` if you would like to collaborate.
@@ -264,6 +278,11 @@ This runs the real Stage 0 → Stage 1 code on a handful of CUSIP chunks and ass
 - **[Distressed-bond filter](stage1/README_distressed_filter.md)**: The ultra-distressed screen and why it exists
 - **[Configuration Guide](stage1/README_stage1.md#configuration-choices-you-can-edit)**: All configurable parameters
 - **[Troubleshooting](stage1/README_stage1.md#troubleshooting)**: Common issues and solutions
+
+**Stage 3 - Sorts and Exhibits:**
+- **[Stage 3 README](stage3/README_stage3.md)**: What it produces, the five inputs, and the conventions that decide what a number means
+- **[Stage 3 Quickstart](stage3/QUICKSTART_stage3.md)**: A minimal run, and what to do when a step complains
+- **[Stage 3 Data Dictionary](stage3/DATA_DICTIONARY.md)**: Every artifact and column
 
 **Stage 2 - Monthly Panel:**
 - **[Stage 2 README](stage2/README_stage2.md)**: What it builds and how to run it
@@ -687,4 +706,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Last Updated:** September 2026
-**Version:** 3.1.0 — see [CHANGELOG.md](CHANGELOG.md) for what each release changed.
+**Version:** 3.2.0 — see [CHANGELOG.md](CHANGELOG.md) for what each release changed.

@@ -11,6 +11,79 @@ Nothing pending.
 
 ---
 
+## [3.2.0] - 2026-09-11
+
+**Stage 3.** The pipeline now goes all the way from the raw TRACE tape to the exhibits the
+data was built for: **32 tables and 11 figures**, every one of *The Corporate Bond Factor
+Replication Crisis* -- main text, appendix and Internet Appendix -- produced from the Stage-2
+monthly panel. Stage 3 runs on your own machine, like Stage 2, and needs no WRDS connection.
+
+### Added
+
+- **`stage3/`** -- 9,400 lines across five sections. Two kinds of step, and the difference
+  matters: **producers** run sorts through PyBondLab and save return series (minutes to tens
+  of minutes; the two uncertainty grids are the long ones), and are SKIPPED when their output
+  exists, so a run that stops can simply be run again. **Exhibits** read those series and
+  render; seconds each.
+
+  Each section computes its statistics **once** into a tidy frame, and every table and figure
+  is a formatter over that frame. Nothing downstream of a statistics frame refits a
+  regression -- which is why a section's figures cannot quietly disagree with its tables, and
+  where they could, the figure drivers check themselves against the statistics engine at 1e-9.
+
+  | section | what it produces |
+  |---|---|
+  | data appendix | Tables A.1-A.3 and IA.I-IA.VII |
+  | Section 3 | Tables 1, 2, IA.XII-XIV, B.1; Figures 3, 4, IA.1 |
+  | Section 4 | Tables 3, 4, IA.XV, IA.XVI; Figures 6, 7, 8, IA.2 |
+  | Section 5 | Tables 5, 6, IA.XVII-XIX; Figures IA.3-IA.6 |
+  | factor zoo | Tables IA.IX-IA.XI and the two inline count tables |
+
+- **`stage3/tools/check_inputs.py` + `spec/inputs.json`** -- the input contract: five files,
+  198 columns, checked for rows, columns and date span before anything long starts. It reports
+  every problem at once, so a missing column surfaces in a second rather than forty minutes
+  into a grid. The panel's column list is derived from the code that reads it, not typed out.
+
+- **`stage3/pblenv.py`** -- which PyBondLab produced a number is part of that number. It puts
+  the chosen build first on `sys.path`, **asserts the import resolved inside it** (a second
+  install in the environment can otherwise shadow it silently), and records the build's
+  version, git state and a content hash in every manifest Stage 3 writes.
+
+- **`stage3/tests/`** -- 32 tests that pass with no configuration at all, which is the
+  fresh-clone case: no absolute user path anywhere; every runner step names a script that
+  exists AND every driver is in the runner; every rendered exhibit has a caption; the input
+  contract and the settings agree; `check_inputs` fails rather than skips on a missing input;
+  both sample windows give 4 Newey-West lags.
+
+### Notes for anyone reading the output
+
+- ❗**Two exhibits ship in two variants**, because the published table and the paper's own
+  definitions differ. Both are produced; neither is silently corrected. `tableB1.tex`
+  differences the stored series as published, without undoing the extract-time sign flips;
+  `tableB1_corrected.tex` undoes them first, and the run reports how many end/begin pairs
+  were flip-mismatched. `table_ia09.tex` places `b_rvol` where the printed table does;
+  `table_ia09_dictionary.tex` where the paper's own signal dictionary does.
+- ❗**A trailing `*` on a factor means the series was sign-corrected**, and the decision is
+  made from the full-sample mean of **the sample that was sorted**. Two runs over different
+  windows can legitimately disagree about which factors are starred. Compare flip *sets*, and
+  never difference a starred series against an unstarred one without re-orienting both.
+- ❗**Section 5 needs a PyBondLab build carrying the fast kernels** (`fast_sorts`,
+  `anomaly_assay_fast`), which the pinned 0.2.0 release does not have. Point `PYBONDLAB_DIR`
+  at one; `pblenv.require_fast()` checks before the fan-out starts rather than letting 108
+  workers each fail on an import. Everything else runs on the pinned release. The pin is NOT
+  floated to fix this -- Stage 2's factor series depend on it exactly.
+
+### Changed
+
+- **`README.md` and `QUICKSTART.md`** carry Stage 3 in the which-machine table and the
+  step-by-step walkthrough, and state plainly that Stage 3 is optional: stages 0-2 build the
+  data, and the panel is useful on its own.
+- **`requirements.txt`** gains a Stage 3 section. It adds no new packages -- everything Stage 3
+  imports was already required -- but it explains the PyBondLab situation above, where someone
+  would otherwise be tempted to float the pin.
+
+---
+
 ## [3.1.0] - 2026-09-11
 
 **Public-readiness.** Stages 0-2 were complete but the repository was not something to hand a

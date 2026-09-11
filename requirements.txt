@@ -57,6 +57,26 @@ matplotlib>=3.8.0
 # it is not; nothing depends on it.
 # psutil>=5.9
 
+# --- Stage 3: sorts, uncertainty grids, and the paper's exhibits -------------
+# Stage 3 runs on your own machine, like Stage 2, and adds nothing to the list above:
+# pandas, numpy, pyarrow, duckdb, scipy, statsmodels and matplotlib are all already
+# required. One thing about PyBondLab needs saying, though.
+#
+# The pin above is Stage 2's, and it is exact for a reason. Stage 3's two UNCERTAINTY
+# GRIDS (Section 5) need `PyBondLab.fast_sorts` and `PyBondLab.anomaly_assay_fast`,
+# which the 0.2.0 release does not carry -- without them those grids are hours rather
+# than minutes, and Stage 3 refuses to start them rather than letting 108 workers each
+# fail on an import.
+#
+# Do NOT float the pin to fix that: Stage 2's factor series, and the ~40 beta columns
+# behind them, depend on it. Instead point Stage 3 at a checkout that has the kernels:
+#
+#     export PYBONDLAB_DIR=/path/to/PyBondLab
+#
+# `stage3/pblenv.py` puts that build FIRST on sys.path, asserts the import resolved
+# inside it, and records its version, git state and a content hash in every manifest.
+# Everything in Stage 3 except Section 5 runs on the pinned 0.2.0.
+
 # Development only, to run the test suites:
 # pytest>=8.0
 

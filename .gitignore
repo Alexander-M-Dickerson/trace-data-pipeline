@@ -191,3 +191,21 @@ stage2/release/
 # The `**` negations above re-include everything under those folders, which defeats the
 # global __pycache__ rule at the top of this file. Exclude the caches again, explicitly.
 stage2/**/__pycache__/
+
+# ---------------------------------------------------------------------------
+# Stage 3 (sorts, uncertainty grids, the paper's exhibits) -- your own machine
+# ---------------------------------------------------------------------------
+# Everything Stage 3 computes is regenerable from the Stage 1/2 outputs, and the
+# grids are tens of GB. The CODE is committed; the results are not.
+stage3/data/
+stage3/reports/
+
+# Stage 3's code lives in section folders and in tools/; the generic Python rules
+# above would swallow some of them, so re-include explicitly.
+!stage3/tools/
+!stage3/tools/**
+!stage3/tests/
+!stage3/tests/**
+!stage3/spec/
+!stage3/spec/**
+stage3/**/__pycache__/
