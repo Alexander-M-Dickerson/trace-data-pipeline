@@ -243,8 +243,13 @@ def title_page(window: str, prov: dict) -> str:
         L.append(r"{\footnotesize\begin{tabular}{lrl}\toprule")
         L.append(r"File & Size & sha256 \\ \midrule")
         for i in data_in:
-            mb = i.get("bytes", 0) / 1e6
-            L.append(f"{latex_escape(str(i['path']))} & {mb:,.0f} MB & "
+            # A settings file printed as "0 MB" reads as an empty file. Scale the unit
+            # to the file instead -- the inputs span 38 KB to 2.3 GB.
+            b = i.get("bytes", 0)
+            size = (f"{b / 1e9:,.2f} GB" if b >= 1e9 else
+                    f"{b / 1e6:,.0f} MB" if b >= 1e6 else
+                    f"{b / 1e3:,.0f} KB")
+            L.append(f"{latex_escape(str(i['path']))} & {size} & "
                      f"\\texttt{{{i.get('sha256_16', '')}}} \\\\")
         L.append(r"\bottomrule\end{tabular}}")
         if derived:
@@ -255,8 +260,9 @@ def title_page(window: str, prov: dict) -> str:
     L.append(r"\vfill")
     L.append(r"{\footnotesize " + NOT_DATA_FIGURES + r" of the paper are schematics drawn "
              r"in \LaTeX{} -- a research framework, a return timeline and a look-ahead "
-             r"illustration. They have no data behind them, so Stage 3 does not produce "
-             r"them and they are absent here.}")
+             r"illustration -- and Table IA.VIII is its signal dictionary, a written "
+             r"list of the panel's fields. None of the four has any computation behind "
+             r"it, so Stage 3 does not produce them and they are absent here.}")
     L.append(r"\end{titlepage}")
     return "\n".join(L)
 
