@@ -405,3 +405,27 @@ def test_the_low_bond_threshold_has_one_definition():
     assert "from mua_summarize import LOW_BOND_THRESHOLD" in src, (
         "t18_portfolio_size.py restates the low-bond threshold instead of importing it "
         "-- two copies drift and the footnote stops describing the column")
+
+
+def test_the_ledger_cannot_be_older_than_the_grid():
+    """A statistics layer derived from a grid that is no longer on disk is not a result.
+
+    Re-running the grid does not invalidate the summarizer's completion marker, so the
+    orchestrator skips it and every Section-5 exhibit quietly describes a different grid.
+    Found on 2026-09-11: six cells with a full 268-month series in the grid and n_obs = 0
+    in the summary, written seven minutes apart.
+    """
+    src = (STAGE3 / "s3_nse" / "nse_engine.py").read_text(encoding="utf-8")
+    assert "STAGE3_ALLOW_STALE_LEDGER" in src and "is OLDER than the grid" in src, (
+        "nse_engine.load_ledger no longer refuses a ledger older than its grid")
+
+
+def test_a_failed_check_reaches_the_reader():
+    """`write_result` runs before `b.check`, so a red exhibit still renders.
+
+    That is the right call -- a missing table is worse than a flagged one -- but the
+    reader holding the PDF has to be told, or a failed assertion looks like a clean run.
+    """
+    src = (STAGE3 / "make_report.py").read_text(encoding="utf-8")
+    assert "def failed_checks(" in src and "Checks that did not pass" in src, (
+        "make_report no longer surfaces failed checks on the provenance page")

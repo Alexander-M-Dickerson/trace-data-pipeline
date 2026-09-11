@@ -256,6 +256,26 @@ def load_ledger(window: str) -> pd.DataFrame:
             f"the MUA status ledger is not at {f}.\n"
             "  Run `python s3_nse/mua_summarize.py` (it writes the ledger beside the "
             "summary).")
+    # ❗Refuse a ledger older than the grid it claims to describe. Re-running the grid
+    # does NOT invalidate the summarizer's completion marker, so the orchestrator will
+    # happily skip it and leave every Section-5 exhibit built on a statistics layer
+    # derived from a different grid. With the engine's cells flipping between runs the
+    # two can disagree about which strategies exist at all -- which is exactly what was
+    # found on 2026-09-11: six cells with a full 268-month series in the grid and
+    # `n_obs = 0` in the summary, seven minutes apart.
+    import os
+    if os.environ.get("STAGE3_ALLOW_STALE_LEDGER") != "1":
+        grids = sorted((paths.GRIDS / "mua").glob("*.parquet"))
+        newest = max((g.stat().st_mtime for g in grids), default=0.0)
+        if newest > f.stat().st_mtime + 1:
+            raise SystemExit(
+                f"the MUA status ledger is OLDER than the grid it describes.\n"
+                f"  ledger : {f.name}\n"
+                f"  grid   : {len(grids)} parquets, newest {newest - f.stat().st_mtime:.0f}s "
+                "later\n"
+                "  Re-run `python s3_nse/mua_summarize.py`. (Set "
+                "STAGE3_ALLOW_STALE_LEDGER=1 to proceed anyway, knowing the exhibits "
+                "will describe a grid that is no longer on disk.)")
     led = pd.read_parquet(f)
     assert len(led) == 23_328, (
         f"the ledger has {len(led):,} rows, expected 23,328 (108 signals x 216 specs). "

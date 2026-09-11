@@ -181,6 +181,32 @@ def provenance() -> dict:
     return out
 
 
+def failed_checks() -> list[tuple[str, str]]:
+    """Steps whose own check failed in the most recent run of each.
+
+    The ledger is append-only, so the last line per tag is the current verdict.
+    """
+    f = paths.TIMINGS
+    if not f.exists():
+        return []
+    last = {}
+    for line in f.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            r = json.loads(line)
+        except Exception:
+            continue
+        last[r.get("tag")] = r
+    out = []
+    for tag, r in last.items():
+        if r.get("ok") is False:
+            detail = next((c.get("detail", "") for c in r.get("checks", [])
+                           if not c.get("passed")), "")
+            out.append((str(tag), detail))
+    return sorted(out)
+
+
 def title_page(window: str, prov: dict) -> str:
     L = [r"\begin{titlepage}", r"\vspace*{2cm}", r"\begin{center}",
          r"{\LARGE\bfseries The Corporate Bond Factor Replication Crisis}\\[0.4em]",
@@ -257,6 +283,20 @@ def title_page(window: str, prov: dict) -> str:
                      r"Stage 3 produced itself are recorded in the per-result "
                      r"manifests under \texttt{data/}.}")
 
+    # ❗An exhibit whose own check FAILED still renders -- `write_result` runs before
+    # `b.check`, and a missing table would be worse than a flagged one. So say so on the
+    # provenance page: a reader holding the PDF cannot otherwise tell.
+    failed = failed_checks()
+    if failed:
+        L.append(r"\subsection*{Checks that did not pass}")
+        L.append(r"{\footnotesize\begin{tabular}{ll}\toprule")
+        L.append(r"Step & What it checks \\ \midrule")
+        for tag, detail in failed[:8]:
+            L.append(latex_escape(tag) + " & " + latex_escape(detail[:88]) + r" \\")
+        L.append(r"\bottomrule\end{tabular}}")
+        L.append(r"{\footnotesize These exhibits are rendered from real numbers; the "
+                 r"line above is the run's own assertion about them, and it did not "
+                 r"hold. See \texttt{reports/timings.jsonl}.}")
     L.append(r"\vfill")
     L.append(r"{\footnotesize " + NOT_DATA_FIGURES + r" of the paper are schematics drawn "
              r"in \LaTeX{} -- a research framework, a return timeline and a look-ahead "
