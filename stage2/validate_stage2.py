@@ -41,25 +41,51 @@ class StepSpec:
     col_tols: dict = field(default_factory=dict)
 
 
+# step -> (key in cfg.GOLDEN_OUTPUTS, our output, join key, rate families, per-col tolerances)
+_STEP_TABLE: dict[str, tuple] = {
+    "returns":  ("returns",       "returns_alt.parquet",   ("cusip", "date"), False, {}),
+    "illiq":    ("illiq_factors", "illiq_factors.parquet", ("date",),         False, {"ARS": 1e-4}),
+    "bbw":      ("bbw_factors",   "bbw_factors.parquet",   ("date",),         False, {}),
+    "betas":    ("betas",         "betas_x.parquet",       ("cusip", "date"), True,  {}),
+    "momentum": ("momentum",      "mom_retx.parquet",      ("cusip", "date"), False, {}),
+    "mmn":      ("price_signals", None,                    ("cusip", "date"), True,  _RESIDUAL_TOLS),
+    "main":     ("main_panel",    None,                    ("cusip", "date"), True,  _RESIDUAL_TOLS),
+}
+
+
 def _specs() -> dict[str, StepSpec]:
+    """Only the steps that actually have a golden configured.
+
+    GOLDEN_OUTPUTS is populated from settings and is EMPTY in a public clone, which has no
+    golden to compare against. Indexing it unguarded made `--help` itself raise KeyError,
+    because argparse builds `choices` from this dict.
+    """
     b = cfg.BLOCKS_DIR / "golden"
-    return {
-        "returns": StepSpec(cfg.GOLDEN_OUTPUTS["returns"], b / "returns_alt.parquet",
-                            ("cusip", "date")),
-        "illiq": StepSpec(cfg.GOLDEN_OUTPUTS["illiq_factors"], b / "illiq_factors.parquet",
-                          ("date",), col_tols={"ARS": 1e-4}),
-        "bbw": StepSpec(cfg.GOLDEN_OUTPUTS["bbw_factors"], b / "bbw_factors.parquet", ("date",)),
-        "betas": StepSpec(cfg.GOLDEN_OUTPUTS["betas"], b / "betas_x.parquet", ("cusip", "date"),
-                          apply_rate_families=True),
-        "momentum": StepSpec(cfg.GOLDEN_OUTPUTS["momentum"], b / "mom_retx.parquet",
-                             ("cusip", "date")),
-        "mmn": StepSpec(cfg.GOLDEN_OUTPUTS["price_signals"],
-                        b / f"mmn_price_based_signals_{cfg.DATE_STAMP}.parquet",
-                        ("cusip", "date"), apply_rate_families=True, col_tols=_RESIDUAL_TOLS),
-        "main": StepSpec(cfg.GOLDEN_OUTPUTS["main_panel"],
-                         cfg.PANEL_DIR / "main_panel_golden.parquet",
-                         ("cusip", "date"), apply_rate_families=True, col_tols=_RESIDUAL_TOLS),
+    ours_override = {
+        "mmn": b / f"mmn_price_based_signals_{cfg.DATE_STAMP}.parquet",
+        "main": cfg.PANEL_DIR / "main_panel_golden.parquet",
     }
+    specs: dict[str, StepSpec] = {}
+    for step, (gk, ours_name, key, rate, tols) in _STEP_TABLE.items():
+        golden = cfg.GOLDEN_OUTPUTS.get(gk)
+        if golden is None:
+            continue
+        ours = ours_override.get(step) or (b / ours_name)
+        specs[step] = StepSpec(Path(golden), ours, key,
+                               apply_rate_families=rate, col_tols=dict(tols))
+    return specs
+
+
+def _require_specs() -> dict[str, StepSpec]:
+    specs = _specs()
+    if not specs:
+        raise SystemExit(
+            "no golden outputs are configured, so there is nothing to validate against.\n"
+            "GOLDEN_OUTPUTS in _stage2_settings.py is empty -- this is normal for a public\n"
+            "clone. Golden validation is an internal reproduction check; a public build is\n"
+            "checked by `pytest stage2/tests` and the gates inside run_stage2.py."
+        )
+    return specs
 
 
 def _load_with_key(path: Path, key: tuple[str, ...]) -> pd.DataFrame:
@@ -71,7 +97,10 @@ def _load_with_key(path: Path, key: tuple[str, ...]) -> pd.DataFrame:
 
 
 def validate_step(step: str, verbose: bool = True) -> tuple[bool, dict]:
-    spec = _specs()[step]
+    specs = _require_specs()
+    if step not in specs:
+        raise SystemExit(f"no golden configured for step {step!r}; available: {sorted(specs)}")
+    spec = specs[step]
     if not spec.ours.exists():
         raise FileNotFoundError(f"our {step} output not built yet: {spec.ours}")
     golden = _load_with_key(spec.golden, spec.key)
@@ -90,10 +119,10 @@ def validate_step(step: str, verbose: bool = True) -> tuple[bool, dict]:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="monthly golden validation")
-    ap.add_argument("--step", required=True, choices=list(_specs()) + ["all"])
+    ap.add_argument("--step", required=True, choices=sorted(_specs()) + ["all"])
     ap.add_argument("--json-out", type=Path, default=None)
     args = ap.parse_args()
-    steps = list(_specs()) if args.step == "all" else [args.step]
+    steps = list(_require_specs()) if args.step == "all" else [args.step]
     results = {}
     ok = True
     for s in steps:
