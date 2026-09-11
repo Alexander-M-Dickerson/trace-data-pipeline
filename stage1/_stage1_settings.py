@@ -315,6 +315,45 @@ except (FileNotFoundError, ValueError) as e:
 # CONFIGURATION GETTER FUNCTION
 # ============================================================================
 
+# An `auto:-Nmo` cut-off is measured from the frontier of the LEAST current source.
+# TRACE Enhanced and 144A/BTDS are different populations reported on different lags --
+# 144A runs months ahead -- so resolving the spec against the POOLED maximum lands the
+# cut in a month where 144A is complete and Enhanced has only a few days. Stage 1 still
+# emits that month, but it is no longer a cross-section: a bond needs a trade near
+# month-end to get a month-end price, so the survivors are 144A issues alone.
+#
+# Measured on the 2026-09-10 run: Enhanced ends 2025-12-04, 144A 2025-12-31. On the
+# pooled max the final monthly cross-section is 1,914 bonds and 100% 144A, against a
+# trailing median of ~10,700 at ~22% 144A.
+#
+# Standard (db_type 2) is NOT a separate population: it is the same public tape, and
+# stage 1 clips it to start where Enhanced ends, so it EXTENDS the Enhanced frontier
+# rather than bounding it. The two are taken together.
+CUT_OFF_POPULATIONS = {"TRACE (Enhanced/Standard)": (1, 2), "144A/BTDS": (3,)}
+
+
+def source_frontiers(df, db_type_col="db_type", date_col="trd_exctn_dt"):
+    """Last trade date per POPULATION (not per db_type). Empty populations are omitted."""
+    import pandas as pd
+
+    out = {}
+    for label, types in CUT_OFF_POPULATIONS.items():
+        m = df.loc[df[db_type_col].isin(types), date_col].max()
+        if pd.notna(m):
+            out[label] = m
+    return out
+
+
+def cut_off_basis(df, db_type_col="db_type", date_col="trd_exctn_dt"):
+    """The date an `auto:-Nmo` spec is measured from: the least current source's last day.
+
+    Falls back to the pooled maximum when no population matched, which is what a
+    single-source run or an unexpected db_type would give anyway.
+    """
+    fr = source_frontiers(df, db_type_col=db_type_col, date_col=date_col)
+    return min(fr.values()) if fr else df[date_col].max()
+
+
 def resolve_date_cut_off(value, raw_max):
     """Resolve a DATE_CUT_OFF spec against the last trade date in the data.
 

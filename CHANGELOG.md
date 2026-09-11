@@ -7,7 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Nothing pending.
+### Fixed
+
+- **Stage 1's `auto:-Nmo` cut-off is now measured from the least current SOURCE, not from
+  the pooled last trade date.** TRACE Enhanced and 144A/BTDS are different populations on
+  different reporting lags, and 144A runs months ahead. From the 2026-09-10 run's log:
+  pooled last trade `2026-06-05` (144A), Enhanced max `2025-12-04`, `auto:-3mo` resolved to
+  `2026-03-31`. Every month from 2025-12 on is therefore one in which no Enhanced bond can
+  have a month-end price, so the monthly panel emitted months that are not cross-sections
+  -- the last held 1,914 bonds, 100% 144A, against a trailing median of ~10,700 at ~22%.
+  The same spec measured from Enhanced gives `2025-09-30`. Standard (db_type 2) is not a
+  separate population -- Stage 1 clips it to start where Enhanced ends -- so it is taken
+  together with Enhanced. An explicit `"YYYY-MM-DD"` cut-off is still the user's choice and
+  is left alone. New: `_stage1_settings.cut_off_basis` / `source_frontiers`,
+  `tests/test_cut_off_basis.py`, and per-population frontiers in the Stage 1 log.
+- **`stage2/validate_stage2.py --help` raised `KeyError: 'returns'`.** The CLI built
+  argparse's `choices` from `_specs()`, which indexed `GOLDEN_OUTPUTS` unguarded; that dict
+  is empty in a public clone, so the exception fired before argparse could print anything.
+  Steps without a configured golden are now skipped, and `--step all` with none configured
+  says so and exits 1. Covered by `stage2/tests/test_validate_cli.py`.
 
 ---
 

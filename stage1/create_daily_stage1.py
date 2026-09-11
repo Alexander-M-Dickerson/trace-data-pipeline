@@ -107,8 +107,12 @@ def run_stage1(config: dict):
 
     # DATE_CUT_OFF may be an "auto:-Nmo" spec; step 2 resolves it once the data's
     # last trade date is known.
-    from _stage1_settings import resolve_date_cut_off
+    from _stage1_settings import (resolve_date_cut_off, cut_off_basis,
+                                  source_frontiers)
     pipeline_module.resolve_date_cut_off = resolve_date_cut_off
+    # The spec is measured from the least current SOURCE, not the pooled max.
+    pipeline_module.cut_off_basis = cut_off_basis
+    pipeline_module.source_frontiers = source_frontiers
 
     # Create directories (in case they don't exist yet)
     for d in [config["stage1_dir"], config["stage1_data"], config["log_dir"]]:
