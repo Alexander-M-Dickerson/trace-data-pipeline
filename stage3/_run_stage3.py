@@ -266,8 +266,12 @@ def main() -> int:
         if not eng["ok"]:
             print("  ...but PyBondLab is unavailable, so every producer would fail.")
         elif not eng["fast"]:
-            print("  Sort kernels are absent: the producers would take the slow path,\n"
-                  "  and `--section nse` would refuse to start at all.")
+            # Only mention the grids if any of them is actually in this run.
+            nse = [st for st in will_run
+                   if st[0] == "nse" and st[1] == "producer"]
+            print("  Sort kernels are absent: the producers would take the slow "
+                  "path" + (",\n  and the two uncertainty grids would refuse to "
+                            "start at all." if nse else " -- same numbers, longer."))
         return 0
     if missing:
         return 1
