@@ -1,5 +1,5 @@
 """treasury.py -- duration-matched Treasury returns (`tret`), faithful to upstream
-`process_bond_data.load_treasury_returns` + `interpolate_treasury_returns`.
+the reference implementation's treasury load + interpolation.
 
 Source series (upstream fetches live from WRDS every run):
   - CRSP Fixed Term Treasury index monthly returns: crsp.tfz_idx (FIXEDTERM family -> terms
@@ -32,7 +32,7 @@ def fetch_treasury_returns(wrds_username: str | None = None) -> pd.DataFrame:
     import wrds
     from pandas.tseries.offsets import MonthEnd
 
-    # same auth pattern as tools/wrds_ingest.py (.pgpass holds the password)
+    # (WRDS auth: .pgpass holds the password)
     _u = os.environ.get("WRDS_USERNAME", "")
     if not _u:
         raise RuntimeError("WRDS_USERNAME is not set. Stage 2 needs it only for its first run, to fetch and cache Treasury returns, Fama-French factors and VIX. Set it in config.py or as an environment variable.")

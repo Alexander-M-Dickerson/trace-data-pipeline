@@ -1,13 +1,13 @@
 """step5_value.py -- upstream step 5: value signals (credit-spread cross-sectional residuals ->
 val_hz / val_ipr families) + d-spread momentum-of-spread signals.
 
-Ground truth: `_debug_stage2.py::step5_value` -- prep_value_signal_inputs (quote extension to
+Ground truth: the reference implementation's value step -- prep_value_signal_inputs (quote extension to
 1997), FISD call-dummy merge, make_value_signals, build_d_spreads(lags=(6,12), bandwidth=1,
 mu_window=12) with the runner's column drops, left-merged into the signal frames. Machinery is
 verbatim in lib/value.py.
 
 Outputs under blocks/<mode>/: value_signals_std, value_signals_adj, all_returns_ext (for step 6),
-end_signals_ext + adj_signals_ext (for the G7 wrangle).
+end_signals_ext + adj_signals_ext (for the final wrangle).
 """
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ import _stage2_settings as cfg
 from lib import quote
 from lib import value as valuelib
 
-# runner drops these build_d_spreads outputs before merging (step5, _debug_stage2 lines 810-813)
+# runner drops these build_d_spreads outputs before merging (step5, the reference implementation)
 DROP_STD = ["dbbtm6", "dcs12", "dbbtm12", "bbtm_mu12_1"]
 DROP_ADJ = ["dbbtm6_adj", "dcs12_adj", "dbbtm12_adj", "bbtm_mu12_1_adj"]
 

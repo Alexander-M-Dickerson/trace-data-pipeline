@@ -1,5 +1,5 @@
 """build_monthly_panel.py -- THE single entry point: rebuild the monthly asset-pricing panel from
-the daily input with one command, driven only by _stage2_settings (HANDOFF §6: nothing assumed).
+the daily input with one command, driven only by _stage2_settings.
 
     python build_monthly_panel.py                       # full golden-mode build, all steps
     python build_monthly_panel.py --input-mode ours     # Phase B on stage1_combined
@@ -37,11 +37,11 @@ STEPS: list[tuple[int, str, str, bool]] = [
 # After step 2 the step DAG forks into two independent chains -- {3: bbw -> 4: betas} and
 # {5: value -> 6: momentum} share NO blocks (3/4 read step-1+2 blocks + quote; 5/6 read step-1
 # blocks + quote; 7 joins everything) -- so a full build runs them as two concurrent subprocesses
-# (W5 speed_up/03). Outputs are byte-identical either way; --sequential disables the overlap.
+#. Outputs are byte-identical either way; --sequential disables the overlap.
 PARALLEL_CHAINS: tuple[tuple[int, int], ...] = ((3, 4), (5, 6))
 
-# Fresh-process orchestration for FULL builds (W5 speed_up/04): DuckDB's parallelism collapses in a
-# long-lived process that already ran a heavy unit (../context/duckdb_python_rules.md -- the repo's
+# Fresh-process orchestration for FULL builds: DuckDB's parallelism collapses in a
+# long-lived process that already ran a heavy unit (the repo's
 # rule #2). Measured: step 2's SQL phase is ~25 s in a fresh process but ~91 s in-process after
 # step 1. So a full build runs each STAGE as child orchestrator processes: the DuckDB steps as
 # sequential singletons, the {3,4}/{5,6} chains concurrently, the final merge last.
@@ -100,7 +100,7 @@ def run(input_mode: str, from_step: int, to_step: int, limit_cusips: int | None,
             manifest.add_input(role, path)
 
     # materialize the factor-panel seam (blocks/<mode>/factors.parquet) BEFORE the steps that read
-    # it (4 and 7): pinned golden vintage by default, or the public create_factors port (W3/A10)
+    # it (4 and 7): pinned golden vintage by default, or the public create_factors port (A10)
     from steps import compute_factors
     factors_path = compute_factors.ensure(input_mode, force_fetch=refresh_factors)
     manifest.add_input(f"factors_{cfg.FACTOR_SOURCE}", factors_path)
@@ -187,7 +187,7 @@ def main() -> None:
     ap.add_argument("--factor-source", choices=["pinned", "public"], default=None,
                     help="factor panel source; default resolves per input-mode via "
                          "_stage2_settings.MODE_PINS (both modes 'pinned' today). 'public' = fresh "
-                         "fetches, A10 vintage drift (context/factors_public_divergence.md)")
+                         "fetches, vintage drift (the divergence report written by this step)")
     ap.add_argument("--refresh-factors", action="store_true",
                     help="with --factor-source public: force re-fetch of every source")
     ap.add_argument("--sequential", action="store_true",

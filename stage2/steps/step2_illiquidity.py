@@ -1,10 +1,10 @@
 """step2_illiquidity.py -- DuckDB port of upstream step 2: per-bond illiquidity/risk signals and the
 market-level nontraded factor panel.
 
-Ground truth: `stage2/illiq_helper_functions.py::run_illiquidity_pipeline` and its metric functions
+Ground truth: the reference implementation's illiquidity pipeline and its metric functions
 (monthly_pi_fast, compute_monthly_amihud, compute_monthly_illiq_roll_fast, compute_hong_warga_spreads,
 cs_ar_spreads, p_zeros, compute_bond_turnover, compute_vov, compute_within_month_risk). The pin IS the
-streamline_data output (validated bit-faithful at G0), so every metric reads the pin.
+streamline_data output (validated bit-faithful), so every metric reads the pin.
 
 Faithfulness notes (each mirrors an upstream quirk -- do not "fix"):
   - ilq/roll: n = the group's ROW count (pandas 'size'), while the sums skip NaN -- inconsistent on
@@ -89,7 +89,7 @@ FROM read_parquet('{pin_path.as_posix()}')
     # ---------------- float32-order-sensitive metrics: verbatim pandas ports ----------------------
     # pi / amihud / ilq-roll / the risk kernel are computed in pandas (lib/illiq_pandas) because
     # their upstream float32 accumulation order and near-singular ratios cannot be reproduced by
-    # parallel double-precision SQL sums (debug.md M9). The frame is pulled in (cusip, dt) order --
+    # parallel double-precision SQL sums. The frame is pulled in (cusip, dt) order --
     # the upstream streamline sort -- so groupby accumulation order matches bit-for-bit.
     with pt("pdf_pull"):
         pdf = con.execute("""
@@ -286,7 +286,7 @@ FULL JOIN m_rsk USING (cusip_id, month_start)
 
     # NaN -> NULL at the block boundary: pandas NaN means "missing" everywhere upstream, while
     # DuckDB propagates NaN as a value through 0/0 divisions AND through avg() (the SPRD factor
-    # was 100% NaN before this -- debug.md M9).
+    # was 100% NaN before this).
     def _n2n(c: str) -> str:
         return f"CASE WHEN isnan({c}) THEN NULL ELSE {c} END AS {c}"
 
@@ -302,7 +302,7 @@ FULL JOIN m_rsk USING (cusip_id, month_start)
     # ---------------- nontraded factors: USA bonds, EW means, differencing ------------------------
     # In PANDAS with the signals' native dtypes: upstream means accumulate float32 for the
     # float32 signals (AMD/LIX/ILLIQ/ROLL come out float32 in the golden factor file); a SQL
-    # double-precision avg differs by ~3e-6 (debug.md M9).
+    # double-precision avg differs by ~3e-6.
     with pt("factors"):
         fisd = pd.read_parquet(cfg.AUX["fisd"], columns=["complete_cusip", "country_domicile"])
         usa = fisd.loc[fisd["country_domicile"] == "USA", ["complete_cusip"]].drop_duplicates()

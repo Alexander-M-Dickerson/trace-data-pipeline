@@ -1,4 +1,4 @@
-"""phase_timer.py -- lightweight per-phase wall-clock accounting for the step modules (W5).
+"""phase_timer.py -- lightweight per-phase wall-clock accounting for the step modules.
 
 Usage:
     pt = PhaseTimer()

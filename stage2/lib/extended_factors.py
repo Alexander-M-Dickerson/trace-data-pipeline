@@ -1,16 +1,21 @@
 """extended_factors.py -- the pre-2002-08 BBW factor backfill, as a PUBLIC fetched/cached input.
 
-The BBW factor columns in the golden `factors.parquet` (mktb/drf/crf/mktbx/drfx/crfx/term) are, before
-2002-08-31, the "modified" (no-LRF) extended BBW factors built in the PRIVATE `lehman-ice` repo from
-licensed Lehman/Warga + ICE/BAML data (1973-2023). The raw data is not redistributable, but the finished
-factor series IS freely licensed and is published to openbondassetpricing.com.
+TRACE begins in 2002-07, so the BBW factor columns (mktb/drf/crf/mktbx/drfx/crfx/term) have no
+TRACE-based history before 2002-08-31. They are backfilled from an extended series (1973-2023)
+estimated on pre-TRACE bond data:
 
-This module is the public seam: it loads the extended factor series from a local cache (under `data/`),
-falling back to the published OSBAP download (`cfg.BBW_EXTENDED_URL`). This is what lets the monthly
-factor build source its pre-2002-08 BBW backfill WITHOUT depending on the private golden
-`factors.parquet` (see HANDOFF_FABLE.md §Wrap-up W1/W2, assumptions.md A18/A10).
+  * the **Lehman Brothers Fixed Income Data**, also known as the Warga Fixed Income data; and
+  * the investment-grade and high-yield **Bank of America (BAML) constituent bonds** distributed
+    by the **Intercontinental Exchange (ICE)**.
 
-Provenance + bit-for-bit reproduction: `lehman-ice/BBW_MODIFIED.md` + `lehman-ice/verify_bbw_modified.py`.
+Those underlying bond data are licensed and cannot be redistributed. The finished monthly FACTOR
+SERIES can be, and is published at openbondassetpricing.com -- so the backfill is available to
+everyone even though the data behind it is not. It is the "modified" variant: no LRF leg, matching
+the factor set this pipeline builds from TRACE.
+
+This module is that seam. It loads the series from a local cache (under `data/`), falling back to
+the published download (`cfg.BBW_EXTENDED_URL`), so a clone builds the full factor history from
+public sources alone.
 """
 from __future__ import annotations
 
@@ -52,13 +57,13 @@ def load_extended_bbw(force_fetch: bool = False) -> pd.DataFrame:
     Reads the cached parquet under data/. If absent, corrupt, or `force_fetch`, downloads the published
     zip from `cfg.BBW_EXTENDED_URL` and caches the NORMALIZED frame. The cache is written only AFTER
     normalization: the published member is date-INDEXED, so caching it raw with index=False silently
-    drops every date (debug.md M11).
+    drops every date.
     """
     if CACHE.exists() and not force_fetch:
         try:
             return _normalize(pd.read_parquet(CACHE))
         except ValueError:
-            pass                                   # corrupt/legacy cache (M11) -> refetch below
+            pass                                   # corrupt/legacy cache -> refetch below
 
     url = getattr(cfg, "BBW_EXTENDED_URL", None)
     if not url or "TODO" in url:

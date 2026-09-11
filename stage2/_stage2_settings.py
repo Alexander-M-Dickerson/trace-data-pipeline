@@ -163,9 +163,10 @@ QUOTE_ZIPKEY = "quote_returns_quantlib.parquet"
 
 # Extended "modified" BBW factor series, used ONLY to backfill factor history before
 # 2002-08-31 (rows from 2002-08 on are recomputed from TRACE and overwritten).
-# Built from licensed Lehman/ICE data that cannot be redistributed; only the finished
-# factor series is published. Do not replace this with a longer file: the build asserts
-# that every date in it exists in the factor panel.
+# Estimated on the Lehman Brothers (Warga) Fixed Income Data and the BAML investment-grade
+# and high-yield constituent bonds distributed by ICE. Those bond data are licensed and
+# cannot be redistributed; the finished factor series can be, and is. Do not replace this
+# with a longer file: the build asserts every date in it exists in the factor panel.
 BBW_EXTENDED_URL = "https://openbondassetpricing.com/wp-content/uploads/2026/09/bbw_factors_extended_1973_2023.zip"
 BBW_EXTENDED_ZIPKEY = "bbw_factors_extended_1973_2023.parquet"
 

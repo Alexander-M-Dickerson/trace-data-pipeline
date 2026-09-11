@@ -56,7 +56,7 @@ def upstream():
 @pytest.fixture(scope="module")
 def sample_cusips():
     import duckdb
-    daily = cfg.GOLDEN_DAILY_INPUT.as_posix()
+    daily = cfg.daily_input().as_posix()
     con = duckdb.connect()
     rows = con.execute(
         f"SELECT DISTINCT cusip_id FROM read_parquet('{daily}') ORDER BY cusip_id LIMIT {N_CUSIPS}"
@@ -68,7 +68,7 @@ def test_pin_matches_upstream_streamline(upstream, sample_cusips, tmp_path):
     import duckdb
     from lib import pin as pinlib
 
-    daily = cfg.GOLDEN_DAILY_INPUT.as_posix()
+    daily = cfg.daily_input().as_posix()
     con = duckdb.connect()
 
     # --- upstream reference on the same sample -----------------------------------------------

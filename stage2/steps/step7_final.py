@@ -1,7 +1,7 @@
 """step7_final.py -- upstream step 7 (step_final_wrangle): the final left-join merge chain that
 produces the 140-column monthly panel.
 
-Ground truth: `_debug_stage2.py::step_final_wrangle` line-for-line -- wrangle_returns (+ OSBAP
+Ground truth: the reference implementation's final wrangle line-for-line -- wrangle_returns (+ OSBAP
 linker), wrangle_signals, build_main_panel, str = ret_vw, runner column drops, str1_adj -> str_adj,
 swap_adj_signals (which also writes the mmn_price_based_signals block), sig_dt/sig_gap merge, rfret
 from the pinned factor panel, FISD 144a/country/call, reorder_panel_cols. Machinery is verbatim in
@@ -164,6 +164,14 @@ def build(con=None, mode: str | None = None, limit_cusips: int | None = None) ->
         alt_path = blocks_dir / "returns_alt_final.parquet"
         wrangle.save_parquet(returns_alt, alt_path, compress=True)
     mmn_path = blocks_dir / f"mmn_price_based_signals_{cfg.DATE_STAMP}.parquet"
+
+    # Every price-based signal in the panel must have its unadjusted twin in the sidecar. Both
+    # are published, and a user given only the adjusted form will pair it with the wrong return.
+    # Checked against the file that was actually written, not the list we meant to write.
+    if mmn_path.exists():
+        import pyarrow.parquet as _pq
+        contract.assert_mmn_twins(_pq.ParquetFile(mmn_path).schema.names,
+                                  what=f"mmn_price_based_signals_{mode}")
 
     (blocks_dir / "step7_meta.json").write_text(json.dumps(
         {"wall_s": round(time.time() - t0, 2), "mode": mode, "phases": pt.phases,

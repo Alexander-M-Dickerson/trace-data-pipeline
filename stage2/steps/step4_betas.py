@@ -1,14 +1,14 @@
 """step4_betas.py -- upstream step 4: the merged factor matrix, combined returns, rolling 36-month
 betas (min 12 obs) for ~38 factor models x 2 return types, and systematic/idiosyncratic momentum.
 
-Ground truth: `_debug_stage2.py::step4_betas` (factor merging incl. the extended-BBW pre-2002-08-31
+Ground truth: the reference implementation's beta step (factor merging incl. the extended-BBW pre-2002-08-31
 backfill and the derived asymmetric factors) + `process_bond_data.{concat_data, compute_all_betas,
-compute_sys_momentum}` (verbatim in lib/betas). Inputs: the pinned factors.parquet (G4/A10), our
-validated bbw_factors (G3) and illiq_factors (G2), all_returns (G1), the cached quote panel, and the
-PUBLISHED extended-BBW series (lib/extended_factors -- the W2 public seam).
+compute_sys_momentum}` (verbatim in lib/betas). Inputs: the pinned factors.parquet, our
+the validated bbw_factors, illiq_factors and all_returns, the cached quote panel, and the
+PUBLISHED extended-BBW series (lib/extended_factors -- the public seam).
 
-Outputs under blocks/<mode>/: betas_x.parquet (the G5 golden target, 2,282,733 x 53),
-betas_std.parquet (feeds the final panel at G7), factors_merged.parquet (feeds steps 5-6 + rfret).
+Outputs under blocks/<mode>/: betas_x.parquet (the beta validation target, 2,282,733 x 53),
+betas_std.parquet (feeds the final panel), factors_merged.parquet (feeds steps 5-6 + rfret).
 """
 from __future__ import annotations
 
@@ -25,9 +25,9 @@ from lib import extended_factors, quote
 from lib.phase_timer import PhaseTimer
 
 # Pre-2002-08-31 backfill: BBW factor column -> its extended-series name. Upstream fills these from
-# the lowercase LHM/ICE columns inside factors.parquet (_debug_stage2.py:541-556); we fill them from
-# the PUBLISHED extended series (== those columns at max|d|=0, assumptions A18), which removes the
-# private-pin dependency for the BBW piece (HANDOFF W2). Post-cutoff stays our pure-TRACE G3 build.
+# the lowercase LHM/ICE columns inside factors.parquet (in the reference implementation); we fill them from
+# the PUBLISHED extended series (== those columns at max|d|=0), which removes the
+# private-pin dependency for the BBW piece. Post-cutoff stays the pure-TRACE build.
 ICE_MAP = {"MKTB": "mktb", "DRF": "drf", "CRF": "crf",
            "MKTBx": "mktbx", "DRFx": "drfx", "CRFx": "crfx", "TERM": "term",
            # DEFB/TERMB are spliced the same way. They were added to the published extended
@@ -44,7 +44,7 @@ def build_factor_matrix(blocks_dir: Path) -> pd.DataFrame:
     factors = pd.read_parquet(blocks_dir / "factors.parquet")
     factors["date"] = pd.to_datetime(factors["date"])
     # The pinned panel's own copies of the extended-BBW columns are dropped UNREAD -- the backfill
-    # below comes from the published series instead (W2).
+    # below comes from the published series instead.
     factors = factors.drop(columns=[c for c in ICE_MAP.values() if c in factors.columns])
 
     bbw = pd.read_parquet(blocks_dir / "bbw_factors.parquet")

@@ -9,9 +9,9 @@ panel, or before an extension to know what will (and won't) advance.
     check_external_data.py --live          # ALSO probe WRDS/DB for the current upstream frontier
     check_external_data.py --json-out inventory.json
 
-The human-readable index (with provenance notes + refresh recipe) is context/external_data_inventory.md;
+The human-readable index (with provenance notes + refresh recipe) is the inventory printed by this script -- inventory.md;
 this script is what keeps its "last available" column honest. See _stage2_settings.MODE_PINS for how these
-vintages become the panel's date frontier (debug.md M13 / assumptions.md A19).
+vintages become the panel's date frontier.
 """
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ import _stage2_settings as cfg
 # provider: the WRDS table or the config attr holding the URL. cache: local parquet we read.
 FC = cfg.FACTOR_CACHE_DIR
 D = cfg.DATA_DIR
-SOURCES = [
+SOURCES: list = [
     # name, kind, used_for, provider (WRDS table / URL attr), cache path, date column (None=rows only)
     ("CRSP treasury returns", "wrds", "tret / ret_vwx (duration-matched Treasury return)",
      "crsp.tfz_idx + crsp.tfz_mth_ft + ff.factors_monthly", D / "crsp_treasury_returns.parquet", "date"),
@@ -55,20 +55,29 @@ SOURCES = [
      "QUOTE_URL", D / "quote_returns_quantlib.parquet", "date"),
     ("NYSE session calendar", "web", "business-day gaps / month-end sessions (mcal-generated)",
      "pandas_market_calendars NYSE", D / "nyse_calendar.parquet", None),
-    # golden-vintage pinned AUX files (consumed by step1 wrangle; stamp = filename vintage)
-    ("OSBAP CUSIP-PERMNO linker", "pinned", "wrangle_returns identifier linker",
-     "AUX['linker'] (golden vintage)", cfg.AUX["linker"], None),
-    ("Moody's ratings", "pinned", "composite rating (mdy_rat)",
-     "AUX['moody'] (golden vintage)", cfg.AUX["moody"], None),
-    ("S&P ratings", "pinned", "composite rating (sp_rat)",
-     "AUX['sp'] (golden vintage)", cfg.AUX["sp"], None),
-    ("Call dummy", "pinned", "callable-bond flag",
-     "AUX['call'] (golden vintage)", cfg.AUX["call"], None),
-    ("FISD issue attributes", "pinned", "144a/country/call/sic bond attributes",
-     "AUX['fisd'] (golden vintage)", cfg.AUX["fisd"], None),
-    ("Pinned factor panel", "pinned", "the assembled factor time series (default --factor-source pinned)",
-     "GOLDEN_OUTPUTS['factors']", cfg.GOLDEN_OUTPUTS["factors"], "date"),
 ]
+
+# Stage-1 auxiliary inputs, and the optional pinned factor panel. These are OPTIONAL by
+# construction: cfg.AUX carries only what this configuration defines, and GOLDEN_OUTPUTS is
+# empty unless a pinned factor file is set -- which is the normal state of a fresh clone.
+# Indexing them directly built the SOURCES list at import time and raised KeyError before
+# main() ran, so the script could not be used by the people it is for.
+for _label, _key, _why, _date_col in (
+    ("CUSIP-PERMNO linker", "linker", "wrangle_returns identifier linker", None),
+    ("Moody's ratings", "moody", "composite rating (mdy_rat)", None),
+    ("S&P ratings", "sp", "composite rating (sp_rat)", None),
+    ("Call dummy", "call", "callable-bond flag", None),
+    ("FISD issue attributes", "fisd", "144a/country/call/sic bond attributes", None),
+):
+    _path = cfg.AUX.get(_key)
+    if _path:
+        SOURCES.append((_label, "stage1", _why, f"AUX[{_key!r}]", Path(_path), _date_col))
+
+_pinned = cfg.GOLDEN_OUTPUTS.get("factors")
+if _pinned:
+    SOURCES.append(("Pinned factor panel", "pinned",
+                    "the assembled factor time series (--factor-source pinned)",
+                    "GOLDEN_OUTPUTS['factors']", Path(_pinned), "date"))
 
 # WRDS tables to probe with --live (table -> date column) for the CURRENT upstream frontier
 _LIVE_WRDS = {

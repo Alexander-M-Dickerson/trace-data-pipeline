@@ -1,6 +1,6 @@
 """rolling_kernels.py -- VERBATIM numba kernels for rolling betas / momentum / skew, extracted
-mechanically from stage2/process_bond_data.py lines 3488-4430 (golden tree, read-only). Do not edit the
-kernel bodies; faithfulness is arbitrated by the G5 validator. Orchestrators live in steps/step4.
+mechanically from the reference implementation (read-only). Do not edit the
+kernel bodies; faithfulness is arbitrated by the beta validator. Orchestrators live in steps/step4.
 
 W5 (speed_up/01): `nogil=True` added to every decorator so lib/betas can fan the independent
 per-model calls out on a thread pool. nogil changes GIL handling only -- the generated machine code

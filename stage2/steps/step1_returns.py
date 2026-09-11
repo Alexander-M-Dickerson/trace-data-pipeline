@@ -1,7 +1,7 @@
 """step1_returns.py -- DuckDB port of upstream step 1: monthly returns (6 price types), month-end
 signals, adjusted signals, LIB, default handling, and duration-matched Treasury returns.
 
-Ground truth: `stage2/process_bond_data.py::process_bond_data` (lines 572-1913; the chunked wrapper is
+Ground truth: the reference implementation's monthly builder (the chunked wrapper is
 semantics-neutral) + `normalize_default_returns` + the returns_alt slice of `wrangle_returns`. Each
 stage below cites the upstream step it reproduces. Two-trap reminders:
   - R = (fp_t - fp_s) / prfull_s with fp = pr + accall (coupons retained), prfull = pr + acclast.
@@ -10,7 +10,7 @@ stage below cites the upstream step it reproduces. Two-trap reminders:
 
 Outputs (parquet blocks under output/blocks/<mode>/), grain one row per (cusip, calendar month-end):
   end_returns, bgn_returns, end_signals, adj_signals, all_returns, returns_alt
-returns_alt is the G1 golden validation target. all_returns keeps the PRE-normalization ret_vw
+returns_alt is the returns validation target. all_returns keeps the PRE-normalization ret_vw
 (the runner normalizes end/bgn AFTER all_returns is built inside process_bond_data).
 """
 from __future__ import annotations
@@ -406,7 +406,7 @@ SELECT cusip, date, ret_vw, tret, ret_std, ret_type FROM (
             QUALIFY row_number() OVER (PARTITION BY cusip_id, dt ORDER BY frn) = 1
         ) p ON p.cusip_id = e.cusip_id AND p.dt = e.dt
         ORDER BY cusip, date""")
-    # returns_alt: the G1 golden target (wrangle_returns step 4 slice, float32)
+    # returns_alt: the returns validation target (wrangle_returns step 4 slice, float32)
     _copy("returns_alt", """
         SELECT cusip, date::TIMESTAMP AS date,
                CAST(ret_vwp AS FLOAT) AS ret_vwp, CAST(ret_ew AS FLOAT) AS ret_ew,

@@ -1,6 +1,6 @@
 """nyse_calendar.py -- the ONE NYSE session calendar for the monthly port.
 
-Faithful to upstream `illiq_helper_functions.streamline_data`: sessions come from
+Faithful to the reference implementation's `streamline_data`: sessions come from
 `pandas_market_calendars.get_calendar('NYSE')` over a fixed range, and business-day gaps are
 `np.busday_count(start, end, holidays=<non-session days>)`, i.e. the number of NYSE sessions in
 [start, end). We expose that same quantity relationally:

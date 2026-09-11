@@ -1,16 +1,16 @@
 """betas.py -- rolling-beta / systematic-momentum / iskew orchestrators (upstream
-stage2/process_bond_data.py lines 4433-4999). The numba kernels (lib/rolling_kernels) and the model
+the reference implementation). The numba kernels (lib/rolling_kernels) and the model
 spec (BETA_MODELS) are verbatim.
 
-W5 fast path (speed_up/01): the old code re-merged, re-dropna'd and re-mergesorted the 2.3M-row
+The fast path: the old code re-merged, re-dropna'd and re-mergesorted the 2.3M-row
 panel for EVERY model x return-type (~76 times) and combined results through ~76 outer merges. Now
 one merged (cusip,date)-sorted base is built per return column (`_PanelBase`); each model takes a
 NaN-mask view of it -- PROVABLY the same row sequence the old merge+dropna+sort produced, because
 the base is block-sorted and masking preserves order -- and results scatter into base-aligned
 arrays (union-of-masks presence == the old outer-merge key union). Kernel calls fan out on a thread
 pool (the kernels are nogil). Values are bit-identical on keys; only the output ROW ORDER changed
-(now fully (cusip,date)-sorted). Faithfulness is arbitrated by the G5 validator
-(betas_x 2,282,733 x 53). `compute_rolling_betas_panel` is the pre-W5 reference path, kept as the
+(now fully (cusip,date)-sorted). Faithfulness is arbitrated by the beta validator
+(betas_x 2,282,733 x 53). `compute_rolling_betas_panel` is the earlier reference path, kept as the
 arbitration baseline."""
 import logging
 import os

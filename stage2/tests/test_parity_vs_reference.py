@@ -11,7 +11,7 @@ inputs and diff the outputs key-by-key.
 It is a DEVELOPMENT test. It needs a reference build on disk, so it skips unless
 STAGE2_REFERENCE_OUTPUT names one:
 
-    STAGE2_REFERENCE_OUTPUT=/path/to/monthly_data/output \\
+    STAGE2_REFERENCE_OUTPUT=/path/to/reference/output \\
         python -m pytest tests/test_parity_vs_reference.py -v
 
 Target is exact equality. Anything else is investigated before it is accepted -- the

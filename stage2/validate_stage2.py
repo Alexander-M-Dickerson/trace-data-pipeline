@@ -5,11 +5,11 @@ Usage:
     validate_monthly.py --step all              # every gate target
     validate_monthly.py --step betas --json-out report.json
 
-Tolerances (context/golden_validation.md + the assumptions ledger):
+Tolerances:
   - default float tol 1e-6; RATE_TOL=1e-4 for the beta/ivol/iskew/sysmom/idimom families and ytm/cs
-    (float32 winsorized rate-likes -- HANDOFF G5);
-  - documented irreducible residuals: cs_sprd/ar_sprd 5e-3 (A15: numpy libm ulps at clip
-    boundaries), b_dvixd 10.0 (A16: 23 near-singular numba-fastmath rows of 1.63M).
+    (float32 winsorized rate-likes);
+  - documented irreducible residuals: cs_sprd/ar_sprd 5e-3 (numpy libm ulps at clip
+    boundaries), b_dvixd 10.0 (23 near-singular numba-fastmath rows of 1.63M).
 """
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ from lib import validate_core
 # rate-tol column families (applied where present on the golden side)
 _RATE_PREFIXES = ("b_", "ivol_", "iskew", "sysmom", "idimom")
 _RATE_EXTRA = ("ytm", "cs")
-# A15/A16 documented residual tolerances (see assumptions.md)
+# documented irreducible residual tolerances
 _RESIDUAL_TOLS = {"cs_sprd": 5e-3, "ar_sprd": 5e-3, "b_dvixd": 10.0,
                   "cs_sprd_mmn": 5e-3, "ar_sprd_mmn": 5e-3, "b_dvixd_mmn": 10.0}
 

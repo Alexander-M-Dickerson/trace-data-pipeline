@@ -1,5 +1,5 @@
 """ff5.py -- Fama-French 5 factors + RF from WRDS (ff.fivefactors_monthly), fetch-once cached.
-Faithful to upstream `process_bond_data.fetch_ff5_factors` (decimal units, MonthEnd dates)."""
+Faithful to the reference implementation's FF5 fetch (decimal units, MonthEnd dates)."""
 from __future__ import annotations
 
 import pandas as pd

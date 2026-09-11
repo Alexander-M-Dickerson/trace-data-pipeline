@@ -1,4 +1,4 @@
-"""Prove `_diff` on known-equal and known-diff fixtures (HANDOFF G0 acceptance)."""
+"""Prove `_diff` on known-equal and known-diff fixtures."""
 import numpy as np
 import pandas as pd
 

@@ -137,7 +137,7 @@ TARGET_ROWS_PER_CHUNK = int(os.environ.get("STAGE0_TARGET_ROWS", "0")) or 750_00
 # the error arrives as "EOFError: EOF when reading a line" -- a rate limit disguised
 # as a keyboard error.
 #
-# MEASURED 2026-09-09 with tests/probe_wrds_connections.py (account phd18ad1):
+# MEASURED 2026-09-09 with tests/probe_wrds_connections.py (one WRDS account):
 #   * 7 connections held simultaneously; the 8th failed with exactly that EOFError.
 #   * Opening 6 AT ONCE, with no stagger and no lock, succeeded -- so the ceiling is
 #     on connections HELD, not on how fast they are opened.

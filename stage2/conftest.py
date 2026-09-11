@@ -1,4 +1,4 @@
-"""pytest bootstrap: make scripts/ importable (_stage2_settings, lib.*) from the tests dir."""
+"""pytest bootstrap: make the stage directory importable (_stage2_settings, lib.*) from the tests dir."""
 import sys
 from pathlib import Path
 

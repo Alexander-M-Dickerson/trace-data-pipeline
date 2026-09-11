@@ -225,9 +225,9 @@ def run_chunks(chunks,
 
     # NO maxtasksperchild. Workers stay alive for the whole run on purpose: recycling
     # one would mean a fresh ~5 s WRDS handshake per chunk -- 485 of them on Enhanced
-    # -- and would hammer the per-user connection limit for nothing. (The house rule
-    # in trace_duckdb about fresh processes exists for DuckDB's parallelism collapse
-    # and does not transfer here.)
+    # -- and would hammer the per-user connection limit for nothing. (The fresh-process
+    # rule that applies to heavy DuckDB work is about DuckDB's parallelism collapsing in
+    # a long-lived process; it does not transfer to a WRDS-bound pool.)
     pool = mp_ctx.Pool(n_workers, initializer=pool_initializer,
                        initargs=pool_initargs)
     got: dict[int, ChunkResult] = {}

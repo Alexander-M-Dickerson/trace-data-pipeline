@@ -1,6 +1,6 @@
 """step3_bbw.py -- Bai-Bali-Wen 4-factor construction (MKTB/DRF/CRF/LRF + duration-adjusted + TERM).
 
-Ground truth: `stage2/process_bond_data.py::prep_bbw_data` (lines 2062-2350) + `create_bbw_factors`
+Ground truth: the reference implementation's `prep_bbw_data` + `create_bbw_factors`
 (2563-3019), called by the runner with rating_col='composite', signal_cols=(var_95, ilq_adj,
 str1_adj) / (var_95x, ilq_adj, str1_adjx), n_portf=5x5, and NO fisd_path (the USA filter is
 SKIPPED for BBW, unlike the illiq factors). This step is pandas end-to-end -- the double sorts run

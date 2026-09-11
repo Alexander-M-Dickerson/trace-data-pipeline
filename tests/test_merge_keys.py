@@ -175,7 +175,7 @@ def _connect_wrds_or_none(user):
     That produced, verbatim:
 
         FATAL: PAM authentication failed for user
-               "[phd18ad1@wrds-sbd-cloud-login-05-w ~]$ cd ~ && rm -rf trace-da"
+               "[<your_wrds_id>@wrds-cloud-login-NN ~]$ cd ~ && rm -rf trace-da"
 
     followed by ~120 lines of SQLAlchemy traceback. So stdin is closed for the duration
     of the connect: the prompt then hits EOF and raises, and we say what to check.

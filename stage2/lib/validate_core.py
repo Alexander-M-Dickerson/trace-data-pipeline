@@ -1,4 +1,4 @@
-"""validate_core.py -- the golden-diff engine (`_diff` is the contract; HANDOFF G0).
+"""validate_core.py -- the golden-diff engine (`_diff` is the contract).
 
 Compares OUR step output to the matching golden intermediate on a key, with per-column tolerances:
 exact for counts/codes/flags/strings/dates; FLOAT_TOL for prices/returns/signals; RATE_TOL for

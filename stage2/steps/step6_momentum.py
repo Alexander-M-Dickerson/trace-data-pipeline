@@ -1,11 +1,11 @@
 """step6_momentum.py -- upstream step 6: momentum / long-term reversal / industry momentum + rolling
 VaR/ES, on the 1997-extended return panel.
 
-Ground truth: `_debug_stage2.py::step6_ret_risk` -- FISD sic_code merge, ret_vwx = ret_vw - tret,
+Ground truth: the reference implementation's return/risk step -- FISD sic_code merge, ret_vwx = ret_vw - tret,
 build_mom_ltr_and_industry (verbatim in lib/momentum), compute_rolling_var_es on ret_vw (-> mom_ret)
 and ret_vwx (-> mom_retx), keeping var_90/es_90/var_95.
 
-Outputs under blocks/<mode>/: mom_retx (the G6 golden target, 2,317,538 x 19) + mom_ret (G7 input).
+Outputs under blocks/<mode>/: mom_retx (the momentum validation target, 2,317,538 x 19) + mom_ret (G7 input).
 """
 from __future__ import annotations
 

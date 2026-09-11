@@ -1,4 +1,4 @@
-"""manifest.py -- the run-manifest writer: the machine-readable re-runnability record (HANDOFF §6).
+"""manifest.py -- the run-manifest writer: the machine-readable re-runnability record.
 
 Every full or partial build writes `manifests/monthly_<stamp>_<mode>.json` recording inputs +
 fingerprints (sha256/bytes/mtime_ns), the FULL config snapshot, git SHA, per-gate timings and
@@ -63,7 +63,7 @@ def git_commit() -> str:
 
 
 def config_snapshot() -> dict[str, Any]:
-    """The FULL knob set (HANDOFF §6: nothing implicit). Every UPPER_CASE scalar/tuple in _stage2_settings."""
+    """The FULL knob set (nothing implicit). Every UPPER_CASE scalar/tuple in _stage2_settings."""
     snap = {}
     for name in dir(cfg):
         if name.isupper():

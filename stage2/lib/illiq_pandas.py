@@ -1,11 +1,11 @@
 """illiq_pandas.py -- verbatim pandas/numba ports of the FLOAT32-ORDER-SENSITIVE illiquidity metrics.
 
-Why these four live in pandas while the rest of step 2 is SQL (see debug.md M9): upstream computes
+Why these four live in pandas while the rest of step 2 is SQL (see below): upstream computes
 pi / amihud / ilq-roll with float32 Series arithmetic and float32 groupby SUMS whose value depends on
 in-group accumulation order, and the risk kernel divides by near-singular denominators that amplify
 any reassociation noise. DuckDB sums in parallel double precision -- close, but the near-singular
 tail (pi up to 0.187, b_dvixd up to 4.9) cannot meet tolerance. These ports reproduce the upstream
-arithmetic operation-for-operation (source: stage2/illiq_helper_functions.py, functions of the same
+arithmetic operation-for-operation (source: the reference implementation, functions of the same
 name); the only residual is numpy-version libm ulps.
 
 All functions take the pin-derived frame in UPSTREAM column names:
@@ -26,7 +26,7 @@ MIN_OBS_DEFAULT = 5
 
 def _is_sorted_by(df: pd.DataFrame, id_col: str, date_col: str) -> bool:
     """O(n) check that df is (id, date)-block-sorted -- the pin pull already ships this order, so
-    the risk function's mergesorts are identity permutations we can skip (W5 speed_up/02)."""
+    the risk function's mergesorts are identity permutations we can skip."""
     ids = pd.factorize(df[id_col], sort=False)[0]
     d = df[date_col].to_numpy()
     di = np.diff(ids)
@@ -339,7 +339,7 @@ def compute_within_month_risk(df, vix_df, id_col="cusip_id", date_col="trd_exctn
         n_groups = g_uniques.shape[0]
         if (np.diff(g_codes) >= 0).all():
             take = None                    # already group-contiguous ascending: skip the identity
-        else:                              # argsort AND the four 29M-row gathers (W5 speed_up/02)
+        else:                              # argsort AND the four 29M-row gathers
             take = np.argsort(g_codes, kind="mergesort")
 
         def _arr(col):

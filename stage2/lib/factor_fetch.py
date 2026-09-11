@@ -1,4 +1,4 @@
-"""factor_fetch.py -- the PUBLIC factor fetchers behind steps/compute_factors (W3, closes A10).
+"""factor_fetch.py -- the PUBLIC factor fetchers behind steps/compute_factors ( A10).
 
 Each fetcher ports its upstream `stage2/create_factors.py` counterpart verbatim (same source, same
 transforms, same output columns) and is fetch-once: the normalized frame is cached under
@@ -8,8 +8,8 @@ that is how a repo user updates factors; bump the vintage URLs in `_stage2_setti
 version their filenames (HKM, Ludvigson).
 
 A fresh pull does NOT bit-match the golden pinned vintage: FRED CPIAUCSL is re-seasonally-adjusted
-and EPU back-renormalized every release; HKM/Ludvigson revise history (A10). See
-context/factors_public_divergence.md. No pandas_datareader dependency: the French zip and FRED's
+and EPU back-renormalized every release; HKM and Ludvigson revise history. See
+the divergence report written by this step. No pandas_datareader dependency: the French zip and FRED's
 fredgraph CSV endpoint parse directly.
 """
 from __future__ import annotations

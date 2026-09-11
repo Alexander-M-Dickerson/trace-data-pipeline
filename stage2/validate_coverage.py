@@ -4,7 +4,7 @@ The golden-vintage pins (the treasury cutoff, the pinned factor panel, the froze
 silently cap a column several months before the panel end. The `TRET_MAX_DATE` pin once did exactly
 this: `tret` -> `ret_vwx` -> the BBW x-factors -> the whole bbw_factors block (inner join) -> every
 rolling beta / ivol / sysmom -- 43 columns died 6 months before the panel's own last month, while
-the panel still reported rows there (debug.md M13 / assumptions.md A19).
+the panel still reported rows there.
 
 The golden validators CANNOT catch this: they diff against the golden, which is capped the same way,
 so both sides agree on NULL. This guard is orthogonal -- it asserts, on the ours panel ALONE, that

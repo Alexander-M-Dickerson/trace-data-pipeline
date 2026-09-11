@@ -1,4 +1,4 @@
-"""test_extended_factors.py -- the published extended-BBW seam normalizes both layouts (debug.md M11).
+"""test_extended_factors.py -- the published extended-BBW seam normalizes both layouts.
 
 The published parquet ships `date` as a DatetimeIndex; a cached copy ships it as a column. Both must
 normalize to the same ['date'] + 7-factor frame, and a dateless frame must fail loudly (the M11 corrupt
@@ -34,7 +34,7 @@ def test_normalize_coerces_mid_month_dates_to_month_end():
 
 
 def test_normalize_rejects_dateless_frame():
-    corrupt = _frame().reset_index(drop=True)      # the M11 corrupt cache: dates dropped entirely
+    corrupt = _frame().reset_index(drop=True)      # the corrupt-cache case: dates dropped entirely
     with pytest.raises(ValueError, match="date"):
         _normalize(corrupt)
 

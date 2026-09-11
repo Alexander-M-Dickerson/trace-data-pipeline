@@ -1,5 +1,5 @@
 """month_boundaries.py -- the per-month boundary table for step 1 (upstream steps 6-7 of
-`process_bond_data`), computed exactly from the NYSE session calendar.
+the reference implementation), computed exactly from the NYSE session calendar.
 
 Upstream builds these with pandas CustomBusinessDay/CustomBusinessMonthEnd offsets; we compute the
 identical dates positionally on the session array (proven equivalent in tests/test_month_boundaries.py):
@@ -13,7 +13,7 @@ identical dates positionally on the session array (proven equivalent in tests/te
   month_end_cal       calendar month end (the panel date)
 
 Note the upstream "internal" offsets: the user-facing knob business_day_gap=5 means "within the first/
-last 5 sessions", implemented as first_bday + 4*bday (process_bond_data lines 624-625).
+last 5 sessions", implemented as first_bday + 4*bday (in the reference implementation).
 """
 from __future__ import annotations
 

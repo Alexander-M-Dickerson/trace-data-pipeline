@@ -1,5 +1,5 @@
 """var_es.py -- rolling historical VaR/ES, verbatim port of upstream
-`process_bond_data._rolling_var_es_numba` + `compute_rolling_var_es` (loss-side, empirical quantile
+the reference implementation's rolling VaR/ES kernels (loss-side, empirical quantile
 floor(p*(T-1)) over an expanding-then-36m window, min 12 obs). Used by step 3 (var_95/var_95x) and
 step 6 (var_90/es_90/var_95)."""
 from __future__ import annotations

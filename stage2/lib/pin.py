@@ -1,9 +1,9 @@
 """pin.py -- the Phase-0 daily projection: the streamlined daily panel, built ONCE, reused by every step.
 
-Faithful DuckDB port of upstream `illiq_helper_functions.streamline_data()` (the step-2 prep), widened
+Faithful DuckDB port of the reference implementation's `streamline_data()` (the step-2 prep), widened
 into the shared base every step reads (the step-1 signal columns ride along so no step re-reads the
 multi-GB daily input). Grain: one row per input row (the 210 duplicate (cusip, date) twins in the
-golden input are KEPT, as upstream does; they are exact-price duplicates -- assumptions.md A4).
+golden input are KEPT, as upstream does; they are exact-price duplicates).
 
 Upstream semantics reproduced exactly:
   - drop rows where BOTH sp_rating and mdy_rating are NULL (step 1.2b / streamline step 1)
