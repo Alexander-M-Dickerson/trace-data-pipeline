@@ -21,7 +21,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))   # stage3/
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import captions                                  # noqa: E402
-import drrlib as D                               # noqa: E402
 import lib_engine as E                           # noqa: E402
 from two_row import FACTORS, run_two_row_exhibit  # noqa: E402
 

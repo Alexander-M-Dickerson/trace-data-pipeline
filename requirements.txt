@@ -80,6 +80,13 @@ psutil>=5.9
 # inside it, and records its version, git state and a content hash in every manifest.
 # Everything in Stage 3 except Section 5 runs on the pinned 0.2.0.
 
+# ONE NON-PYTHON DEPENDENCY, Stage 3 only: **pdflatex** (TeX Live or MiKTeX).
+# The last Stage-3 step compiles every exhibit into reports/exhibits.pdf, which is
+# how a LaTeX fragment that will not compile gets caught -- a broken fragment looks
+# perfectly fine sitting on disk. It is not needed for anything else: run
+# `make_report.py --no-compile` and you still get every table and figure as a file.
+# `stage3/tools/check_inputs.py` warns when it is missing rather than failing.
+
 # Development only, to run the test suites:
 # pytest>=8.0
 

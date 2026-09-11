@@ -22,10 +22,18 @@ The exhibit numbers in it are **the paper's** (Table IA.XII, Figure IA.3), annou
 each heading. LaTeX's own sequential numbering is suppressed, so a reference to "Table 4"
 means the same table it does in the paper.
 
-Its title page records what produced it: the sample windows, the PyBondLab build with its
-content hash and whether the fast kernels were present, and every input with its size and
-sha256 prefix. `reports/exhibits.tex` is the assembled source, and
-`reports/exhibits.build.log` the pdflatex transcript.
+Its title page records what produced it: the sample windows, **every** PyBondLab build
+that contributed (by version, git state and content hash -- more than one appears if a
+section was run against a different engine), and every DATA input with its size and
+sha256 prefix. Intermediate files Stage 3 wrote itself are counted rather than listed;
+the manifests under `data/` carry those individually.
+
+❗The build is identified by **hash, not by filesystem path**. A manifest is meant to
+travel -- in a zip, on OSF, in a replication archive -- and an absolute path records one
+machine's home directory and tells a reader nothing they can act on.
+
+`reports/exhibits.tex` is the assembled source, and `reports/exhibits.build.log` the
+pdflatex transcript.
 
 ---
 
@@ -45,7 +53,8 @@ sha256 prefix. `reports/exhibits.tex` is the assembled source, and
 | `count` | int | bonds in the leg that month |
 
 The month-begin sets also carry `lib` and `ilq` — the portfolio-level characteristic
-spreads, which Table 2's decomposition tests against the return gap.
+spreads, which Table 2's decomposition tests against the return gap. So there are two
+header shapes on disk: eight columns, or ten for the month-begin sets.
 
 ### File naming
 
@@ -132,18 +141,30 @@ recomputes a regression.
 Approaches are `unadjusted`, `adj_signal`, `adj_return`; pairs are `bias_1_2` and
 `bias_1_3`.
 
-**Section 4** (`data/s2_lab/*_stats.csv`) — one row per (factor, leg, variant, stat):
+**Section 4** (`data/s2_lab/*_stats.csv`) — one row per
+(return_type, rating, tail, factor, leg, variant, stat), then `value, tstat, T, nw_lags`.
 `leg` ∈ {long, short, ls}, `variant` ∈ {wins, base, bias}, `stat` ∈ {mu, alpha}.
-❗`T` is **each series' own** length here, not one shared number.
+❗The first three are part of the key, not context: the same factor appears once per
+design cell, and reading the frame without them silently pools cells. ❗`T` is **each
+series' own** length here, not one shared number — 257 to 268 in this build.
 
-**Section 5** (`data/s3_nse/*.csv`) — one row per cluster: `mu_mean`, `mu_median`,
-`nse_mu`, `ratio_mu`, the same four for alpha, and `n_paths`. NSE is the interquartile
-range of the estimate across paths; Ratio divides it by the average conventional
-standard error.
+**Section 5** (`data/s3_nse/*.csv`) — the two NSE tables are one row per cluster:
+`cluster_name`, `mu_mean`, `mu_median`, `nse_mu`, `ratio_mu`, the same four for alpha,
+and `n_paths`. NSE is the interquartile range of the estimate across paths; Ratio divides
+it by the average conventional standard error. The other Section-5 frames are shaped by
+what they report, not by cluster — `table_ia17_*` is one row per (cluster, location,
+filter type), `table_ia18_*` one row per printed row of the portfolio-size table, and
+`table_ia19_*` one row per cluster with a triple of columns per grid dimension.
 
-**The zoo** (`data/s4_zoo/*_cells.csv`) — one row per printed factor: `T`, `start`,
-`end`, `mu`, `sd`, `t_mu`, `sr`, `alpha`, `t_alpha`, `ir`, and `shaded` for
-Benjamini-Hochberg survival. Means, SDs and alphas are annualized and in percent.
+**The zoo** — `table_ia10_cells.csv` and `table_ia11_cells.csv` are one row per printed
+factor: `panel`, `factor`, `shaded` for Benjamini-Hochberg survival, then `T`, `start`,
+`end`, `mu`, `sd`, `t_mu`, `sr`, `alpha`, `t_alpha`, `ir`. Means, SDs and alphas are
+annualized and in percent.
+
+❗`table_ia09_cells.csv` is a different frame despite the matching suffix: it is the
+FDR-by-cluster count table, one row per (cluster, spec), with `n` as printed and
+`n_dictionary` as the paper's own signal dictionary would place it. The two disagree for
+`b_rvol`, which is why Table IA.IX ships in two variants.
 
 ---
 
@@ -153,11 +174,17 @@ Every result carries one, written by `drrlib.write_result`:
 
 | field | what |
 |---|---|
+| `name`, `section` | which result, and which section wrote it |
 | `written_utc`, `wall_s` | when, and how long |
 | `git_commit`, `git_branch`, `code_dirty` | the code that produced it |
-| `pybondlab` | version, path, git state, content hash, whether the fast kernels were present |
+| `pybondlab` | version, git state, content hash, whether the fast kernels were present — **no path**; `null` for a step that runs no sort |
 | `inputs` | each input's path, size and sha256 prefix |
 | `python` | interpreter version |
+
+Recorded paths are **relative to the pipeline root** whenever the file sits inside it,
+and absolute only for something genuinely outside — where a relative path would be a lie.
+`data/_cache/_sha_cache.json` follows the same rule: it is keyed on the portable path
+plus size and mtime, so it ships without naming anyone's home directory.
 
 A number whose inputs, code version and engine are not recorded cannot be defended
 later, which is why this block is written by one function rather than by each caller.
@@ -172,14 +199,20 @@ produced an incomplete artifact is not a result.
 
 | window | span | T | used by |
 |---|---|---|---|
-| `lib` | 2002-09-30 → 2024-12-31 | 268 | Section 3 and the Section-5 `paper` window |
-| `lab` | 2002-08-31 → 2024-12-31 | 269 | Section 4 |
-| `full` | to the panel's own frontier | derived | the `full` window variants, and the zoo |
+| `lib` | 2002-09-30 → 2024-12-31 | 268, asserted | Section 3 and the Section-5 `paper` window |
+| `lab` | 2002-08-31 → 2024-12-31 | spans 269; series run 257–268 | Section 4 |
+| `full` | to the panel's own frontier | derived | the `full` window variants |
+| zoo | sorted to the frontier, reported to 2024-12-31 | per series | every zoo exhibit |
 
-Both fixed windows give `floor(T**0.25) = 4` Newey-West lags. **Assert the length before
-trusting a t-statistic**: the lag count is derived from it, so a window one month off
-moves every number in the table. `drrlib.assert_sample` is the check, and the exhibits
-call it.
+❗Only the `lib` window has one T to assert, and `drrlib.assert_sample` asserts it. The
+Section-4 window is a **span**, not a length: each series is its own length inside it and
+carries its own `T` and `nw_lags`, because the winsorization threshold is a full-sample
+quantile by construction and so the window is a producer argument there, not a statistics
+-layer truncation.
+
+Every window in this build gives `floor(T**0.25) = 4` Newey-West lags. **Assert the
+length before trusting a t-statistic**: the lag count is derived from it, so a window one
+month off moves every number in the table.
 
 Sorts are formed from **2002-07-31** so the first printed return, 2002-09-30, has a
 formed portfolio behind it.

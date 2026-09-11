@@ -186,7 +186,10 @@ def main() -> int:
                              workers=min(n_w, len(chunks)), threads=n_t)
                 summary = pd.concat([p["summary"] for p in parts], ignore_index=True)
                 nbonds = pd.concat([p["nbonds"] for p in parts], ignore_index=True)
-                assert len(summary) == 108 * 216, len(summary)
+                assert len(summary) == 108 * 216, (
+                    f"{w} window: {len(summary):,} rows, expected "
+                    f"{108 * 216:,} (108 signals x 216 specs). A short frame means a "
+                    "worker returned fewer signals than it was given.")
                 summary.to_parquet(out / f"mua_summary_{w}.parquet", index=False)
                 nbonds.to_parquet(out / f"mua_nbonds_{w}.parquet", index=False)
                 results[w] = summary

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -117,6 +118,14 @@ def main() -> int:
             print(f"       columns: {', '.join(r['columns'])}")
     n_ok = sum(not r["problems"] for r in results)
     print(f"\n{n_ok}/{len(results)} inputs satisfy the contract")
+
+    # ❗A WARNING, not a failure. pdflatex is needed only by the last step, and
+    # `make_report.py --no-compile` is a legitimate way to run the whole pipeline --
+    # you still get every table and figure as a file, just not the assembled PDF.
+    if shutil.which("pdflatex") is None:
+        print("\nWARN pdflatex not found on PATH.")
+        print("       Everything runs; the final step cannot compile reports/exhibits.pdf.")
+        print("       Install TeX Live or MiKTeX, or run make_report.py --no-compile.")
     if not ok:
         print("\nStage 3 will not produce correct exhibits until these are fixed.\n"
               "  Run Stage 2 first, or point STAGE2_* at where its output lives.")

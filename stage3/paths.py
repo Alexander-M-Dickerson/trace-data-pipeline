@@ -1,7 +1,7 @@
 """paths.py -- every path Stage 3 uses, derived from `_stage3_settings.py`.
 
 Import this; never hard-code a path anywhere else. `tools/check_inputs.py` audits what is
-present before a run starts, and `tests/test_no_absolute_paths.py` fails on any absolute
+present before a run starts, and `tests/test_stage3_contract.py` fails on any absolute
 user path that creeps into the tree -- a home directory baked into a script is the defect
 that makes a replication package unrunnable on the next machine.
 
@@ -35,8 +35,6 @@ DATA = S.DATA                   # computed artifacts: sorts, stats, factor serie
 REPORTS = S.REPORTS             # rendered exhibits
 
 SORTS = DATA / "sorts"          # long-format long-short panels (the file grammar)
-STATS = DATA / "stats"          # one tidy statistics frame per section
-FACTOR_SERIES = DATA / "factors"    # wide factor return series, for distribution
 GRIDS = DATA / "grids"          # the uncertainty grids (large, one parquet per signal)
 CACHE = DATA / "_cache"         # signature-keyed intermediates
 
@@ -46,7 +44,7 @@ TIMINGS = REPORTS / "timings.jsonl"
 
 SECTIONS = ("s0_data", "s1_lib", "s2_lab", "s3_nse", "s4_zoo")
 
-for _d in (DATA, REPORTS, SORTS, STATS, FACTOR_SERIES, GRIDS, CACHE, TABLES, FIGURES):
+for _d in (DATA, REPORTS, SORTS, GRIDS, CACHE, TABLES, FIGURES):
     _d.mkdir(parents=True, exist_ok=True)
 
 

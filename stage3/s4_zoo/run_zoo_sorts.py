@@ -180,7 +180,7 @@ def main() -> int:
                 t0 = time.perf_counter()
                 panel = run_batch(data, signals, sort=sort, n_jobs=args.n_jobs,
                                   fast=args.fast)
-                panel.to_csv(out, index=False)
+                D.write_atomic(panel, out, index=False)
                 print(f"[done] {out.name}  {len(panel):,} rows  "
                       f"{time.perf_counter() - t0:.1f}s")
         bench.note(sorts=args.sorts, end=args.end, excess=args.excess,

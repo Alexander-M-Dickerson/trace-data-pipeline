@@ -147,7 +147,7 @@ def run_one(sort: str, timing: str, n_jobs: int, *, fast: bool = False) -> tuple
         panel = extract_panel(batch.fit(), naming=NamingConfig(sign_correct=True))
         how = f"n_jobs={n_jobs}"
 
-    panel.to_csv(out, index=False)
+    D.write_atomic(panel, out, index=False)
     wall = time.perf_counter() - t0
     print(f"[done] {out.name}  {len(panel):,} rows  {wall:.0f}s  {how}")
     return out, {"rows": len(panel), "n_signals": len(signal_cols),

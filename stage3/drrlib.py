@@ -15,7 +15,10 @@ House conventions encoded here, each one asserted against the data:
     at the boundary, via `PCT`.
   * a factor mnemonic ending in "*" is PyBondLab sign-corrected. The paper prints the
     UNFLIPPED sign, so `strip_sign_flag` returns the sign to undo it. Getting this
-    wrong flips dcs6 and str and nothing else -- a silent, plausible-looking error.
+    wrong is silent and plausible-looking. ❗How many factors it touches depends on
+    the file -- two of the seven in the three-approach CSVs, around forty-five of the
+    108 in the wide ones -- because the flip set is decided on the sample that was
+    sorted. It is a property of the run, not a constant.
   * the LIB sample is 2002-09-30..2024-12-31, T = 268. Asserted, never assumed.
 """
 from __future__ import annotations
@@ -186,7 +189,10 @@ def sha256_file(path: Path) -> str:
     """sha256 of a file, cached on (size, mtime_ns) so multi-GB inputs hash once."""
     path = Path(path)
     st = path.stat()
-    key = f"{path.resolve()}|{st.st_size}|{st.st_mtime_ns}"
+    # ❗Key on the PORTABLE path. The cache is written under data/ and ships with
+    # everything else there, and an absolute key would put one machine's home
+    # directory in the archive. Size + mtime still do the invalidating.
+    key = f"{portable(path)}|{st.st_size}|{st.st_mtime_ns}"
     cache = {}
     if _SHA_CACHE.exists():
         try:
@@ -239,6 +245,27 @@ def _git(*args: str) -> str | None:
     except Exception:
         return None
 
+
+
+def write_atomic(df, path: Path, **kw) -> Path:
+    """Write a frame to a temp file beside its destination, then rename it into place.
+
+    ❗The orchestrator decides to skip a producer by asking whether its output EXISTS.
+    A Ctrl-C or an out-of-disk halfway through `to_csv` leaves a truncated file that
+    exists, so the producer is skipped for ever and every exhibit downstream formats a
+    short series without complaint. `os.replace` is atomic on both Windows and POSIX,
+    so what lands is either the whole file or nothing.
+    """
+    import os
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    if path.suffix == ".csv":
+        df.to_csv(tmp, **kw)
+    else:
+        df.to_parquet(tmp, **kw)
+    os.replace(tmp, path)
+    return path
 
 
 def mark_complete(where: Path, ok: bool, what: dict) -> Path:

@@ -1,10 +1,19 @@
 # Stage 3 — portfolio sorts, uncertainty grids and the paper's exhibits
 
-Stage 3 sits on top of the Stage-2 monthly bond panel and produces every table and
-figure of *The Corporate Bond Factor Replication Crisis* — main text, appendix and
-Internet Appendix: **32 tables and 11 figures**.
+Stage 3 sits on top of the Stage-2 monthly bond panel and reproduces the exhibits of
+*The Corporate Bond Factor Replication Crisis* (Dickerson, Robotti and Rossetti) — main
+text, appendix and Internet Appendix.
+
+It writes **32 table files and 11 figures**. Twenty-eight of the tables are the paper's;
+the other four are Stage 3's own — two alternate variants where the paper disagrees with
+itself (see below) and the two uncaptioned inline count blocks from Section IA.3.
 
 It runs on your own computer, like Stage 2. It needs no WRDS connection.
+
+**Beyond Stage 2's requirements it needs two things:** `PyBondLab`, installed by the
+repository's `requirements.txt`, and **pdflatex** (TeX Live or MiKTeX) for the last step.
+`tools/check_inputs.py` warns if pdflatex is missing rather than failing -- without it
+every table and figure is still written, you just do not get the assembled PDF.
 
 ```bash
 cd stage3
@@ -24,7 +33,7 @@ Compiling is what catches it.
 
 | output | what |
 |---|---|
-| `data/sorts/` | long-format long-short panels: `date, factor, freq, leg, weighting, return, turnover` |
+| `data/sorts/` | long-format long-short panels: `date, factor, freq, leg, weighting, return, turnover, count` |
 | `data/grids/` | the two uncertainty grids, one parquet per signal |
 | `data/<section>/` | the tidy statistics frames the exhibits format, plus a manifest per result |
 | `reports/tables/` | the paper's tables, as LaTeX fragments |
@@ -47,7 +56,7 @@ tree beside this folder and all overridable from the environment:
 | variable | what it is | used by |
 |---|---|---|
 | `STAGE2_PANEL` | the monthly bond panel | every section |
-| `STAGE2_MMN` | the unadjusted `*_mmn` signal twins | the three approaches (Sections 3, 4) |
+| `STAGE2_MMN` | the unadjusted `*_mmn` signal twins | the three approaches (Section 3) |
 | `STAGE2_BBW` | `bbw_factors.parquet` — **MKTB** | every CAPM_B alpha |
 | `STAGE2_FACTORS` | `factors.parquet` — the risk-free rate, VIX, the macro set | excess returns, Figure 7 |
 | `STAGE1_DAILY` | the daily bond-day panel | the data appendix only |
@@ -55,31 +64,43 @@ tree beside this folder and all overridable from the environment:
 > ❗**`STAGE2_BBW` and `STAGE2_FACTORS` are different files.** MKTB lives in the first,
 > the risk-free rate in the second. They are not interchangeable.
 
-`python tools/check_inputs.py` checks all five against `spec/inputs.json`: rows, the 198
-columns Stage 3 reads, and the date span. It reports every problem at once, so a missing
-column surfaces in a second rather than forty minutes into a grid.
+`python tools/check_inputs.py` checks all five against `spec/inputs.json`: rows, every
+column Stage 3 reads (198 entries across the five files, 193 distinct names), and the
+date span. It reports every problem at once, so a missing column surfaces in a second
+rather than forty minutes into a grid.
+
+❗`spec/inputs.json` is **maintained by hand**. It is the contract Stage 3 asserts
+against, not a description generated from the code, so a producer that starts reading a
+new column will not appear there until someone adds it.
 
 ---
 
 ## PyBondLab
 
-Stage 3 runs every sort through PyBondLab, so **which copy is on `sys.path` is part of
-the result**. `pblenv.py` makes that explicit: it puts the chosen build first, asserts
-the import resolved there (a second install in the environment can otherwise shadow it
-silently), and records the build's version, git state and a content hash in every
-manifest Stage 3 writes.
+[PyBondLab](https://github.com/GiulioRossetti94/PyBondLab) is the portfolio-sorting
+library the paper is built on. `requirements.txt` installs it. Stage 3 runs every sort
+through it, so **which copy is on `sys.path` is part of the result**: `pblenv.py` puts
+the chosen build first, asserts the import resolved there (a second install in the
+environment can otherwise shadow it silently), and records the build's version, git state
+and a content hash in every manifest Stage 3 writes.
 
 ```bash
 export PYBONDLAB_DIR=/path/to/PyBondLab     # a checkout; unset = whatever is installed
 ```
 
-> ❗**The uncertainty grids need a build carrying the fast kernels** —
-> `PyBondLab.fast_sorts` and `PyBondLab.anomaly_assay_fast`. These are not in the 0.2.0
-> release that Stage 2 pins. `pblenv.require_fast()` checks before the fan-out starts,
-> rather than letting 108 workers each fail on an import.
+> ❗**Only the uncertainty grids (`--section nse`) need the fast kernels** —
+> `PyBondLab.fast_sorts` and `PyBondLab.anomaly_assay_fast`. The 0.2.0 release that
+> Stage 2 pins does not carry them, and `pblenv.require_fast()` says so before the
+> fan-out starts rather than letting 108 workers each fail on an import.
 >
-> Everything except `--section nse` runs on the released PyBondLab. The `--fast` flag
-> elsewhere is an optional speed-up, not a requirement.
+> **Everything else genuinely runs without them.** `_run_stage3.py` asks the installed
+> engine once and takes the slow path automatically — same numbers, longer. Measured on
+> one sort: 43.8 s without the kernels against 3.2 s with them. `--no-fast` forces the
+> slow path even when they are available, which is how you check the two agree.
+>
+> At the time of writing, the build carrying the kernels and the released 0.2.0 report
+> the **same version string**, so there is no version test to give you — `pblenv` looks
+> for the modules themselves. Check what you have with `python pblenv.py`.
 
 ---
 
@@ -128,8 +149,14 @@ Figures 1, 2 and 5 of the paper are schematics drawn in LaTeX -- a research fram
 return timeline, a look-ahead illustration. They have no data behind them, so Stage 3
 does not produce them, and the document says so rather than leaving a gap.
 
-Those timings are with the fast kernels, on 24 cores. Without them the grids are hours
-rather than minutes — that is what the kernels are for.
+Table IA.VIII is the same case: it is the paper's **signal dictionary**, a hand-written
+list of the 140 panel fields and what each one means. There is no computation behind it,
+so Stage 3 does not emit it either. The Stage-2 `DATA_DICTIONARY.md` is the live version
+of that table.
+
+Those timings are with the fast kernels, on 24 cores. Without them a sort takes roughly
+fourteen times as long (43.8 s against 3.2 s, measured on one), which is what turns the
+grids from minutes into hours — and is what the kernels are for.
 
 ---
 
@@ -154,8 +181,12 @@ rather than minutes — that is what the kernels are for.
 - A duplicate `(cusip, date)` silently corrupts the sort rather than raising. Every
   producer checks.
 - Do not filter to `ret_type == 'standard'`: the published factors keep defaulted bonds.
-- Three sample windows coexist — Section 3 and Section 5 use T = 268, Section 4 T = 269,
-  and the zoo runs to the panel's own frontier. All give 4 Newey-West lags.
+- Three sample windows coexist. Section 3 and Section 5 run on a fixed T = 268 and
+  assert it. Section 4's window **spans** 269 months, but its series are not all that
+  long — each is its own length, T 257 to 268 in this build — so there is no single T to
+  assert there; every row carries its own. The zoo SORTS to the panel's own frontier and
+  every zoo exhibit then truncates to 2024-12-31. Every window in the build gives 4
+  Newey-West lags.
 
 ### Where the paper disagrees with itself
 
@@ -196,6 +227,11 @@ stage3/
   spec/inputs.json        the input contract
   tools/check_inputs.py   enforces it
   tests/                  the package's own tests
+  README_stage3.md        this file
+  QUICKSTART_stage3.md    a minimal run
+  DATA_DICTIONARY.md      every artifact and column
+  data/                   everything Stage 3 computes        (gitignored)
+  reports/                the exhibits, and exhibits.pdf     (gitignored)
 ```
 
 > ⚠ **Naming trap.** `s1_lib/` implements the paper's **Section 3**; `s3_nse/` implements

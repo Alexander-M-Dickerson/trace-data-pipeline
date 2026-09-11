@@ -5,6 +5,19 @@ It runs **on your own computer**, like Stage 2, and needs no WRDS connection.
 
 If you have just finished Stage 2, everything below should work with no configuration.
 
+**You need two things beyond Stage 2's requirements:**
+
+- **PyBondLab** — the portfolio-sorting library every sort runs through. The
+  repository's own `requirements.txt` installs it
+  (`python -m pip install -r ../requirements.txt`); the source is at
+  [github.com/GiulioRossetti94/PyBondLab](https://github.com/GiulioRossetti94/PyBondLab).
+- **pdflatex** — only for the last step, which compiles the exhibits into one PDF. TeX
+  Live or MiKTeX. Without it, run with `--no-compile` and you still get every table and
+  figure as a file; you just do not get `exhibits.pdf`.
+
+`python tools/check_inputs.py` warns if pdflatex is missing rather than failing, because
+`--no-compile` is a legitimate way to run.
+
 ---
 
 ## 1. Check the inputs
@@ -46,9 +59,16 @@ build it resolved, and records it in every manifest:
 [pblenv] PyBondLab v0.2.0 tree=2f2dfb0d7cdd443e  fast kernels: yes  <- /path/to/PyBondLab
 ```
 
-> ❗`fast kernels: no` means **Section 5 will refuse to run** — the two uncertainty
-> grids need `PyBondLab.fast_sorts` and `PyBondLab.anomaly_assay_fast`, which the 0.2.0
-> release does not carry. Everything else runs fine without them.
+> ❗`fast kernels: NO` means **only Section 5 is blocked** — the two uncertainty grids
+> need `PyBondLab.fast_sorts` and `PyBondLab.anomaly_assay_fast`, and the 0.2.0 release
+> does not carry them. Everything else runs on the slow path automatically, with the
+> same numbers: `_run_stage3.py` asks once at startup and prints which path it took.
+> Expect roughly fourteen times the sort time there (43.8 s against 3.2 s, measured on
+> one sort).
+>
+> There is no minimum version to give you: at the time of writing the build with the
+> kernels and the release without them both report `0.2.0`, so `pblenv` looks for the
+> modules rather than comparing version strings.
 
 ## 3. Smoke run
 
@@ -107,9 +127,10 @@ return about three times, not twelve. The grids avoid this by making a unit of w
 signal and having each worker read its own column slice, rather than inheriting the
 panel. That is why they are minutes rather than hours.
 
-`--workers` and `--threads` are exposed on both grid runners. Keep `workers * threads`
-at or below your core count. The DUA grid holds 10–20 GB per worker, so size that one
-against memory rather than cores.
+`--workers` and `--threads` are exposed on both grid runners, and both now clamp their
+own defaults so `workers * threads` stays at or below your core count. Measured peak on
+this build is **0.7 GB per DUA worker** (`max_worker_rss_gb` in the grid's own manifest),
+so on a normal machine the grids are bounded by cores, not by memory.
 
 ---
 
@@ -122,4 +143,4 @@ against memory rather than cores.
 | `this exhibit needs sort CSVs under ...` | the message names the missing files and the command that makes them |
 | `needs PyBondLab's fast kernels` | set `PYBONDLAB_DIR` to a build that has them |
 | `--stats with a --signals subset` | refused on purpose: it would overwrite the full statistics with subset-only frames, and no exhibit downstream could tell |
-| `T=NNN, expected 268` | the sample window moved. Every t-statistic depends on T through the lag count, so this stops rather than printing quietly wrong numbers |
+| `expected T=268, got NNN` | the sample window moved. Every t-statistic depends on T through the lag count, so this stops rather than printing quietly wrong numbers |

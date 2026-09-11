@@ -42,7 +42,6 @@ MIN_TSTAT = 1.96
 FILTER_TYPES = ("trim", "price", "bounce")
 LOCATIONS = ("left", "right", "both")
 N_DUA_PATHS = 69_984
-N_MUA_PATHS = 18_128
 
 
 # ---------------------------------------------------------------------------
@@ -124,7 +123,10 @@ def load_dua_baselines(window: str = "full") -> pd.DataFrame:
     carry a different sign from the full-window file -- that is correct, not a bug.
     """
     df = pd.read_parquet(_dua_file("baselines", window))
-    assert len(df) == 648, len(df)
+    assert len(df) == 648, (
+        f"the DUA baselines frame has {len(df)} rows, expected 648 "
+        "(108 signals x 2 weightings x 3 ratings). Re-run "
+        "`python s3_nse/run_dua_grid.py --stats` -- a partial grid gives a short frame.")
     return df
 
 
@@ -231,7 +233,8 @@ def dua_baseline_values(baselines_df: pd.DataFrame, col: str) -> dict[str, float
 
 
 # ---------------------------------------------------------------------------
-# MUA -- methodological uncertainty (18,128 construction paths; CSV is DECIMAL)
+# MUA -- method uncertainty. The analysis set's size depends on how many
+# strategies are degenerate in THIS data, so it is reported, never pinned.
 # ---------------------------------------------------------------------------
 MUA_SUMMARY_DIR = paths.DATA / "s3_nse" / "mua_summary"
 
@@ -267,7 +270,10 @@ def load_mua_paths(twin: str, window: str = "paper") -> pd.DataFrame:
             "  Run `python s3_nse/run_mua_grid.py` then "
             "`python s3_nse/mua_summarize.py`.")
     df = pd.read_parquet(f)
-    assert len(df) == 23_328, len(df)
+    assert len(df) == 23_328, (
+        f"the MUA summary has {len(df)} rows, expected 23,328 (108 signals x 216 "
+        "specs). Re-run `python s3_nse/mua_summarize.py`; a short frame means the "
+        "grid behind it is incomplete.")
     degen = _degenerates(window)
     sid = df["signal"] + "__" + df["spec_id"]
     df = df[~sid.isin(degen)]
@@ -320,7 +326,7 @@ MUA_COLUMN_GROUPS = [
 
 
 def mua_improvement_counts(paths_df: pd.DataFrame,
-                           expected_denominator: int | None = 17_480) -> pd.DataFrame:
+                           expected_denominator: int | None = None) -> pd.DataFrame:
     """The improvement-count cells.
 
     ❗The two pools are NOT the same, deliberately. The NUMERATOR excludes only the
@@ -375,7 +381,10 @@ def load_mua_nbonds(twin: str, window: str = "paper") -> pd.DataFrame:
     # the summarizer's active-window mask drops never-active series (at minimum the
     # 24 infeasible ig_bp x hy per signal): 108 x 192 x 3 = 62,208 when nothing else
     # is dead, fewer only if a leg never activates at all
-    assert 60_000 < len(nb) <= 108 * 192 * 3, len(nb)
+    assert 60_000 < len(nb) <= 108 * 192 * 3, (
+        f"the MUA bond-count frame has {len(nb):,} rows, expected between 60,000 and "
+        f"{108 * 192 * 3:,}. Below the floor means the grid is incomplete; above "
+        "the ceiling means the infeasible ig_bp x hy cells were not dropped.")
     nb = C.exclude_redundant(nb, twin=twin)
     mins = nb.pivot_table(index=["signal", "spec_id"], columns="leg",
                           values="min", aggfunc="first")

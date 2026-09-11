@@ -98,7 +98,10 @@ def _function_defaults(tree, name: str) -> dict:
             for arg, d in zip(pos[len(pos) - len(a.defaults):], a.defaults):
                 out[arg.arg] = _literal(d)
             return out
-    raise KeyError(name)
+    raise KeyError(
+        f"no function named {name!r} in the parsed source. Table A.1 reads the "
+        "pipeline's filter parameters straight out of Stage 0/1 -- a rename upstream "
+        "lands here, and the fix is to follow the rename, not to hard-code a value.")
 
 
 def _module_dict(tree, name: str) -> dict:
@@ -108,7 +111,10 @@ def _module_dict(tree, name: str) -> dict:
             val = _literal(node.value)
             if isinstance(val, dict):
                 return val
-    raise KeyError(name)
+    raise KeyError(
+        f"no module-level dict named {name!r} in the parsed source. Same cause as "
+        "above: Table A.1 quotes the pipeline's own constants, so a rename upstream "
+        "must be followed here.")
 
 
 def load_params() -> dict[str, dict]:

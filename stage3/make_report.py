@@ -362,7 +362,10 @@ def main() -> int:
               + "\n  Run `python _run_stage3.py` to produce them.")
 
     if args.no_compile:
-        return 0
+        # ❗Same verdict as the compiling path. `--no-compile` skips pdflatex; it does
+        # not mean "missing exhibits are fine". Returning 0 here made the assembly step
+        # of run_stage3.sh green on an incomplete document.
+        return 0 if not missing else 1
     rc = compile_pdf(tex)
     if rc:
         return rc

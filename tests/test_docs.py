@@ -68,6 +68,8 @@ DOC_FILES = [
     "stage1/DATA_DICTIONARY.md",
     "stage2/README_stage2.md", "stage2/QUICKSTART_stage2.md",
     "stage2/DATA_DICTIONARY.md", "stage2/README_Default.md", "stage2/README_Value.md",
+    "stage3/README_stage3.md", "stage3/QUICKSTART_stage3.md",
+    "stage3/DATA_DICTIONARY.md",
 ]
 
 # Named in prose but produced at runtime or shipped inside a download, so they are
@@ -269,6 +271,7 @@ def main():
         and not (ROOT / "stage0" / f).exists()
         and not (ROOT / "stage1" / f).exists()
         and not (ROOT / "stage2" / f).exists()
+        and not (ROOT / "stage3" / f).exists()
         and not (ROOT / "tests" / f).exists()
     )
     check("every file named in the docs exists", not missing, str(missing))

@@ -87,7 +87,12 @@ def run_one(item) -> dict:
     out["spec_id"] = out["fast_spec"].map(canon_spec)
     out["signal"] = signal
     out = out[["date", "signal", "spec_id", "leg", "return", "nbonds"]]
-    out.to_parquet(out_path, index=False)
+    # ❗Temp file then rename. This runs in a spawned worker; a kill halfway through
+    # the write would otherwise leave a truncated parquet that EXISTS, and the
+    # orchestrator skips a producer whose output exists.
+    tmp = out_path.with_name(out_path.name + ".tmp")
+    out.to_parquet(tmp, index=False)
+    os.replace(tmp, out_path)
     return {"signal": signal, "n_specs": res.returns_df.shape[1],
             "rows": len(out), "wall_s": round(time.perf_counter() - t0, 2)}
 

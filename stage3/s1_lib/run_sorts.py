@@ -239,7 +239,7 @@ def main() -> int:
                                     signals=args.signals, ret_type=args.ret,
                                     rating=args.rating, n_jobs=args.n_jobs,
                                     fast=args.fast)
-                    panel.to_csv(out, index=False)
+                    D.write_atomic(panel, out, index=False)
                     written.append(name)
                     print(f"[done] {name}  {len(panel):,} rows  "
                           f"{time.perf_counter() - t0:.1f}s")
