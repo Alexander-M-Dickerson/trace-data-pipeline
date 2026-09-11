@@ -54,7 +54,7 @@ build it resolved, and records it in every manifest:
 
 ```bash
 python _run_stage3.py --dry-run     # resolve and print the configuration, compute nothing
-python _run_stage3.py --list        # the 39 steps, and which outputs already exist
+python _run_stage3.py --list        # the 40 steps, and which outputs already exist
 ```
 
 Then one cheap section end to end, which exercises the whole shape — a producer, a

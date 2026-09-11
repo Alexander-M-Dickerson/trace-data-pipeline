@@ -20,7 +20,7 @@ monthly panel. Stage 3 runs on your own machine, like Stage 2, and needs no WRDS
 
 ### Added
 
-- **`stage3/`** -- 9,400 lines across five sections. Two kinds of step, and the difference
+- **`stage3/`** -- 9,341 lines across five sections. Two kinds of step, and the difference
   matters: **producers** run sorts through PyBondLab and save return series (minutes to tens
   of minutes; the two uncertainty grids are the long ones), and are SKIPPED when their output
   exists, so a run that stops can simply be run again. **Exhibits** read those series and
@@ -48,6 +48,20 @@ monthly panel. Stage 3 runs on your own machine, like Stage 2, and needs no WRDS
   the chosen build first on `sys.path`, **asserts the import resolved inside it** (a second
   install in the environment can otherwise shadow it silently), and records the build's
   version, git state and a content hash in every manifest Stage 3 writes.
+
+- **`stage3/make_report.py`** -- assembles all 43 exhibits into **`reports/exhibits.pdf`**
+  (49 pages), in the paper's order and under the paper's own exhibit numbers. It is the
+  last step of every run rather than an afterthought, and that is the point: a LaTeX
+  fragment that will not compile looks perfectly fine sitting on disk. Wiring the compile
+  into the run is what catches it.
+
+  Its title page is a provenance page. It states that these are **not** the paper's
+  printed numbers and that nothing in the document compares them -- a PDF of tables under
+  familiar captions is exactly the kind of artifact that gets mistaken for the original.
+  It also lists **every distinct PyBondLab build that contributed**, with what each
+  produced and whether it carried the fast kernels: a producer is skipped when its output
+  exists, so re-rendering exhibits later under a different build is normal, and naming
+  only one engine would misdescribe most of the document.
 
 - **`stage3/tests/`** -- 32 tests that pass with no configuration at all, which is the
   fresh-clone case: no absolute user path anywhere; every runner step names a script that

@@ -177,7 +177,7 @@ own 16-versus-15 gap. It is emitted and marked, with `--quantified-only` to drop
 ```
 stage3/
   _stage3_settings.py     every path and constant; nothing hard-coded
-  _run_stage3.py          the entry point: 39 steps, producers then exhibits
+  _run_stage3.py          the entry point: 40 steps, producers then exhibits then the report
   run_stage3.sh           contract check, then the above
   paths.py                paths derived from the settings
   pblenv.py               which PyBondLab, asserted and fingerprinted
