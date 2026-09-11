@@ -198,12 +198,17 @@ This runs the real Stage 0 → Stage 1 code on a handful of CUSIP chunks and ass
 **Stage 0 - TRACE Data Processing:**
 - **[README](stage0/README_stage0.md)**: Complete guide for intraday to daily TRACE processing
 - **[QUICKSTART](stage0/quickstart.md)**: Fast-track guide to get started quickly
+- **[Data Dictionary](stage0/DATA_DICTIONARY.md)**: The 21-column bond-day panel and the 23-column FISD attribute file
+- **[Bounce-back filter](stage0/README_bounce_back_filter.md)**: How reversal artefacts are detected and removed
+- **[Decimal-shift corrector](stage0/README_decimal_shift_corrector.md)**: How mis-scaled prices are found and repaired
 - **[Configuration Guide](stage0/README_stage0.md#configuration-choices-you-can-edit)**: All configurable parameters
 - **[Troubleshooting](stage0/README_stage0.md#troubleshooting)**: Common issues and solutions
 
 **Stage 1 - Bond Analytics:**
 - **[README](stage1/README_stage1.md)**: Complete guide for bond analytics and enrichment
 - **[QUICKSTART](stage1/QUICKSTART_stage1.md)**: Fast-track guide to get started quickly
+- **[Data Dictionary](stage1/DATA_DICTIONARY.md)**: All 44 columns, and what the public download leaves out
+- **[Distressed-bond filter](stage1/README_distressed_filter.md)**: The ultra-distressed screen and why it exists
 - **[Configuration Guide](stage1/README_stage1.md#configuration-choices-you-can-edit)**: All configurable parameters
 - **[Troubleshooting](stage1/README_stage1.md#troubleshooting)**: Common issues and solutions
 
@@ -211,7 +216,8 @@ This runs the real Stage 0 → Stage 1 code on a handful of CUSIP chunks and ass
 - **[Stage 2 README](stage2/README_stage2.md)**: What it builds and how to run it
 - **[Quick Start](stage2/QUICKSTART_stage2.md)**: The shortest path from Stage 1 output to a panel
 - **[Data Dictionary](stage2/DATA_DICTIONARY.md)**: All 140 columns, the factor models, and the `_mmn` sidecar
-- **[Default vs Value signals](stage2/README_Default.md)**: How the default-risk signals are built
+- **[Default-risk signals](stage2/README_Default.md)**: How the default-risk signals are built
+- **[Value signals](stage2/README_Value.md)**: The value-signal family and its duration-times-spread variants
 
 ---
 

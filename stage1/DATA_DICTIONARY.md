@@ -1,6 +1,13 @@
 # Stage 1 Data Dictionary
 
-Comprehensive documentation for the Stage 1 output dataset. Available in zipped parquet format on [Open Bond Asset Pricing](https://openbondassetpricing.com/data). All proprietary data (GVKEY, ratings etc.) set to NaN.
+Comprehensive documentation for the Stage 1 output dataset. Available in zipped parquet format on
+[Open Bond Asset Pricing](https://openbondassetpricing.com/data).
+
+**The file you build is not the file you download.** A panel you build yourself carries all 44
+columns with every value populated. The published download has **34 columns**: the four agency
+ratings (†) are removed because they are licensed, six trade-timing and count columns (‡) are
+removed to keep the file small, and `gvkey` is present but **set to NaN** throughout. The
+restriction is on redistribution, not on the pipeline.
 
 ---
 
@@ -30,7 +37,7 @@ in the schema, and the largest drops ~9% of bond-days.
 | **Structure** | Panel data: one row per (cusip_id, trd_exctn_dt) |
 | **Size** | ~500MB - 2GB (depending on time period) |
 | **Rows** | ~31 million (full sample 2002-present; 31,344,732 in the 2026 vintage) |
-| **Columns** | 44 |
+| **Columns** | 44 as built; **34 in the public download** (see the note above) |
 | **Download** | Available in zipped parquet format on [Open Bond Asset Pricing](https://openbondassetpricing.com/data) |
 
 ---
@@ -52,7 +59,8 @@ All bonds in the dataset have a principal amount of $1,000.
 
 ## Notes
 
-- **\* Columns marked with asterisk** are not included in the output file but can be obtained by merging with FISD data in `stage0/enhanced/trace_enhanced_fisd_YYYYMMDD.parquet`
+Two groups of columns are dropped from the public download:
+
 - **† Columns marked with dagger** are excluded from the public download due to proprietary data restrictions
 - **‡ Columns marked with double dagger** are excluded from the public download to reduce file size
 
@@ -67,7 +75,7 @@ All bonds in the dataset have a principal amount of $1,000.
 | `cusip_id` | category | 9-character CUSIP identifier (unique bond ID) |
 | `permno` | Int32 | CRSP PERMNO equity identifier (links to stock data) |
 | `permco` | Int32 | CRSP PERMCO company identifier |
-| `gvkey` | Int32 | Compustat GVKEY identifier (links to accounting data) |
+| `gvkey` | Int32 | Compustat GVKEY identifier (links to accounting data). **NaN throughout the public download**; populated in a panel you build. |
 | `trd_exctn_dt` | datetime | Trade execution date |
 
 #### How bonds are linked to firms

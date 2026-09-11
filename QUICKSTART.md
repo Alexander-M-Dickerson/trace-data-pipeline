@@ -149,6 +149,36 @@ qsub run_smoke_test.sh      # result in smoke_test.out
 
 ---
 
+
+## Stage 2 — the monthly panel
+
+Stages 0 and 1 run on the WRDS grid. **Stage 2 runs on your own machine**, because it reads
+Stage 1's output rather than the TRACE tape. Copy `stage0/` and `stage1/` down first, then:
+
+```bash
+cd stage2
+python _run_stage2.py --dry-run     # resolve and validate the config, build nothing
+python _run_stage2.py               # the full build, ~8 minutes on 24 cores
+```
+
+It writes `output/panel/main_panel_<mode>.parquet` -- 140 columns per bond-month -- plus the
+unadjusted `_mmn` twins, the factor series, and the beta and momentum blocks. Every column is
+defined in [stage2/DATA_DICTIONARY.md](stage2/DATA_DICTIONARY.md).
+
+The build asserts its own column contract at the end: the 140 names **and their order** are
+frozen in `stage2/lib/contract.py`, so a change to the model list cannot silently permute the
+published file.
+
+To package a vintage for distribution:
+
+```bash
+python make_release.py --mode <mode>
+```
+
+which redacts the proprietary identifiers and licensed ratings, and refuses to write a bundle
+that still carries them. See [stage2/QUICKSTART_stage2.md](stage2/QUICKSTART_stage2.md).
+
+
 ## Monitor Progress
 
 ```bash
@@ -461,20 +491,30 @@ trace-data-pipeline/
 │   ├── standard/                    # Standard TRACE outputs
 │   └── 144a/                        # 144A TRACE outputs
 │
-└── stage1/                          # Bond analytics and enrichment
-    ├── run_stage1.sh                # SGE job script
-    ├── _run_stage1.py               # Main entry point
-    ├── stage1_pipeline.py           # Pipeline logic
-    ├── _stage1_settings.py          # Stage 1 configuration
-    ├── QUICKSTART_stage1.md         # Stage 1 specific guide
-    ├── logs/                        # Job logs
-    └── data/                        # Stage 1 outputs
-        ├── stage1_YYYYMMDD.parquet  # Final dataset
-        ├── liu_wu_yields.xlsx       # Treasury yields (auto-downloaded)
-        ├── bond_firm_linker_2026/   # Equity linker (auto-downloaded)
-        ├── Siccodes12.txt           # FF12 industries (auto-downloaded)
-        ├── Siccodes17.txt           # FF17 industries (auto-downloaded)
-        └── Siccodes30.txt           # FF30 industries (auto-downloaded)
+├── stage1/                          # Bond analytics and enrichment
+│   ├── run_stage1.sh                # SGE job script
+│   ├── _run_stage1.py               # Main entry point
+│   ├── stage1_pipeline.py           # Pipeline logic
+│   ├── _stage1_settings.py          # Stage 1 configuration
+│   ├── QUICKSTART_stage1.md         # Stage 1 specific guide
+│   ├── DATA_DICTIONARY.md           # Every one of the 44 columns
+│   ├── logs/                        # Job logs
+│   ├── data_reports/                # Data-quality report (LaTeX/PDF)
+│   └── data/                        # Stage 1 outputs
+│       ├── stage1_YYYYMMDD.parquet  # Final dataset
+│       ├── liu_wu_yields.xlsx       # Treasury yields (auto-downloaded)
+│       ├── bond_firm_linker_2026/   # Equity linker (auto-downloaded)
+│       ├── Siccodes12.txt           # FF12 industries (auto-downloaded)
+│       ├── Siccodes17.txt           # FF17 industries (auto-downloaded)
+│       └── Siccodes30.txt           # FF30 industries (auto-downloaded)
+│
+└── stage2/                          # Monthly panel -- YOUR machine, not the grid
+    ├── _run_stage2.py               # Main entry point
+    ├── _stage2_settings.py          # Stage 2 configuration
+    ├── make_release.py              # Packages a vintage (and redacts it)
+    ├── DATA_DICTIONARY.md           # Every one of the 140 columns
+    ├── lib/  steps/  tests/         # Engine, the seven steps, 14 test files
+    └── output/panel/                # main_panel_<mode>.parquet
 ```
 
 ---

@@ -66,11 +66,31 @@ git checkout -b feature/your-feature-name
 
 The repo ships a test suite. Run it before submitting a pull request.
 
-**No WRDS needed** -- seconds:
+**Most of it needs no WRDS and runs in seconds.** The bulk lives under `stage2/tests/` and is
+pytest:
 
 ```bash
-python3 tests/test_chunk_plan.py        # chunk-partition properties
-python3 tests/test_chunk_scheduler.py   # ordering + failure handling
+python -m pytest stage2/tests tests -q      # ~110 tests, no WRDS, no network
+```
+
+That covers the frozen 140-column contract and its order, the `_mmn` twin rule, the release
+redaction gate, the frontier guard, the `auto:complete` cut-off rule, the golden-diff engine,
+the NYSE calendar, month boundaries, the factor fetchers and the published extended series.
+
+❗**Some of it skips on a fresh clone, and a skip is not a pass.** Five of the six
+`stage2/tests/test_column_contract.py` tests need a built panel under `stage2/output/panel/`, so the
+panel = report = dictionary gate passes *vacuously* until you have run a build. The parity
+tests skip unless `STAGE2_REFERENCE_OUTPUT` / `STAGE2_REFERENCE_ROOT` point at a reference
+tree. `pytest -rs` lists what skipped and why.
+
+Four files under `tests/` are scripts rather than pytest modules -- pytest imports them and
+collects nothing -- so run them directly:
+
+```bash
+python tests/test_docs.py               # documentation structure
+python tests/test_chunk_plan.py         # chunk-partition properties
+python tests/test_chunk_scheduler.py    # ordering + failure handling
+python tests/test_merge_keys.py         # one row per key on every lookup
 ```
 
 **Whole chain, WRDS needed** -- ~10 minutes. Runs the real Stage 0 and Stage 1 code on a
