@@ -29,7 +29,22 @@ Transforms raw TRACE data into a research-ready bond dataset with:
 
 ---
 
-## Quick Start (3 Steps)
+## Two machines, one pipeline
+
+Before you start, know where you will be:
+
+| | Where | What |
+|---|---|---|
+| Stages 0 and 1 | **WRDS Cloud** | build the daily bond panel from the raw TRACE tape (~5 h) |
+| The hand-off | you | zip it on WRDS, `scp` it to your own computer (~6 GB) |
+| Stage 2 | **your own computer** | build the monthly panel from that file (~8 min) |
+
+Steps 1-3 below are all **on WRDS**. The switch to your own computer happens at
+[Download Results](#download-results-to-your-local-machine), and Stage 2 follows it.
+
+---
+
+## Quick Start (3 Steps) — on WRDS
 
 ### Step 1: Clone and Configure
 
@@ -148,35 +163,6 @@ qsub run_smoke_test.sh      # result in smoke_test.out
 **Runtime:** about 4.5-5 hours total on the WRDS Cloud with default settings (measured 4.63 h on 2026-09-09)
 
 ---
-
-
-## Stage 2 — the monthly panel
-
-Stages 0 and 1 run on the WRDS grid. **Stage 2 runs on your own machine**, because it reads
-Stage 1's output rather than the TRACE tape. Copy `stage0/` and `stage1/` down first, then:
-
-```bash
-cd stage2
-python _run_stage2.py --dry-run     # resolve and validate the config, build nothing
-python _run_stage2.py               # the full build, ~8 minutes on 24 cores
-```
-
-It writes `output/panel/main_panel_<mode>.parquet` -- 140 columns per bond-month -- plus the
-unadjusted `_mmn` twins, the factor series, and the beta and momentum blocks. Every column is
-defined in [stage2/DATA_DICTIONARY.md](stage2/DATA_DICTIONARY.md).
-
-The build asserts its own column contract at the end: the 140 names **and their order** are
-frozen in `stage2/lib/contract.py`, so a change to the model list cannot silently permute the
-published file.
-
-To package a vintage for distribution:
-
-```bash
-python make_release.py --mode <mode>
-```
-
-which redacts the proprietary identifiers and licensed ratings, and refuses to write a bundle
-that still carries them. See [stage2/QUICKSTART_stage2.md](stage2/QUICKSTART_stage2.md).
 
 
 ## Monitor Progress
@@ -360,6 +346,44 @@ print(df.head())
 ```
 
 ---
+
+## Now switch to your own computer: Stage 2
+
+Everything above happened **on WRDS**. Stage 2 happens **on your own computer**, on the
+files you just downloaded. It needs no WRDS connection.
+
+First install the requirements there, in a Python 3.10+ environment:
+
+```bash
+cd trace-data-pipeline          # the folder you just unzipped
+python -m pip install -r requirements.txt
+```
+
+Then build the panel:
+
+```bash
+cd stage2
+python _run_stage2.py --dry-run     # resolve and validate the config, build nothing
+python _run_stage2.py               # the full build, ~8 minutes on 24 cores
+```
+
+It writes `output/panel/main_panel_<mode>.parquet` -- 140 columns per bond-month -- plus the
+unadjusted `_mmn` twins, the factor series, and the beta and momentum blocks. Every column is
+defined in [stage2/DATA_DICTIONARY.md](stage2/DATA_DICTIONARY.md).
+
+The build asserts its own column contract at the end: the 140 names **and their order** are
+frozen in `stage2/lib/contract.py`, so a change to the model list cannot silently permute the
+published file.
+
+To package a vintage for distribution:
+
+```bash
+python make_release.py --mode <mode>
+```
+
+which redacts the proprietary identifiers and licensed ratings, and refuses to write a bundle
+that still carries them. See [stage2/QUICKSTART_stage2.md](stage2/QUICKSTART_stage2.md).
+
 
 ## Troubleshooting
 

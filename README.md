@@ -10,9 +10,62 @@ The companion repository is [PyBondLab](https://github.com/GiulioRossetti94/PyBo
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Stage 0](https://img.shields.io/badge/Stage%200-Public%20Beta-green)](stage0/)
 [![Stage 1](https://img.shields.io/badge/Stage%201-Public%20Beta-green)](stage1/)
-[![Stage 2](https://img.shields.io/badge/Stage%202-Coming%20Soon-orange)](stage2/)
+[![Stage 2](https://img.shields.io/badge/Stage%202-Public%20Beta-green)](stage2/)
 
 [📄 Link to paper](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4575879)
+---
+
+## Which machine am I on?
+
+**This pipeline runs in two places, and the hand-off between them is a file you copy yourself.**
+Getting this straight first will save you an afternoon.
+
+| | Where | What happens | How long |
+|---|---|---|---|
+| **1** | **WRDS Cloud** | Stages 0 and 1 build the daily bond panel from the raw TRACE tape | ~5 hours, mostly waiting |
+| **2** | **In between** | You zip the output on WRDS and copy it down to your own computer | ~15 min for ~6 GB |
+| **3** | **Your own computer** | Stage 2 turns that daily panel into the monthly asset-pricing panel | ~8 minutes |
+
+**Why the split?** Stages 0 and 1 read the raw TRACE transaction tape, which is a WRDS
+database — so they have to run where the data is, submitted to the WRDS job grid. Stage 2
+reads nothing but the file Stage 1 produced, so there is no reason to queue for it; it runs
+faster on your own machine and needs no WRDS connection at all.
+
+### Step by step
+
+**On WRDS** — you will be SSH'd into `wrds-cloud.wharton.upenn.edu`:
+
+1. Clone this repository into your WRDS home directory.
+2. Install the Python packages (`pip install --user -r requirements.txt`).
+3. Run `bash download_inputs.sh` **on the login node** — compute nodes have no internet.
+4. Submit the pipeline: `./run_pipeline.sh`. Stage 0 runs in parallel per TRACE member, then
+   Stage 1 starts automatically when they finish.
+5. Wait. Check on it with `qstat`.
+
+**Moving the results** — you end up with roughly 6 GB across hundreds of files:
+
+6. On WRDS, zip it: `cd ~ && zip -r /scratch/{institution}/trace-data-pipeline.zip trace-data-pipeline/`
+7. From your own computer, copy it down with `scp`, then unzip.
+
+> ❗Zip from `~` using a **relative** path, exactly as written. `zip -r out.zip ~/trace-data-pipeline/`
+> stores the absolute path and you get an archive nested four directories deep.
+
+**On your own computer:**
+
+8. Install the same requirements (`pip install -r requirements.txt`) in a Python 3.10+
+   environment. You do **not** need a WRDS connection from here.
+9. `cd stage2 && python _run_stage2.py`
+10. You now have `stage2/output/panel/main_panel_<mode>.parquet` — 140 columns per bond-month.
+
+Full detail: [QUICKSTART.md](QUICKSTART.md) for stages 0-1,
+[stage2/QUICKSTART_stage2.md](stage2/QUICKSTART_stage2.md) for stage 2.
+
+> ❗**You cannot skip stages 0 and 1 by downloading the published Stage 1 file.** The public
+> download has its rating columns removed, because agency ratings are licensed. Stage 2 keeps
+> only bond-months that carry a rating, so it would silently produce an empty panel. Stage 2
+> detects this and refuses to start. Run stages 0 and 1 yourself — that is what the WRDS
+> subscription is for.
+
 ---
 
 ## Overview
@@ -28,8 +81,8 @@ Processes raw intraday TRACE transaction data to clean daily panels. Handles thr
 **Automated workflow:** Run `./run_pipeline.sh` from the project ROOT to execute the complete multi-stage pipeline with automatic job dependencies. Stage 0 jobs run in parallel, then automatically chain to Stage 1 processing when complete.
 
 **Status:** Public beta - fully functional and ready for testing
-**Execution:** WRDS Cloud or your home machine (WRDS subscription required)
-**Documentation:** See [stage0/README_stage0.md](stage0/README_stage0.md) and [stage0/quickstart.md](stage0/quickstart.md)
+**Execution:** **On the WRDS Cloud grid.** Stage 0 reads the raw TRACE tape, which lives on WRDS.
+**Documentation:** See [stage0/README_stage0.md](stage0/README_stage0.md), [stage0/quickstart.md](stage0/quickstart.md) and [stage0/DATA_DICTIONARY.md](stage0/DATA_DICTIONARY.md)
 
 ### Stage 1: Daily Bond Analytics  **PUBLIC BETA**
 Enriches Stage 0 daily panels with comprehensive bond analytics and characteristics:
@@ -41,8 +94,8 @@ Enriches Stage 0 daily panels with comprehensive bond analytics and characterist
 - **Ultra-distressed filters** to flag potentially erroneous prices
 
 **Status:** Public beta - fully functional and ready for testing
-**Execution:** WRDS Cloud or your home machine (WRDS subscription required)
-**Documentation:** See [stage1/README_stage1.md](stage1/README_stage1.md) and [stage1/QUICKSTART_stage1.md](stage1/QUICKSTART_stage1.md)
+**Execution:** **On the WRDS Cloud grid**, chained automatically after Stage 0.
+**Documentation:** See [stage1/README_stage1.md](stage1/README_stage1.md), [stage1/QUICKSTART_stage1.md](stage1/QUICKSTART_stage1.md) and [stage1/DATA_DICTIONARY.md](stage1/DATA_DICTIONARY.md)
 
 ### Stage 2: Monthly Panel with Factor Signals
 Produces a clean, error-corrected monthly panel with dozens of corporate bond signals for asset pricing research:

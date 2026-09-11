@@ -18,8 +18,25 @@
 ### Do I need a WRDS subscription?
 Yes, the pipeline requires WRDS access with TRACE Enhanced, Standard, or 144A entitlements, plus FISD and ratings data for Stage 1. You can check your entitlements by logging into WRDS and viewing your subscriptions.
 
-### Can I run this on my local machine?
-Both Stage 0 and Stage 1 are designed for WRDS Cloud due to database access requirements, though technically they can run locally with proper WRDS connectivity. WRDS Cloud is recommended for optimal performance.
+### Which parts run where?
+This is a **two-machine pipeline**, and the hand-off is a file you copy yourself.
+
+| | Where | Why |
+|---|---|---|
+| Stages 0 and 1 | **WRDS Cloud** | they read the raw TRACE tape, which is a WRDS database |
+| the hand-off | you | zip on WRDS, `scp` down (~6 GB) |
+| Stage 2 | **your own computer** | it reads only Stage 1's output file; no WRDS connection needed |
+
+### Can I run Stages 0 and 1 on my own machine?
+Technically yes, with a working WRDS connection -- but you would be pulling hundreds of
+millions of trades across the internet, and `run_pipeline.sh` submits jobs to the WRDS grid,
+so you would be invoking the stage scripts directly instead. Use WRDS Cloud.
+
+### Can I skip Stages 0 and 1 and just download the Stage 1 file?
+No, not for Stage 2. The published Stage 1 download has its rating columns removed, because
+agency ratings are licensed. Stage 2 keeps only bond-months carrying a rating, so it would
+produce an **empty panel with no error**. Stage 2 checks for exactly this and refuses to
+start. The download is there for people who want the daily panel itself.
 
 ### How long does processing take?
 Using `./run_pipeline.sh` (complete automated pipeline):
