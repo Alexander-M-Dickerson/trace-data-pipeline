@@ -747,3 +747,57 @@ def test_every_step_names_a_script_that_exists():
     missing = sorted({script for _s, _k, script, _a, _t in R.STEPS
                       if not (STAGE3 / script).exists()})
     assert not missing, "steps naming a file that is not there: " + ", ".join(missing)
+
+
+def test_the_paper_groups_the_signals_the_way_stage3_does():
+    """Table IA.VIII's own cluster blocks must match both of Stage 3's maps.
+
+    Until the spec existed this could not be checked: the paper's grouping lived in
+    LaTeX. Now it is data, so a signal that moves cluster in the code -- or a
+    transcription slip in the spec -- shows up here. Names are allowed to differ
+    (Section 5 reports risk groups, the zoo reports beta groups); the PARTITION is not.
+
+    Measured when this was written: all three agree on all 108.
+    """
+    import json
+    import re
+    from collections import defaultdict
+
+    sys.path.insert(0, str(STAGE3 / "s3_nse"))
+    sys.path.insert(0, str(STAGE3 / "s4_zoo"))
+    import clusters as C
+    import zoo_engine as Z
+
+    rows = json.loads(
+        (STAGE3 / "spec" / "signal_definitions.json").read_text(encoding="utf-8"))["rows"]
+    paper = defaultdict(set)
+    for r in rows:
+        m = re.match(r"Cluster ([IVX]+):", r["group"] or "")
+        if m:
+            paper[m.group(1)].add(r["mnemonic"])
+
+    zoo, nse = defaultdict(set), defaultdict(set)
+    for sig, name in Z.CLUSTER_OF.items():
+        zoo[name].add(sig)
+        nse[C.get_group_name(C.get_signal_group(sig))].add(sig)
+
+    def blocks(d):
+        return sorted(tuple(sorted(v)) for v in d.values())
+
+    assert sum(len(v) for v in paper.values()) == 108, "the spec lost a sorted signal"
+    assert blocks(paper) == blocks(zoo), "the paper and the zoo group differently"
+    assert blocks(paper) == blocks(nse), "the paper and Section 5 group differently"
+
+
+def test_the_prose_cluster_counts_are_recorded_as_a_paper_defect():
+    """The paper's prose counts contradict its own table; that must stay written down.
+
+    22/14/14/15 in the prose against 21/13/13/18 in the table, in four of nine
+    clusters. Both total 108, which is why nothing caught it for so long. Stage 3
+    follows the TABLE. This test does not check the paper -- it checks that the finding
+    is still on file, so a future tidy-up cannot quietly delete the only record of it.
+    """
+    doc = (STAGE3 / "RECONCILIATION_ia08.md").read_text(encoding="utf-8")
+    for n in ("22", "21", "14", "13", "15", "18"):
+        assert n in doc, f"the prose-vs-table cluster counts no longer name {n}"
+    assert "contradicts its own table" in doc
