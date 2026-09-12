@@ -177,28 +177,39 @@ x108  signals
 =18,128  well-defined factor return series
 ```
 
-**Stage 3's own ladder ends lower, and the difference is the point of the ledger:**
+**Stage 3's own ladder ends lower, and the difference is the point of the ledger.**
+Two consecutive cold runs of 2026-09-12, over identical data:
 
 ```
-18,144  factor return series            (the same 168 x 108)
--80     empty_leg    a leg empty in some month inside the signal's coverage
--32     no_series    no portfolio was ever formed -- no month has a return
-=18,032  well-defined factor return series
+        run A    run B
+18,144  18,144   factor return series      (the same 168 x 108)
+  -80     -80    empty_leg   a leg empty in some month inside the signal's coverage
+  -32     -36    no_series   no portfolio was ever formed -- no month has a return
+=18,032 =18,028  well-defined factor return series
 ```
 
-Two differences from the paper's 18,128, both measured on this build:
+❗**Those are two measurements of a quantity that moves, not a disagreement.** The
+sort engine returns a few restricted-breakpoint cells as an empty series in one run and a
+full one in the next (see *What is not reproducible* in README_stage3.md), so
+`no_series` breathes by a handful. Every exhibit reads the count from the ledger the run
+itself wrote, which is why Table 6, Table IA.XVIII and Table IA.XIX agree with each other
+within any one document even though no two documents need agree. Read your own run's
+number from `reports/timings.jsonl` or from Table 6's footnote; do not take a number out
+of this file.
 
-* **80 rather than 16 `empty_leg`.** The paper's 16 are the ones its own long leg
-  realises; the upstream engine's long-leg rule misses others. Our 80 is a superset
-  containing all 16.
-* **32 `no_series`, a category the paper does not have.** Its rule is about a leg being
-  empty in some month, which presupposes a series; a construction that never formed a
-  portfolio at all cannot be a well-defined factor return series either, so it is
-  excluded here and named separately rather than folded into the same word.
+Two differences from the paper's 18,128, both structural rather than numerical:
 
-Both numbers move when the engine's restricted-universe instability bites, which is why
-every exhibit reads them from the ledger rather than from a constant. Table 6's footnote
-prints both exclusions so the subtraction closes on the page.
+* **80 rather than the paper's 16 `empty_leg`.** The paper's 16 are the ones its own
+  long leg realises; the upstream engine's long-leg rule misses others. Ours is a
+  superset containing all 16.
+* **`no_series`, a category the paper does not have at all.** Its rule is about a leg
+  being empty in some month, which presupposes a series; a construction that never formed
+  a portfolio cannot be a well-defined factor return series either, so it is excluded
+  here and named separately rather than folded into the same word.
+
+Table 6's footnote prints both exclusions, so the subtraction closes on the page:
+"18,028 construction paths of 18,144, after excluding 80 with an empty leg and 36 never
+formed". A test does that arithmetic on every run.
 
 Before this ledger, Stage 3 arrived at that answer three different ways and got three
 different numbers — Table 6 printed 18,064, Table IA.XVIII printed 18,038 for the same

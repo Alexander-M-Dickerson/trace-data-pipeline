@@ -82,10 +82,11 @@ def main() -> int:
                          "different breakpoint-universe labels, so the BP rows "
                          "re-attribute. ❗The strategy count is NOT conserved "
                          "when the engine forms one twin member and not the "
-                         "other. Measured on this build: feb 18,032 vs mar14 "
-                         "18,018, a 14-strategy gap that is the count of "
-                         "asymmetric pairs. The gap is a property of the run; "
-                         "nse_engine.twin_asymmetry names the pairs.")
+                         "other. Measured on one run: feb 18,032 vs mar14 "
+                         "18,018, a gap equal to that run's 14 asymmetric pairs. "
+                         "Both numbers move run to run -- read yours from this "
+                         "table's own footnote, and nse_engine.twin_asymmetry "
+                         "names the pairs.")
     ap.add_argument("--no-bench", action="store_true")
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
