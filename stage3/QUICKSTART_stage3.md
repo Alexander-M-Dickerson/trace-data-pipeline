@@ -1,6 +1,6 @@
 # Quickstart — Stage 3
 
-Stage 3 turns the Stage-2 monthly panel into the paper's 32 tables and 11 figures.
+Stage 3 turns the Stage-2 monthly panel into the paper's 33 tables and 11 figures.
 It runs **on your own computer**, like Stage 2, and needs no WRDS connection.
 
 If you have just finished Stage 2, everything below should work with no configuration.
@@ -113,8 +113,8 @@ statistics layer, tables and figures:
 python _run_stage3.py --section lib
 ```
 
-About four minutes on 24 cores with the kernels — 215 s of benched work in the cold
-run of 2026-09-11, most of it the four 108-signal sorts. You should end up with
+About four and a half minutes on 24 cores with the kernels — 242 s of benched work in
+the cold run of 2026-09-12, most of it the four 108-signal sorts. You should end up with
 `reports/tables/table01.tex` and `reports/figures/fig03_cumret.pdf`.
 
 ## 4. Everything
@@ -123,9 +123,9 @@ run of 2026-09-11, most of it the four 108-signal sorts. You should end up with
 bash run_stage3.sh
 ```
 
-**833 s — just under 14 minutes** on 24 cores with the fast kernels, measured on a
-cold run (`data/` and `reports/` wiped first) on 2026-09-11. The two uncertainty grids
-are 56% of it. See **What it costs** in
+**906 s — about 15 minutes** on 24 cores with the fast kernels, measured on a cold
+run (`data/` and `reports/` wiped first) on 2026-09-12, all 40 steps. The two
+uncertainty grids are 55% of it. See **What it costs** in
 [README_stage3.md](README_stage3.md) for the per-section split, the disk and memory
 figures, and what to lower first on a smaller machine.
 
@@ -156,7 +156,7 @@ broken at once.
 ## 5. Read the results
 
 ```
-reports/tables/     32 .tex files, one per exhibit
+reports/tables/     33 .tex files, one per exhibit
 reports/figures/    11 .pdf files
 data/<section>/     the statistics frames behind them, as CSV, plus a manifest per result
 reports/timings.jsonl   one line per run: phases, wall clock, and its own check

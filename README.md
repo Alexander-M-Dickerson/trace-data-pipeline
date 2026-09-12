@@ -62,7 +62,7 @@ faster on your own machine and needs no WRDS connection at all.
 **Still on your own computer, if you want the research output too:**
 
 11. `cd stage3 && python tools/check_inputs.py` — confirms Stage 3 can see what Stage 2 made.
-12. `bash run_stage3.sh` — portfolio sorts, the uncertainty grids, and 32 tables and
+12. `bash run_stage3.sh` — portfolio sorts, the uncertainty grids, and 33 tables and
     11 figures into `stage3/reports/`.
 
 Stages 0-2 build the DATA. Stage 3 is what the data was built for: it reproduces every
@@ -130,7 +130,7 @@ Produces a clean, error-corrected monthly panel with dozens of corporate bond si
 - **Stage 0**: ✅ **Now available** - Public beta, ready for testing
 - **Stage 1**: ✅ **Now available** - Public beta, ready for testing
 - **Stage 2**: 🔨 **Code available** - Builds the monthly panel from your Stage 1 output; the first published data vintage is still to come
-- **Stage 3**: 🔨 **Code available** - Turns that monthly panel into portfolio sorts, uncertainty grids and the paper's 32 tables and 11 figures
+- **Stage 3**: 🔨 **Code available** - Turns that monthly panel into portfolio sorts, uncertainty grids and the paper's 33 tables and 11 figures
 
 **This project is under active development and any feedback is greatly appreciated.**
 Please reach out to `alexander.dickerson1@unsw.edu.au` if you would like to collaborate.

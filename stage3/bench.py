@@ -47,6 +47,31 @@ def _git_sha() -> str | None:
         return None
 
 
+def _portable_text(msg: str) -> str:
+    """Strip this machine out of a message before it is written to the ledger.
+
+    ❗Several drivers abort with a message naming the file they could not find, and
+    that file is named absolutely so the operator can go and look at it. Useful on the
+    console; not in `reports/timings.jsonl`, which ships. This rewrites any path under
+    the pipeline to a repo-relative one -- the same rule `drrlib.portable` applies to
+    manifests -- and leaves the message otherwise intact.
+
+    Found by the purge gate, which is the second leak of this kind it has caught: the
+    first was `reports/*.log`, 15 lines of home directory in a shipped artifact.
+    """
+    import re
+
+    import paths
+    out = msg
+    for base in (paths.PIPELINE, paths.STAGE3):
+        b = str(Path(base).resolve())
+        for form in (b, b.replace("\\", "/")):
+            out = out.replace(form + "\\", "").replace(form + "/", "")
+            out = out.replace(form, "")
+    # anything still absolute belongs to another machine's tree: keep the filename only
+    return re.sub(r"[A-Za-z]:[\\/][^\s\"\']*[\\/]([^\\/\s\"\']+)", r"\1", out)
+
+
 class Bench:
     """One timed run. Use as a context manager; the ledger line is written on exit."""
 
@@ -90,7 +115,8 @@ class Bench:
             "wall_s": wall,
             "phases": {k: round(v, 3) for k, v in self.phases.items()},
             "notes": self.notes,
-            "failed": None if exc is None else f"{exc_type.__name__}: {exc}",
+            "failed": None if exc is None else _portable_text(
+                f"{exc_type.__name__}: {exc}"),
             "git": _git_sha(),
             "python": sys.version.split()[0],
             "platform": platform.platform(),

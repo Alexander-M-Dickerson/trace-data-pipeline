@@ -69,6 +69,25 @@ the same PDF had been computed to 2025-11 and printed a 2025 row.
   section reports risk groups and the other beta groups -- so it passed while its own
   failure message described something that was not happening. It now pins the partition.
 
+### Measured again
+
+A cold run on 2026-09-12, all 40 steps, `data/` and `reports/` wiped first, 24 cores /
+128 GB with the fast kernels: **906 s (15.1 minutes)** -- Section 5 472 s (55%),
+Section 3 242 s, the zoo 62 s, the data appendix 60 s, Section 4 21 s; 856 s of that
+benched. Inputs 3.9 GB, outputs 395 MB (279 MB of it the two grids), peak 0.7 GB per
+grid worker. 33 tables, 11 figures, a 0.8 MB PDF.
+
+Longer than the 833 s recorded at 3.2.0 for two reasons, both real work rather than a
+regression: the exhibits now run to the panel's frontier rather than to 2024-12, and
+that 833 s run reached only step 27 of 40. It also exits non-zero, and should --
+`s3_nse/t06_mua_nse.py`'s twin-invariance check is red while the sort engine's
+unstable empty cell is open, and a failed exhibit no longer abandons the run.
+
+The **120 filters** in `run_dua_grid.py`'s own docstring were a leftover from before
+the filter count was corrected to 108; measured on the grid, 109 distinct
+`filter_config` values = 108 filters plus the baseline. Several other numbers in code
+comments and docs were re-derived the same way.
+
 ### Removed
 
 - Dead code, each checked for callers first: `mua_engines.run_slow` and its three

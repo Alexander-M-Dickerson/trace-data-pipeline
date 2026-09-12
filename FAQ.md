@@ -756,7 +756,7 @@ Stage 3 is what the data was built for, and it is **optional**: Stages 0-2 build
 panel, and the panel is useful on its own.
 
 It turns the Stage-2 monthly panel into portfolio sorts, two uncertainty grids, and
-**32 table files and 11 figures** reproducing *The Corporate Bond Factor Replication
+**33 table files and 11 figures** reproducing *The Corporate Bond Factor Replication
 Crisis* -- main text, appendix and Internet Appendix -- ending in a single compiled
 `stage3/reports/exhibits.pdf`. Twenty-eight of the tables are the paper's; the other four
 are Stage 3's own.

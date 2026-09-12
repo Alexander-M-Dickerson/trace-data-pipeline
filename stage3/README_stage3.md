@@ -4,9 +4,15 @@ Stage 3 sits on top of the Stage-2 monthly bond panel and reproduces the exhibit
 *The Corporate Bond Factor Replication Crisis* (Dickerson, Robotti and Rossetti) — main
 text, appendix and Internet Appendix.
 
-It writes **32 table files and 11 figures**. Twenty-eight of the tables are the paper's;
-the other four are Stage 3's own — two alternate variants where the paper disagrees with
-itself (see below) and the two uncaptioned inline count blocks from Section IA.3.
+It writes **33 table files and 11 figures**. Twenty-nine of the tables are the
+paper's; the other four are Stage 3's own — two alternate variants where the paper
+disagrees with itself (see below) and the two uncaptioned inline count blocks from
+Section IA.3.
+
+A run produces one variant of each window-dependent exhibit — Tables 5, 6, IA.XVII,
+IA.XVIII and IA.XIX exist as `_full` or `_paper` depending on `--sample` — so
+`reports/tables/` holds 33 files after any single run, and 38 if you have run both
+windows.
 
 It runs on your own computer, like Stage 2. It needs no WRDS connection.
 
@@ -128,16 +134,17 @@ implementation bias the paper is about.
 **skipped when its output already exists**, so re-running after a crash resumes rather
 than restarting; `--force` recomputes.
 
-Measured on the cold run of 2026-09-11, 24 cores with the kernels:
+Measured on the cold run of 2026-09-12, 24 cores with the kernels:
 
 | section | producer | cost |
 |---|---|---|
-| `lib` | the three approaches, all bonds and both rating splits | 25–28 s each |
-| `lib` | the 108-signal month-end/month-begin sorts, x4 | 27–28 s each |
-| `lab` | the winsorization sweep, 2 tails x 3 ratings | 19 s |
-| `nse` | the **MUA grid** — 108 signals x 216 method choices | 142 s |
-| `nse` | the **DUA grid** — 108 signals x 108 filters x 3 ratings | 241 s, then 32 s for its statistics |
-| `zoo` | all 108 signals, single and within-firm | 49 s |
+| `lib` | the three approaches, all bonds and both rating splits | 24–29 s each |
+| `lib` | the 108-signal month-end/month-begin sorts, x4 | 30–36 s each |
+| `lab` | the winsorization sweep, 2 tails x 3 ratings | 20 s |
+| `nse` | the **MUA grid** — 108 signals x 216 method choices | 158 s |
+| `nse` | the **status ledger** — one row per grid cell, read by every Section-5 denominator | 13 s |
+| `nse` | the **DUA grid** — 108 signals x 108 filters x 3 ratings | 264 s, then 33 s for its statistics |
+| `zoo` | all 108 signals, single and within-firm | 56 s |
 
 **Exhibits** read those series and render. Seconds each, always re-rendered. The final
 step compiles them all into one PDF.
@@ -221,24 +228,26 @@ drops that row so Table 3 prints 15 and the two tables agree.
 
 ## What it costs
 
-Measured on a **cold run** — `data/` and `reports/` wiped first — on 24 cores / 128 GB, Windows, with a PyBondLab build carrying the fast kernels, 2026-09-11:
+Measured on a **cold run** — `data/` and `reports/` wiped first — on 24 cores / 128 GB, Windows, with a PyBondLab build carrying the fast kernels, 2026-09-12. All 40 steps ran; none was skipped.
 
-**833 s = 13.9 minutes** end to end, `tools/check_inputs.py` through `reports/exhibits.pdf`.
+**906 s = 15.1 minutes** end to end, `tools/check_inputs.py` through `reports/exhibits.pdf`.
 
 | section | `--section` | wall | share |
 |---|---|---|---|
-| Section 5 -- the two uncertainty grids | `nse` | 438 s | 56% |
-| Section 3 -- latent implementation bias | `lib` | 215 s | 27% |
-| data appendix | `data` | 57 s | 7% |
-| the factor zoo | `zoo` | 55 s | 7% |
-| Section 4 -- look-ahead bias | `lab` | 23 s | 3% |
+| Section 5 -- the two uncertainty grids | `nse` | 472 s | 55% |
+| Section 3 -- latent implementation bias | `lib` | 242 s | 28% |
+| the factor zoo | `zoo` | 62 s | 7% |
+| data appendix | `data` | 60 s | 7% |
+| Section 4 -- look-ahead bias | `lab` | 21 s | 2% |
 
-Those are the benched steps (787 s of the 833 s); the rest is process start-up, the 40 subprocess launches and the LaTeX compile. `reports/timings.jsonl` carries one line per step, and the run prints its own five slowest at the end.
+Those are the benched steps (856 s of the 906 s); the rest is process start-up, the 40 subprocess launches and the LaTeX compile. `reports/timings.jsonl` carries one line per step, and the run prints its own five slowest at the end.
+
+The run **exits non-zero**, and should: `s3_nse/t06_mua_nse.py`'s twin-invariance check is red while the sort engine's unstable empty cell is open. Every other step passed, and the PDF was produced -- a failed exhibit does not abandon the run.
 
 ### Disk and memory
 
 - **Inputs**: 3.9 GB, of which the Stage-1 daily panel is most. They are read, never copied.
-- **Outputs**: about 348 MB under `data/` and `reports/` together. Both are gitignored.
+- **Outputs**: about **400 MB** under `data/` and `reports/` together, almost all of it the two uncertainty grids (`data/grids/` is 279 MB of the 395 MB measured on the 2026-09-12 cold run; `reports/` is 1.4 MB). Both are gitignored.
 - **Peak per grid worker**: 0.7 GB, recorded by the grid itself as `max_worker_rss_gb` (needs `psutil`, which `requirements.txt` installs). The grids are bounded by cores, not by memory.
 
 ### If your machine is smaller

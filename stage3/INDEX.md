@@ -32,8 +32,8 @@ Shared code sits at the top level: `drrlib.py` (statistics, sample provenance, r
 | Table 2 | `tab:mmn_2` | `s1_lib/t02_validation.py` | 2002-09 to 2025-11, T=279 | `table02` |
 | Table 3 | `tab:lab_affected_factors` | `s2_lab/t03_affected.py` | -- | `table03` |
 | Table 4 | `tab:lab_ls_1` | `s2_lab/t04_table4.py` | 2002-08 to 2025-11, T 268-279 by series | `table04` |
-| Table 5 ⚠ not produced | -- | `s3_nse/t05_dua_nse.py` | -- | `table05 (x2)` |
-| Table 6 ⚠ not produced | -- | `s3_nse/t06_mua_nse.py` | -- | `table06 (x2)` |
+| Table 5 | `tab:nse_by_cluster` | `s3_nse/t05_dua_nse.py` | 2002-09 to 2025-11; 69,984 filter paths | `table05 (x2)` |
+| Table 6 | `tab:mu_nse_by_cluster` | `s3_nse/t06_mua_nse.py` | 2002-09 to 2025-11; 18,026 construction paths | `table06 (x2)` |
 | Figure 3 | -- | `s1_lib/f_lib_figures.py` | 2002-09 to 2025-11 | `fig03_cumret` |
 | Figure 4 | -- | `s1_lib/f_lib_figures.py` | 2002-09 to 2025-11 | `fig04_bias` |
 | Figure 6 | -- | `s2_lab/f06_dua.py` | 2002-09 to 2025-11, T=279 | `fig06_momentum_trim` |
@@ -46,6 +46,8 @@ Shared code sits at the top level: `drrlib.py` (statistics, sample provenance, r
 - **Table 2** -- Latent implementation bias validation for price-based factors.
 - **Table 3** -- Corporate bond factors sensitive to ex-post return filtering.
 - **Table 4** -- Look-ahead bias by factor.
+- **Table 5** -- Non-standard errors and data uncertainty by factor cluster.
+- **Table 6** -- Non-standard errors and methodological uncertainty by factor cluster.
 
 </details>
 
@@ -90,27 +92,27 @@ Shared code sits at the top level: `drrlib.py` (statistics, sample provenance, r
 | Table IA.V | `tab:extreme_returns` | `s0_data/t_ia_monthly.py` | 2002-08 to 2025-11 | `table_ia5` |
 | Table IA.VI | `tab:time_concentration_extremes` | `s0_data/t_ia_monthly.py` | 2002-08 to 2025-11 | `table_ia6` |
 | Table IA.VII | `tab:annual_return_stats` | `s0_data/t_ia_monthly.py` | 2002-08 to 2025-11 | `table_ia7` |
-| Table IA.VIII ⚠ not produced | -- | `s4_zoo/t_ia08.py` | -- | `table_ia08` |
-| Table IA.IX ⚠ not produced | -- | `s4_zoo/t_ia09.py` | -- | `table_ia09` |
-| Table IA.IX (by the signal dictionary) ⚠ not produced | -- | `s4_zoo/t_ia09.py` | -- | `table_ia09_dictionary` |
-| Table IA.X ⚠ not produced | -- | `s4_zoo/t_ia10_11.py` | -- | `table_ia10` |
-| Table IA.XI ⚠ not produced | -- | `s4_zoo/t_ia10_11.py` | -- | `table_ia11` |
+| Table IA.VIII | `tab:signal_definitions` | `s4_zoo/t_ia08.py` | -- | `table_ia08` |
+| Table IA.IX | `tab:fdr_by_cluster` | `s4_zoo/t_ia09.py` | 2002-08 to 2025-11 | `table_ia09` |
+| Table IA.IX (by the signal dictionary) | `tab:fdr_by_cluster` | `s4_zoo/t_ia09.py` | 2002-08 to 2025-11 | `table_ia09_dictionary` |
+| Table IA.X | `tab:vw_results` | `s4_zoo/t_ia10_11.py` | 2002-08 to 2025-11 | `table_ia10` |
+| Table IA.XI | `tab:ew_results` | `s4_zoo/t_ia10_11.py` | 2002-08 to 2025-11 | `table_ia11` |
 | Table IA.XII | `tab:mmn_app_1` | `s1_lib/t12_rating_single.py` | 2002-09 to 2025-11, T=279 | `table12` |
 | Table IA.XIII | `tab:mmn_app_2` | `s1_lib/t13_rating_wf.py` | 2002-09 to 2025-11, T=279 | `table13` |
 | Table IA.XIV | `tab:illiq_1` | `s1_lib/t14_illiq.py` | 2002-09 to 2025-11, T=279 | `table14` |
 | Table IA.XV | `tab:lab_full_mean_8` | `s2_lab/t15_decomp.py` | 2002-08 to 2025-11, T 268-279 by series | `table15` |
 | Table IA.XVI | `tab:lab_full_alpha_9` | `s2_lab/t15_decomp.py` | 2002-08 to 2025-11, T 268-279 by series | `table16` |
-| Table IA.XVII ⚠ not produced | -- | `s3_nse/t17_filter_paths.py` | -- | `table_ia17 (x2)` |
-| Table IA.XVIII ⚠ not produced | -- | `s3_nse/t18_portfolio_size.py` | -- | `table_ia18 (x2)` |
-| Table IA.XIX ⚠ not produced | -- | `s3_nse/t19_mua_improvement.py` | -- | `table_ia19 (x2)` |
-| Inline counts (alpha) ⚠ not produced | -- | `s4_zoo/t_inline.py` | -- | `inline_counts_alpha` |
-| Inline counts (premium) ⚠ not produced | -- | `s4_zoo/t_inline.py` | -- | `inline_counts_premium` |
+| Table IA.XVII | `tab:filter_paths` | `s3_nse/t17_filter_paths.py` | 2002-09 to 2025-11; 69,984 filter paths | `table_ia17 (x2)` |
+| Table IA.XVIII | `tab:mua_portfolio_size` | `s3_nse/t18_portfolio_size.py` | 2002-09 to 2025-11; 18,026 strategies | `table_ia18 (x2)` |
+| Table IA.XIX | `tab:mua_improvement` | `s3_nse/t19_mua_improvement.py` | 2002-09 to 2025-11; 18,026 construction paths | `table_ia19 (x2)` |
+| Inline counts (alpha) | -- | `s4_zoo/t_inline.py` | 2002-08 to 2025-11 | `inline_counts_alpha` |
+| Inline counts (premium) | -- | `s4_zoo/t_inline.py` | 2002-08 to 2025-11 | `inline_counts_premium` |
 | Figure IA.1 | -- | `s1_lib/f_lib_figures.py` | 2002-09 to 2025-11 | `figIA1_bias_by_rating` |
 | Figure IA.2 | -- | `s2_lab/f_lab_figures.py` | 2002-08 to 2025-11 | `figIA2_lab_decomposition_rating` |
-| Figure IA.3 ⚠ not produced | -- | `s3_nse/f_nse_figures.py` | -- | `figIA3_nse_alpha_tstat_dua (x2)` |
-| Figure IA.4 ⚠ not produced | -- | `s3_nse/f_nse_figures.py` | -- | `figIA4_nse_tstat_dua (x2)` |
-| Figure IA.5 ⚠ not produced | -- | `s3_nse/f_nse_figures.py` | -- | `figIA5_nse_alpha_tstat_mua (x2)` |
-| Figure IA.6 ⚠ not produced | -- | `s3_nse/f_nse_figures.py` | -- | `figIA6_nse_tstat_mua (x2)` |
+| Figure IA.3 | -- | `s3_nse/f_nse_figures.py` | 2002-09 to 2025-11 | `figIA3_nse_alpha_tstat_dua (x2)` |
+| Figure IA.4 | -- | `s3_nse/f_nse_figures.py` | 2002-09 to 2025-11 | `figIA4_nse_tstat_dua (x2)` |
+| Figure IA.5 | -- | `s3_nse/f_nse_figures.py` | 2002-09 to 2025-11 | `figIA5_nse_alpha_tstat_mua (x2)` |
+| Figure IA.6 | -- | `s3_nse/f_nse_figures.py` | 2002-09 to 2025-11 | `figIA6_nse_tstat_mua (x2)` |
 
 <details><summary>caption titles</summary>
 
@@ -121,11 +123,19 @@ Shared code sits at the top level: `drrlib.py` (statistics, sample provenance, r
 - **Table IA.V** -- Extreme Returns Analysis.
 - **Table IA.VI** -- Time Concentration of Extreme Returns.
 - **Table IA.VII** -- Annual Return Summary Statistics.
+- **Table IA.VIII** -- Signal Definitions and Citations.
+- **Table IA.IX** -- FDR survivors by factor cluster.
+- **Table IA.IX (by the signal dictionary)** -- FDR survivors by factor cluster.
+- **Table IA.X** -- Factors with significant alphas after bias correction (value-weighted).
+- **Table IA.XI** -- Factors with significant alphas after bias correction (equal-weighted).
 - **Table IA.XII** -- Latent implementation bias in price-based factors (value-weighted, single-sort).
 - **Table IA.XIII** -- Latent implementation bias in price-based factors (value-weighted, within-firm).
 - **Table IA.XIV** -- Latent implementation bias in illiquidity factors.
 - **Table IA.XV** -- Look-ahead bias decomposition by leg (mean return).
 - **Table IA.XVI** -- Look-ahead bias decomposition by leg (CAPMB alpha).
+- **Table IA.XVII** -- Filter path improvement analysis by factor cluster, filter type, and tail location.
+- **Table IA.XVIII** -- Cross-sectional portfolio size by design dimension.
+- **Table IA.XIX** -- Portfolio construction improvement analysis by factor cluster and methodology dimension.
 
 </details>
 

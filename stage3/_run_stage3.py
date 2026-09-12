@@ -207,6 +207,19 @@ def window_is_stale(script: str, want_end: str) -> bool:
     series it was given rather than the one that was requested.
     """
     import json
+
+    # The MUA summarizer writes one ledger PER WINDOW and its completion marker says
+    # nothing about which. Run `--sample frontier`, then `--sample paper`: the marker
+    # exists, the step is skipped, and every Section-5 exhibit then aborts with "the
+    # MUA summary is not at ...". Same failure as Section 4's, different mechanism --
+    # so the same rule, checking for the artifact this run will actually read.
+    if script == "s3_nse/mua_summarize.py":
+        import drrlib as _D
+        want = ("paper" if str(want_end)[:10] == _D.SAMPLE_END_PAPER[:10]
+                else "full")
+        led = _target(f"data/s3_nse/mua_summary/mua_status_{want}.parquet")
+        return not led.exists()
+
     if script != "s2_lab/run_lab.py":
         return False
     man = _target("data/s2_lab/series/manifest.json")
@@ -399,7 +412,8 @@ def main() -> int:
             skipped.append(label)
             continue
         if kind == "producer" and window_is_stale(script, sample_end):
-            print(f"[rebuild] {label}  (its series were built for a different window)")
+            print(f"[rebuild] {label}  "
+                  "(what it wrote does not cover the window you asked for)")
         argv = [sys.executable, script, *sargs]
         if use_fast and script in ACCEPTS_FAST:
             argv.append("--fast")
