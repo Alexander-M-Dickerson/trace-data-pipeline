@@ -309,7 +309,21 @@ def main() -> int:
         else:
             failed.append((label, r.returncode))
             print(f"[FAIL] {label}  exit {r.returncode}  {dt:.1f}s\n")
-            if not args.keep_going:
+            # ❗A failed PRODUCER stops the chain: everything downstream reads what it
+            # was supposed to write, so continuing would build exhibits on absent or
+            # stale data. A failed EXHIBIT does not -- each one is independent, and one
+            # red check is no reason to abandon the other thirty-nine steps and the
+            # report. The run still exits non-zero either way.
+            #
+            # This is not hypothetical: `t06_mua_nse.py` is step 27 of 40 and its
+            # twin-invariance check fails on every run while the engine's
+            # restricted-universe cells keep flipping. Stopping there silently skipped
+            # Tables IA.XVII-IA.XIX, the Section-5 figures, the whole zoo and the PDF --
+            # from the command the README calls "everything".
+            if kind == "producer" and not args.keep_going:
+                print("  a producer failed, so everything downstream would read "
+                      "missing or stale data.\n  Stopping. Use --keep-going to "
+                      "override.")
                 break
 
     wall = time.perf_counter() - t0

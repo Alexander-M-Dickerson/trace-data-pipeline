@@ -84,9 +84,14 @@ def main() -> int:
             ours.to_csv(out / f"table06_mu_nse_by_cluster_{args.window}.csv",
                         index=False)
             tex = paths.TABLES / f"table06_{args.window}.tex"
+            # ❗Both exclusions, so the arithmetic closes: the footnote used to
+            # report the empty-leg count alone, and a reader subtracting it from the
+            # 18,144-strategy grid landed 32 short with nothing to explain the gap.
             note = (f"Ratio computed with independent skipna; "
-                    f"{mua.attrs['n_paths']:,} construction paths after dropping "
-                    f"{mua.attrs['n_degenerate']} degenerate strategies; "
+                    f"{mua.attrs['n_paths']:,} construction paths of "
+                    f"{E.GRID_STRATEGIES:,}, after excluding "
+                    f"{mua.attrs['n_degenerate']} with an empty leg and "
+                    f"{mua.attrs['n_no_series']} never formed; "
                     f"{len(flips)} signals sign-corrected.")
             tex.write_text(CT.render_latex(ours, LABEL, note=note), encoding="utf-8")
             D.write_result(

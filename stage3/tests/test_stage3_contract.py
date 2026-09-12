@@ -62,9 +62,16 @@ def _artifacts() -> list[Path]:
     ❗These are gitignored, so they never reach a reviewer through `git diff` -- but they
     are exactly what travels in a zip, on OSF, or in a replication archive. The code
     gates below were blind to them until a leak was found in one.
+
+    ❗EVERYTHING under `reports/`, not just the `.tex`. The narrower glob had a hole
+    exactly where a leak was: pdflatex writes the absolute path of the TeX installation
+    into its transcript, so `exhibits.build.log` carried a home directory while this
+    test passed. A gate that names the right threat and looks in the wrong place is
+    worse than no gate.
     """
     out = list((STAGE3 / "data").rglob("*.json"))
-    out += list((STAGE3 / "reports").glob("*.tex"))
+    out += [p for p in (STAGE3 / "reports").rglob("*")
+            if p.is_file() and p.suffix.lower() not in {".pdf", ".png", ".parquet"}]
     return [p for p in out if p.is_file()]
 
 
@@ -429,3 +436,23 @@ def test_a_failed_check_reaches_the_reader():
     src = (STAGE3 / "make_report.py").read_text(encoding="utf-8")
     assert "def failed_checks(" in src and "Checks that did not pass" in src, (
         "make_report no longer surfaces failed checks on the provenance page")
+
+
+def test_the_table6_footnote_arithmetic_closes():
+    """The one piece of arithmetic a reader can check by eye must be right.
+
+    The footnote used to report the empty-leg exclusions alone, so subtracting it from
+    the 18,144-strategy grid landed 32 short with nothing on the page to explain the
+    gap. Both exclusions are now stated.
+    """
+    f = STAGE3 / "reports" / "tables" / "table06_paper.tex"
+    if not f.exists():
+        pytest.skip("Table 6 not built yet")
+    m = re.search(r"([\d,]+) construction paths of ([\d,]+), after excluding "
+                  r"(\d+) with an empty leg and (\d+) never formed",
+                  f.read_text(encoding="utf-8"))
+    assert m, "Table 6's footnote no longer states its exclusions in a checkable form"
+    kept, grid, empty, never = (int(x.replace(",", "")) for x in m.groups())
+    assert grid - empty - never == kept, (
+        f"the footnote does not close: {grid:,} - {empty} - {never} = "
+        f"{grid - empty - never:,}, but it prints {kept:,}")

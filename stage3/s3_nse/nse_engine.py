@@ -238,6 +238,10 @@ def dua_baseline_values(baselines_df: pd.DataFrame, col: str) -> dict[str, float
 # ---------------------------------------------------------------------------
 MUA_SUMMARY_DIR = paths.DATA / "s3_nse" / "mua_summary"
 
+# 108 signals x 168 economically distinct constructions: the grid every MUA denominator
+# is a subset of. Derived, so a change to the spec grid cannot leave a footnote behind.
+GRID_STRATEGIES = 108 * (216 - 24 - 24)
+
 
 def load_ledger(window: str) -> pd.DataFrame:
     """The status ledger: one row per (signal, spec_id), all 23,328 of them.
@@ -486,6 +490,7 @@ def load_mua_nbonds(twin: str, window: str = "paper") -> pd.DataFrame:
                            labels=["<200", "200-600", ">600"])
     hist = load_ledger(window)["status"].value_counts().astype(int).to_dict()
     ls.attrs.update({"window": window, "n_degenerate": hist.get("empty_leg", 0),
+                     "n_no_series": hist.get("no_series", 0),
                      "n_strategies": len(ls)})
     return ls
 

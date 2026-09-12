@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -351,22 +352,29 @@ INTERMEDIATES = ("aux", "log", "out", "toc", "lof", "lot", "fls", "fdb_latexmk")
 
 def clean() -> int:
     n = 0
-    for ext in INTERMEDIATES:
-        for f in paths.REPORTS.glob(f"exhibits.{ext}"):
+    # ❗`exhibits.build.log` is double-suffixed, so the `exhibits.{ext}` glob never
+    # matched it and `--clean` left the one file that carries absolute paths.
+    for pat in [f"exhibits.{ext}" for ext in INTERMEDIATES] + ["exhibits.build.log"]:
+        for f in paths.REPORTS.glob(pat):
             f.unlink()
             n += 1
     print(f"removed {n} LaTeX intermediate(s)")
     return 0
 
 
-def compile_pdf(tex: Path) -> int:
-    """Two passes: the first writes the table of contents, the second resolves it."""
+def compile_pdf(tex: Path) -> tuple[int, str]:
+    """Two passes: the first writes the table of contents, the second resolves it.
+
+    Returns (exit code, page count). The count is read from pdflatex's own output while
+    it is still in memory -- the transcript on disk is deleted on success, because it
+    carries the absolute path of every font file the TeX installation touched.
+    """
     exe = shutil.which("pdflatex")
     if not exe:
         print("pdflatex is not on PATH -- wrote the .tex but did not compile it.\n"
               "  Install any TeX distribution (MiKTeX, TeX Live, MacTeX) and re-run,\n"
               "  or compile reports/exhibits.tex yourself.")
-        return 2
+        return 2, "?"
     log = tex.with_suffix(".build.log")
     for i in (1, 2):
         print(f"[{i}/2] pdflatex")
@@ -379,8 +387,18 @@ def compile_pdf(tex: Path) -> int:
             tail = [ln for ln in (r.stdout or "").splitlines() if ln.startswith("!")]
             for ln in tail[:10]:
                 print("   " + ln)
-            return 1
-    return 0
+            return 1, "?"
+    # ❗A SUCCESSFUL compile leaves no transcript. pdflatex writes the absolute path of
+    # every font and map file it touches, so the log carries the TeX installation's
+    # location -- a home directory, in a file the docs used to list as a shipped
+    # artifact. It is worth keeping only when the compile FAILED, which is the one time
+    # anybody reads it; on success it is a leak with no reader.
+    m = re.search(r"Output written on .*?\((\d+) pages", (r.stdout or ""))
+    pages = m.group(1) if m else "?"
+    for f in (log, tex.with_suffix(".log")):
+        if f.exists():
+            f.unlink()
+    return 0, pages
 
 
 def main() -> int:
@@ -412,19 +430,11 @@ def main() -> int:
         # not mean "missing exhibits are fine". Returning 0 here made the assembly step
         # of run_stage3.sh green on an incomplete document.
         return 0 if not missing else 1
-    rc = compile_pdf(tex)
+    rc, pages = compile_pdf(tex)
     if rc:
         return rc
 
     pdf = tex.with_suffix(".pdf")
-    pages = "?"
-    aux = tex.with_suffix(".log")
-    if aux.exists():
-        import re
-        m = re.search(r"Output written on .*?\((\d+) pages", aux.read_text(
-            encoding="utf-8", errors="replace"))
-        if m:
-            pages = m.group(1)
     print(f"\nOK   {pdf}")
     print(f"     {pages} pages, {pdf.stat().st_size / 1e6:.1f} MB, "
           f"{time.perf_counter() - t0:.1f}s")

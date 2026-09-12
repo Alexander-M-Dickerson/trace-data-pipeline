@@ -131,8 +131,9 @@ def main() -> int:
                      f"({sums})")
 
     print(f"\nTable IA.XVIII ({LABEL}), window={args.window}: "
-          f"{ls.attrs['n_strategies']:,} strategies, "
-          f"{ls.attrs['n_degenerate']} degenerate excluded")
+          f"{ls.attrs['n_strategies']:,} strategies of {E.GRID_STRATEGIES:,}, "
+          f"{ls.attrs['n_degenerate']} with an empty leg and "
+          f"{ls.attrs['n_no_series']} never formed, excluded")
     print(ours[["row", "avg", "med", "min", "pct_low", "n_spec"]]
           .round(1).to_string(index=False))
     print(f"\nwrote {tex}")
