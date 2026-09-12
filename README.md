@@ -283,6 +283,9 @@ This runs the real Stage 0 → Stage 1 code on a handful of CUSIP chunks and ass
 - **[Stage 3 README](stage3/README_stage3.md)**: What it produces, the five inputs, and the conventions that decide what a number means
 - **[Stage 3 Quickstart](stage3/QUICKSTART_stage3.md)**: A minimal run, and what to do when a step complains
 - **[Stage 3 Data Dictionary](stage3/DATA_DICTIONARY.md)**: Every artifact and column
+- **[Stage 3 Exhibit Index](stage3/INDEX.md)**: Every table and figure the report prints,
+  mapped to the file that produces it, its LaTeX label and the sample it states.
+  Generated, and gated so it cannot go stale
 
 **Stage 2 - Monthly Panel:**
 - **[Stage 2 README](stage2/README_stage2.md)**: What it builds and how to run it
@@ -439,9 +442,13 @@ trace-data-pipeline/
     ├── s3_nse/                       # The paper's Section 5 - non-standard errors
     ├── s4_zoo/                       # The factor zoo
     ├── spec/inputs.json              # The five-file input contract
-    ├── tools/check_inputs.py         # Enforces it
-    ├── tests/                        # Contract, purge and structure gates
+    ├── spec/signal_definitions.json  # What each of the 140 panel columns MEANS
+    ├── tools/check_inputs.py         # Enforces the input contract
+    ├── tools/build_index.py          # Generates INDEX.md; --check gates it
+    ├── tests/                        # Contract, purge, provenance and index gates
+    ├── INDEX.md                      # Every exhibit -> its driver, label and sample
     ├── README_stage3.md  QUICKSTART_stage3.md  DATA_DICTIONARY.md
+    ├── RECONCILIATION_ia08.md        # Table IA.VIII vs Stage 2 vs the code
     └── data/  reports/               # Gitignored build artifacts
 ```
 

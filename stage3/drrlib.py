@@ -16,10 +16,15 @@ House conventions encoded here, each one asserted against the data:
   * a factor mnemonic ending in "*" is PyBondLab sign-corrected. The paper prints the
     UNFLIPPED sign, so `strip_sign_flag` returns the sign to undo it. Getting this
     wrong is silent and plausible-looking. ❗How many factors it touches depends on
-    the file -- two of the seven in the three-approach CSVs, around forty-five of the
-    108 in the wide ones -- because the flip set is decided on the sample that was
-    sorted. It is a property of the run, not a constant.
-  * the LIB sample is 2002-09-30..2024-12-31, T = 268. Asserted, never assumed.
+    the file -- two of the seven in the three-approach CSVs, 41 of the 108 in the wide
+    ones on this build -- because the flip set is decided on the sample that was
+    sorted. It is a property of the run, not a constant: `t06_mua_nse.py` records it
+    as `n_signals_flipped` in `reports/timings.jsonl` every run, so read it there
+    rather than trusting this sentence.
+  * the LIB sample under `--sample paper` is 2002-09-30..2024-12-31, T = 268,
+    asserted and never assumed. Under `--sample frontier` (the default) it runs
+    to whatever the Stage-2 panel reaches and T follows; every caption states
+    which of the two produced it.
 """
 from __future__ import annotations
 

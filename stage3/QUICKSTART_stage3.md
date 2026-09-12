@@ -129,10 +129,29 @@ are 56% of it. See **What it costs** in
 [README_stage3.md](README_stage3.md) for the per-section split, the disk and memory
 figures, and what to lower first on a smaller machine.
 
+### Which sample
+
+By default the exhibits run to **whatever month your Stage-2 panel reaches**. To
+reproduce the published window instead:
+
+```bash
+python _run_stage3.py --sample paper      # 2002-09 to 2024-12, T = 268
+```
+
+Every caption states which one produced it, so a PDF is never ambiguous about its own
+sample. One switch fans out to each section's own flag, so running a driver by hand is
+unchanged.
+
+### Resuming, forcing, and what a failure does
+
 A producer whose output already exists is **skipped**, so if a run stops you can simply
-run it again and it resumes. `--force` recomputes from scratch. `--keep-going` runs the
-rest of the steps after a failure instead of stopping, which is what you want when you
-are trying to see everything that is broken at once.
+run it again and it resumes. `--force` recomputes from scratch.
+
+A failed **exhibit** does not abandon the run: the remaining steps still run and the PDF
+is still produced, and the run exits non-zero so the failure is not lost. A failed
+**producer** stops the chain, because everything downstream of it would read missing or
+stale data -- `--keep-going` overrides that too, when you want to see everything that is
+broken at once.
 
 ## 5. Read the results
 
@@ -144,8 +163,15 @@ reports/timings.jsonl   one line per run: phases, wall clock, and its own check
 ```
 
 Each run prints a `PASS` or `FAIL` line saying what it checked — every printed cell
-populated, a grid complete, a figure agreeing with its own table. A `FAIL` sets the exit
-code, so `run_stage3.sh` stops on it.
+populated, a grid complete, a figure agreeing with its own table. Those lines are the
+run's own audit and they are collected in `reports/timings.jsonl`; `make_report.py`
+prints any that failed on the PDF's title page, so a red check cannot leave the document
+silently.
+
+❗One check is **red by design** on this build: `t06_mua_nse.py`'s twin-invariance check
+fails whenever the sort engine's unstable empty cell bites (see *What is not
+reproducible* in README_stage3.md). The run continues, the PDF is produced, and the exit
+code is non-zero. That is the intended behaviour, not a broken install.
 
 ---
 

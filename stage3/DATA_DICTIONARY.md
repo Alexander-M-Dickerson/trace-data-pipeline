@@ -116,8 +116,9 @@ it is presence that moves, and with it every count Section 5 prints.
 `s3_nse/run_mua_grid.py` measures this every run as `n_unstable_empty_cells` in its manifest.
 `mua_summarize` reindexes onto the full 216 -- derived from `mua_engines.all_spec_ids()`,
 not typed out -- so the SUMMARY is a rectangle regardless. An empty cell arrives there
-with `n_obs = 0` and no statistics, and `nse_engine._degenerates` excludes it. See
-README_stage3.md for what is fixed here and what is not.
+with `n_obs = 0` and no statistics, and the status ledger classifies it `no_series`
+so `nse_engine.usable()` leaves it out. See README_stage3.md for what is fixed here and
+what is not.
 
 ### Data uncertainty — `data/grids/dua/series/<rating>/<signal>.parquet`
 
@@ -175,6 +176,29 @@ x108  signals
 -16   degenerate       "produce months with empty long or short legs"
 =18,128  well-defined factor return series
 ```
+
+**Stage 3's own ladder ends lower, and the difference is the point of the ledger:**
+
+```
+18,144  factor return series            (the same 168 x 108)
+-80     empty_leg    a leg empty in some month inside the signal's coverage
+-32     no_series    no portfolio was ever formed -- no month has a return
+=18,032  well-defined factor return series
+```
+
+Two differences from the paper's 18,128, both measured on this build:
+
+* **80 rather than 16 `empty_leg`.** The paper's 16 are the ones its own long leg
+  realises; the upstream engine's long-leg rule misses others. Our 80 is a superset
+  containing all 16.
+* **32 `no_series`, a category the paper does not have.** Its rule is about a leg being
+  empty in some month, which presupposes a series; a construction that never formed a
+  portfolio at all cannot be a well-defined factor return series either, so it is
+  excluded here and named separately rather than folded into the same word.
+
+Both numbers move when the engine's restricted-universe instability bites, which is why
+every exhibit reads them from the ledger rather than from a constant. Table 6's footnote
+prints both exclusions so the subtraction closes on the page.
 
 Before this ledger, Stage 3 arrived at that answer three different ways and got three
 different numbers — Table 6 printed 18,064, Table IA.XVIII printed 18,038 for the same

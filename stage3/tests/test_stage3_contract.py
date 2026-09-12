@@ -676,3 +676,60 @@ def test_corrected_definition_rows_say_what_was_printed_and_why():
             f"{r['mnemonic']}: corrected without recording what the paper prints")
         assert len(r["why_corrected"]) > 80, (
             f"{r['mnemonic']}: the reason is too short to be a reason")
+
+
+def _declared_flags(script: str) -> set:
+    """Every long option a driver declares, read from its own `add_argument` calls."""
+    import ast
+    src = (STAGE3 / script).read_text(encoding="utf-8")
+    out = set()
+    for node in ast.walk(ast.parse(src)):
+        if (isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "add_argument"):
+            for a in node.args:
+                if isinstance(a, ast.Constant) and str(a.value).startswith("--"):
+                    out.add(a.value)
+    return out
+
+
+def test_the_orchestrator_only_passes_flags_that_exist():
+    """A flag the orchestrator adds must be one the driver accepts.
+
+    The defect this catches, found by a cold run on 2026-09-12: `--window full` was
+    being passed to `s3_nse/run_dua_grid.py`, which has no such flag -- it computes
+    BOTH windows in one pass. Every run had passed anyway, because that producer was
+    always SKIPPED: its `_complete.json` existed, so the argv was never built. The
+    first run that actually had to produce the grid died with argparse exit 2, and
+    the whole chain stopped behind it.
+
+    Static, so it does not need the flag to be reached.
+    """
+    sys.path.insert(0, str(STAGE3))
+    import _run_stage3 as R
+
+    bad = []
+    for script, flag in R.SAMPLE_FLAG.items():
+        if flag and flag not in _declared_flags(script):
+            bad.append(f"{script} has no {flag}")
+    for script, flag in R.TAKES_WINDOW.items():
+        if flag not in _declared_flags(script):
+            bad.append(f"{script} has no {flag}")
+    for script in R.ACCEPTS_FAST:
+        if "--fast" not in _declared_flags(script):
+            bad.append(f"{script} has no --fast")
+    for script in R.ACCEPTS_FORCE:
+        if "--force" not in _declared_flags(script):
+            bad.append(f"{script} has no --force")
+    assert not bad, "the orchestrator would pass a flag that does not exist: " + \
+        "; ".join(bad)
+
+
+def test_every_step_names_a_script_that_exists():
+    """A renamed driver must fail here, not 20 minutes into a run."""
+    sys.path.insert(0, str(STAGE3))
+    import _run_stage3 as R
+
+    missing = sorted({script for _s, _k, script, _a, _t in R.STEPS
+                      if not (STAGE3 / script).exists()})
+    assert not missing, "steps naming a file that is not there: " + ", ".join(missing)

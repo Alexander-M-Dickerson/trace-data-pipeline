@@ -171,11 +171,26 @@ SAMPLE_FLAG = {
 }
 # Section 5 and the report name a WINDOW rather than a date.
 WINDOW_FLAG = {"paper": "paper", "frontier": "full"}
-TAKES_WINDOW = {"s3_nse/mua_summarize.py", "s3_nse/run_dua_grid.py",
-                "s3_nse/t05_dua_nse.py", "s3_nse/t06_mua_nse.py",
-                "s3_nse/t17_filter_paths.py", "s3_nse/t18_portfolio_size.py",
-                "s3_nse/t19_mua_improvement.py", "s3_nse/f_nse_figures.py",
-                "make_report.py"}
+
+# The flag each script spells it with. ❗Two things this table fixes:
+#
+#   * `run_dua_grid.py` is NOT here. It computes BOTH windows in one pass from the
+#     saved series and has no window flag at all. It WAS listed, and every run passed
+#     anyway because that producer was always skipped -- its `_complete.json` existed,
+#     so the argv was never built. The first cold run that had to produce the grid
+#     died on argparse exit 2 and stopped the whole chain behind it.
+#   * `mua_summarize.py` spells it `--windows`, plural, because it takes a list. The
+#     orchestrator passed `--window` and it worked -- by argparse PREFIX MATCHING,
+#     which would stop the day a second `--window...` option is added. Named
+#     explicitly now rather than left to luck.
+TAKES_WINDOW = {"s3_nse/mua_summarize.py": "--windows",
+                "s3_nse/t05_dua_nse.py": "--window",
+                "s3_nse/t06_mua_nse.py": "--window",
+                "s3_nse/t17_filter_paths.py": "--window",
+                "s3_nse/t18_portfolio_size.py": "--window",
+                "s3_nse/t19_mua_improvement.py": "--window",
+                "s3_nse/f_nse_figures.py": "--window",
+                "make_report.py": "--window"}
 
 def window_is_stale(script: str, want_end: str) -> bool:
     """Was this producer's output built for a DIFFERENT sample window?
@@ -393,8 +408,9 @@ def main() -> int:
         flag = SAMPLE_FLAG.get(script)
         if flag and not any(a == flag for a in sargs):
             argv += [flag, sample_end]
-        elif script in TAKES_WINDOW and not any(a == "--window" for a in sargs):
-            argv += ["--window", WINDOW_FLAG[args.sample]]
+        elif script in TAKES_WINDOW and not any(a.startswith("--window")
+                                                for a in sargs):
+            argv += [TAKES_WINDOW[script], WINDOW_FLAG[args.sample]]
         extra = [a for a in argv[2 + len(sargs):]]
         print(f"[run ] {label}" + (f"  ({' '.join(extra)})" if extra else ""))
         t = time.perf_counter()

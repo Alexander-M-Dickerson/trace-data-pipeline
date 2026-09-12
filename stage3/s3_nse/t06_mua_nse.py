@@ -57,8 +57,12 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--window", choices=("paper", "full"), default="paper")
     ap.add_argument("--twin", choices=("mar14", "feb"), default="feb",
-                    help="which member of the redundant twin pair to keep; a LABEL "
-                         "choice that cannot move a cell, asserted each run")
+                    help="which member of the redundant twin pair to keep. It is a "
+                         "LABEL choice, so it should move no cell -- and the run "
+                         "asserts that. It stops being one when the engine forms one "
+                         "member and not the other: the conventions then select "
+                         "different data and the check fails, which is the point of "
+                         "it. See --twin in README_stage3.md.")
     ap.add_argument("--no-bench", action="store_true")
     args = ap.parse_args()
 

@@ -228,16 +228,20 @@ def main() -> int:
         # computed: a re-run over a finished grid must still report the grid as
         # complete, and a truncated file must not count as present.
         present = [s for s in signals if readable(d / f"{s}.parquet")]
-        # The grid is RAGGED and that is not a defect: `assay_anomaly_fast` is handed
-        # `skip_invalid=True`, so a (rating x maturity) cell with nothing to sort is
-        # dropped rather than returned empty, and which cells those are depends on the
-        # whole sample that was sorted. `mua_summarize` reindexes onto the full 216
-        # afterwards. So this REPORTS the raggedness rather than failing on it -- but a
-        # signal that came back with less than half a grid means something else is wrong.
+        # ❗The grid should be a RECTANGLE, and is: `assay_anomaly_fast` is handed
+        # `skip_invalid=False`, so it returns all 216 columns for every signal and hands
+        # back an all-NaN column where it cannot form a portfolio. Measured on the grid
+        # on disk: 108 of 108 signals carry exactly 216 specs.
+        #
+        # This check survives from when the flag was True and the engine DROPPED
+        # unformable cells, which made the column set depend on the sample and differ
+        # run to run. It is kept as the guard for that regression: if the flag or the
+        # engine changes back, a signal comes up short here rather than silently
+        # narrowing every count Section 5 reports.
         #
         # Measured from the PARQUETS, like `present` above and for the same reason: a
-        # re-run over a finished grid computes nothing, and reporting what this run
-        # computed would then say "0 ragged" about a grid whose true minimum is 180.
+        # re-run over a finished grid computes nothing, so reporting what THIS run
+        # computed would say "0 narrow" about a grid it never looked at.
         narrow = spec_census(d, signals)
         wide_enough = all(n >= N_SPECS // 2 for _, n in narrow)
         min_specs = min([n for _, n in narrow], default=N_SPECS)
@@ -246,7 +250,7 @@ def main() -> int:
                n_unstable_empty_cells=unstable)
         ok = b.check(len(present) == len(signals) and wide_enough,
                      f"{len(present)}/{len(signals)} signal grids readable, "
-                     f"{len(results)} computed this run; {len(narrow)} ragged "
+                     f"{len(results)} computed this run; {len(narrow)} narrow "
                      f"(min {min_specs}/{N_SPECS} specs); "
                      f"{unstable} unstable-empty cells")
         if unstable > 0:

@@ -1,7 +1,7 @@
-r"""run_dua_grid.py -- the data-uncertainty (DUA) grid: 108 signals x 120 filters x 3 ratings.
+r"""run_dua_grid.py -- the data-uncertainty (DUA) grid: 108 signals x 108 filters x 3 ratings.
 
 Where the MUA grid varies the METHOD, this varies the DATA: every signal is re-sorted
-after each of 120 defensible ways of cleaning the return panel, and the spread of the
+after each of 108 defensible ways of cleaning the return panel, and the spread of the
 resulting premia is the data-uncertainty the section reports.
 
 The 108 filters (see `filters_all`): 48 return-trim thresholds, 30 price screens and

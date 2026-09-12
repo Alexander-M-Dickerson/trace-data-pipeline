@@ -151,14 +151,69 @@ Figures 1, 2 and 5 of the paper are schematics drawn in LaTeX -- a research fram
 return timeline, a look-ahead illustration. They have no data behind them, so Stage 3
 does not produce them, and the document says so rather than leaving a gap.
 
-Table IA.VIII is the same case: it is the paper's **signal dictionary**, a hand-written
-list of the 140 panel fields and what each one means. There is no computation behind it,
-so Stage 3 does not emit it either. The Stage-2 `DATA_DICTIONARY.md` is the live version
-of that table.
+Table IA.VIII is different: it is the paper's **signal dictionary**, defining each of
+the 140 panel fields. There is no computation behind it, so Stage 3 renders it from a
+spec -- `spec/signal_definitions.json`, one entry per field -- rather than from data.
+That spec was reconciled against Stage 2's `DATA_DICTIONARY.md` and against the code
+that computes each signal; six rows differ from the printed table and each records what
+was printed and why it changed. `RECONCILIATION_ia08.md` has the full account, and
+`python s4_zoo/t_ia08.py --diffs` prints the six.
 
 Those timings are with the fast kernels, on 24 cores. Without them a sort takes roughly
 fourteen times as long (43.8 s against 3.2 s, measured on one), which is what turns the
 grids from minutes into hours — and is what the kernels are for.
+
+---
+
+## The flags that change the answer
+
+Most flags only change speed or scope. These four change what the exhibits say, so each
+is worth understanding before you use it.
+
+### `--sample {frontier,paper}` on `_run_stage3.py`
+
+**`frontier` is the default**: the exhibits run to whatever month the Stage-2 panel
+actually reaches. `paper` reproduces the published window, 2002-09 to 2024-12, T = 268,
+for anyone checking Stage 3's output against the printed tables. One switch at the top
+fans out to each section's own flag, so running a driver by hand is unchanged.
+
+Every caption states which one produced it -- "Sample: 2002-09 to 2025-11, T=279" against
+"Sample: 2002-09 to 2024-12, T=268" -- so a PDF is never ambiguous about its own sample.
+
+❗Three of the 108 signals stop before the frontier because their data does. That is
+coverage, not degeneracy: the status ledger judges each strategy inside its own signal's
+span, so extending the window does not manufacture degenerate strategies.
+
+### `--no-fast`
+
+Force the slow PyBondLab path even when the fast kernels are present. **Same numbers,
+roughly fourteen times the sort time** (43.8 s against 3.2 s, measured on one sort). It
+exists so the two paths can be checked against each other; it is not a fallback, because
+the fallback is automatic.
+
+### `--twin {feb,mar14}` on the Section-5 exhibits
+
+`all_ig` and `ig_bp_ig` are the **same portfolio reached two ways**: filter to investment
+grade, or draw the breakpoints on an IG-only universe and then filter to IG. When every
+bond in the sort is investment grade the two coincide, so one member of each pair is
+redundant and is dropped -- 24 pairs, which is the second `-24` in the ladder. `feb` keeps
+`all_ig`, which is the labelling the paper prints, and is the default; `mar14` keeps the
+other.
+
+So it is a labelling convention -- **except when the engine forms one member and not the
+other**. Then the two conventions select different data rather than different labels, and
+the statistics move: measured on this build, `feb` gives 18,032 strategies and `mar14`
+gives 18,018, a gap equal to the 14 asymmetric pairs. `t06_mua_nse.py` fails its
+twin-invariance check when this bites, rather than printing a number as though nothing
+had happened. `nse_engine.twin_asymmetry()` names the pairs.
+
+### `--quantified-only` on `s2_lab/t03_affected.py`
+
+Table 3 classifies **16** factors as sensitive to ex-post filtering; Table 4 quantifies
+**15**. `b_dunc6` is listed in the first and never estimated in the second. That is the
+paper's own inconsistency, and Stage 3 reproduces it rather than correcting it: by
+default Table 3 prints all 16, with the unquantified one daggered and footnoted. The flag
+drops that row so Table 3 prints 15 and the two tables agree.
 
 ---
 
