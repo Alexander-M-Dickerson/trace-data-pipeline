@@ -247,16 +247,32 @@ def test_sample_windows_give_four_lags():
         assert H.nw_lags(T) == 4, f"{name}: T={T} gives {H.nw_lags(T)} lags, not 4"
 
 
-def test_the_two_sections_use_different_cluster_maps():
-    """s3_nse and s4_zoo disagree on b_rvol deliberately; unifying them moves cells."""
+def test_the_two_cluster_maps_are_the_same_partition():
+    """Section 5 and the zoo must group the 108 signals identically.
+
+    This replaces a test that asserted the two maps DIFFER on `b_rvol`. They do not,
+    and never did: it compared cluster NAMES, three of which differ because one section
+    reports risk groups and the other beta groups, so it passed while its own failure
+    message described something that was not happening. The partition is the thing
+    worth pinning -- move a signal in one map and not the other and Section 5's cluster
+    rows change with nothing to say so.
+    """
     sys.path.insert(0, str(STAGE3 / "s3_nse"))
     sys.path.insert(0, str(STAGE3 / "s4_zoo"))
     import clusters as C
     import zoo_engine as Z
 
-    assert C.get_group_name(C.get_signal_group("b_rvol")) != Z.CLUSTER_OF["b_rvol"], (
-        "the two cluster maps now agree on b_rvol -- if that was deliberate, update "
-        "this test and the comment in clusters.py; if not, a map has drifted")
+    nse, zoo = {}, {}
+    for s, name in Z.CLUSTER_OF.items():
+        nse.setdefault(C.get_group_name(C.get_signal_group(s)), set()).add(s)
+        zoo.setdefault(name, set()).add(s)
+    blocks = lambda d: sorted(tuple(sorted(v)) for v in d.values())
+    assert blocks(nse) == blocks(zoo), (
+        "the two cluster maps no longer group the signals the same way; Section 5's "
+        "cluster rows and the zoo's would stop describing the same sets")
+    # the names are allowed to differ, and exactly these three do
+    assert set(nse) - set(zoo) == {"Credit & Default Risk", "Macro & Other Risk",
+                                   "Volatility & Liquidity Risk"}, sorted(set(nse))
 
 
 def test_no_unimported_shared_module():

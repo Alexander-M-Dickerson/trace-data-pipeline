@@ -69,7 +69,12 @@ def compute_lib(*, undo_flips: bool = False, root: Path | None = None,
 
     Also returns the flip-mismatch census, which does not depend on `undo_flips`.
     """
-    results, flips = {}, {"mismatched_pairs": [], "n_pairs": 0}
+    # `span` is the REALISED overlap, not the requested cutoff: each end/bgn pair is
+    # compared on its own common index, so the window a reader should be told about is
+    # the one the pairs share, and T is a range.
+    results, flips = {}, {"mismatched_pairs": [], "n_pairs": 0,
+                          "span": {"first": None, "last": None,
+                                   "T_min": None, "T_max": None}}
     for sort in ("single", "within"):
         for timing, key in (("end", "e"), ("bgn", "b")):
             f = _lib_csv(sort, timing, root=root)
@@ -101,6 +106,14 @@ def compute_lib(*, undo_flips: bool = False, root: Path | None = None,
                     e = -e if ec.endswith("*") else e
                     b = -b if bc.endswith("*") else b
                 diff = e - b
+                sp = flips["span"]
+                lo, hi = str(common.min())[:10], str(common.max())[:10]
+                sp["first"] = lo if sp["first"] is None else min(sp["first"], lo)
+                sp["last"] = hi if sp["last"] is None else max(sp["last"], hi)
+                sp["T_min"] = (len(common) if sp["T_min"] is None
+                               else min(sp["T_min"], len(common)))
+                sp["T_max"] = (len(common) if sp["T_max"] is None
+                               else max(sp["T_max"], len(common)))
                 _, t_diff = D.nw_mean(diff, D.nw_lags(len(diff)))
                 base_clean = base.replace("_mmn", "")
                 base_clean = base_clean[:-3] if base_clean.endswith("_wf") else base_clean
@@ -187,9 +200,12 @@ def main() -> int:
             lib_c, _ = compute_lib(undo_flips=True, cutoff_end=args.end)
             summ, summ_c = summarize(lib), summarize(lib_c)
         global _sample, _note
+        # ❗this took `DATE_CUTOFF_END`, the module constant, so `--end` changed
+        # what was computed and not what the caption said. It takes the span the
+        # census actually covered.
         _sample = D.sample_block(
-            first=D.SAMPLE_START_LAB, last=DATE_CUTOFF_END,
-            basis="the LIB census window; each pair carries its own overlap")
+            **flips["span"],
+            basis="the end/bgn pairs' realised overlap; each pair is its own length")
         _note = D.sample_sentence(_sample)
         with b.phase("render"):
             n_mm, n_pairs = len(flips["mismatched_pairs"]), flips["n_pairs"]

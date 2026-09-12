@@ -52,6 +52,14 @@ class Bench:
 
     def __init__(self, tag: str, *, section: str | None = None, echo: bool = True,
                  sample: bool = True, ledger: Path | None = None):
+        """`sample=False` (every driver's `--no-bench`) runs the exhibit and keeps the
+        console timings, but writes no line to `reports/timings.jsonl`.
+
+        ❗It used to store the flag and never read it, so `--no-bench` appeared in 23
+        drivers' `--help` and changed nothing. The ledger is what README's cost table
+        and `make_report`'s check summary are built from, so a run you do not want in
+        those -- a one-off, a re-render while debugging -- is the case it is for.
+        """
         self.tag = tag
         self.section = section
         self.echo = echo
@@ -61,7 +69,7 @@ class Bench:
         self.checks: list[dict] = []
         self.ok: bool | None = None
         self._t0 = 0.0
-        self._sample = sample        # accepted for call compatibility; sampling is optional
+        self._sample = sample        # False: run normally, but do not append to the ledger
 
     # -- lifecycle ----------------------------------------------------------
     def __enter__(self) -> "Bench":
@@ -88,12 +96,13 @@ class Bench:
             "platform": platform.platform(),
             "cpu_count": os.cpu_count(),
         }
-        try:
-            self.ledger.parent.mkdir(parents=True, exist_ok=True)
-            with self.ledger.open("a", encoding="utf-8") as fh:
-                fh.write(json.dumps(rec, default=str) + "\n")
-        except Exception as e:          # a ledger write must never lose a computed result
-            print(f"[bench] could not write {self.ledger}: {e}", flush=True)
+        if self._sample:
+            try:
+                self.ledger.parent.mkdir(parents=True, exist_ok=True)
+                with self.ledger.open("a", encoding="utf-8") as fh:
+                    fh.write(json.dumps(rec, default=str) + "\n")
+            except Exception as e:      # a ledger write must never lose a result
+                print(f"[bench] could not write {self.ledger}: {e}", flush=True)
         if self.echo:
             parts = "  ".join(f"{k} {v:.1f}s" for k, v in self.phases.items())
             print(f"[bench] {self.tag} done {wall:.1f}s   {parts}", flush=True)

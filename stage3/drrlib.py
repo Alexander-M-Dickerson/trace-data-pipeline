@@ -37,7 +37,7 @@ import paths
 # so `drrlib.nw_lags` and `drrlib.base_mnemonic` keep working -- two definitions
 # of a sign-flip rule is exactly the kind of thing that drifts apart.
 from helper_functions import (  # noqa: F401
-    base_mnemonic, nw_lags, strip_sign_flag, to_percent)
+    base_mnemonic, nw_lags, strip_sign_flag)
 
 PCT = 100.0                       # sort-panel returns are decimals; the paper prints %
 SAMPLE_START = "2002-09-30"       # LIB / NSE tables: T = 268

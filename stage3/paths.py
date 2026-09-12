@@ -57,11 +57,6 @@ def section_results(section: str) -> Path:
     return d
 
 
-def cube(kind: str, sig: str) -> Path:
-    """Signature-keyed cache path: cube('lib_stats', sig) -> data/_cache/lib_stats_<sig>.parquet."""
-    return CACHE / f"{kind}_{sig}.parquet"
-
-
 _AUDIT = [("PANEL", PANEL), ("MMN", MMN), ("BBW", BBW), ("FACTORS", FACTORS),
           ("DAILY", DAILY)]
 

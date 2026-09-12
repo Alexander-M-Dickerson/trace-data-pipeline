@@ -129,9 +129,12 @@ def main() -> int:
                   "\n     so `feb` and `mar14` select different data, not different "
                   "labels."
                   "\n     Examples: " + ", ".join(broken[:3])
-                  + "\n     This is the engine defect AF14. No VALUE is wrong; the "
-                    "cluster statistics move"
-                    "\n     because the two sets are not the same set.", flush=True)
+                  + "\n     This is the sort engine's unstable empty cell, "
+                    "described under"
+                    "\n     'What is not reproducible' in README_stage3.md. No VALUE "
+                    "is wrong; the"
+                    "\n     cluster statistics move because the two sets are not the "
+                    "same set.", flush=True)
         ok = b.check(len(ours) == 10 and twin_max_d <= TWIN_TOL,
                      f"{len(ours)} rows over {mua.attrs['n_paths']:,} paths; "
                      f"twin convention moves no cell (max|d|={twin_max_d:.2e}, "

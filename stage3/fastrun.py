@@ -72,8 +72,8 @@ def pmap(task_fn, items, workers: int | None = None, threads: int | None = None,
     """Process-parallel map. `task_fn` (TOP-LEVEL, picklable) gets one item and returns its result.
     Fresh process per task (spawn, maxtasksperchild=1). Returns results in input order.
 
-    `threads` is published to the workers through the environment rather than the pipe;
-    a task reads it with `worker_threads()`.
+    `threads` is published to the workers through the environment rather than the
+    pipe, as STAGE3_WORKER_THREADS; a task reads it with os.environ.
     """
     n = len(items)
     if n == 0:
@@ -90,6 +90,3 @@ def pmap(task_fn, items, workers: int | None = None, threads: int | None = None,
     with ctx.Pool(processes=workers, maxtasksperchild=1) as pool:
         return pool.map(task_fn, items)
 
-
-def worker_threads(default: int = 4) -> int:
-    return int(os.environ.get("STAGE3_WORKER_THREADS", default))

@@ -48,7 +48,3 @@ def base_mnemonic(factor: str) -> str:
                 changed = True
     return f
 
-
-def to_percent(x, dec: int = 2):
-    """Sort panels store DECIMALS; every table prints percent. Convert at the boundary."""
-    return round(float(x) * 100, dec)

@@ -16,7 +16,7 @@ investment-grade breakpoint universe is crossed with a high-yield rating filter.
 
 Two engines produce it:
 
-  `run_slow`  the definition: per breakpoint universe, SingleSort +
+  `run_fast`  assay_anomaly_fast over the grid: per breakpoint universe,
               AssayAnomalyRunner, save_idx=True, turnover=True,
               dynamic_weights=True. Correct, and slow enough that the full grid
               is a multi-hour job.
@@ -93,72 +93,11 @@ def load_panel(signals: list[str], end: str | None = None) -> pd.DataFrame:
     df["spc_rat"] = df["spc_rat"].astype("float64")        # nullable Int breaks numba
     dup = df.duplicated(["date", "cusip"]).sum()
     if dup:
-        raise AssertionError(f"{dup} duplicate (date, cusip) rows -- PyBondLab's "
-                             f"fast path silently corrupts on these (open bug D1)")
+        raise AssertionError(
+            f"{dup} duplicate (date, cusip) rows. The fast sort path indexes the\n"
+            "  panel positionally, so a duplicate key does not raise -- it pairs one\n"
+            "  bond's return with another's signal and returns a plausible number.")
     return df
-
-
-def run_slow(data: pd.DataFrame, signal: str,
-             universes: tuple[str, ...] = ("all", "lg_bp", "ig_bp")) -> pd.DataFrame:
-    """The definitional slow path. Returns the long frame: one row per
-    (date, leg, canonical spec coordinates) with return / nbonds / turnover."""
-    pblenv.use()
-    from PyBondLab.StrategyClass import SingleSort
-    from PyBondLab.AnomalyAssayer import AssayAnomalyRunner
-
-    funcs = bp_universe_funcs()
-    frames = []
-    for bp_name in universes:
-        strategy = SingleSort(sort_var=signal, holding_period=1, num_portfolios=5,
-                              breakpoint_universe_func=funcs[bp_name], verbose=False)
-        runner = AssayAnomalyRunner(
-            strategy=strategy, data=data, holding_periods=[1],
-            nport=[3, 5, 10], ratings=[None, "IG", "NIG"],
-            subset_filter={"tmat": [(0, float("inf")), (0, 5), (5, 10),
-                                    (10, float("inf"))]},
-            breakpoint_universe_func=funcs[bp_name],
-            save_idx=True, turnover=True, dynamic_weights=True,
-            verbose=False, n_jobs=1,
-            IDvar="cusip", DATEvar="date", RETvar="ret_vw", Wvar="mcap_e",
-            RATINGvar="spc_rat")
-        results = runner.run()
-        out = results.runs.reset_index().rename(columns={"index": "date"})
-        out["bp_universe"] = bp_name
-        frames.append(out)
-    long = pd.concat(frames, ignore_index=True)
-    long["weighting"] = long["weight"]
-    long["nport"] = long["Sort"].map(_nport_code)
-    long["rating"] = long["Rating"].map(_rating_code)
-    long["maturity"] = long["Subset"].map(_maturity_code)
-    long["leg"] = long["type"]
-    return long
-
-
-def _nport_code(sort_val) -> str:
-    """'10'/'10p' -> 'Dp'; the runner's Sort column holds 'T'/'Q'/'D' letters."""
-    s = str(sort_val).replace("_", "").rstrip("p")
-    if s.isdigit():
-        return NPORT_CODE[int(s)]
-    if s in ("T", "Q", "D"):
-        return s + "p"
-    raise ValueError(f"unrecognised Sort value {sort_val!r}")
-
-
-def _rating_code(r) -> str:
-    if r is None or (isinstance(r, float) and np.isnan(r)) or str(r).lower() in ("none", "all"):
-        return "all"
-    return {"IG": "ig", "NIG": "hy", "HY": "hy"}.get(str(r), str(r).lower())
-
-
-def _maturity_code(subset) -> str:
-    s = str(subset)
-    if "0-5" in s:
-        return "short"
-    if "5-10" in s:
-        return "mid"
-    if "10-inf" in s:
-        return "long"
-    return "all"
 
 
 def fast_specs() -> dict:
@@ -199,8 +138,7 @@ def all_spec_ids() -> list[str]:
 
 
 def run_fast(data: pd.DataFrame, signal: str, verbose: bool = False,
-             return_legs: bool = False, return_counts: bool = False,
-             return_formation_counts: bool = False):
+             return_legs: bool = False, return_counts: bool = False):
     """assay_anomaly_fast over the identical grid.
 
     ❗`skip_invalid=False`, deliberately. With it True, PyBondLab's spec validator
@@ -213,10 +151,8 @@ def run_fast(data: pd.DataFrame, signal: str, verbose: bool = False,
 
     Returns (wide LS frame with canonical tuple columns, canon map, the result
     object). `return_legs` / `return_counts` add the long and short legs and their
-    realised bond counts; `return_formation_counts` adds the counts as of FORMATION,
-    so formation minus realised would be the month's attrition. ❗No producer requests
-    it: nothing in Stage 3 computes or stores formation counts, and Table IA.XVIII
-    reports REALISED counts, as its own docstring and every manifest say.
+    realised bond counts. Table IA.XVIII reports the REALISED counts, as its own
+    docstring and every manifest say; Stage 3 never asks for formation counts.
     """
     pblenv.use()
     from PyBondLab.anomaly_assay_fast import assay_anomaly_fast
@@ -224,8 +160,6 @@ def run_fast(data: pd.DataFrame, signal: str, verbose: bool = False,
     extra = {}
     if return_legs or return_counts:
         extra = {"return_legs": return_legs, "return_counts": return_counts}
-    if return_formation_counts:
-        extra["return_formation_counts"] = True
     res = assay_anomaly_fast(
         data, signal, fast_specs(), holding_period=1, dynamic_weights=True,
         validate=False, skip_invalid=False, verbose=verbose,

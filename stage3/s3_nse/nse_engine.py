@@ -328,7 +328,8 @@ def twin_asymmetry(window: str) -> list[str]:
     The two conventions are supposed to be a relabelling: `all_ig` and `ig_bp_ig` are
     the same portfolio reached two ways, so which one you keep cannot move a number.
     That holds only while BOTH members exist. When the engine forms one and not the
-    other (AF14), the conventions select different data and every cluster statistic
+    other -- the unstable empty cell, see README_stage3.md -- the conventions select
+    different data and every cluster statistic
     moves -- which is what `t06_mua_nse.py`'s invariance check detects.
 
     Returns the `signal__spec_id` of the usable member of each broken pair, so a failure
@@ -403,7 +404,8 @@ def mua_cluster_summary(paths_df: pd.DataFrame) -> pd.DataFrame:
     `no_series` and they never arrive. Before that they did, and this column printed 26
     more than the sample its own means and quantiles were computed over.
 
-    The path count is NOT pinned to a constant. It follows the data, and while AF14 is
+    The path count is NOT pinned to a constant. It follows the data, and while the
+    unstable empty cell is
     open it moves between runs; `df.attrs["n_by_status"]` records the whole histogram so
     two runs can be compared.
     """
@@ -447,7 +449,7 @@ def mua_improvement_counts(paths_df: pd.DataFrame,
 
     ❗The pool is whatever the ledger says is usable, less the six `*_all_all_all`
     per signal. It is DERIVED, not pinned: while the engine's restricted-universe cells
-    flip between runs (AF14) the absolute size moves, but the relationship to Table 6's
+    flip between runs the absolute size moves, but the relationship to Table 6's
     N does not -- and that relationship is what the tests check.
 
     `expected_denominator` pins the pool size when you know it; pass None to record

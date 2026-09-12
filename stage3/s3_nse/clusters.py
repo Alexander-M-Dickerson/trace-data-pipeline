@@ -1,8 +1,20 @@
 """clusters.py -- the 108-signal to 9-cluster map for Section 5, and the grid grammars.
 
-❗The cluster map here is NOT the same as `zoo_engine.CLUSTERS`. They differ on
-`b_rvol`, deliberately: Section 5's exhibits are built on this grouping and reassigning
-that one signal moves four of its cells. Keep them separate; do not "unify" them.
+❗This map and `zoo_engine.CLUSTERS` put every one of the 108 signals in the SAME
+block -- the two partitions are identical, `b_rvol` included. What differs is three
+cluster NAMES, because Section 5 reports risk groups and the zoo reports beta groups:
+
+    Credit & Default Risk        <->  Credit & Default Betas
+    Volatility & Liquidity Risk  <->  Vol. & Liq. Betas
+    Macro & Other Risk           <->  Macro & Other Betas
+
+So do not join the two sections on a cluster name; join on the signal. Reassigning a
+signal in one map and not the other would move cells in Section 5 silently, which is
+what `test_the_two_cluster_maps_are_the_same_partition` is there to catch.
+
+(The `b_rvol` question is real but it lives elsewhere: the PUBLISHED Table IA.IX places
+it in the beta group while the paper's own signal dictionary places it in Macro & Other.
+`t_ia09.py` reproduces both and says which is which.)
 
 Also owns the two spec-grammar parsers, because both grids' exhibits need them:
 
@@ -82,34 +94,6 @@ def add_groups(df: pd.DataFrame, signal_col: str = "signal") -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 # the MUA spec-id grammar
 # ---------------------------------------------------------------------------
-def exclude_redundant(df: pd.DataFrame, twin: str, col: str = "spec_id") -> pd.DataFrame:
-    """The FULL redundancy rule: drop one member of the all_ig == ig_bp_ig twin pair
-    AND the 24 infeasible ig_bp x hy specs. ❗This is no longer the only thing removing
-    them: `mua_summarize` classifies every cell of the grid and `nse_engine.usable`
-    selects on that, so an all-NaN cell is `no_series` or `inadmissible` by name rather
-    than by whichever mask happened to catch it.
-
-    The twin pair is the same portfolio reached two ways: filtering to investment
-    grade, or drawing the breakpoints on an investment-grade universe that is then
-    filtered to investment grade. `twin='mar14'` keeps ig_bp_ig; `twin='feb'` keeps
-    all_ig, which is the labelling the paper prints.
-
-    ❗Which member to keep is a LABELLING choice ONLY WHILE BOTH MEMBERS EXIST. When
-    the engine forms one and not the other (AF14), the two conventions select different
-    DATA and every statistic built on them moves -- measured at 14 broken pairs and
-    max|d| = 1.9e-03 on the 2026-09-11 build, against a 1e-12 tolerance.
-    `nse_engine.twin_asymmetry` lists them; `t06_mua_nse.py` fails when it bites. Do not
-    read the old claim that the two give "identical content": it is false on this data.
-    """
-    s = df[col]
-    if twin == "mar14":
-        mask = s.str.contains("_all_ig_", regex=False)
-    elif twin == "feb":
-        mask = s.str.contains("_ig_bp_ig_", regex=False)
-    else:
-        raise ValueError(f"unknown twin convention: {twin!r} (mar14|feb)")
-    mask = mask | s.str.contains("_ig_bp_hy_", regex=False)
-    return df[~mask]
 
 
 def parse_spec_id_cols(df: pd.DataFrame, col: str = "spec_id") -> pd.DataFrame:
@@ -176,7 +160,7 @@ def parse_filter_config(config: str) -> tuple[str, str | None]:
             break
     if config == "baseline" or config.startswith("baseline"):
         return "baseline", None
-    for ftype in ("trim", "price", "bounce", "wins"):
+    for ftype in ("trim", "price", "bounce"):
         if config.startswith(f"{ftype}_"):
             vals = [float(x) for x in config[len(ftype) + 1:].split("_")]
             if len(vals) == 2:

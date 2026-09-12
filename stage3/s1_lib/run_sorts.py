@@ -108,7 +108,10 @@ def prepare_data(signals: list[str], *, ret_types: tuple[str, ...] = ("exc",),
     if not pd.api.types.is_float_dtype(data["spc_rat"]):
         data["spc_rat"] = data["spc_rat"].astype("float64")
     dup = data.duplicated(["cusip", "date"]).sum()
-    assert dup == 0, f"{dup} duplicate (cusip,date) rows would silently corrupt PyBondLab (bug D1)"
+    assert dup == 0, (
+        f"{dup} duplicate (cusip,date) rows. PyBondLab indexes the panel\n"
+        "  positionally, so a duplicate key does not raise -- it puts one bond's\n"
+        "  return against another's signal, silently.")
 
     if verbose:
         print(f"[data] {len(data):,} rows  {data['date'].min():%Y-%m-%d}"
