@@ -109,10 +109,17 @@ def lib_stats(series: dict[str, pd.DataFrame], mktb: pd.Series, spec: LibSpec,
 
     rows = []
 
+    # ❗The REALISED span, carried beside T. The exhibits used to record the window
+    # they ASKED for -- the LibSpec constants -- while the index they actually got sat
+    # here unread, so a caption built on it would have described the intention rather
+    # than the result.
+    first, last = str(idx.min())[:10], str(idx.max())[:10]
+
     def add(factor: str, quantity: str, value: float, tstat: float):
         rows.append({"ret_type": spec.ret_type, "sort": spec.sort, "rating": spec.rating,
                      "weighting": spec.weighting, "factor": factor, "quantity": quantity,
-                     "value": value, "tstat": tstat, "T": len(idx), "nw_lags": lags})
+                     "value": value, "tstat": tstat, "T": len(idx), "nw_lags": lags,
+                     "first": first, "last": last})
 
     for f in factors:
         for a in APPROACHES:
@@ -153,6 +160,8 @@ def validation_stats(spec: LibSpec, factors: tuple[str, ...], *,
     if expected_T is not None:
         D.assert_sample(end.index, expected_T, what=f"{spec.key} End sample")
     lags = D.nw_lags(len(end.index))
+    # the realised span, carried on every row -- same reason as in `lib_stats`
+    _first, _last = str(end.index.min())[:10], str(end.index.max())[:10]
 
     rows = []
     for f in factors:
@@ -169,6 +178,7 @@ def validation_stats(spec: LibSpec, factors: tuple[str, ...], *,
                      "dmu": dmu * D.PCT, "t_dmu": t_dmu,
                      "mu_lib": mu_lib * D.PCT, "t_mu_lib": t_lib,
                      "rho": rho, "resid": (dmu - mu_lib) * D.PCT,
+                     "first": _first, "last": _last,
                      "T": len(end.index), "nw_lags": lags})
     return pd.DataFrame(rows)
 

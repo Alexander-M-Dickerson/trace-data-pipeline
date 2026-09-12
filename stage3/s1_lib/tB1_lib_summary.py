@@ -38,6 +38,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))   # stage3/
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import captions             # noqa: E402
+
+# ❗Set by main() before rendering, from the data actually used. The caption
+# TITLE is fixed in `captions.py`; this is the sentence that tracks the sample.
+_sample: dict = {}
+_note = ""
 import drrlib as D          # noqa: E402
 import paths                # noqa: E402
 import run_lib_sorts as RL  # noqa: E402
@@ -143,7 +148,7 @@ def render_tex(summ: pd.DataFrame, *, corrected: bool, n_mismatch: int,
              rf"% flip-mismatched -- see tableB1_corrected.tex."])
     L = note + [
         r"\begin{table}[!ht]",
-        r"\caption{" + captions.caption(LABEL) + "}",
+        r"\caption{" + captions.caption(LABEL, note=_note) + "}",
         r"\label{" + LABEL + ("-corrected}" if corrected else "}"),
         r"\begin{center}",
         r"\scalebox{0.85}{%",
@@ -181,6 +186,11 @@ def main() -> int:
             lib, flips = compute_lib(cutoff_end=args.end)
             lib_c, _ = compute_lib(undo_flips=True, cutoff_end=args.end)
             summ, summ_c = summarize(lib), summarize(lib_c)
+        global _sample, _note
+        _sample = D.sample_block(
+            first=D.SAMPLE_START_LAB, last=DATE_CUTOFF_END,
+            basis="the LIB census window; each pair carries its own overlap")
+        _note = D.sample_sentence(_sample)
         with b.phase("render"):
             n_mm, n_pairs = len(flips["mismatched_pairs"]), flips["n_pairs"]
             summ.to_csv(out / "tableB1_cells.csv", index=False)
@@ -195,6 +205,7 @@ def main() -> int:
             D.write_result(
                 "tableB1",
                 {"summary": {"exhibit": "Table B.1", "tex_label": LABEL,
+                             "sample": _sample,
                              "n_flip_mismatched_pairs": n_mm, "n_pairs": n_pairs,
                              "cutoff_end": args.end},
                  "as_published": summ.to_dict("records"),

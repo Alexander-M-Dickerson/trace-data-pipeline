@@ -37,6 +37,12 @@ import drrlib as D          # noqa: E402
 import latex_format as F    # noqa: E402
 import nse_engine as E      # noqa: E402
 import paths                # noqa: E402
+
+# ❗Set by main() before rendering, from the data this driver actually used.
+# The caption TITLE is fixed in `captions.py`; this is the sentence that has to
+# track the sample, so it is never written by hand.
+_sample: dict = {}
+_note = ""
 from bench import Bench     # noqa: E402
 
 LABEL = "tab:mua_improvement"
@@ -55,7 +61,7 @@ PANELS = [("Panel A", "np", "Improving specifications, count (share)"),
 
 def render_latex(df: pd.DataFrame) -> str:
     ncol = len(KEYS) + 1
-    L = [r"\begin{table}[!ht]", r"\caption{" + captions.caption(LABEL) + "}",
+    L = [r"\begin{table}[!ht]", r"\caption{" + captions.caption(LABEL, note=_note) + "}",
          r"\begin{center}", r"\label{" + LABEL + r"}", r"\scalebox{0.68}{%",
          r"\begin{tabular}{l " + "r" * len(KEYS) + "}", r"\toprule"]
     L.append(" & " + " & ".join(rf"\multicolumn{{{n}}}{{c}}{{{name}}}"
@@ -110,6 +116,13 @@ def main() -> int:
             tot = ours[ours["cluster_name"] == "Total"].iloc[0]
             n_improving = int(sum(tot[f"rating:{v}_n"] for v in ("all", "ig", "hy")))
             n_pool = int(sum(tot[f"rating:{v}_N"] for v in ("all", "ig", "hy")))
+        global _sample, _note
+        lo, hi = E.window_span(args.window)
+        _sample = D.sample_block(
+            first=lo, last=hi, window=args.window,
+            n_paths=mua.attrs["n_paths"], paths_label="construction paths",
+            basis="construction paths, not a time series")
+        _note = D.sample_sentence(_sample)
         with b.phase("render"):
             out = paths.section_results("s3_nse")
             ours.to_csv(out / f"table_ia19_mua_improvement_{args.window}.csv",
@@ -119,6 +132,7 @@ def main() -> int:
             D.write_result(
                 f"table_ia19_{args.window}",
                 {"summary": {"exhibit": "Table IA.XIX", "tex_label": LABEL,
+                             "sample": _sample,
                              "window": args.window, "twin": args.twin,
                              "n_improving": n_improving,
                              "n_denominator_pool": n_pool,

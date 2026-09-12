@@ -104,11 +104,21 @@ def lab_stats(cell: dict, mktb: pd.Series, spec: LabSpec,
     factors = tuple(factors) if factors else TAIL_SIGNALS[spec.tail]
     rows = []
 
+    # ❗The realised span of THIS cell, carried on every row beside its own T.
+    # Section 4's series are each their own length, so a single date pair for the
+    # whole exhibit would be a fiction -- but the outer span is what a caption
+    # states, and it has to come from the data rather than from the window that
+    # was requested.
+    _idx = cell[_series_key(LEGS[0], 'base')].index
+    _first, _last = str(_idx.min())[:10], str(_idx.max())[:10]
+
     def add(factor, leg, variant, stat, value, tstat, T):
         rows.append({"return_type": spec.return_type, "rating": spec.rating,
                      "tail": spec.tail, "factor": factor, "leg": leg,
                      "variant": variant, "stat": stat, "value": value,
-                     "tstat": tstat, "T": T, "nw_lags": D.nw_lags(T) if T else None})
+                     "tstat": tstat, "T": T,
+                     "nw_lags": D.nw_lags(T) if T else None,
+                     "first": _first, "last": _last})
 
     for f in factors:
         series = {(leg, var): cell[_series_key(leg, var)][f]

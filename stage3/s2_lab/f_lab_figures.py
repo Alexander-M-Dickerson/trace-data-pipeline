@@ -36,6 +36,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import _stage3_settings as S   # noqa: E402
 import drrlib as D          # noqa: E402
 import lab_engine as E      # noqa: E402
 import paths                # noqa: E402
@@ -313,7 +314,11 @@ def main() -> int:
                 "lab_figures",
                 {"summary": {"exhibit": "Figures 7, 8, IA.2",
                              "figIA2_identity_max_abs_diff": ident,
-                             "identity_ok": bool(ident <= IDENT_TOL)},
+                             "identity_ok": bool(ident <= IDENT_TOL),
+                             "sample": D.sample_block(
+                                 first=S.SAMPLE["lab"]["start"],
+                                 last=S.SAMPLE["lab"]["end"],
+                                 basis="the LAB window; each series is its own length")},
                  "fig07_vix_fit": f7,
                  "fig08_finals": {k: d["finals"] for k, d in f8.items()},
                  "figIA2_bars": ia2},

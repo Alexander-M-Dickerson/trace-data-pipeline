@@ -456,3 +456,75 @@ def test_the_table6_footnote_arithmetic_closes():
     assert grid - empty - never == kept, (
         f"the footnote does not close: {grid:,} - {empty} - {never} = "
         f"{grid - empty - never:,}, but it prints {kept:,}")
+
+
+# ---------------------------------------------------------------------------
+# Sample provenance: every exhibit states the months it was computed over, and
+# states them from the data it used rather than from a settings constant.
+# ---------------------------------------------------------------------------
+# Exhibits with no sample by nature: the three cleaning-parameter tables read
+# constants out of the Stage-0/1 source, and Table 3 is a classification list.
+NO_SAMPLE = {"tablesA_filter_params", "table03"}
+
+
+def _summaries() -> dict:
+    out = {}
+    for f in sorted((STAGE3 / "data").glob("*/*.json")):
+        if f.name.startswith("_"):
+            continue
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if isinstance(d.get("summary"), dict) and "exhibit" in d["summary"]:
+            out[f.stem] = d["summary"]
+    return out
+
+
+def test_every_exhibit_records_the_sample_it_used():
+    """A caption that cannot say which months produced it is not provenance.
+
+    Before this, 11 of 26 manifests recorded a span and 9 a T, under eight different
+    key names -- and the whole of Section 5 recorded neither. A document then claimed
+    one sample for exhibits computed over two different ones.
+    """
+    summ = _summaries()
+    if not summ:
+        pytest.skip("no exhibits built yet")
+    missing = sorted(k for k, v in summ.items()
+                     if k not in NO_SAMPLE and not isinstance(v.get("sample"), dict))
+    assert not missing, (
+        "exhibits with no sample block: " + ", ".join(missing)
+        + " -- add `\"sample\": D.sample_block(...)` to the write_result payload")
+
+
+def test_sample_blocks_are_well_formed():
+    """One shape, so a caption can be rendered from any of them without asking."""
+    for stem, v in _summaries().items():
+        blk = v.get("sample")
+        if not isinstance(blk, dict):
+            continue
+        assert blk.get("first") and blk.get("last"), f"{stem}: sample has no span"
+        assert blk["first"] <= blk["last"], f"{stem}: sample runs backwards"
+        assert blk.get("basis"), (
+            f"{stem}: sample has no `basis` -- a reader needs to know whether T is "
+            "asserted, per-series, or absent because the exhibit counts paths")
+        if "T" in blk:
+            assert blk.get("nw_lags") == int(blk["T"] ** 0.25), (
+                f"{stem}: nw_lags does not follow from T")
+
+
+def test_the_rendered_captions_state_their_sample():
+    """The sentence has to reach the page, not just the manifest."""
+    tables = sorted((STAGE3 / "reports" / "tables").glob("*.tex"))
+    if not tables:
+        pytest.skip("no tables built yet")
+    # the parameter tables and the classification table carry no sample; the two
+    # inline count blocks carry no caption at all
+    exempt = {"tableA1", "tableA2", "tableA3", "table03",
+              "inline_counts_alpha", "inline_counts_premium"}
+    silent = [t.stem for t in tables
+              if t.stem not in exempt
+              and "Sample:" not in t.read_text(encoding="utf-8")]
+    assert not silent, (
+        "rendered tables with no sample sentence: " + ", ".join(silent))

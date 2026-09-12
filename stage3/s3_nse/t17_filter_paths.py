@@ -38,6 +38,12 @@ import drrlib as D          # noqa: E402
 import latex_format as F    # noqa: E402
 import nse_engine as E      # noqa: E402
 import paths                # noqa: E402
+
+# ❗Set by main() before rendering, from the data this driver actually used.
+# The caption TITLE is fixed in `captions.py`; this is the sentence that has to
+# track the sample, so it is never written by hand.
+_sample: dict = {}
+_note = ""
 from bench import Bench     # noqa: E402
 
 LABEL = "tab:filter_paths"
@@ -51,7 +57,7 @@ PANELS = [("Panel A", "Improving paths, count (share)"),
 
 def render_latex(counts: pd.DataFrame) -> str:
     cols = [(loc, ft) for loc in E.LOCATIONS for ft in E.FILTER_TYPES]
-    L = [r"\begin{table}[!ht]", r"\caption{" + captions.caption(LABEL) + "}",
+    L = [r"\begin{table}[!ht]", r"\caption{" + captions.caption(LABEL, note=_note) + "}",
          r"\begin{center}", r"\label{" + LABEL + r"}", r"\scalebox{0.72}{%",
          r"\begin{tabular}{l " + " ".join("r" * 3 for _ in E.LOCATIONS) + "}",
          r"\toprule"]
@@ -101,6 +107,13 @@ def main() -> int:
             design_ok = all(int(per[(loc, ft)]) == exp * N_SIGNALS
                             for loc in E.LOCATIONS
                             for ft, exp in PER_SIGNAL.items())
+        global _sample, _note
+        lo, hi = E.window_span(args.window)
+        _sample = D.sample_block(
+            first=lo, last=hi, window=args.window,
+            n_paths=int(counts["n_total"].sum()), paths_label="filter paths",
+            basis="filter paths, not a time series")
+        _note = D.sample_sentence(_sample)
         with b.phase("render"):
             out = paths.section_results("s3_nse")
             counts.to_csv(out / f"table_ia17_filter_paths_{args.window}.csv",
@@ -110,6 +123,7 @@ def main() -> int:
             D.write_result(
                 f"table_ia17_{args.window}",
                 {"summary": {"exhibit": "Table IA.XVII", "tex_label": LABEL,
+                             "sample": _sample,
                              "window": args.window,
                              "n_improving_total": int(counts["n_improving"].sum()),
                              "n_paths_total": int(counts["n_total"].sum()),

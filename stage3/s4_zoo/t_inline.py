@@ -101,6 +101,9 @@ def main() -> int:
                 "inline_counts",
                 {"summary": {"exhibit": "Inline specification counts",
                              "tex_label": None, "end": args.end,
+                             "sample": D.sample_block(
+                                 first=Z.DATE_START, last=args.end,
+                                 basis="the zoo window; each factor carries its own T"),
                              "n_factors_per_spec": Z.N_FACTORS,
                              "totals": {s: out_counts[s]["Total"] for s in STATS}},
                  "rows": flat},

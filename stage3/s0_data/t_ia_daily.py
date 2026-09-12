@@ -33,6 +33,11 @@ for _p in (str(Path(__file__).resolve().parents[1]), str(Path(__file__).resolve(
         sys.path.insert(0, _p)
 
 import captions             # noqa: E402
+
+# ❗Set by main() before anything renders, from the data this driver actually
+# used. The caption TITLE is fixed in `captions.py`; this is the sentence that has
+# to track the sample, so it is never written by hand.
+_note = ""
 import data_engine as E     # noqa: E402
 import drrlib as D          # noqa: E402
 import latex_format as F    # noqa: E402
@@ -44,7 +49,7 @@ LAB1, LAB2 = "tab:data_availability", "tab:descriptive_stats"
 
 def render_availability(avail: pd.DataFrame, label: str, vars_: list) -> str:
     piv = avail.set_index(["variable", "bucket"])
-    L = [r"\begin{table}[!ht]", r"\caption{" + captions.caption(label) + "}",
+    L = [r"\begin{table}[!ht]", r"\caption{" + captions.caption(label, note=_note) + "}",
          r"\begin{center}", r"\label{" + label + r"}", r"\scalebox{0.88}{%",
          r"\begin{tabular}{l " + " ".join("rr" for _ in E.RATING_BUCKETS) + "}",
          r"\toprule"]
@@ -66,7 +71,7 @@ def render_availability(avail: pd.DataFrame, label: str, vars_: list) -> str:
 
 
 def render_stats(pooled: pd.DataFrame, cross: pd.DataFrame, label: str) -> str:
-    L = [r"\begin{table}[!ht]", r"\caption{" + captions.caption(label) + "}",
+    L = [r"\begin{table}[!ht]", r"\caption{" + captions.caption(label, note=_note) + "}",
          r"\begin{center}", r"\label{" + label + r"}", r"\scalebox{0.85}{%",
          r"\begin{tabular}{l " + "r" * len(E.STAT_COLS) + "}", r"\toprule",
          "Variable & " + " & ".join(E.STAT_COLS) + r" \\"]
@@ -107,6 +112,10 @@ def main() -> int:
             pooled = E.daily_pooled(end=args.end)
         with b.phase("cross"):
             cross = E.daily_cross_sectional(end=args.end)
+        global _note
+        _note = D.sample_sentence(D.sample_block(
+            first=str(span[0])[:10], last=str(span[1])[:10],
+            basis="the daily bond-day panel, to its own frontier"))
         with b.phase("render"):
             out = paths.section_results("s0_data")
             avail.to_csv(out / "table_ia1_availability.csv", index=False)
@@ -120,7 +129,9 @@ def main() -> int:
                 "tables_ia1_ia2",
                 {"summary": {"exhibit": "Tables IA.I-IA.II",
                              "tex_labels": [LAB1, LAB2],
-                             "sample": list(span),
+                             "sample": D.sample_block(
+                                 first=str(span[0])[:10], last=str(span[1])[:10],
+                                 basis="the daily bond-day panel, to its own frontier"),
                              "n_availability_rows": len(avail),
                              "n_pooled_vars": len(pooled),
                              "n_cross_vars": len(cross)},

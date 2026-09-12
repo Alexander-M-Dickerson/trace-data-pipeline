@@ -32,6 +32,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))   # stage3/
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import captions             # noqa: E402
+
+# ❗Set by main() before anything renders, from the data this driver actually
+# used. The caption TITLE is fixed in `captions.py`; this is the sentence that has
+# to track the sample, so it is never written by hand.
+_note = ""
 import drrlib as D          # noqa: E402
 import latex_format as F    # noqa: E402
 import paths                # noqa: E402
@@ -73,7 +78,7 @@ def as_rows(frames: dict, weighting: str) -> dict:
 
 def render_latex(ours: dict, label: str, what: str) -> str:
     L = [r"\begin{longtable}{l rrr rrr r rrr}",
-         r"\caption{" + captions.caption(label) + r"}\label{" + label + r"}\\",
+         r"\caption{" + captions.caption(label, note=_note) + r"}\label{" + label + r"}\\",
          r"\toprule",
          "Factor & " + " & ".join(HEADERS) + r" \\", r"\midrule", r"\endfirsthead",
          r"\toprule", "Factor & " + " & ".join(HEADERS) + r" \\", r"\midrule",
@@ -108,6 +113,10 @@ def main() -> int:
         with b.phase("stats"):
             frames = ZF.load_frames(args.which, end=args.end)
             ours = as_rows(frames, args.which)
+        global _note
+        _note = D.sample_sentence(D.sample_block(
+            first=Z.DATE_START, last=args.end,
+            basis="the zoo window; the T column is per factor"))
         with b.phase("render"):
             out = paths.section_results("s4_zoo")
             flat = [{"panel": p, "factor": f, "shaded": r["shaded"],
@@ -125,6 +134,9 @@ def main() -> int:
                 cfg["stem"],
                 {"summary": {"exhibit": cfg["exhibit"], "tex_label": cfg["label"],
                              "weighting": args.which, "end": args.end,
+                             "sample": D.sample_block(
+                                 first=Z.DATE_START, last=args.end,
+                                 basis="the zoo window; the T column is per factor"),
                              "n_factors": Z.N_FACTORS,
                              "n_significant": n_sig, "n_fdr_survivors": n_bh},
                  "rows": flat},

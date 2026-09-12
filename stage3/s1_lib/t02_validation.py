@@ -76,8 +76,11 @@ def as_rows(ours: dict) -> list[dict]:
             for panel in ours for f in FACTORS for i, col in enumerate(COLUMNS)]
 
 
-def render_latex(ours: dict, caption: str, T: int) -> str:
-    L = [r"\begin{table}[!ht]", r"\caption{" + caption + "}",
+def render_latex(ours: dict, caption: str, sample: dict) -> str:
+    """❗Took `T` and never referenced it. It now takes the sample block and the
+    caption carries the sentence."""
+    L = [r"\begin{table}[!ht]",
+         r"\caption{" + caption + " " + D.sample_sentence(sample) + "}",
          r"\begin{center}", r"\label{" + LABEL + r"}", r"\scalebox{0.85}{%",
          r"\begin{tabular}{l rrrrrrrr}", r"\toprule",
          "Factor & " + " & ".join(HEADERS) + r" \\"]
@@ -113,11 +116,15 @@ def main() -> int:
             pd.DataFrame(rows).to_csv(out / "table02_cells.csv", index=False)
             stats.to_csv(out / "table02_stats.csv", index=False)
             tex = paths.TABLES / "table02.tex"
-            tex.write_text(render_latex(ours, captions.caption(LABEL), T),
+            sample = D.sample_block(
+                first=stats["first"].iloc[0], last=stats["last"].iloc[0], T=T,
+                basis="the LIB window; T is asserted, so every row shares it")
+            tex.write_text(render_latex(ours, captions.caption(LABEL), sample),
                            encoding="utf-8")
             D.write_result(
                 "table02",
                 {"summary": {"exhibit": "Table 2", "tex_label": LABEL,
+                             "sample": sample,
                              "n_cells": len(rows), "T": T, "nw_lags": lags},
                  "cells": rows},
                 section="s1_lib",

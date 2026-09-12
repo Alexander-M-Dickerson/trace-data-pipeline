@@ -39,6 +39,15 @@ import paths                  # noqa: E402
 
 # (paper's exhibit number, kind, file stem, one-line note or "")
 # Order is the paper's. A stem that is not on disk is reported, never silently dropped.
+# The order the title page summarises samples in, and what to call each section.
+SECTION_LABELS = {
+    "s0_data": "Data appendix sample",
+    "s1_lib": "Section 3 sample",
+    "s2_lab": "Section 4 sample",
+    "s3_nse": "Section 5 sample",
+    "s4_zoo": "Factor zoo sample",
+}
+
 EXHIBITS = [
     ("main", "Main text", [
         ("Table 1", "table", "table01", ""),
@@ -161,6 +170,18 @@ def provenance() -> dict:
         except Exception:            # noqa: BLE001 -- a half-written manifest is not fatal
             continue
         out["n_runs"] += 1
+        # ❗Keep the SAMPLE. This loop already opens every manifest and until now took
+        # the `manifest` block and dropped the `summary` sibling, which is exactly where
+        # each exhibit records the months it was computed over.
+        try:
+            summ = json.loads(f.read_text(encoding="utf-8")).get("summary") or {}
+        except Exception:
+            summ = {}
+        blk = summ.get("sample")
+        if isinstance(blk, dict) and blk.get("first") and blk.get("last"):
+            out.setdefault("samples", {})[f.parent.name] = \
+                out.setdefault("samples", {}).get(f.parent.name, [])
+            out["samples"][f.parent.name].append((blk["first"], blk["last"]))
         pbl = m.get("pybondlab")
         if pbl:
             rec = by_tree.setdefault(pbl.get("tree_sha256"),
@@ -225,9 +246,17 @@ def title_page(window: str, prov: dict) -> str:
     L.append(r"\subsection*{What produced these}")
     L.append(r"\begin{tabular}{ll}\toprule")
     L.append(r"Section 5 window & " + latex_escape(window) + r" \\")
-    lib, lab = S.SAMPLE["lib"], S.SAMPLE["lab"]
-    L.append(r"Section 3 and 5 sample & " + f"{lib['start']} to {lib['end']}" + r" \\")
-    L.append(r"Section 4 sample & " + f"{lab['start']} to {lab['end']}" + r" \\")
+    # ❗Per SECTION, and measured. A single sample line for the whole document was
+    # wrong: it claimed 2002-09 to 2024-12 while the data appendix in the same PDF was
+    # computed to 2025-11 and printed a 2025 row, with nothing to tell a reader which
+    # exhibits stop where. Each exhibit now states its own sample in its own caption;
+    # this is the summary of those.
+    for sect, label in SECTION_LABELS.items():
+        spans = (prov.get("samples") or {}).get(sect)
+        if not spans:
+            continue
+        first, last = min(s_[0] for s_ in spans), max(s_[1] for s_ in spans)
+        L.append(latex_escape(label) + " & " + f"{first[:7]} to {last[:7]}" + r" \\")
     if prov.get("written"):
         L.append(r"Last exhibit written & " + latex_escape(prov["written"][:19]) + r" \\")
     L.append(r"Exhibit runs recorded & " + str(prov.get("n_runs", 0)) + r" \\")

@@ -25,6 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))   # stage3/
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import captions             # noqa: E402
+import drrlib as D          # noqa: E402
 import latex_format as F    # noqa: E402
 
 COLS = ["mu_mean", "mu_median", "nse_mu", "ratio_mu",
@@ -39,8 +40,11 @@ def as_rows(df: pd.DataFrame) -> list[dict]:
             for _, r in df.iterrows() for c in COLS]
 
 
-def render_latex(df: pd.DataFrame, label: str, *, note: str = "") -> str:
-    L = [r"\begin{table}[!ht]", r"\caption{" + captions.caption(label) + "}",
+def render_latex(df: pd.DataFrame, label: str, *, note: str = "",
+                 sample: dict | None = None) -> str:
+    L = [r"\begin{table}[!ht]",
+         r"\caption{" + captions.caption(label) + " "
+         + D.sample_sentence(sample) + "}",
          r"\begin{center}", r"\label{" + label + r"}", r"\scalebox{0.85}{%",
          r"\begin{tabular}{l rrrr rrrr r}", r"\toprule"]
     L.append(" & " + " & ".join(

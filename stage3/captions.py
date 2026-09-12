@@ -76,11 +76,18 @@ CAPTIONS: dict[str, str] = {
 }
 
 
-def caption(label: str) -> str:
+def caption(label: str, note: str = "") -> str:
     """The caption for a LaTeX label. Unknown labels fail here rather than printing
-    an empty caption into a table nobody then notices is unlabelled."""
+    an empty caption into a table nobody then notices is unlabelled.
+
+    ❗`note` is appended verbatim and is where the SAMPLE SENTENCE goes -- render it
+    with `drrlib.sample_sentence(block)` and pass it in. The titles above are the
+    authors' and never change; what has to track the data is the sentence that says
+    which months and how many observations produced the numbers. Keeping the two apart
+    means this module stays free of dependencies and the note stays derived.
+    """
     try:
-        return CAPTIONS[label]
+        return CAPTIONS[label] + (" " + note if note else "")
     except KeyError:
         raise KeyError(
             f"no caption registered for {label!r}. Add it to captions.CAPTIONS -- "

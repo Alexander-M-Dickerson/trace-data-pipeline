@@ -28,6 +28,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))   # stage3/
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import captions             # noqa: E402
+
+# ❗Set by main() before anything renders, from the data this driver actually
+# used. The caption TITLE is fixed in `captions.py`; this is the sentence that has
+# to track the sample, so it is never written by hand.
+_note = ""
 import drrlib as D          # noqa: E402
 import latex_format as F    # noqa: E402
 import paths                # noqa: E402
@@ -81,7 +86,7 @@ def render_latex(counts: dict, names: dict, *, as_printed: bool) -> str:
             if as_printed else
             "b_rvol is placed as the paper's own signal dictionary places it.")
     L = [r"% " + note,
-         r"\begin{table}[!ht]", r"\caption{" + captions.caption(LABEL) + "}",
+         r"\begin{table}[!ht]", r"\caption{" + captions.caption(LABEL, note=_note) + "}",
          r"\begin{center}",
          r"\label{" + LABEL + ("}" if as_printed else "-dictionary}"),
          r"\scalebox{0.85}{%", r"\begin{tabular}{l l rrrr}", r"\toprule",
@@ -122,6 +127,10 @@ def main() -> int:
             surv = survivors(frames)
             printed_c, printed_n = counts_and_names(surv, as_printed=True)
             dict_c, dict_n = counts_and_names(surv, as_printed=False)
+        global _note
+        _note = D.sample_sentence(D.sample_block(
+            first=Z.DATE_START, last=args.end,
+            basis="the zoo window; each factor carries its own T"))
         with b.phase("render"):
             out = paths.section_results("s4_zoo")
             pd.DataFrame([{"cluster": cl, "spec": f"{w}_{s}", "n": printed_c[cl][(w, s)],
@@ -141,6 +150,9 @@ def main() -> int:
                 "table_ia09",
                 {"summary": {"exhibit": "Table IA.IX", "tex_label": LABEL,
                              "end": args.end, "survivors_by_spec": n_total,
+                             "sample": D.sample_block(
+                                 first=Z.DATE_START, last=args.end,
+                                 basis="the zoo window; each factor carries its own T"),
                              "sign_conflicts": conflicts},
                  "as_printed": {cl: {f"{w}_{s_}": printed_c[cl][(w, s_)]
                                      for w, s_ in ZF.SPEC_COLS}

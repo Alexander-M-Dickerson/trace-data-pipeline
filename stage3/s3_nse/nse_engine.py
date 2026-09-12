@@ -243,6 +243,23 @@ MUA_SUMMARY_DIR = paths.DATA / "s3_nse" / "mua_summary"
 GRID_STRATEGIES = 108 * (216 - 24 - 24)
 
 
+def window_span(window: str) -> tuple[str, str]:
+    """(first, last) of a Section-5 reporting window.
+
+    ❗Unlike Sections 3 and 4, this is NOT read off an index: Section 5 summarises
+    across construction paths, and the window is a truncation applied to each series at
+    the statistics layer. The span is therefore a property of the WINDOW, and
+    `mua_summarize` has already truncated to it.
+    """
+    import _stage3_settings as _S
+    if window == "paper":
+        return _S.SAMPLE["lib"]["start"], _S.SAMPLE["lib"]["end"]
+    lo = _S.SAMPLE["lib"]["start"]
+    led = load_ledger(window)
+    hi = str(led["last_month"].dropna().max())[:10] or _S.SAMPLE["lib"]["end"]
+    return lo, hi
+
+
 def load_ledger(window: str) -> pd.DataFrame:
     """The status ledger: one row per (signal, spec_id), all 23,328 of them.
 

@@ -171,6 +171,85 @@ def load_mktb(path: Path | None = None, *, start: str = SAMPLE_START,
     return s.loc[str(start):str(end)]
 
 
+def sample_block(obj=None, *, window: str | None = None, basis: str = "",
+                 T: int | None = None, T_min: int | None = None,
+                 T_max: int | None = None, first=None, last=None,
+                 **extra) -> dict:
+    """THE sample-provenance record every exhibit carries. One shape, one place.
+
+    ❗Built from the data the exhibit ACTUALLY used, never from a settings constant.
+    Before this existed, only 11 of 26 result manifests recorded a span and 9 a T, under
+    eight different key names -- and where a "sample" was recorded it was usually the
+    REQUESTED window rather than the realised one, so a caption built on it would have
+    described the intention instead of the result.
+
+    Pass an index or a frame and the span and length are read off it; or pass `first`,
+    `last` and `T`/`T_min`/`T_max` directly when the exhibit pools series of different
+    lengths and no single index exists.
+
+    `basis` says in words what the numbers rest on -- "the LIB window, T asserted",
+    "each series' own length", "construction paths, not a time series" -- because the
+    three cases are genuinely different and a reader needs to know which one they have.
+    """
+    import pandas as _pd
+
+    idx = None
+    if obj is not None:
+        idx = obj.index if hasattr(obj, "index") and not isinstance(obj, _pd.Index) else obj
+    if idx is not None and len(idx):
+        ts = _pd.to_datetime(_pd.Index(idx))
+        first = first or ts.min().strftime("%Y-%m-%d")
+        last = last or ts.max().strftime("%Y-%m-%d")
+        T = T if T is not None else len(ts)
+
+    block: dict = {"first": first, "last": last, "basis": basis}
+    if T is not None:
+        block["T"] = int(T)
+        block["nw_lags"] = nw_lags(int(T))
+    if T_min is not None:
+        block["T_min"] = int(T_min)
+    if T_max is not None:
+        block["T_max"] = int(T_max)
+    if window:
+        block["window"] = window
+    block.update(extra)
+    return block
+
+
+def sample_sentence(block: dict | None) -> str:
+    """The sentence that closes a caption, in the form the paper uses.
+
+        Sample: 2002-09 to 2024-12, T=268.
+        Sample: 2002-08 to 2024-12, T 257-268 by series.
+        Sample: 2002-09 to 2024-12; 18,032 construction paths.
+
+    ❗Derived, never typed. The titles in `captions.py` are the authors' words and do
+    not change; this is the part that has to track whatever data the run was given, so
+    that a document whose data appendix reaches 2025-11 says 2025-11.
+    """
+    if not block:
+        return ""
+    def _m(v):
+        return str(v)[:7] if v else None
+    first, last = _m(block.get("first")), _m(block.get("last"))
+    span = f"Sample: {first} to {last}" if first and last else "Sample"
+    bits = []
+    if block.get("T") is not None:
+        bits.append(f"T={block['T']}")
+    elif block.get("T_min") is not None and block.get("T_max") is not None:
+        lo, hi = block["T_min"], block["T_max"]
+        bits.append(f"T={lo}" if lo == hi else f"T {lo}-{hi} by series")
+    if block.get("n_paths") is not None:
+        # the noun comes from the block: Section 5's two halves vary different things
+        # (data-cleaning filters vs portfolio construction) and must not both be called
+        # "construction paths"
+        bits.append(f"{block['n_paths']:,} {block.get('paths_label', 'paths')}")
+    if not bits:
+        return span + "."
+    sep = "; " if block.get("n_paths") is not None and block.get("T") is None else ", "
+    return span + sep + ", ".join(bits) + "."
+
+
 def assert_sample(idx: pd.Index, expected_T: int, what: str = "sample") -> None:
     """Fail loudly on a wrong sample length -- T drives the NW lag count."""
     if len(idx) != expected_T:

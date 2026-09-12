@@ -106,11 +106,16 @@ def _fmt(v: float) -> str:
     return s.replace("-", "$-$", 1) if s.startswith("-") else s
 
 
-def render_latex(ours: dict, caption: str, T: int, *, label: str,
+def render_latex(ours: dict, caption: str, sample: dict, *, label: str,
                  factors: tuple[str, ...] = FACTORS,
                  subtitles: dict[str, str] | None = None) -> str:
+    """❗The caption's TITLE is the authors' and does not change. What gets
+    appended is the sample sentence, derived from the run that produced these
+    numbers -- see `drrlib.sample_sentence`. This function used to take `T` as its
+    third argument and never reference it."""
     subtitles = subtitles or DEFAULT_SUBTITLES
-    L = [r"\begin{table}[!ht]", r"\caption{" + caption + "}",
+    L = [r"\begin{table}[!ht]",
+         r"\caption{" + caption + " " + D.sample_sentence(sample) + "}",
          r"\begin{center}", r"\label{" + label + r"}", r"\scalebox{0.75}{%",
          r"\begin{tabular}{l rr rr rr rr rr}", r"\toprule"]
     L.append(" & " + " & ".join(r"\multicolumn{2}{c}{" + g[0] + "}"
@@ -166,12 +171,15 @@ def run_two_row_exhibit(*, exhibit: str, label: str, caption: str,
             ours = as_cells(stats, factors, panel_specs)
             T = int(stats["T"].iloc[0])
             lags = int(stats["nw_lags"].iloc[0])
+            sample = D.sample_block(
+                first=stats["first"].iloc[0], last=stats["last"].iloc[0], T=T,
+                basis="the LIB window; T is asserted, so every row shares it")
             out = paths.section_results("s1_lib")
             pd.DataFrame(as_rows(ours, factors)).to_csv(
                 out / f"{stem}_cells.csv", index=False)
             stats.to_csv(out / f"{stem}_stats.csv", index=False)
             tex = paths.TABLES / f"{stem}.tex"
-            tex.write_text(render_latex(ours, caption, T, label=label,
+            tex.write_text(render_latex(ours, caption, sample, label=label,
                                         factors=factors, subtitles=subtitles),
                            encoding="utf-8")
             D.write_result(
@@ -181,8 +189,7 @@ def run_two_row_exhibit(*, exhibit: str, label: str, caption: str,
                              "n_panels": len(panel_specs),
                              "n_cells": len(factors) * len(panel_specs)
                                         * len(COLUMNS) * 2,
-                             "T": T, "nw_lags": lags,
-                             "sample": [any_spec.start, any_spec.end]},
+                             "T": T, "nw_lags": lags, "sample": sample},
                  "cells": as_rows(ours, factors)},
                 section="s1_lib",
                 inputs=[paths.BBW] + [paths.SORTS / E.sort_csv(

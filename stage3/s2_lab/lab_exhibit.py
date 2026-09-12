@@ -75,9 +75,12 @@ def _fmt(v: float) -> str:
 
 
 def render_latex(ours: dict, caption: str, columns: list[tuple], label: str,
-                 head_groups: list[tuple[str, list[str]]]) -> str:
+                 head_groups: list[tuple[str, list[str]]],
+                 sample: dict | None = None) -> str:
     ncol = len(columns) + 1
-    L = [r"\begin{table}[!ht]", r"\caption{" + caption + "}", r"\begin{center}",
+    L = [r"\begin{table}[!ht]",
+         r"\caption{" + caption + " " + D.sample_sentence(sample) + "}",
+         r"\begin{center}",
          r"\label{" + label + r"}", r"\scalebox{0.78}{%",
          r"\begin{tabular}{l " + " ".join("c" * len(g[1]) for g in head_groups) + "}",
          r"\toprule"]
@@ -114,17 +117,26 @@ def run_lab_exhibit(*, exhibit: str, label: str, columns: list[tuple], stem: str
             # ❗T is per series here, not one shared number: a LAB signal can be
             # missing months its neighbours have, and each t-statistic uses its own.
             T_range = (int(stats["T"].min()), int(stats["T"].max()))
+            # ❗T is per series here, so the sentence says a RANGE. Section 4's
+            # winsorization threshold is a full-sample quantile, so the window is a
+            # producer argument and the series inside it are each their own length.
+            sample = D.sample_block(
+                first=str(stats["first"].min())[:10] if "first" in stats else None,
+                last=str(stats["last"].max())[:10] if "last" in stats else None,
+                T_min=T_range[0], T_max=T_range[1],
+                basis="each series' own length inside the LAB window")
             out = paths.section_results("s2_lab")
             pd.DataFrame(rows).to_csv(out / f"{stem}_cells.csv", index=False)
             stats.to_csv(out / f"{stem}_stats.csv", index=False)
             tex = paths.TABLES / f"{stem}.tex"
             tex.write_text(render_latex(ours, captions.caption(label), columns,
-                                        label, head_groups), encoding="utf-8")
+                                        label, head_groups, sample=sample),
+                           encoding="utf-8")
             D.write_result(
                 stem,
                 {"summary": {"exhibit": exhibit, "tex_label": label,
                              "n_cells": len(rows), "T_min": T_range[0],
-                             "T_max": T_range[1]},
+                             "T_max": T_range[1], "sample": sample},
                  "cells": rows},
                 section="s2_lab", inputs=[paths.BBW], t0=t0,
                 extra={"exhibit": exhibit, "tex_label": label})

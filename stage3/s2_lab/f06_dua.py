@@ -167,6 +167,12 @@ def main() -> int:
                              "holding_period": HOLDING,
                              "n_bars": len(allp), "T_min": int(allp["T"].min()),
                              "T_max": int(allp["T"].max()),
+                             "sample": D.sample_block(
+                                 first=str(allp["start"].min())[:10],
+                                 last=str(allp["end"].max())[:10],
+                                 T_min=int(allp["T"].min()),
+                                 T_max=int(allp["T"].max()),
+                                 basis="the ex-ante momentum sweep, per bar"),
                              "n_ex_ante": len(ex_ante),
                              "n_ex_ante_significant": len(significant)},
                  "bars": allp.to_dict("records")},

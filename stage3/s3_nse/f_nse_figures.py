@@ -185,6 +185,11 @@ def main() -> int:
                 {"summary": {"exhibit": "Figures IA.3-IA.6",
                              "window": args.window, "twin": args.twin,
                              "n_figures": len(checks),
+                             "sample": D.sample_block(
+                                 first=E.window_span(args.window)[0],
+                                 last=E.window_span(args.window)[1],
+                                 window=args.window,
+                                 basis="box statistics over paths, not a time series"),
                              "identity_ok": all(c["identity_ok"] for c in checks),
                              "sign_flips_premia_of_36": premia_flips,
                              "sign_flips_alpha_of_36": alpha_flips},

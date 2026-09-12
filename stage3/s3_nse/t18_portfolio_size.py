@@ -36,6 +36,12 @@ import drrlib as D          # noqa: E402
 import latex_format as F    # noqa: E402
 import nse_engine as E      # noqa: E402
 import paths                # noqa: E402
+
+# ❗Set by main() before rendering, from the data this driver actually used.
+# The caption TITLE is fixed in `captions.py`; this is the sentence that has to
+# track the sample, so it is never written by hand.
+_sample: dict = {}
+_note = ""
 from bench import Bench     # noqa: E402
 
 LABEL = "tab:mua_portfolio_size"
@@ -47,7 +53,7 @@ from mua_summarize import LOW_BOND_THRESHOLD as LOW_THRESHOLD   # noqa: E402
 
 
 def render_latex(df: pd.DataFrame) -> str:
-    L = [r"\begin{table}[!ht]", r"\caption{" + captions.caption(LABEL) + "}",
+    L = [r"\begin{table}[!ht]", r"\caption{" + captions.caption(LABEL, note=_note) + "}",
          r"\begin{center}", r"\label{" + LABEL + r"}", r"\scalebox{0.88}{%",
          r"\begin{tabular}{l rrrrrr}", r"\toprule",
          "Design dimension & " + " & ".join(h for _, h, _ in COLS) + r" \\",
@@ -89,6 +95,13 @@ def main() -> int:
             ls = E.load_mua_nbonds(twin=args.twin, window=args.window)
         with b.phase("stats"):
             ours = E.mua_portfolio_size(ls)
+        global _sample, _note
+        lo, hi = E.window_span(args.window)
+        _sample = D.sample_block(
+            first=lo, last=hi, window=args.window,
+            n_paths=ls.attrs["n_strategies"], paths_label="strategies",
+            basis="strategies, not a time series")
+        _note = D.sample_sentence(_sample)
         with b.phase("render"):
             out = paths.section_results("s3_nse")
             ours.to_csv(out / f"table_ia18_portfolio_size_{args.window}.csv",
@@ -98,6 +111,7 @@ def main() -> int:
             D.write_result(
                 f"table_ia18_{args.window}",
                 {"summary": {"exhibit": "Table IA.XVIII", "tex_label": LABEL,
+                             "sample": _sample,
                              "window": args.window, "twin": args.twin,
                              "n_rows": len(ours),
                              "n_strategies": ls.attrs["n_strategies"],

@@ -93,12 +93,18 @@ def main() -> int:
                     f"{mua.attrs['n_degenerate']} with an empty leg and "
                     f"{mua.attrs['n_no_series']} never formed; "
                     f"{len(flips)} signals sign-corrected.")
-            tex.write_text(CT.render_latex(ours, LABEL, note=note), encoding="utf-8")
+            lo, hi = E.window_span(args.window)
+            sample = D.sample_block(first=lo, last=hi, window=args.window,
+                                    n_paths=mua.attrs["n_paths"],
+                                    
+                                    paths_label="construction paths",basis="construction paths, not a time series")
+            tex.write_text(CT.render_latex(ours, LABEL, note=note, sample=sample),
+                           encoding="utf-8")
             D.write_result(
                 f"table06_{args.window}",
                 {"summary": {"exhibit": "Table 6", "tex_label": LABEL,
                              "window": args.window, "twin": args.twin,
-                             "n_paths": mua.attrs["n_paths"],
+                             "n_paths": mua.attrs["n_paths"], "sample": sample,
                              "n_degenerate": mua.attrs["n_degenerate"],
                              "n_signals_flipped": len(flips),
                              "twin_invariance_max_abs_diff": twin_max_d,

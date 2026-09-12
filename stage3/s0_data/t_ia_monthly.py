@@ -35,6 +35,11 @@ for _p in (str(Path(__file__).resolve().parents[1]), str(Path(__file__).resolve(
         sys.path.insert(0, _p)
 
 import captions             # noqa: E402
+
+# ❗Set by main() before anything renders, from the data this driver actually
+# used. The caption TITLE is fixed in `captions.py`; this is the sentence that has
+# to track the sample, so it is never written by hand.
+_note = ""
 import data_engine as E     # noqa: E402
 import drrlib as D          # noqa: E402
 import latex_format as F    # noqa: E402
@@ -49,7 +54,7 @@ RET_COLS = [("End", "ret_vw"), ("Begin", "ret_vw_bgn")]
 
 def _table(label: str, body: list[str], colspec: str, scale: str = "0.85") -> str:
     return "\n".join(
-        [r"\begin{table}[!ht]", r"\caption{" + captions.caption(label) + "}",
+        [r"\begin{table}[!ht]", r"\caption{" + captions.caption(label, note=_note) + "}",
          r"\begin{center}", r"\label{" + label + r"}", r"\scalebox{" + scale + r"}{%",
          r"\begin{tabular}{" + colspec + "}", r"\toprule", *body,
          r"\bottomrule", r"\end{tabular}", "}", r"\end{center}", r"\end{table}"]) + "\n"
@@ -164,6 +169,10 @@ def main() -> int:
             tc = E.time_concentration(df)
             an = E.annual_stats(df)
             total = E.annual_total_row(an)
+        global _note
+        _note = D.sample_sentence(D.sample_block(
+            first=str(df["date"].min())[:10], last=str(df["date"].max())[:10],
+            basis="the monthly panel, to its own frontier"))
         with b.phase("render"):
             out = paths.section_results("s0_data")
             for name, frame in (("table_ia3_availability", avail),
@@ -188,8 +197,10 @@ def main() -> int:
                              "tex_labels": list(LABELS.values()),
                              "n_rows": len(df), "n_years": len(an),
                              "n_printed_vars_ia4": len(pooled),
-                             "sample": [str(df["date"].min().date()),
-                                        str(df["date"].max().date())]},
+                             "sample": D.sample_block(
+                                 first=str(df["date"].min().date()),
+                                 last=str(df["date"].max().date()),
+                                 basis="the monthly panel, to its own frontier")},
                  "availability": avail.to_dict("records"),
                  "pooled": pooled.to_dict("records"),
                  "cross_sectional": cross.to_dict("records"),

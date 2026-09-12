@@ -319,7 +319,10 @@ def main() -> int:
                 {"summary": {"exhibit": "Figures 3, 4, IA.1",
                              "identity_fig4": bool(g4["pass"]),
                              "identity_figIA1": bool(gia["pass"]),
-                             "sample": [CTX["start"], CTX["end"]]},
+                             "sample": D.sample_block(
+                                 first=CTX["start"], last=CTX["end"],
+                                 T=CTX["expected_T"],
+                                 basis="the LIB window; T is asserted")},
                  "fig03_finals": finals,
                  "fig04": {k: v.to_dict("records") for k, v in d4.items()},
                  "figIA1": {k: v.to_dict("records") for k, v in dia.items()},

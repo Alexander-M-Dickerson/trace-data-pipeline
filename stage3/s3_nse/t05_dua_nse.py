@@ -63,10 +63,17 @@ def main() -> int:
             note = (f"Ratio computed on the pairwise-matched sample; "
                     f"{dua.attrs['n_grid_paths']:,} filter paths; tail location from "
                     f"{dua.attrs['location_source']}.")
-            tex.write_text(CT.render_latex(ours, LABEL, note=note), encoding="utf-8")
+            lo, hi = E.window_span(args.window)
+            sample = D.sample_block(first=lo, last=hi, window=args.window,
+                                    n_paths=dua.attrs["n_grid_paths"],
+                            paths_label="filter paths",
+                                    basis="filter paths, not a time series")
+            tex.write_text(CT.render_latex(ours, LABEL, note=note, sample=sample),
+                           encoding="utf-8")
             D.write_result(
                 f"table05_{args.window}",
                 {"summary": {"exhibit": "Table 5", "tex_label": LABEL,
+                             "sample": sample,
                              "window": args.window,
                              "n_grid_paths": dua.attrs["n_grid_paths"],
                              "location_source": dua.attrs["location_source"],
