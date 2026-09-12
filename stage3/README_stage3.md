@@ -203,7 +203,7 @@ other.
 So it is a labelling convention -- **except when the engine forms one member and not the
 other**. Then the two conventions select different data rather than different labels, and
 the statistics move: measured on this build, `feb` gives 18,032 strategies and `mar14`
-gives 18,018, a gap equal to the 14 asymmetric pairs. `t06_mua_nse.py` fails its
+gives 18,018, a gap equal to the 14 asymmetric pairs. `s3_nse/t06_mua_nse.py` fails its
 twin-invariance check when this bites, rather than printing a number as though nothing
 had happened. `nse_engine.twin_asymmetry()` names the pairs.
 

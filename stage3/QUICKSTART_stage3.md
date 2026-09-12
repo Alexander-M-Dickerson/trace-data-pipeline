@@ -168,7 +168,7 @@ run's own audit and they are collected in `reports/timings.jsonl`; `make_report.
 prints any that failed on the PDF's title page, so a red check cannot leave the document
 silently.
 
-❗One check is **red by design** on this build: `t06_mua_nse.py`'s twin-invariance check
+❗One check is **red by design** on this build: `s3_nse/t06_mua_nse.py`'s twin-invariance check
 fails whenever the sort engine's unstable empty cell bites (see *What is not
 reproducible* in README_stage3.md). The run continues, the PDF is produced, and the exit
 code is non-zero. That is the intended behaviour, not a broken install.

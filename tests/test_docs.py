@@ -69,7 +69,8 @@ DOC_FILES = [
     "stage2/README_stage2.md", "stage2/QUICKSTART_stage2.md",
     "stage2/DATA_DICTIONARY.md", "stage2/README_Default.md", "stage2/README_Value.md",
     "stage3/README_stage3.md", "stage3/QUICKSTART_stage3.md",
-    "stage3/DATA_DICTIONARY.md",
+    "stage3/DATA_DICTIONARY.md", "stage3/INDEX.md",
+    "stage3/RECONCILIATION_ia08.md",
 ]
 
 # Named in prose but produced at runtime or shipped inside a download, so they are
