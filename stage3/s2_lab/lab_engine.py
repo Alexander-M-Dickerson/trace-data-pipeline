@@ -88,9 +88,18 @@ def load_series(root: Path | None = None) -> dict:
     return out
 
 
-def load_mktb_lab() -> pd.Series:
-    """MKTB over the LAB window (2002-08 .. 2024-12), from Stage 2's factor file."""
-    return D.load_mktb(paths.BBW, start=D.SAMPLE_START_LAB, end=D.SAMPLE_END)
+def load_mktb_lab(end: str | None = None) -> pd.Series:
+    """MKTB over the LAB window, from Stage 2's factor file.
+
+    ❗`end` follows the SERIES, not a constant. Every alpha here is a regression on
+    MKTB, so capping MKTB caps the estimate -- and this used to load a pinned
+    `D.SAMPLE_END`. The producer would rebuild its series to the panel frontier, the
+    exhibits would read them, and every alpha would still stop at 2024-12 because the
+    right-hand side did. Pass the series' own last month and the two agree by
+    construction.
+    """
+    return D.load_mktb(paths.BBW, start=D.SAMPLE_START_LAB,
+                       end=end or D.SAMPLE_END)
 
 
 def lab_stats(cell: dict, mktb: pd.Series, spec: LabSpec,

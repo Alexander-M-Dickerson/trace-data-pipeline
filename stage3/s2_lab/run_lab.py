@@ -122,6 +122,26 @@ def run_cell(data: pd.DataFrame, *, tail: str, rating: str | None,
     return {k: pd.DataFrame(v) for k, v in ts.items()}
 
 
+def built_window(root: Path) -> tuple[str, str] | None:
+    """The window the series ON DISK were built for, or None if unrecorded.
+
+    ❗The per-cell skip in `main` is what makes a re-run cheap, and it was also how
+    the series and their manifest came to disagree: a run with a new `--date-end` found
+    every cell present, skipped all of them, and then wrote a manifest claiming the new
+    window over parquets built for the old one. Every Section-4 caption takes its sample
+    from these series, so the document stated a window it had not used. The skip is
+    conditional on this now.
+    """
+    p = root / "manifest.json"
+    if not p.exists():
+        return None
+    try:
+        m = json.loads(p.read_text(encoding="utf-8"))
+        return str(m["date_start"])[:10], str(m["date_end"])[:10]
+    except Exception:
+        return None
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--tails", nargs="+", default=["left", "right"],
@@ -140,6 +160,18 @@ def main() -> int:
     root = series_root()
     tag = "lab-series"
 
+    want = (str(args.date_start)[:10], str(args.date_end)[:10])
+    have = built_window(root)
+    rebuild_all = args.force
+    if not rebuild_all and any(root.glob("*.parquet")) and have != want:
+        was = f"{have[0]} .. {have[1]}" if have else "an unrecorded window"
+        print(f"[window] the series on disk were built for {was}; you asked "
+              f"for {want[0]} .. {want[1]}.")
+        print("         The winsorization threshold is a quantile of the "
+              "window, so these cannot be truncated after the fact -- "
+              "rebuilding every cell.")
+        rebuild_all = True
+
     data = None
     with Bench(tag, section="s2_lab", echo=True) as bench:
         for tail in args.tails:
@@ -147,7 +179,7 @@ def main() -> int:
                 cell_files = [root / f"standard__{rating}__{tail}__{k}.parquet"
                               for k in E.TS_KEYS]
                 with bench.phase(f"{tail}.{rating}"):
-                    if all(p.exists() for p in cell_files) and not args.force:
+                    if all(p.exists() for p in cell_files) and not rebuild_all:
                         print(f"[skip] {tail}/{rating} exists")
                         continue
                     if data is None:
@@ -168,6 +200,18 @@ def main() -> int:
                      for t in args.tails for r in args.ratings)
         ok = bench.check(n_have == n_cells,
                          f"{n_have}/{n_cells} LAB cells complete (9 frames each)")
+        # the manifest is about to claim this window; prove the parquets agree, so a
+        # skipped cell can never leave the two out of step again
+        spans = []
+        for p in sorted(root.glob("*.parquet")):
+            idx = pd.to_datetime(pd.read_parquet(p).index)
+            spans.append((str(idx.min())[:10], str(idx.max())[:10]))
+        if spans:
+            lo, hi = min(x for x, _ in spans), max(y for _, y in spans)
+            ok &= bench.check(
+                lo >= want[0] and hi <= want[1],
+                f"the series span {lo} .. {hi}, inside the requested "
+                f"{want[0]} .. {want[1]}")
 
     manifest = {"tails": args.tails, "ratings": args.ratings,
                 "date_start": args.date_start, "date_end": args.date_end,

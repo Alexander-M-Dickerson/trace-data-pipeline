@@ -280,7 +280,11 @@ def main() -> int:
         with b.phase("load"):
             source = load_series_source()
             vix = load_vix()
-            mktb = E.load_mktb_lab()
+            # same rule as the tables: MKTB follows the series, or every alpha
+            # in the figure stops wherever the pinned constant did
+            mktb = E.load_mktb_lab(
+                end=max(str(c[k].index.max())[:10]
+                        for c in source.values() for k in c))
             specs = [E.LabSpec(tail=t, rating=r)
                      for t in ("left", "right") for r in E.RATINGS]
             stats = E.build(source, specs, mktb=mktb)

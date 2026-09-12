@@ -528,3 +528,36 @@ def test_the_rendered_captions_state_their_sample():
               and "Sample:" not in t.read_text(encoding="utf-8")]
     assert not silent, (
         "rendered tables with no sample sentence: " + ", ".join(silent))
+
+
+def test_the_lab_series_match_the_window_their_manifest_claims():
+    """Section 4's series are built FOR a window; the manifest must not outrun them.
+
+    The defect this catches, which shipped once: `run_lab.py` skips a cell whose nine
+    parquets already exist, but wrote its manifest unconditionally from the requested
+    dates. Asking for a later `--date-end` therefore skipped every cell and rewrote
+    only the manifest -- and since each Section-4 caption takes its sample from the
+    series it was handed, the tables went on printing the old window while the run had
+    been asked for a new one. Nothing failed; the document was just wrong about itself.
+    """
+    import json
+    pd = pytest.importorskip("pandas")
+    root = STAGE3 / "data" / "s2_lab" / "series"
+    man = root / "manifest.json"
+    parts = sorted(root.glob("*.parquet"))
+    if not man.exists() or not parts:
+        pytest.skip("the LAB series have not been produced")
+    m = json.loads(man.read_text(encoding="utf-8"))
+    want_lo, want_hi = str(m["date_start"])[:10], str(m["date_end"])[:10]
+    spans = []
+    for p in parts:
+        idx = pd.to_datetime(pd.read_parquet(p).index)
+        spans.append((str(idx.min())[:10], str(idx.max())[:10]))
+    lo, hi = min(x for x, _ in spans), max(y for _, y in spans)
+    assert lo >= want_lo and hi <= want_hi, (
+        f"the manifest claims {want_lo} .. {want_hi} but the series span {lo} .. {hi}")
+    # `hi` is the widest series, so this only asks that SOMETHING reached the end --
+    # a signal whose own data stops early is coverage, not a skipped rebuild.
+    assert hi[:7] == want_hi[:7], (
+        f"the manifest claims the window ends {want_hi} but no series reaches past "
+        f"{hi} -- the cells were skipped rather than rebuilt")

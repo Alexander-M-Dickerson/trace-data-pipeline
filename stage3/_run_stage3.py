@@ -174,6 +174,34 @@ TAKES_WINDOW = {"s3_nse/mua_summarize.py", "s3_nse/run_dua_grid.py",
                 "s3_nse/t19_mua_improvement.py", "s3_nse/f_nse_figures.py",
                 "make_report.py"}
 
+def window_is_stale(script: str, want_end: str) -> bool:
+    """Was this producer's output built for a DIFFERENT sample window?
+
+    ❗Almost every producer saves untruncated series and the window is applied later,
+    so re-running one is unnecessary when the window changes. Section 4 is the exception
+    and it matters: its winsorization threshold is a full-sample quantile BY
+    CONSTRUCTION, so the window is a producer argument there and the saved series belong
+    to one specific window.
+
+    Without this check, `--sample frontier` would find the series present, skip the
+    producer, and hand every Section-4 exhibit a 2024-12 sample while the user had asked
+    for 2025-11 -- quietly, because each exhibit's caption reports the window of the
+    series it was given rather than the one that was requested.
+    """
+    import json
+    if script != "s2_lab/run_lab.py":
+        return False
+    man = _target("data/s2_lab/series/manifest.json")
+    try:
+        got = json.loads(man.read_text(encoding="utf-8"))["date_end"]
+    except Exception:
+        # Series with no readable manifest could have been built for any window. We
+        # cannot tell, so we do not get to assume it is the right one: run the
+        # producer, which re-reads the manifest itself and decides per cell.
+        return True
+    return str(got)[:10] != str(want_end)[:10]
+
+
 ACCEPTS_FAST = {"s1_lib/run_sorts.py", "s1_lib/run_lib_sorts.py",
                 "s4_zoo/run_zoo_sorts.py"}
 ACCEPTS_FORCE = {"s1_lib/run_sorts.py", "s1_lib/run_lib_sorts.py", "s2_lab/run_lab.py",
@@ -230,16 +258,21 @@ def needed_inputs(steps) -> list[str]:
             and (S.INPUTS[k] is None or not Path(S.INPUTS[k]).exists())]
 
 
-def would_run(steps, force: bool) -> tuple[list, list]:
-    """Split the selected steps into (would run, would skip), applying the skip rule."""
+def would_run(steps, force: bool, sample_end: str = "") -> tuple[list, list]:
+    """Split the selected steps into (would run, would skip), applying the skip rule.
+
+    ❗Applies the SAME rule as the run loop, window-staleness included. A preview that
+    disagrees with the run it previews is worse than no preview.
+    """
     run, skip = [], []
     for st in steps:
-        (run if st[1] != "producer" or force or not _target(st[4]).exists()
+        stale = bool(sample_end) and window_is_stale(st[2], sample_end)
+        (run if st[1] != "producer" or force or stale or not _target(st[4]).exists()
          else skip).append(st)
     return run, skip
 
 
-def print_config(args, eng: dict, missing: list[str]) -> None:
+def print_config(args, eng: dict, missing: list[str], sample_end: str) -> None:
     unset = "(unset: export it, or edit _stage3_settings.py)"
     print("Stage 3 configuration")
     print(f"  stage 0 dir    {S.STAGE0_DIR}")
@@ -256,7 +289,13 @@ def print_config(args, eng: dict, missing: list[str]) -> None:
         print(f"  sort kernels   {'yes' if eng['fast'] else 'NO -- the slow path'}")
     else:
         print(f"  PyBondLab      UNAVAILABLE -- {eng['why']}")
-    print(f"  sample         {S.SAMPLE}")
+    # the pinned S.SAMPLE is the PAPER window and is not necessarily this run's.
+    # Printing it under `--sample frontier` told the operator 2024-12 while every
+    # exhibit was in fact being built to the panel's own end.
+    why = ("the panel's own frontier" if args.sample == "frontier"
+           else "the published window")
+    print(f"  sample         {S.SAMPLE['lib']['start'][:7]} .. {sample_end[:7]}"
+          f"   (--sample {args.sample}: {why})")
     print(f"  portfolios     {S.N_PORTFOLIOS}")
     print(f"  columns        {S.COLUMNS}")
     if args.section:
@@ -304,9 +343,9 @@ def main() -> int:
     import drrlib as _D
     sample_end = _D.resolve_sample_end(args.sample)
     missing = needed_inputs(steps)
-    print_config(args, eng, missing)
+    print_config(args, eng, missing, sample_end)
 
-    will_run, will_skip = would_run(steps, args.force)
+    will_run, will_skip = would_run(steps, args.force, sample_end)
     if args.dry_run:
         print(f"\n{len(will_run)} step(s) would run, {len(will_skip)} skipped "
               "(their output already exists).")
@@ -336,10 +375,13 @@ def main() -> int:
     ran, skipped, failed = [], [], []
     for section, kind, script, sargs, target in steps:
         label = _label(script, sargs)
-        if kind == "producer" and not args.force and _target(target).exists():
+        if (kind == "producer" and not args.force and _target(target).exists()
+                and not window_is_stale(script, sample_end)):
             print(f"[skip] {label}  ({target} exists)")
             skipped.append(label)
             continue
+        if kind == "producer" and window_is_stale(script, sample_end):
+            print(f"[rebuild] {label}  (its series were built for a different window)")
         argv = [sys.executable, script, *sargs]
         if use_fast and script in ACCEPTS_FAST:
             argv.append("--fast")

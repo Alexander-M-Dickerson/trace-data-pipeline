@@ -107,7 +107,12 @@ def run_lab_exhibit(*, exhibit: str, label: str, columns: list[tuple], stem: str
     with Bench(stem, section="s2_lab", sample=not no_bench, echo=True) as b:
         with b.phase("load"):
             source = load_source()
-            mktb = E.load_mktb_lab()
+            # the series were built by the producer for one specific window; MKTB
+            # has to match it, or every alpha is silently truncated to whichever
+            # is shorter
+            _end = max(str(c[k].index.max())[:10]
+                       for c in source.values() for k in c)
+            mktb = E.load_mktb_lab(end=_end)
         with b.phase("stats"):
             specs = [E.LabSpec(tail=t) for t in PANELS.values()]
             stats = E.build(source, specs, mktb=mktb)
