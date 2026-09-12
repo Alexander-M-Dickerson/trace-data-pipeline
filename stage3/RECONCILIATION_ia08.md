@@ -55,11 +55,20 @@ that follows.
 | IX. Macro & Other Betas | **15** | **18** | ✗ |
 | **total** | **108** | **108** | |
 
-Both add to 108, which is why nothing caught it: −1 −1 −1 +3 = 0. The *table* is the one
-Stage 3 and Stage 2 agree with, and it is the one the sorts actually use.
+Both add to 108, which is why nothing caught it: −1 −1 −1 +3 = 0. Any check on the
+total would have passed. The *table* is the one Stage 3 and Stage 2 agree with, and it is
+the one the sorts actually use.
 
-Located at `main.tex:2062, 2065, 2077, 2080`. **This is a defect in the paper's text, not
-in the pipeline** — fixing it is an edit to `main.tex`, which is out of scope here.
+**Fixed in the paper on 2026-09-12** — four digits in each of `main.tex` (lines 2062,
+2065, 2077, 2080) and `internet-appendix.tex` (547, 550, 562, 565), which carry the same
+nine sentences. Nothing else changed, and all three PDFs rebuild at their expected page
+counts (main-ms 53, internet-appendix 38, main 94).
+
+Only the digits needed changing. The prose descriptions are **compressed throughout**,
+not enumerations — cluster II describes 5 signals in 2 clauses, V covers 16 in 11, IX
+covers 18 in 7 — so although cluster IV's sentence names twelve things for thirteen
+members (`ilq`, Roll Autocovariance, goes unnamed), that is the same house style as
+every other cluster and not a second defect.
 
 ---
 
