@@ -134,6 +134,46 @@ STEPS = [
 # Producers that accept `--fast` (PyBondLab's sort kernels) and `--force`. The runner
 # appends these itself rather than baking them into STEPS: whether the kernels are
 # available is a property of the installed engine, not of the step.
+# How each section spells "end the sample here". One switch at the top; the drivers
+# keep their own flags, so running one by hand is unchanged.
+#
+# ❗`--sample frontier` is the DEFAULT: if you built a panel reaching 2025-11, the
+# exhibits use it. `--sample paper` reproduces the published window (2024-12, T=268) for
+# anyone checking our output against the printed tables. Every caption states which one
+# it was, so a PDF is never ambiguous about its own sample.
+#
+# ❗Three of the 108 signals stop before the frontier because their data does
+# (`b_cptlt` 2025-05, `b_dcpi`/`b_cpi_vol6` 2025-10). That is coverage, not degeneracy:
+# the status ledger judges each strategy inside its own signal's span, which is why
+# extending the window does not invent degenerate strategies.
+SAMPLE_FLAG = {
+    "s0_data/t_ia_daily.py": "--end",
+    "s0_data/t_ia_monthly.py": "--end",
+    "s1_lib/run_sorts.py": None,          # producers save untruncated series;
+    "s1_lib/run_lib_sorts.py": None,      # the window is applied at the statistics layer
+    "s1_lib/t01_table1.py": "--end",
+    "s1_lib/t02_validation.py": "--end",
+    "s1_lib/t12_rating_single.py": "--end",
+    "s1_lib/t13_rating_wf.py": "--end",
+    "s1_lib/t14_illiq.py": "--end",
+    "s1_lib/tB1_lib_summary.py": "--end",
+    "s1_lib/f_lib_figures.py": "--end",
+    "s2_lab/run_lab.py": "--date-end",    # ❗a PRODUCER argument here: the
+                                          # winsorization threshold is a full-sample
+                                          # quantile, so the window cannot be applied
+                                          # afterwards
+    "s4_zoo/t_ia09.py": "--end",
+    "s4_zoo/t_ia10_11.py": "--end",
+    "s4_zoo/t_inline.py": "--end",
+}
+# Section 5 and the report name a WINDOW rather than a date.
+WINDOW_FLAG = {"paper": "paper", "frontier": "full"}
+TAKES_WINDOW = {"s3_nse/mua_summarize.py", "s3_nse/run_dua_grid.py",
+                "s3_nse/t05_dua_nse.py", "s3_nse/t06_mua_nse.py",
+                "s3_nse/t17_filter_paths.py", "s3_nse/t18_portfolio_size.py",
+                "s3_nse/t19_mua_improvement.py", "s3_nse/f_nse_figures.py",
+                "make_report.py"}
+
 ACCEPTS_FAST = {"s1_lib/run_sorts.py", "s1_lib/run_lib_sorts.py",
                 "s4_zoo/run_zoo_sorts.py"}
 ACCEPTS_FORCE = {"s1_lib/run_sorts.py", "s1_lib/run_lib_sorts.py", "s2_lab/run_lab.py",
@@ -239,6 +279,11 @@ def main() -> int:
     ap.add_argument("--no-fast", action="store_true",
                     help="never use PyBondLab's sort kernels, even when available. "
                          "Much slower; useful for checking the two paths agree")
+    ap.add_argument("--sample", choices=("frontier", "paper"), default="frontier",
+                    help="how far the exhibits run. `frontier` (default) uses whatever "
+                         "the Stage-2 panel reaches; `paper` reproduces the published "
+                         "window, 2002-09 to 2024-12, T=268. Every caption states which "
+                         "one produced it.")
     ap.add_argument("--keep-going", action="store_true",
                     help="continue after a failing step instead of stopping")
     args = ap.parse_args()
@@ -256,6 +301,8 @@ def main() -> int:
 
     eng = engine_status()
     use_fast = eng["fast"] and not args.no_fast
+    import drrlib as _D
+    sample_end = _D.resolve_sample_end(args.sample)
     missing = needed_inputs(steps)
     print_config(args, eng, missing)
 
@@ -298,6 +345,11 @@ def main() -> int:
             argv.append("--fast")
         if args.force and script in ACCEPTS_FORCE:
             argv.append("--force")
+        flag = SAMPLE_FLAG.get(script)
+        if flag and not any(a == flag for a in sargs):
+            argv += [flag, sample_end]
+        elif script in TAKES_WINDOW and not any(a == "--window" for a in sargs):
+            argv += ["--window", WINDOW_FLAG[args.sample]]
         extra = [a for a in argv[2 + len(sargs):]]
         print(f"[run ] {label}" + (f"  ({' '.join(extra)})" if extra else ""))
         t = time.perf_counter()

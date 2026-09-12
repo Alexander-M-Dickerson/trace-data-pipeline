@@ -171,6 +171,41 @@ def load_mktb(path: Path | None = None, *, start: str = SAMPLE_START,
     return s.loc[str(start):str(end)]
 
 
+def panel_frontier() -> str:
+    """The last month the Stage-2 panel actually holds, as YYYY-MM-DD.
+
+    Read from the parquet's own metadata, so it costs nothing and cannot go stale the
+    way a constant would. This is what `--sample frontier` resolves to: a panel rebuilt
+    next year moves it without anybody editing a date.
+    """
+    global _FRONTIER
+    try:
+        return _FRONTIER
+    except NameError:
+        pass
+    import duckdb
+    p = Path(paths.PANEL).as_posix()
+    d = duckdb.sql(f"SELECT MAX(date) FROM read_parquet(\'{p}\')").fetchone()[0]
+    _FRONTIER = str(d)[:10]
+    return _FRONTIER
+
+
+def resolve_sample_end(mode: str) -> str:
+    """`paper` -> the published window\'s end; `frontier` -> whatever the panel reaches.
+
+    ❗Signals do NOT all reach the frontier: three of the 108 stop earlier because
+    their underlying data does (`b_cptlt` 2025-05, `b_dcpi` and `b_cpi_vol6` 2025-10).
+    That is coverage, not degeneracy -- the status ledger judges each strategy inside
+    its own signal\'s span, so extending the window does not manufacture degenerate
+    strategies. See `mua_summarize.signal_last_return`.
+    """
+    if mode == "paper":
+        return SAMPLE_END_PAPER
+    if mode == "frontier":
+        return panel_frontier()
+    raise ValueError(f"unknown sample mode {mode!r} (paper|frontier)")
+
+
 def sample_block(obj=None, *, window: str | None = None, basis: str = "",
                  T: int | None = None, T_min: int | None = None,
                  T_max: int | None = None, first=None, last=None,
