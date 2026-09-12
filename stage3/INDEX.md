@@ -32,8 +32,8 @@ Shared code sits at the top level: `drrlib.py` (statistics, sample provenance, r
 | Table 2 | `tab:mmn_2` | `s1_lib/t02_validation.py` | 2002-09 to 2025-11, T=279 | `table02` |
 | Table 3 | `tab:lab_affected_factors` | `s2_lab/t03_affected.py` | -- | `table03` |
 | Table 4 | `tab:lab_ls_1` | `s2_lab/t04_table4.py` | 2002-08 to 2025-11, T 268-279 by series | `table04` |
-| Table 5 | `tab:nse_by_cluster` | `s3_nse/t05_dua_nse.py` | 2002-09 to 2025-11; 69,984 filter paths | `table05 (x2)` |
-| Table 6 | `tab:mu_nse_by_cluster` | `s3_nse/t06_mua_nse.py` | 2002-09 to 2025-11; 18,032 construction paths | `table06 (x2)` |
+| Table 5 ⚠ not produced | -- | `s3_nse/t05_dua_nse.py` | -- | `table05 (x2)` |
+| Table 6 ⚠ not produced | -- | `s3_nse/t06_mua_nse.py` | -- | `table06 (x2)` |
 | Figure 3 | -- | `s1_lib/f_lib_figures.py` | 2002-09 to 2025-11 | `fig03_cumret` |
 | Figure 4 | -- | `s1_lib/f_lib_figures.py` | 2002-09 to 2025-11 | `fig04_bias` |
 | Figure 6 | -- | `s2_lab/f06_dua.py` | 2002-09 to 2025-11, T=279 | `fig06_momentum_trim` |
@@ -46,8 +46,6 @@ Shared code sits at the top level: `drrlib.py` (statistics, sample provenance, r
 - **Table 2** -- Latent implementation bias validation for price-based factors.
 - **Table 3** -- Corporate bond factors sensitive to ex-post return filtering.
 - **Table 4** -- Look-ahead bias by factor.
-- **Table 5** -- Non-standard errors and data uncertainty by factor cluster.
-- **Table 6** -- Non-standard errors and methodological uncertainty by factor cluster.
 
 </details>
 
@@ -85,34 +83,34 @@ Shared code sits at the top level: `drrlib.py` (statistics, sample provenance, r
 
 | exhibit | label | driver | sample | stem |
 |---|---|---|---|---|
-| Table IA.I | `tab:data_availability` | `s0_data/t_ia_daily.py` | -- | `table_ia1` |
-| Table IA.II | `tab:descriptive_stats` | `s0_data/t_ia_daily.py` | -- | `table_ia2` |
-| Table IA.III | `tab:monthly_data_availability` | `s0_data/t_ia_monthly.py` | -- | `table_ia3` |
-| Table IA.IV | `tab:desc_stats_all` | `s0_data/t_ia_monthly.py` | -- | `table_ia4` |
-| Table IA.V | `tab:extreme_returns` | `s0_data/t_ia_monthly.py` | -- | `table_ia5` |
-| Table IA.VI | `tab:time_concentration_extremes` | `s0_data/t_ia_monthly.py` | -- | `table_ia6` |
-| Table IA.VII | `tab:annual_return_stats` | `s0_data/t_ia_monthly.py` | -- | `table_ia7` |
-| Table IA.VIII | `tab:signal_definitions` | `s4_zoo/t_ia08.py` | -- | `table_ia08` |
-| Table IA.IX | `tab:fdr_by_cluster` | `s4_zoo/t_ia09.py` | 2002-08 to 2025-11 | `table_ia09` |
-| Table IA.IX (by the signal dictionary) | `tab:fdr_by_cluster-dictionary` | `s4_zoo/t_ia09.py` | -- | `table_ia09_dictionary` |
-| Table IA.X | `tab:vw_results` | `s4_zoo/t_ia10_11.py` | 2002-08 to 2025-11 | `table_ia10` |
-| Table IA.XI | `tab:ew_results` | `s4_zoo/t_ia10_11.py` | 2002-08 to 2025-11 | `table_ia11` |
+| Table IA.I | `tab:data_availability` | `s0_data/t_ia_daily.py` | 2002-07 to 2025-11 | `table_ia1` |
+| Table IA.II | `tab:descriptive_stats` | `s0_data/t_ia_daily.py` | 2002-07 to 2025-11 | `table_ia2` |
+| Table IA.III | `tab:monthly_data_availability` | `s0_data/t_ia_monthly.py` | 2002-08 to 2025-11 | `table_ia3` |
+| Table IA.IV | `tab:desc_stats_all` | `s0_data/t_ia_monthly.py` | 2002-08 to 2025-11 | `table_ia4` |
+| Table IA.V | `tab:extreme_returns` | `s0_data/t_ia_monthly.py` | 2002-08 to 2025-11 | `table_ia5` |
+| Table IA.VI | `tab:time_concentration_extremes` | `s0_data/t_ia_monthly.py` | 2002-08 to 2025-11 | `table_ia6` |
+| Table IA.VII | `tab:annual_return_stats` | `s0_data/t_ia_monthly.py` | 2002-08 to 2025-11 | `table_ia7` |
+| Table IA.VIII ⚠ not produced | -- | `s4_zoo/t_ia08.py` | -- | `table_ia08` |
+| Table IA.IX ⚠ not produced | -- | `s4_zoo/t_ia09.py` | -- | `table_ia09` |
+| Table IA.IX (by the signal dictionary) ⚠ not produced | -- | `s4_zoo/t_ia09.py` | -- | `table_ia09_dictionary` |
+| Table IA.X ⚠ not produced | -- | `s4_zoo/t_ia10_11.py` | -- | `table_ia10` |
+| Table IA.XI ⚠ not produced | -- | `s4_zoo/t_ia10_11.py` | -- | `table_ia11` |
 | Table IA.XII | `tab:mmn_app_1` | `s1_lib/t12_rating_single.py` | 2002-09 to 2025-11, T=279 | `table12` |
 | Table IA.XIII | `tab:mmn_app_2` | `s1_lib/t13_rating_wf.py` | 2002-09 to 2025-11, T=279 | `table13` |
 | Table IA.XIV | `tab:illiq_1` | `s1_lib/t14_illiq.py` | 2002-09 to 2025-11, T=279 | `table14` |
 | Table IA.XV | `tab:lab_full_mean_8` | `s2_lab/t15_decomp.py` | 2002-08 to 2025-11, T 268-279 by series | `table15` |
 | Table IA.XVI | `tab:lab_full_alpha_9` | `s2_lab/t15_decomp.py` | 2002-08 to 2025-11, T 268-279 by series | `table16` |
-| Table IA.XVII | `tab:filter_paths` | `s3_nse/t17_filter_paths.py` | 2002-09 to 2025-11; 69,984 filter paths | `table_ia17 (x2)` |
-| Table IA.XVIII | `tab:mua_portfolio_size` | `s3_nse/t18_portfolio_size.py` | 2002-09 to 2025-11; 18,032 strategies | `table_ia18 (x2)` |
-| Table IA.XIX | `tab:mua_improvement` | `s3_nse/t19_mua_improvement.py` | 2002-09 to 2025-11; 18,032 construction paths | `table_ia19 (x2)` |
-| Inline counts (alpha) | -- | `s4_zoo/t_inline.py` | -- | `inline_counts_alpha` |
-| Inline counts (premium) | -- | `s4_zoo/t_inline.py` | -- | `inline_counts_premium` |
+| Table IA.XVII ⚠ not produced | -- | `s3_nse/t17_filter_paths.py` | -- | `table_ia17 (x2)` |
+| Table IA.XVIII ⚠ not produced | -- | `s3_nse/t18_portfolio_size.py` | -- | `table_ia18 (x2)` |
+| Table IA.XIX ⚠ not produced | -- | `s3_nse/t19_mua_improvement.py` | -- | `table_ia19 (x2)` |
+| Inline counts (alpha) ⚠ not produced | -- | `s4_zoo/t_inline.py` | -- | `inline_counts_alpha` |
+| Inline counts (premium) ⚠ not produced | -- | `s4_zoo/t_inline.py` | -- | `inline_counts_premium` |
 | Figure IA.1 | -- | `s1_lib/f_lib_figures.py` | 2002-09 to 2025-11 | `figIA1_bias_by_rating` |
 | Figure IA.2 | -- | `s2_lab/f_lab_figures.py` | 2002-08 to 2025-11 | `figIA2_lab_decomposition_rating` |
-| Figure IA.3 | -- | `s3_nse/f_nse_figures.py` | 2002-09 to 2025-11 | `figIA3_nse_alpha_tstat_dua (x2)` |
-| Figure IA.4 | -- | `s3_nse/f_nse_figures.py` | 2002-09 to 2025-11 | `figIA4_nse_tstat_dua (x2)` |
-| Figure IA.5 | -- | `s3_nse/f_nse_figures.py` | 2002-09 to 2025-11 | `figIA5_nse_alpha_tstat_mua (x2)` |
-| Figure IA.6 | -- | `s3_nse/f_nse_figures.py` | 2002-09 to 2025-11 | `figIA6_nse_tstat_mua (x2)` |
+| Figure IA.3 ⚠ not produced | -- | `s3_nse/f_nse_figures.py` | -- | `figIA3_nse_alpha_tstat_dua (x2)` |
+| Figure IA.4 ⚠ not produced | -- | `s3_nse/f_nse_figures.py` | -- | `figIA4_nse_tstat_dua (x2)` |
+| Figure IA.5 ⚠ not produced | -- | `s3_nse/f_nse_figures.py` | -- | `figIA5_nse_alpha_tstat_mua (x2)` |
+| Figure IA.6 ⚠ not produced | -- | `s3_nse/f_nse_figures.py` | -- | `figIA6_nse_tstat_mua (x2)` |
 
 <details><summary>caption titles</summary>
 
@@ -123,20 +121,61 @@ Shared code sits at the top level: `drrlib.py` (statistics, sample provenance, r
 - **Table IA.V** -- Extreme Returns Analysis.
 - **Table IA.VI** -- Time Concentration of Extreme Returns.
 - **Table IA.VII** -- Annual Return Summary Statistics.
-- **Table IA.VIII** -- Signal Definitions and Citations.
-- **Table IA.IX** -- FDR survivors by factor cluster.
-- **Table IA.X** -- Factors with significant alphas after bias correction (value-weighted).
-- **Table IA.XI** -- Factors with significant alphas after bias correction (equal-weighted).
 - **Table IA.XII** -- Latent implementation bias in price-based factors (value-weighted, single-sort).
 - **Table IA.XIII** -- Latent implementation bias in price-based factors (value-weighted, within-firm).
 - **Table IA.XIV** -- Latent implementation bias in illiquidity factors.
 - **Table IA.XV** -- Look-ahead bias decomposition by leg (mean return).
 - **Table IA.XVI** -- Look-ahead bias decomposition by leg (CAPMB alpha).
-- **Table IA.XVII** -- Filter path improvement analysis by factor cluster, filter type, and tail location.
-- **Table IA.XVIII** -- Cross-sectional portfolio size by design dimension.
-- **Table IA.XIX** -- Portfolio construction improvement analysis by factor cluster and methodology dimension.
 
 </details>
+
+## By driver
+
+The same exhibits keyed on the file instead of the paper's numbering, in the order the run reaches them. An exhibit number is what a reader of the paper has; a filename is what a reader of the repo has.
+
+| driver | kind | produces |
+|---|---|---|
+| `s0_data/tA_filter_params.py` | exhibit | Table A.1, Table A.2, Table A.3 |
+| `s0_data/t_ia_daily.py` | exhibit | Table IA.I, Table IA.II |
+| `s0_data/t_ia_monthly.py` | exhibit | Table IA.III, Table IA.IV, Table IA.V, Table IA.VI, Table IA.VII |
+| `s1_lib/t01_table1.py` | exhibit | Table 1 |
+| `s1_lib/t02_validation.py` | exhibit | Table 2 |
+| `s1_lib/t12_rating_single.py` | exhibit | Table IA.XII |
+| `s1_lib/t13_rating_wf.py` | exhibit | Table IA.XIII |
+| `s1_lib/t14_illiq.py` | exhibit | Table IA.XIV |
+| `s1_lib/tB1_lib_summary.py` | exhibit | Table B.1, Table B.1 (corrected) |
+| `s1_lib/f_lib_figures.py` | exhibit | Figure 3, Figure 4, Figure IA.1 |
+| `s2_lab/t03_affected.py` | exhibit | Table 3 |
+| `s2_lab/t04_table4.py` | exhibit | Table 4 |
+| `s2_lab/t15_decomp.py` | exhibit | Table IA.XV, Table IA.XVI |
+| `s2_lab/f06_dua.py` | exhibit | Figure 6 |
+| `s2_lab/f_lab_figures.py` | exhibit | Figure 7, Figure 8, Figure IA.2 |
+| `s3_nse/t05_dua_nse.py` | exhibit | Table 5 |
+| `s3_nse/t06_mua_nse.py` | exhibit | Table 6 |
+| `s3_nse/t17_filter_paths.py` | exhibit | Table IA.XVII |
+| `s3_nse/t18_portfolio_size.py` | exhibit | Table IA.XVIII |
+| `s3_nse/t19_mua_improvement.py` | exhibit | Table IA.XIX |
+| `s3_nse/f_nse_figures.py` | exhibit | Figure IA.3, Figure IA.4, Figure IA.5, Figure IA.6 |
+| `s4_zoo/t_ia08.py` | exhibit | Table IA.VIII |
+| `s4_zoo/t_ia09.py` | exhibit | Table IA.IX, Table IA.IX (by the signal dictionary) |
+| `s4_zoo/t_ia10_11.py` | exhibit | Table IA.X, Table IA.XI |
+| `s4_zoo/t_inline.py` | exhibit | Inline counts (alpha), Inline counts (premium) |
+
+Producers are the expensive half -- they run sorts through PyBondLab and save return series, and are skipped when their output already exists. Exhibits read those series and render in seconds. `python _run_stage3.py --list` prints all 41 steps with their arguments.
+
+## What the producers read and write
+
+Scanned from each producer's source. The five external files are pinned in `spec/inputs.json` and checked by `tools/check_inputs.py` before a run starts; everything else is another Stage-3 step's output.
+
+| producer | reads | writes |
+|---|---|---|
+| `s1_lib/run_sorts.py` | the Stage-2 monthly panel (`paths.PANEL`); the MMN price-based signals (`paths.MMN`); the factor file (`paths.FACTORS`) | `data/sorts/` |
+| `s1_lib/run_lib_sorts.py` | the Stage-2 monthly panel (`paths.PANEL`); the MMN price-based signals (`paths.MMN`) | `data/sorts/lib/` |
+| `s2_lab/run_lab.py` | the Stage-2 monthly panel (`paths.PANEL`) | `data/s2_lab/series/` |
+| `s3_nse/run_mua_grid.py` | the Stage-2 monthly panel (`paths.PANEL`); the grids under `data/grids/` | `data/grids/mua/` |
+| `s3_nse/mua_summarize.py` | the BBW factor series (`paths.BBW`); the grids under `data/grids/` | `data/s3_nse/mua_summary/` |
+| `s3_nse/run_dua_grid.py` | the Stage-2 monthly panel (`paths.PANEL`); the BBW factor series (`paths.BBW`); the grids under `data/grids/` | `data/grids/dua/` |
+| `s4_zoo/run_zoo_sorts.py` | the Stage-2 monthly panel (`paths.PANEL`); the factor file (`paths.FACTORS`) | `data/sorts/zoo/` |
 
 ## Figures the paper draws in LaTeX
 

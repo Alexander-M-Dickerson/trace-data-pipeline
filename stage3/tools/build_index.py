@@ -245,6 +245,59 @@ def render(rs: list[dict]) -> str:
                 L.append(f"- **{r['number']}** -- {r['caption']}")
             L += ["", "</details>", ""]
 
+    # --- the same 44 rows the other way round: one entry per FILE ------------
+    # An exhibit number is what a reader of the paper has; a filename is what a reader
+    # of the repo has. Both need to reach the other in one step, and a driver that
+    # makes four figures is invisible in the tables above.
+    L += ["## By driver", "",
+          "The same exhibits keyed on the file instead of the paper's numbering, in the "
+          "order the run reaches them. An exhibit number is what a reader of the "
+          "paper has; a filename is what a reader of the repo has.", "",
+          "| driver | kind | produces |", "|---|---|---|"]
+    seen: dict[str, list] = {}
+    for r in rs:
+        seen.setdefault(r["driver"], []).append(r["number"])
+    order = {s: i for i, (_sec, _k, s, _a, _t) in enumerate(R.STEPS)}
+    for drv in sorted(seen, key=lambda d: (order.get(d, 999), d)):
+        kind = next((k for _s, k, s, _a, _t in R.STEPS if s == drv), "exhibit")
+        L.append(f"| `{drv}` | {kind} | " + ", ".join(seen[drv]) + " |")
+    L += ["",
+          "Producers are the expensive half -- they run sorts through PyBondLab and "
+          "save return series, and are skipped when their output already exists. "
+          "Exhibits read those series and render in seconds. `python _run_stage3.py "
+          "--list` prints all 41 steps with their arguments.",
+          ""]
+
+    # --- what each producer reads and writes ---------------------------------
+    # Scanned from the source, not from a manifest: a manifest only exists after a
+    # run, and this file is checked by a test that must pass on a fresh clone.
+    INPUT_NAMES = {"PANEL": "the Stage-2 monthly panel",
+                   "MMN": "the MMN price-based signals",
+                   "BBW": "the BBW factor series",
+                   "FACTORS": "the factor file",
+                   "DAILY": "the Stage-1 daily panel"}
+    L += ["## What the producers read and write", "",
+          "Scanned from each producer's source. The five external files are pinned in "
+          "`spec/inputs.json` and checked by `tools/check_inputs.py` before a run "
+          "starts; everything else is another Stage-3 step's output.",
+          "", "| producer | reads | writes |", "|---|---|---|"]
+    sources = driver_sources()
+    prod = {}
+    for _sec, kind, script, _a, target in R.STEPS:
+        if kind == "producer":
+            prod.setdefault(script, set()).add(str(Path(target).parent).replace("\\", "/"))
+    for script in sorted(prod, key=lambda d: order.get(d, 999)):
+        body = sources.get(script, "")
+        reads = [f"{INPUT_NAMES[k]} (`paths.{k}`)" for k in INPUT_NAMES
+                 if f"paths.{k}" in body]
+        if "paths.GRIDS" in body or "grids/" in body:
+            reads.append("the grids under `data/grids/`")
+        if "section_results" in body and not reads:
+            reads.append("another step's `data/<section>/` output")
+        L.append(f"| `{script}` | " + ("; ".join(reads) or "--") + " | "
+                 + ", ".join(f"`{w}/`" for w in sorted(prod[script])) + " |")
+    L.append("")
+
     L += [
         "## Figures the paper draws in LaTeX",
         "",
