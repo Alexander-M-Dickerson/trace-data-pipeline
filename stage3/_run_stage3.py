@@ -115,6 +115,7 @@ STEPS = [
     # -- the factor zoo -------------------------------------------------------
     ("zoo", "producer", "s4_zoo/run_zoo_sorts.py", [],
      "data/sorts/zoo/bond_within_firm_all_p2_h1.csv"),
+    ("zoo", "exhibit", "s4_zoo/t_ia08.py", [], "reports/tables/table_ia08.tex"),
     ("zoo", "exhibit", "s4_zoo/t_ia09.py", [], "reports/tables/table_ia09.tex"),
     ("zoo", "exhibit", "s4_zoo/t_ia10_11.py", ["--which", "vw"],
      "reports/tables/table_ia10.tex"),

@@ -83,6 +83,12 @@ EXHIBITS = [
         ("Table IA.V", "table", "table_ia5", ""),
         ("Table IA.VI", "table", "table_ia6", ""),
         ("Table IA.VII", "table", "table_ia7", ""),
+        ("Table IA.VIII", "table", "table_ia08",
+         "Generated from \\texttt{spec/signal\\_definitions.json}, which was "
+         "reconciled against Stage 2's data dictionary and against the code that "
+         "computes each signal. Rows marked $^{\\dagger}$ differ from the printed "
+         "table; \\texttt{RECONCILIATION\\_ia08.md} lists each one and what "
+         "settled it."),
         ("Table IA.IX", "table", "table_ia09",
          "As published: \\texttt{b\\_rvol} is placed where the printed table puts it."),
         ("Table IA.IX (by the signal dictionary)", "table", "table_ia09_dictionary",

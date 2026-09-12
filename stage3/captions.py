@@ -67,6 +67,8 @@ CAPTIONS: dict[str, str] = {
         "dimension.",
 
     # --- the factor zoo (Section IA) ------------------------------------------
+    "tab:signal_definitions":
+        "Signal Definitions and Citations.",
     "tab:vw_results":
         "Factors with significant alphas after bias correction (value-weighted).",
     "tab:ew_results":

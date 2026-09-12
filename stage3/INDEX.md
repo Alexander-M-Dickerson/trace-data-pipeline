@@ -92,6 +92,7 @@ Shared code sits at the top level: `drrlib.py` (statistics, sample provenance, r
 | Table IA.V | `tab:extreme_returns` | `s0_data/t_ia_monthly.py` | -- | `table_ia5` |
 | Table IA.VI | `tab:time_concentration_extremes` | `s0_data/t_ia_monthly.py` | -- | `table_ia6` |
 | Table IA.VII | `tab:annual_return_stats` | `s0_data/t_ia_monthly.py` | -- | `table_ia7` |
+| Table IA.VIII | `tab:signal_definitions` | `s4_zoo/t_ia08.py` | -- | `table_ia08` |
 | Table IA.IX | `tab:fdr_by_cluster` | `s4_zoo/t_ia09.py` | 2002-08 to 2025-11 | `table_ia09` |
 | Table IA.IX (by the signal dictionary) | `tab:fdr_by_cluster-dictionary` | `s4_zoo/t_ia09.py` | -- | `table_ia09_dictionary` |
 | Table IA.X | `tab:vw_results` | `s4_zoo/t_ia10_11.py` | 2002-08 to 2025-11 | `table_ia10` |
@@ -122,6 +123,7 @@ Shared code sits at the top level: `drrlib.py` (statistics, sample provenance, r
 - **Table IA.V** -- Extreme Returns Analysis.
 - **Table IA.VI** -- Time Concentration of Extreme Returns.
 - **Table IA.VII** -- Annual Return Summary Statistics.
+- **Table IA.VIII** -- Signal Definitions and Citations.
 - **Table IA.IX** -- FDR survivors by factor cluster.
 - **Table IA.X** -- Factors with significant alphas after bias correction (value-weighted).
 - **Table IA.XI** -- Factors with significant alphas after bias correction (equal-weighted).

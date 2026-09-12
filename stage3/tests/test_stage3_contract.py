@@ -480,7 +480,15 @@ def test_the_table6_footnote_arithmetic_closes():
 # ---------------------------------------------------------------------------
 # Exhibits with no sample by nature: the three cleaning-parameter tables read
 # constants out of the Stage-0/1 source, and Table 3 is a classification list.
-NO_SAMPLE = {"tablesA_filter_params", "table03"}
+# The three exhibits with no sample BY NATURE, each for a stated reason -- not a
+# convenience list. Anything else must record the months that produced it.
+#   tablesA_filter_params  Tables A.1-A.3: the cleaning filters' parameter values
+#   table03                Table 3: the paper's own classification of which factors
+#                          are filter-sensitive, a constant list, no data read
+#   table_ia08             Table IA.VIII: what each of the 140 panel columns MEANS.
+#                          A definition does not have a sample, and giving it one
+#                          would be a sentence with nothing behind it.
+NO_SAMPLE = {"tablesA_filter_params", "table03", "table_ia08"}
 
 
 def _summaries() -> dict:
@@ -535,9 +543,9 @@ def test_the_rendered_captions_state_their_sample():
     tables = sorted((STAGE3 / "reports" / "tables").glob("*.tex"))
     if not tables:
         pytest.skip("no tables built yet")
-    # the parameter tables and the classification table carry no sample; the two
-    # inline count blocks carry no caption at all
-    exempt = {"tableA1", "tableA2", "tableA3", "table03",
+    # the parameter tables, the classification table and the definition table carry
+    # no sample (see NO_SAMPLE above); the two inline count blocks carry no caption
+    exempt = {"tableA1", "tableA2", "tableA3", "table03", "table_ia08",
               "inline_counts_alpha", "inline_counts_premium"}
     silent = [t.stem for t in tables
               if t.stem not in exempt
@@ -607,3 +615,64 @@ def test_every_exhibit_the_report_expects_has_a_driver():
     rs, orphans = B.rows()
     assert not orphans, "no driver produces: " + ", ".join(orphans)
     assert len(rs) == sum(len(items) for _, _, items in B.MR.EXHIBITS)
+
+
+def test_every_sorted_signal_has_a_definition():
+    """Table IA.VIII must define every signal Stage 3 actually sorts.
+
+    If it does not, the table documents a different universe from the one the paper
+    reports on -- and the gap is invisible, because a missing definition does not stop
+    anything from running.
+    """
+    import json
+    sys.path.insert(0, str(STAGE3 / "s4_zoo"))
+    import zoo_engine as Z
+
+    spec = STAGE3 / "spec" / "signal_definitions.json"
+    rows = json.loads(spec.read_text(encoding="utf-8"))["rows"]
+    defined = {r["mnemonic"] for r in rows}
+    assert not (set(Z.CLUSTER_OF) - defined), (
+        "sorted with no definition: " + ", ".join(sorted(set(Z.CLUSTER_OF) - defined)))
+    assert len(rows) == len(defined) == 140, (len(rows), len(defined))
+
+
+def test_the_signal_spec_matches_the_stage2_contract():
+    """The 140 defined names must be exactly the 140 panel columns, in any order.
+
+    This is the join that makes the whole thing checkable: the paper's definition
+    table, Stage 2's panel and Stage 3's sorts all describing one set of names. A
+    variable added to Stage 2 and not to the spec shows up here rather than as a
+    column nobody ever documented.
+    """
+    import json
+    contract = STAGE3.parent / "stage2" / "lib" / "contract.py"
+    if not contract.exists():
+        pytest.skip("stage 2 is not beside stage 3 in this checkout")
+    sys.path.insert(0, str(STAGE3.parent / "stage2"))
+    from lib.contract import PANEL_COLUMNS
+
+    rows = json.loads(
+        (STAGE3 / "spec" / "signal_definitions.json").read_text(encoding="utf-8"))["rows"]
+    spec = {r["mnemonic"] for r in rows}
+    assert spec == set(PANEL_COLUMNS), {
+        "defined, not a panel column": sorted(spec - set(PANEL_COLUMNS)),
+        "a panel column, undefined": sorted(set(PANEL_COLUMNS) - spec)}
+
+
+def test_corrected_definition_rows_say_what_was_printed_and_why():
+    """A correction that does not record what it replaced is not reproducible.
+
+    Six rows differ from the printed Table IA.VIII. Each must carry the paper's own
+    text and the reason, so the printed table can be reconstructed from the spec and
+    no change is silent.
+    """
+    import json
+    rows = json.loads(
+        (STAGE3 / "spec" / "signal_definitions.json").read_text(encoding="utf-8"))["rows"]
+    fixed = [r for r in rows if "why_corrected" in r]
+    assert fixed, "no corrections recorded -- see RECONCILIATION_ia08.md"
+    for r in fixed:
+        assert r.get("paper_prints") or r.get("paper_prints_citation"), (
+            f"{r['mnemonic']}: corrected without recording what the paper prints")
+        assert len(r["why_corrected"]) > 80, (
+            f"{r['mnemonic']}: the reason is too short to be a reason")

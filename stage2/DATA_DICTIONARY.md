@@ -181,7 +181,7 @@ For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month r
 | `md_dur` | Modified Duration | Modified duration measuring price sensitivity to yield changes. |
 | `convx` | Convexity | Second-order price sensitivity to yield changes. |
 | `sze` | Bond Size | Bond market capitalization: dirty price times amount outstanding ($ millions). |
-| `dcs6` | 6-Month Spread Change | Log change in credit spread over prior 6 months: $\log(cs_{t-6}) - \log(cs_t)$. If spread is missing exactly 6 months ago, searches with ±1 month bandwidth. |
+| `dcs6` | 6-Month Spread Change | Log change in credit spread over prior 6 months: $\log(cs_{t-6}) - \log(cs_t)$. If spread is missing exactly 6 months ago, searches ±1 month, taking the EARLIER month first (`_stage2_settings.DSPREAD_BANDWIDTH = 1`; `lib/value.py` builds `offsets = [0, -1, +1]` and takes the first hit). |
 | `cs_mu12_1` | 12-Month Average Spread | Rolling 12-month average credit spread, skipping the prior month. Requires minimum 6 observations. |
 
 ---
