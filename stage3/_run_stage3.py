@@ -162,6 +162,8 @@ SAMPLE_FLAG = {
                                           # winsorization threshold is a full-sample
                                           # quantile, so the window cannot be applied
                                           # afterwards
+    "s2_lab/f06_dua.py": "--end",       # fits its OWN sweep, so the window is an
+                                        # argument here too
     "s4_zoo/t_ia09.py": "--end",
     "s4_zoo/t_ia10_11.py": "--end",
     "s4_zoo/t_inline.py": "--end",

@@ -577,3 +577,33 @@ def test_the_lab_series_match_the_window_their_manifest_claims():
     assert hi[:7] == want_hi[:7], (
         f"the manifest claims the window ends {want_hi} but no series reaches past "
         f"{hi} -- the cells were skipped rather than rebuilt")
+
+
+def test_the_exhibit_index_is_current():
+    """INDEX.md is generated; regenerating it must produce no diff.
+
+    Hand-written it would be stale in a month and nothing would say so -- the run still
+    works when a driver is renamed, you just find out from a "Not produced" stub at the
+    end of a 14-minute run.
+    """
+    import subprocess
+    out = subprocess.run(
+        [sys.executable, str(STAGE3 / "tools" / "build_index.py"), "--check"],
+        capture_output=True, text=True, cwd=str(STAGE3))
+    assert out.returncode == 0, (out.stdout + out.stderr).strip()
+
+
+def test_every_exhibit_the_report_expects_has_a_driver():
+    """Nothing asserted this before: the suite stayed green through a rename.
+
+    `make_report.EXHIBITS` is the list of what the PDF prints. If a stem there is
+    produced by no file in the tree, the report emits a stub instead of the exhibit,
+    and the only symptom is a gap in a document nobody diffs.
+    """
+    sys.path.insert(0, str(STAGE3))
+    sys.path.insert(0, str(STAGE3 / "tools"))
+    import build_index as B
+
+    rs, orphans = B.rows()
+    assert not orphans, "no driver produces: " + ", ".join(orphans)
+    assert len(rs) == sum(len(items) for _, _, items in B.MR.EXHIBITS)

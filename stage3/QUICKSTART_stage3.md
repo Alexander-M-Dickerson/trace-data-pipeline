@@ -46,6 +46,35 @@ export STAGE2_DIR=/path/to/trace-data-pipeline/stage2
 Any single input can also be pointed at directly — `STAGE2_PANEL`, `STAGE2_MMN`,
 `STAGE2_BBW`, `STAGE2_FACTORS`, `STAGE1_DAILY`.
 
+### Every environment variable Stage 3 reads
+
+Nothing here is required: each has a working default, and `_stage3_settings.py` is the
+alternative to exporting any of them.
+
+| variable | default | what it does |
+|---|---|---|
+| `STAGE0_DIR`, `STAGE1_DIR`, `STAGE2_DIR` | the sibling folders | where the earlier stages live |
+| `STAGE2_PANEL`, `STAGE2_MMN`, `STAGE2_BBW`, `STAGE2_FACTORS`, `STAGE1_DAILY` | derived from the above | one input file each, when the layout is not standard |
+| `STAGE3_MODE` | `stage1` | which panel to read: Stage 2 writes `main_panel_<mode>.parquet` |
+| `STAGE3_DATA` | `stage3/data` | where intermediate results are written. Point it at a fast disk, or at a scratch area to leave the repo clean |
+| `STAGE3_REPORTS` | `stage3/reports` | where tables, figures, `timings.jsonl` and the PDF go |
+| `PYBONDLAB_DIR` | the installed package | a PyBondLab checkout to use instead. Section 5 needs one with the fast kernels; everything else falls back on its own |
+| `STAGE3_WORKERS` | cores, clamped | processes for the two grids. `--workers` overrides per run |
+| `STAGE3_MEMORY_LIMIT` | `4GB` | DuckDB's memory cap in the data appendix |
+| `STAGE3_WORKER_THREADS` | set by `fastrun.pmap` | internal: how many threads one worker may use. Set by the parent, read by the child; you do not set this |
+| `NUMBA_NUM_THREADS` | set by the grid runners | internal, same idea, for numba inside a worker |
+| `STAGE3_ALLOW_STALE_LEDGER` | unset | ❗a correctness bypass — see below |
+
+**`STAGE3_ALLOW_STALE_LEDGER=1`** switches off one guard: the check that Section 5's
+status ledger is not older than the MUA grid it describes. Re-running the grid does not
+invalidate the summarizer's completion marker, so without the guard the orchestrator
+skips the summarizer and every Section-5 exhibit is built on a statistics layer derived
+from a *different* grid. That is not hypothetical — on 2026-09-11 it produced six cells
+holding a full 268-month series in the grid and `n_obs = 0` in the summary, seven minutes
+apart. The fix is almost always `python s3_nse/mua_summarize.py`. Set the variable only
+when you know the exhibits will describe a grid that is no longer on disk and you want
+them anyway.
+
 ## 2. Point at a PyBondLab build
 
 ```bash
@@ -138,6 +167,22 @@ so on a normal machine the grids are bounded by cores, not by memory.
 
 ---
 
+## Check it
+
+```bash
+cd stage3
+python -m pytest tests/ -q          # the contract suite: 68 checks, about 1 s
+python tools/check_inputs.py        # the five inputs, before a long run
+python _run_stage3.py --dry-run     # what would run, what would be skipped
+```
+
+The contract suite reads what is on disk and asserts what the code must be; it does not
+recompute any statistic, so it is fast enough to run on every edit. The run itself checks
+its own numbers as it goes — each driver records a PASS/FAIL line in
+`reports/timings.jsonl`, and `make_report.py` prints those that failed on the title page.
+
+---
+
 ## If something goes wrong
 
 | symptom | what it means |
@@ -147,4 +192,8 @@ so on a normal machine the grids are bounded by cores, not by memory.
 | `this exhibit needs sort CSVs under ...` | the message names the missing files and the command that makes them |
 | `needs PyBondLab's fast kernels` | set `PYBONDLAB_DIR` to a build that has them |
 | `--stats with a --signals subset` | refused on purpose: it would overwrite the full statistics with subset-only frames, and no exhibit downstream could tell |
+| `the MUA status ledger is not at ...` | run `s3_nse/mua_summarize.py`; it writes the ledger beside the summary |
+| `the MUA status ledger is OLDER than the grid it describes` | the grid was rebuilt and the summary was not. Re-run `s3_nse/mua_summarize.py`. `STAGE3_ALLOW_STALE_LEDGER=1` proceeds anyway |
+| `the ledger has N rows, expected 23,328` | the summarizer did not see the whole grid (108 signals x 216 specs). Re-run it |
+| `the series on disk were built for ...` | not an error: Section 4's window is a producer argument, so a different `--sample` rebuilds its cells |
 | `expected T=268, got NNN` | the sample window moved. Every t-statistic depends on T through the lag count, so this stops rather than printing quietly wrong numbers |

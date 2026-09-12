@@ -56,8 +56,14 @@ def trim_grid() -> dict:
                     + [round(p / 100, 4) for p in TRIM_PCTS]}
 
 
-def run_sweep():
-    """The DataUncertaintyAnalysis fit behind all four panels."""
+def run_sweep(end: str | None = None):
+    """The DataUncertaintyAnalysis fit behind all four panels.
+
+    ❗This figure does not read the producer's series -- it fits its own sweep
+    over the panel -- so the window is an argument here, not something applied
+    afterwards. It used to take the paper's constant, so the figure stayed at
+    2024-12 under `--sample frontier` while everything around it moved.
+    """
     import warnings
 
     from PyBondLab import DataUncertaintyAnalysis
@@ -70,7 +76,7 @@ def run_sweep():
     data["date"] = pd.to_datetime(data["date"])
     data["ret_vw"] = data["ret_vw"] - data["rfret"]
     data = data[(data["date"] >= S.SAMPLE["lab"]["start"])
-                & (data["date"] <= S.SAMPLE["lab"]["end"])].copy()
+                & (data["date"] <= (end or S.SAMPLE["lab"]["end"]))].copy()
     data["spc_rat"] = data["spc_rat"].astype("float64")
     assert data.duplicated(["cusip", "date"]).sum() == 0, "duplicate (cusip, date)"
     mapped = data.rename(columns={"cusip": "ID", "mcap_e": "VW",
@@ -138,6 +144,8 @@ def build_figure(panels: dict, out_pdf: Path) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--end", default=S.SAMPLE["lab"]["end"],
+                    help="last month of the sweep (default: the paper's window)")
     ap.add_argument("--no-bench", action="store_true")
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
@@ -148,10 +156,11 @@ def main() -> int:
     with Bench("fig06-dua", section="s2_lab", sample=not args.no_bench,
                echo=True) as b:
         with b.phase("sweep"):
-            result = run_sweep()
+            result = run_sweep(end=args.end)
         with b.phase("stats"):
+            # MKTB has to reach as far as the sweep, or every alpha is truncated
             mktb = D.load_mktb(paths.BBW, start=S.SAMPLE["lab"]["start"],
-                               end=S.SAMPLE["lab"]["end"])
+                               end=args.end)
             panels = compute_panels(result, mktb)
             allp = pd.concat(panels.values(), ignore_index=True)
         with b.phase("render"):

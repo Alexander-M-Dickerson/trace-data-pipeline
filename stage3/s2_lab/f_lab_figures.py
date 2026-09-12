@@ -319,10 +319,16 @@ def main() -> int:
                 {"summary": {"exhibit": "Figures 7, 8, IA.2",
                              "figIA2_identity_max_abs_diff": ident,
                              "identity_ok": bool(ident <= IDENT_TOL),
+                             # ❗from the series actually plotted, not from the
+                             # pinned constants -- those said 2024-12 while the
+                             # figures were drawn to the panel's frontier
                              "sample": D.sample_block(
-                                 first=S.SAMPLE["lab"]["start"],
-                                 last=S.SAMPLE["lab"]["end"],
-                                 basis="the LAB window; each series is its own length")},
+                                 first=min(str(c[k].index.min())[:10]
+                                           for c in source.values() for k in c),
+                                 last=max(str(c[k].index.max())[:10]
+                                          for c in source.values() for k in c),
+                                 basis="the LAB window; each series is its own "
+                                       "length")},
                  "fig07_vix_fit": f7,
                  "fig08_finals": {k: d["finals"] for k, d in f8.items()},
                  "figIA2_bars": ia2},

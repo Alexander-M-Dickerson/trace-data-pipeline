@@ -414,10 +414,22 @@ def write_result(name: str, payload: dict, *, section: str, inputs: list[Path],
             pbl = sys.modules["pblenv"].active()
         except Exception:
             pbl = None
+    # ❗The driver records ITSELF. `INDEX.md` is built by joining manifests to
+    # exhibits, and a hand-maintained "which file makes Table 7" list is stale the
+    # first time a driver is renamed. Taken from argv[0], so it is whatever was
+    # actually run.
+    try:
+        driver = Path(sys.argv[0]).resolve()
+        root = Path(__file__).resolve().parent
+        driver = driver.relative_to(root).as_posix()
+    except Exception:
+        driver = Path(sys.argv[0]).name if sys.argv and sys.argv[0] else None
+
     rec = dict(payload)
     rec["manifest"] = {
         "name": name,
         "section": section,
+        "driver": driver,
         "written_utc": pd.Timestamp.utcnow().isoformat(),
         "git_commit": _git("rev-parse", "HEAD"),
         "git_branch": _git("rev-parse", "--abbrev-ref", "HEAD"),
