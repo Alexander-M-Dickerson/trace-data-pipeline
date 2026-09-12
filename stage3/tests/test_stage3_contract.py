@@ -593,8 +593,22 @@ def test_the_exhibit_index_is_current():
     Hand-written it would be stale in a month and nothing would say so -- the run still
     works when a driver is renamed, you just find out from a "Not produced" stub at the
     end of a 14-minute run.
+
+    ❗Skipped unless every exhibit has been produced. One column -- the sample each
+    exhibit states -- is read from the manifests, so a clone that has run nothing, or a
+    run stopped half way, legitimately regenerates a different file. Failing there would
+    mean a stranger's first `pytest` is red for no reason, and a gate that cries wolf is
+    a gate people stop reading. It is exact once a full run exists, which is when it
+    can catch anything.
     """
     import subprocess
+    sys.path.insert(0, str(STAGE3))
+    sys.path.insert(0, str(STAGE3 / "tools"))
+    import build_index as B
+
+    rs, _ = B.rows()
+    if not all(r["produced"] for r in rs):
+        pytest.skip("not every exhibit is built, so the sample column is incomplete")
     out = subprocess.run(
         [sys.executable, str(STAGE3 / "tools" / "build_index.py"), "--check"],
         capture_output=True, text=True, cwd=str(STAGE3))
