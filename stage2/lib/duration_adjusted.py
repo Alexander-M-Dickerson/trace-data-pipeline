@@ -92,11 +92,15 @@ _GSW_SKIP = 9   # the Fed prepends a provenance preamble before the real header 
 
 # first_interest_date anchors the coupon grid on FISD's own dated cycle; last_interest_date caps it;
 # coupon_change_indicator marks step-ups, whose dates are right but whose constant amount is not.
-# Coupon / frequency / maturity come along only so a consumer can assert this file agrees with the
-# stage0 extract it augments -- the extract remains the source of truth for a bond's terms.
+# Coupon / frequency / maturity / coupon_type / dated_date / offering_date come along for two
+# reasons: so a consumer can assert this file agrees with the stage0 extract it augments (the
+# extract stays the source of truth for a bond's terms in stage 2), and because the PRE-TRACE engine
+# has no such extract -- its bond universe reaches back to 1973 and is not TRACE-limited -- so for
+# that engine this file is the only source of the terms the cash-flow ladder needs.
 _FISD_TERMS_SQL = """
     SELECT complete_cusip, first_interest_date, last_interest_date,
-           coupon_change_indicator, coupon, interest_frequency, maturity
+           coupon_change_indicator, coupon, coupon_type, interest_frequency,
+           maturity, dated_date, offering_date
     FROM fisd.fisd_mergedissue
 """
 

@@ -706,6 +706,12 @@ Compute as: `ret_vw - tret` (month-end) or `ret_vw_bgn - tret` (month-begin)
 | `tret_mat` | `tret`'s twin -- same series, nodes and rounding, interpolated at MATURITY rather than modified duration (Bessembinder, Kahle, Maxwell & Xu 2009) |
 | `rfret` | Monthly risk-free rate from Fama-French |
 
+> **The four `tret_*` columns are benchmarks only — nothing else in the panel uses them.** Every
+> duration-adjusted quantity we ship (`ret_vwx`, the 68 rolling beta and momentum columns, `str`,
+> `var_95`, `es_95`) is built from `ret_vw - tret`, the incumbent duration-interpolated benchmark.
+> Subtracting a different `tret_*` from `ret_vw` is left to you; no beta or momentum column has
+> been re-estimated against one.
+
 ---
 
 ## Defaulted Bond Returns
