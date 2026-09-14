@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - House conventions throughout (ACT/365, continuous compounding, FISD's actual coupon frequency)
     rather than the paper's 30/360 and semi-annual, so all five benchmarks stay directly
     differenceable against one another.
+  - **The 2026 bundles were re-cut for this.** `osbap_main_data_2026.zip` and
+    `osbap_additional_data_2026.zip` keep their names, so the filename does not distinguish a
+    140-, 144- or 145-column download. `PROVENANCE.json` inside each bundle is the discriminator;
+    the superseded cuts are kept locally under `stage2/release/_superseded_2026_*`.
 
 - **Four Treasury benchmark columns in the Stage-2 panel** (`tret_bns`, `tret_cfm`, `tret_gprs`,
   `tret_mat`), placed immediately after the incumbent `tret`. Each is a Treasury return you can
