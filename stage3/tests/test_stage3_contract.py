@@ -647,7 +647,7 @@ def test_every_sorted_signal_has_a_definition():
     defined = {r["mnemonic"] for r in rows}
     assert not (set(Z.CLUSTER_OF) - defined), (
         "sorted with no definition: " + ", ".join(sorted(set(Z.CLUSTER_OF) - defined)))
-    assert len(rows) == len(defined) == 140, (len(rows), len(defined))
+    assert len(rows) == len(defined) == 144, (len(rows), len(defined))
 
 
 def test_the_signal_spec_matches_the_stage2_contract():

@@ -23,7 +23,7 @@ import numpy as np
 import pandas as pd
 
 import _stage2_settings as cfg
-from lib import month_boundaries, nyse_calendar, treasury
+from lib import duration_adjusted, month_boundaries, nyse_calendar, treasury
 from lib import pin as pinlib
 
 # price column (pin name) -> return column. Upstream PRICE_MAP; its 'last_bid' key never matches the
@@ -238,6 +238,16 @@ SELECT * FROM t_bgn_ret2 WHERE hprd > 0 AND month_end_cal >= DATE '{cfg.START_DA
     _attach_tret(con, "t_end_f", "date_end_ref", mode=mode)
     _attach_tret(con, "t_bgn_f", "month_end_cal", mode=mode)
 
+    # Four more Treasury benchmarks, built from each bond's own cash flows -- see
+    # lib/duration_adjusted.py for the equations and citations. Attached to the END frame only: the
+    # shipped `tret` users subtract comes from t_end_f_t and these are its alternatives, so a
+    # `_bgn` twin would be a column nobody reads.
+    _da = duration_adjusted.attach(
+        con, "t_end_f_t", "date_end_ref", "t_end_f_td",
+        treasury_mod=treasury, mode=mode)
+    print(f"  duration-adjusted benchmarks: {_da['tret_bns']:,}/{_da['rows']:,} rows "
+          f"(tret_mat {_da['tret_mat']:,})")
+
     # ============ upstream steps 16/16.6: end_signals (PRE n<=31 frame, point-in-time) ============
     # bbtm = 100/pr (float32); sze = mcap; fce_val = round(ao); short-name renames per SIGNAL_NAME_MAP
     con.execute(f"""
@@ -314,7 +324,8 @@ LEFT JOIN cal_lut cse ON cse.cday = a.dt_e
 CREATE OR REPLACE TEMP TABLE end_returns AS
 SELECT cusip, date, dt_s, dt_e, hprd, lib, libd, ret_std, ret_type,
        ret_vw_n AS ret_vw, {alt_norm},
-       sp_rat, mdy_rat, spc_rat, mdyc_rat, tret, ret_vw_pre
+       sp_rat, mdy_rat, spc_rat, mdyc_rat, tret,
+       tret_bns, tret_cfm, tret_gprs, tret_mat, ret_vw_pre
 FROM (
   SELECT cusip_id AS cusip, date_end_ref AS date, dt_s, dt AS dt_e, hprd, lib, libd,
          ret_std, ret_type, ret_vw_adj AS ret_vw_pre,
@@ -322,8 +333,9 @@ FROM (
               ELSE ret_vw_adj END AS ret_vw_n,
          ret_vwp, ret_ew, ret_1st, ret_lst, ret_bid,
          sp_rating AS sp_rat, mdy_rating AS mdy_rat,
-         spc_rating AS spc_rat, mdc_rating AS mdyc_rat, tret
-  FROM t_end_f_t
+         spc_rating AS spc_rat, mdc_rating AS mdyc_rat, tret,
+         tret_bns, tret_cfm, tret_gprs, tret_mat
+  FROM t_end_f_td
 )
 """)
     con.execute("""
@@ -362,7 +374,8 @@ SELECT cusip, date, ret_vw, tret, ret_std, ret_type FROM (
         SELECT cusip, date::TIMESTAMP AS date, dt_s::TIMESTAMP AS dt_s, dt_e::TIMESTAMP AS dt_e,
                hprd, lib, libd, ret_std, ret_type, ret_vw,
                ret_vwp, ret_ew, ret_1st, ret_lst, ret_bid,
-               sp_rat, mdy_rat, spc_rat, mdyc_rat, tret
+               sp_rat, mdy_rat, spc_rat, mdyc_rat, tret,
+               tret_bns, tret_cfm, tret_gprs, tret_mat
         FROM end_returns ORDER BY cusip, date""")
     _copy("bgn_returns", """
         SELECT cusip, date::TIMESTAMP AS date, dt_s::TIMESTAMP AS dt_s, dt_e::TIMESTAMP AS dt_e,

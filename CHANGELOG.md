@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Four Treasury benchmark columns in the Stage-2 panel** (`tret_bns`, `tret_cfm`, `tret_gprs`,
+  `tret_mat`), placed immediately after the incumbent `tret`. Each is a Treasury return you can
+  subtract from `ret_vw` to form a duration-adjusted (credit) return; as with `tret`, the panel
+  ships the benchmark and leaves the subtraction to the user. **This takes the panel from 140 to
+  144 columns and is a public API change.**
+  - `tret_bns` -- the bond's own cash flows, present-value (duration) weighted, applied to
+    zero-coupon Treasury returns from the Gurkaynak-Sack-Wright curve. van Binsbergen, Nozawa and
+    Schwert, "Duration-Based Valuation of Corporate Bonds" (SSRN 3914422), Eqs. (3)-(6).
+  - `tret_cfm` -- the same ladder, future-value weights. Their Internet Appendix A1, Eq. (19).
+  - `tret_gprs` -- the exact duration match. Ghaderi, Plante, Roussanov and Seo (2026),
+    "Reconstructing a Century of U.S. Corporate Bonds", Appendix B.2.
+  - `tret_mat` -- `tret`'s twin, interpolated at maturity rather than modified duration.
+    Bessembinder, Kahle, Maxwell and Xu (2009).
+  - Computed in `stage2/lib/duration_adjusted.py`, attached in `step1_returns`. Validated against
+    the BNS authors' own published estimates: correlation 0.9987, median absolute error 0.175 bps
+    over 1.2M bond-months.
+  - Two new cached inputs in `stage2/data/`: `gsw_svensson.parquet` (the Fed's curve parameters)
+    and `fisd_cashflow_terms.parquet` (`first_interest_date` / `last_interest_date` /
+    `coupon_change_indicator`, which the Stage-0 FISD extract does not carry). Stage 0 is unchanged.
+  - Before 1986 the long end of the Treasury curve is held flat beyond the longest tenor GSW
+    actually fitted, because no Treasury that long existed to price. Measured cost of that
+    convention: RMSE 15.8 bps, bias -0.3 bps, and exactly zero for any bond whose cash flows end
+    inside the fitted range.
+
 ### Stage 3 -- the exhibits use the data you built, and say which data that was
 
 **`--sample frontier` is the new default.** Stage 3 ran to 2024-12 whatever your panel

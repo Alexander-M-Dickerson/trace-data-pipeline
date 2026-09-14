@@ -993,6 +993,30 @@ def get_signal_definitions() -> list:
                     'citation': '--',
                 },
                 {
+                    'mnemonic': 'tret_bns',
+                    'name': 'Treasury Return, Duration-Weighted Cash Flows',
+                    'description': "Treasury benchmark built from the cash flows of the bond itself, weighted by their present-value shares (Macaulay duration weights) and applied to zero-coupon Treasury returns from the Gurkaynak-Sack-Wright curve. Subtract from `ret_vw` for a duration-adjusted return.",
+                    'citation': 'van Binsbergen, Nozawa, and Schwert (2025)',
+                },
+                {
+                    'mnemonic': 'tret_cfm',
+                    'name': 'Treasury Return, Cash-Flow-Weighted',
+                    'description': "As `tret_bns`, but weighting the same cash flows by future value rather than present value. Places more weight on long-dated cash flows and so overstates interest rate risk; reported as the robustness alternative given by the same authors.",
+                    'citation': 'van Binsbergen, Nozawa, and Schwert (2025), Internet Appendix A1',
+                },
+                {
+                    'mnemonic': 'tret_gprs',
+                    'name': 'Treasury Return, Exact Duration Match',
+                    'description': "As `tret_bns`, refined so the duration of the Treasury portfolio equals that of the bond exactly. The present-value weights are duration-matched only when the term structure is flat; this solves for the Treasury yield that restores the match and reweights accordingly.",
+                    'citation': 'Ghaderi, Plante, Roussanov, and Seo (2026), Appendix B.2',
+                },
+                {
+                    'mnemonic': 'tret_mat',
+                    'name': 'Treasury Return, Maturity-Matched',
+                    'description': "The twin of `tret`: the same key-rate Treasury index returns, the same interpolation nodes and rounding, but interpolated at remaining MATURITY rather than modified duration. Included as the maturity-matched comparator; duration matching is the more precise of the two.",
+                    'citation': 'Bessembinder, Kahle, Maxwell, and Xu (2009)',
+                },
+                {
                     'mnemonic': 'ret_vw',
                     'name': 'Total Return (End)',
                     'description': 'Month-end to month-end total return (see Figure~\\ref{fig:return_timeline}).',

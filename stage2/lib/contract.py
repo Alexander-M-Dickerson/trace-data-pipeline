@@ -30,7 +30,7 @@ from __future__ import annotations
 PANEL_COLUMNS: tuple[str, ...] = (
     "cusip", "date", "issuer_cusip", "permno", "permco", "gvkey", "144a", "country",
     "call", "ret_vw", "ret_vw_bgn", "hprd", "lib", "libd", "ret_type", "spc_rat",
-    "mdc_rat", "ff17num", "ff30num", "fce_val", "mcap_s", "mcap_e", "tret", "rfret",
+    "mdc_rat", "ff17num", "ff30num", "fce_val", "mcap_s", "mcap_e", "tret", "tret_bns", "tret_cfm", "tret_gprs", "tret_mat", "rfret",
     "dt_s", "dt_e", "dt_s_bgn", "dt_e_bgn", "hprd_bgn", "igap_bgn", "sig_dt", "sig_gap",
     "tmat", "age", "ytm", "cs", "md_dur", "convx", "bbtm", "sze", "val_hz", "val_hz_dts",
     "val_ipr", "val_ipr_dts", "dcs6", "cs_mu12_1", "pi", "ami", "ami_v", "lix", "ilq",
