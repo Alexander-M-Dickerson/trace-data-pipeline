@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A fifth Treasury benchmark, `tret_cls`**, placed immediately after `tret_gprs`. **This takes
+  the panel from 144 to 145 columns and is a public API change.** Cui, S., Lu, Y. and Song, Y.
+  (2026), "Understanding Corporate Bond Excess Returns", Eqs. (3)-(6).
+  - It prices a synthetic Treasury with the bond's own cash flows on the **Treasury zero curve**,
+    where `tret_bns` discounts the same cash flows at the **bond's own yield to maturity**. That is
+    the entire difference between them, and the authors derive it in their Section 7.1: both are
+    value-weighted averages of the same zero-coupon Treasury returns, so only the weights move.
+  - Consequence: `tret_bns` matches the bond's *duration* and removes parallel shifts of the curve;
+    `tret_cls` matches its *cash flows* and so removes slope and curvature as well. `tret_cls -
+    tret_bns` is the authors' higher-order component.
+  - Computed on the same ladder, same inputs, same GSW curve. No new input files. Coverage is
+    identical to `tret_bns` by construction (1,949,917 of 1,950,002 rows), because both require the
+    bond's own yield to build the ladder that `tret_bns` weights.
+  - House conventions throughout (ACT/365, continuous compounding, FISD's actual coupon frequency)
+    rather than the paper's 30/360 and semi-annual, so all five benchmarks stay directly
+    differenceable against one another.
+
 - **Four Treasury benchmark columns in the Stage-2 panel** (`tret_bns`, `tret_cfm`, `tret_gprs`,
   `tret_mat`), placed immediately after the incumbent `tret`. Each is a Treasury return you can
   subtract from `ret_vw` to form a duration-adjusted (credit) return; as with `tret`, the panel

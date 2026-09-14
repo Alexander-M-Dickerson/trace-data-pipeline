@@ -1,6 +1,6 @@
 """duration_adjusted.py -- Treasury benchmark returns built from each bond's own cash flows.
 
-Adds four columns beside the incumbent `tret`, each a Treasury benchmark you can subtract from
+Adds five columns beside the incumbent `tret`, each a Treasury benchmark you can subtract from
 `ret_vw` to get a duration-adjusted (credit) return:
 
     tret_bns    present-value (duration) weights on the bond's own cash flows
@@ -12,6 +12,12 @@ Adds four columns beside the incumbent `tret`, each a Treasury benchmark you can
     tret_gprs   the EXACT duration match
                 Ghaderi, M., Plante, S., Roussanov, N. and Seo, S.B. (2026), "Reconstructing a
                 Century of U.S. Corporate Bonds: Credit Risk in Historical Perspective", App. B.2.
+    tret_cls    the CASH-FLOW match: the same ladder discounted on the Treasury curve itself
+                Cui, S., Lu, Y. and Song, Y. (2026), "Understanding Corporate Bond Excess Returns",
+                Eqs. (3)-(6). Where tret_bns discounts at the bond's OWN yield, this discounts at
+                the zero yields, so it replicates the cash flows rather than the duration. Their
+                Section 7.1 works the comparison out: both are value-weighted averages of the SAME
+                zero returns, and only the weights differ.
     tret_mat    key-rate index returns interpolated at MATURITY rather than duration
                 Bessembinder, H., Kahle, K., Maxwell, W. and Xu, D. (2009). The twin of `tret`,
                 which interpolates the same series at modified duration (Andreani, M., Palhares, D.
@@ -28,6 +34,11 @@ t_k is measured from the START of the return window and t'_k from its END, so t'
 falls out of the dates. t'_k = 0 handles a cash flow paid inside the window: that zero matured, so
 its leg is held to maturity. tret_cfm swaps w_k for CF_k / SUM_j CF_j. tret_gprs solves
 SUM_k w_k*exp((y*-z_k)t_k) = 1 for the Treasury yield y* and reweights by w_k*exp((y*-z_k)t_k).
+tret_cls swaps w_k for v_k = CF_k*exp(-z_k*t_k) / SUM_j CF_j*exp(-z_j*t_j) -- the cash flows priced
+on the Treasury curve. Note v_k is tret_gprs's weight without its exp((y*-yhat)t_k) tilt: the tilt
+is what re-prices the portfolio to the CORPORATE bond's price, and tret_cls is the untilted case.
+A single cash flow therefore gets weight 1 under all four schemes, so they agree exactly on a
+zero-coupon bond -- which is a cheap, exact test that each weight normalised over the right rows.
 
 TWO INPUTS THIS REPO DID NOT HAVE, both in stage2/data/ beside crsp_treasury_returns.parquet:
   gsw_svensson.parquet        the Fed's curve parameters (feds200628), plus its published SVENYnn
@@ -69,7 +80,7 @@ YEAR_BASIS = 365.0
 # guaranteeing the lagged yield below belongs to the row it is used on.
 WINDOW_DAYS_LO, WINDOW_DAYS_HI = 15, 45
 
-NEW_COLS = ("tret_bns", "tret_cfm", "tret_gprs", "tret_mat")
+NEW_COLS = ("tret_bns", "tret_cfm", "tret_gprs", "tret_cls", "tret_mat")
 
 # Newton steps for the tret_gprs root-find. The equation is strictly increasing in y*, so six is
 # generous; measured max residual |SUM omega - 1| = 7.8e-16.
@@ -445,7 +456,9 @@ def attach(con, table: str, date_col: str, out_table: str, *,
         SELECT l.cusip_id, l.d,
                SUM(l.w * l.rk)                                AS tret_bns,
                SUM(l.fv * l.rk) / SUM(l.fv)                   AS tret_cfm,
-               SUM(l.w * exp((y.y - l.z0) * l.tk) * l.rk)     AS tret_gprs
+               SUM(l.w * exp((y.y - l.z0) * l.tk) * l.rk)     AS tret_gprs,
+               SUM(l.fv * exp(-l.tk * l.z0) * l.rk)
+                 / SUM(l.fv * exp(-l.tk * l.z0))              AS tret_cls
         FROM da_lad l JOIN da_y y USING (cusip_id, d)
         GROUP BY l.cusip_id, l.d
     """)
@@ -453,7 +466,7 @@ def attach(con, table: str, date_col: str, out_table: str, *,
 
     con.execute(f"""
         CREATE OR REPLACE TEMP TABLE {out_table} AS
-        SELECT t.*, b.tret_bns, b.tret_cfm, b.tret_gprs, m.tret_mat
+        SELECT t.*, b.tret_bns, b.tret_cfm, b.tret_gprs, b.tret_cls, m.tret_mat
         FROM {table} t
         LEFT JOIN da_bench b ON b.cusip_id = t.cusip_id AND b.d = t.{date_col}
         LEFT JOIN da_mat   m ON m.cusip_id = t.cusip_id AND m.date = t.{date_col}

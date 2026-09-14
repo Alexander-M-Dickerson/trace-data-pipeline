@@ -485,7 +485,7 @@ def test_the_table6_footnote_arithmetic_closes():
 #   tablesA_filter_params  Tables A.1-A.3: the cleaning filters' parameter values
 #   table03                Table 3: the paper's own classification of which factors
 #                          are filter-sensitive, a constant list, no data read
-#   table_ia08             Table IA.VIII: what each of the 140 panel columns MEANS.
+#   table_ia08             Table IA.VIII: what each of the 145 panel columns MEANS.
 #                          A definition does not have a sample, and giving it one
 #                          would be a sentence with nothing behind it.
 NO_SAMPLE = {"tablesA_filter_params", "table03", "table_ia08"}
@@ -647,11 +647,11 @@ def test_every_sorted_signal_has_a_definition():
     defined = {r["mnemonic"] for r in rows}
     assert not (set(Z.CLUSTER_OF) - defined), (
         "sorted with no definition: " + ", ".join(sorted(set(Z.CLUSTER_OF) - defined)))
-    assert len(rows) == len(defined) == 144, (len(rows), len(defined))
+    assert len(rows) == len(defined) == 145, (len(rows), len(defined))
 
 
 def test_the_signal_spec_matches_the_stage2_contract():
-    """The 140 defined names must be exactly the 140 panel columns, in any order.
+    """The 145 defined names must be exactly the 145 panel columns, in any order.
 
     This is the join that makes the whole thing checkable: the paper's definition
     table, Stage 2's panel and Stage 3's sorts all describing one set of names. A

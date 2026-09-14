@@ -106,6 +106,7 @@ column differs from `ret_vw` only in which price is used at each month end:
 | `tret_bns` | float32 | Treasury Return, Duration-Weighted Cash Flows; see the main panel. |
 | `tret_cfm` | float32 | Treasury Return, Cash-Flow-Weighted; see the main panel. |
 | `tret_gprs` | float32 | Treasury Return, Exact Duration Match; see the main panel. |
+| `tret_cls` | float32 | Treasury Return, Cash-Flow-Matched; see the main panel. |
 | `tret_mat` | float32 | Treasury Return, Maturity-Matched; see the main panel. |
 
 where day $d$ is in the last 5 business days of months $t$ and $t+1$.
@@ -150,6 +151,7 @@ For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month r
 | `tret_bns` | Treasury Return, Duration-Weighted Cash Flows | Treasury benchmark built from the bond's own cash flows, weighted by their present-value shares (Macaulay duration weights) and applied to zero-coupon Treasury returns from the Gurkaynak-Sack-Wright curve. Subtract from `ret_vw` for a duration-adjusted return. |
 | `tret_cfm` | Treasury Return, Cash-Flow-Weighted | As `tret_bns`, but weighting the same cash flows by their future value rather than their present value. Places more weight on long-dated cash flows and so overstates a bond's interest rate risk; reported as the authors' own robustness alternative. |
 | `tret_gprs` | Treasury Return, Exact Duration Match | As `tret_bns`, refined so the Treasury portfolio's duration equals the bond's exactly. The present-value weights are duration-matched only when the term structure is flat; this solves for the Treasury yield that restores the match and reweights accordingly. |
+| `tret_cls` | Treasury Return, Cash-Flow-Matched | As `tret_bns`, but discounting the same cash flows on the Treasury zero curve instead of at the bond's own yield to maturity. This replicates the bond's cash flows rather than its duration, so it removes slope and curvature effects as well as parallel shifts. The difference from `tret_bns` is the authors' higher-order component. |
 | `tret_mat` | Treasury Return, Maturity-Matched | The twin of `tret`: the same key-rate Treasury index returns, the same interpolation nodes and rounding, but interpolated at the bond's remaining MATURITY rather than its modified duration. Included as the maturity-matched comparator; duration matching is the more precise of the two. |
 | `ret_vw` | Total Return (End) | Month-end to month-end total return. |
 | `ret_vw_bgn` | Total Return (Begin) | Month-begin to month-end total return within the same month. |
@@ -703,6 +705,7 @@ Compute as: `ret_vw - tret` (month-end) or `ret_vw_bgn - tret` (month-begin)
 | `tret_bns` | Treasury benchmark from the bond's OWN cash flows, present-value (duration) weighted, on the Gurkaynak-Sack-Wright zero curve (van Binsbergen, Nozawa & Schwert) |
 | `tret_cfm` | The same ladder weighted by future value instead of present value; overstates interest rate risk (their Internet Appendix A1) |
 | `tret_gprs` | The exact duration match: present-value weights are duration-matched only on a flat curve, so the Treasury yield is solved for and the weights restated (Ghaderi, Plante, Roussanov & Seo, App. B.2) |
+| `tret_cls` | The CASH-FLOW match: the same ladder discounted on the Treasury curve rather than the bond's own yield, so it also removes slope and curvature, not just parallel shifts (Cui, Lu & Song 2026) |
 | `tret_mat` | `tret`'s twin -- same series, nodes and rounding, interpolated at MATURITY rather than modified duration (Bessembinder, Kahle, Maxwell & Xu 2009) |
 | `rfret` | Monthly risk-free rate from Fama-French |
 

@@ -1,5 +1,5 @@
 {
- "_about": "Table IA.VIII, Signal Definitions and Citations. One row per column of the 144-column Stage-2 panel: 108 sorted signals plus 36 identifiers, returns and characteristics. Extracted from the paper's longtable, then reconciled against Stage 2's DATA_DICTIONARY.md and the code that computes each signal. A row carrying `paper_prints` or `paper_prints_citation` is one where the two disagreed and the code settled it; `why_corrected` says what settled it. Everything else is the paper's text unchanged. See RECONCILIATION_ia08.md.",
+ "_about": "Table IA.VIII, Signal Definitions and Citations. One row per column of the 145-column Stage-2 panel: 108 sorted signals plus 37 identifiers, returns and characteristics. Extracted from the paper's longtable, then reconciled against Stage 2's DATA_DICTIONARY.md and the code that computes each signal. A row carrying `paper_prints` or `paper_prints_citation` is one where the two disagreed and the code settled it; `why_corrected` says what settled it. Everything else is the paper's text unchanged. See RECONCILIATION_ia08.md.",
  "rows": [
   {
    "mnemonic": "cusip",
@@ -162,6 +162,15 @@
    "citation": "Ghaderi, Plante, Roussanov, and Seo (2026), Appendix B.2",
    "citation_keys": [],
    "citation_text": "Ghaderi, Plante, Roussanov, and Seo (2026), Appendix B.2"
+  },
+  {
+   "mnemonic": "tret_cls",
+   "group": "Bond Identifiers and Return Metrics",
+   "name": "Treasury Return, Cash-Flow-Matched",
+   "description": "As `tret_bns`, but discounting the same cash flows on the Treasury zero curve instead of at the bond's own yield to maturity. This replicates the bond's cash flows rather than its duration, so it removes slope and curvature effects as well as parallel shifts. The difference from `tret_bns` is the authors' higher-order component.",
+   "citation": "Cui, Lu, and Song (2026)",
+   "citation_keys": [],
+   "citation_text": "Cui, Lu, and Song (2026)"
   },
   {
    "mnemonic": "tret_mat",

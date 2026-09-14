@@ -8,7 +8,7 @@ merge order, so a change to the beta model list could silently permute the panel
 
 That is not hypothetical. Collapsing the two degenerate DEF and TERM regressions into the
 single two-factor model that produces a real default beta also swapped `b_defb` and `b_termb`
-in the output -- emission follows the model's `keep` order. Same 140 columns, different file.
+in the output -- emission follows the model's `keep` order. Same 145 columns, different file.
 Nobody would have noticed until a downstream positional read broke.
 
 So the list below is the contract, and `assert_panel_contract` enforces it at the end of the
@@ -30,7 +30,7 @@ from __future__ import annotations
 PANEL_COLUMNS: tuple[str, ...] = (
     "cusip", "date", "issuer_cusip", "permno", "permco", "gvkey", "144a", "country",
     "call", "ret_vw", "ret_vw_bgn", "hprd", "lib", "libd", "ret_type", "spc_rat",
-    "mdc_rat", "ff17num", "ff30num", "fce_val", "mcap_s", "mcap_e", "tret", "tret_bns", "tret_cfm", "tret_gprs", "tret_mat", "rfret",
+    "mdc_rat", "ff17num", "ff30num", "fce_val", "mcap_s", "mcap_e", "tret", "tret_bns", "tret_cfm", "tret_gprs", "tret_cls", "tret_mat", "rfret",
     "dt_s", "dt_e", "dt_s_bgn", "dt_e_bgn", "hprd_bgn", "igap_bgn", "sig_dt", "sig_gap",
     "tmat", "age", "ytm", "cs", "md_dur", "convx", "bbtm", "sze", "val_hz", "val_hz_dts",
     "val_ipr", "val_ipr_dts", "dcs6", "cs_mu12_1", "pi", "ami", "ami_v", "lix", "ilq",
@@ -57,7 +57,7 @@ PANEL_COLUMNS: tuple[str, ...] = (
 # column needs, which tells you at a glance whether a panel built from a different source could
 # carry it -- and, when one is unexpectedly empty, which input to go and look at.
 #
-# Measured on the 2026 vintage: 51 of the 140 need something beyond a month-end price.
+# Measured on the 2026 vintage: 51 of the 145 need something beyond a month-end price.
 
 REQUIRES_TRADE_PRINTS: tuple[str, ...] = (
     # signed prints with sizes: spreads, price impact, zero-trading days

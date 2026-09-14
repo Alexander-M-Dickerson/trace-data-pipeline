@@ -325,7 +325,7 @@ CREATE OR REPLACE TEMP TABLE end_returns AS
 SELECT cusip, date, dt_s, dt_e, hprd, lib, libd, ret_std, ret_type,
        ret_vw_n AS ret_vw, {alt_norm},
        sp_rat, mdy_rat, spc_rat, mdyc_rat, tret,
-       tret_bns, tret_cfm, tret_gprs, tret_mat, ret_vw_pre
+       tret_bns, tret_cfm, tret_gprs, tret_cls, tret_mat, ret_vw_pre
 FROM (
   SELECT cusip_id AS cusip, date_end_ref AS date, dt_s, dt AS dt_e, hprd, lib, libd,
          ret_std, ret_type, ret_vw_adj AS ret_vw_pre,
@@ -334,7 +334,7 @@ FROM (
          ret_vwp, ret_ew, ret_1st, ret_lst, ret_bid,
          sp_rating AS sp_rat, mdy_rating AS mdy_rat,
          spc_rating AS spc_rat, mdc_rating AS mdyc_rat, tret,
-         tret_bns, tret_cfm, tret_gprs, tret_mat
+         tret_bns, tret_cfm, tret_gprs, tret_cls, tret_mat
   FROM t_end_f_td
 )
 """)
@@ -375,7 +375,7 @@ SELECT cusip, date, ret_vw, tret, ret_std, ret_type FROM (
                hprd, lib, libd, ret_std, ret_type, ret_vw,
                ret_vwp, ret_ew, ret_1st, ret_lst, ret_bid,
                sp_rat, mdy_rat, spc_rat, mdyc_rat, tret,
-               tret_bns, tret_cfm, tret_gprs, tret_mat
+               tret_bns, tret_cfm, tret_gprs, tret_cls, tret_mat
         FROM end_returns ORDER BY cusip, date""")
     _copy("bgn_returns", """
         SELECT cusip, date::TIMESTAMP AS date, dt_s::TIMESTAMP AS dt_s, dt_e::TIMESTAMP AS dt_e,

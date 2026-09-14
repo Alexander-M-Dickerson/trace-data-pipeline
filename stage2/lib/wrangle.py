@@ -341,7 +341,7 @@ def wrangle_returns(
         Columns to keep from end_returns for returns_main.
         Default: ['cusip', 'date', 'dt_s', 'dt_e', 'ret_vw', 'lib', 'ret_type',
                   'spc_rat', 'mdyc_rat', 'tret',
-                  'tret_bns', 'tret_cfm', 'tret_gprs', 'tret_mat']
+                  'tret_bns', 'tret_cfm', 'tret_gprs', 'tret_cls', 'tret_mat']
     bgn_cols : list, optional
         Columns to keep from bgn_returns for returns_main.
         Default: ['cusip', 'date', 'dt_s', 'dt_e', 'ret_vw', 'hprd', 'igap']
@@ -371,7 +371,7 @@ def wrangle_returns(
     if end_cols is None:
         end_cols = ['cusip', 'date', 'dt_s', 'dt_e', 'ret_vw', 'hprd', 'lib', 'libd', 'ret_type',
                     'spc_rat', 'mdyc_rat', 'tret',
-                    'tret_bns', 'tret_cfm', 'tret_gprs', 'tret_mat']
+                    'tret_bns', 'tret_cfm', 'tret_gprs', 'tret_cls', 'tret_mat']
 
     if bgn_cols is None:
         bgn_cols = ['cusip', 'date', 'dt_s', 'dt_e', 'ret_vw', 'hprd', 'igap']
@@ -523,6 +523,7 @@ def wrangle_returns(
         'tret_bns': 'float32',
         'tret_cfm': 'float32',
         'tret_gprs': 'float32',
+        'tret_cls': 'float32',
         'tret_mat': 'float32',
         'hprd_bgn': 'Int16',
         'igap_bgn': 'Int8',
@@ -562,7 +563,7 @@ def wrangle_returns(
         'tmat', 'age', 'fce_val', 'cpn', 'call', 'ff17num', 'ff30num',
         'mcap_s', 'mcap_e',
         # Treasury return, then the cash-flow-based benchmarks (lib/duration_adjusted.py)
-        'tret', 'tret_bns', 'tret_cfm', 'tret_gprs', 'tret_mat',
+        'tret', 'tret_bns', 'tret_cfm', 'tret_gprs', 'tret_cls', 'tret_mat',
         # Date ranges (end then bgn)
         'dt_s', 'dt_e', 'dt_s_bgn', 'dt_e_bgn',
         # Within-month (bgn) other
@@ -1187,7 +1188,7 @@ def reorder_panel_cols(
     ret_prefix = [
         'ret_vw', 'ret_vw_bgn', 'hprd', 'lib', 'libd', 'ret_type',
         'spc_rat', 'mdc_rat', 'ff17num', 'ff30num', 'fce_val', 'mcap_s', 'mcap_e',
-        'tret', 'tret_bns', 'tret_cfm', 'tret_gprs', 'tret_mat',
+        'tret', 'tret_bns', 'tret_cfm', 'tret_gprs', 'tret_cls', 'tret_mat',
         'rfret', 'dt_s', 'dt_e', 'dt_s_bgn', 'dt_e_bgn',
         'hprd_bgn', 'igap_bgn', 'sig_dt', 'sig_gap',
     ]

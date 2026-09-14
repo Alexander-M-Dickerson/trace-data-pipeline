@@ -1011,6 +1011,12 @@ def get_signal_definitions() -> list:
                     'citation': 'Ghaderi, Plante, Roussanov, and Seo (2026), Appendix B.2',
                 },
                 {
+                    'mnemonic': 'tret_cls',
+                    'name': 'Treasury Return, Cash-Flow-Matched',
+                    'description': "As `tret_bns`, but discounting the same cash flows on the Treasury zero curve instead of at the bond's own yield to maturity. This replicates the bond's cash flows rather than its duration, so it removes slope and curvature effects as well as parallel shifts. The difference from `tret_bns` is the authors' higher-order component.",
+                    'citation': 'Cui, Lu, and Song (2026)',
+                },
+                {
                     'mnemonic': 'tret_mat',
                     'name': 'Treasury Return, Maturity-Matched',
                     'description': "The twin of `tret`: the same key-rate Treasury index returns, the same interpolation nodes and rounding, but interpolated at remaining MATURITY rather than modified duration. Included as the maturity-matched comparator; duration matching is the more precise of the two.",
