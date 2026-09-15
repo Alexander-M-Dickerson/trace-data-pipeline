@@ -44,8 +44,9 @@ EXEMPT = {
         "duration-adjusted columns are the tret ones by definition"),
     "lib/value.py": (
         "value signals are NOT duration-adjusted, by design: the dur_adj panel merges the SAME "
-        "value_signals_std the std panel does (stage2_lhm_ice: 'Both panels include "
-        "value_signals_std'), and no val_* is among the 68 swapped columns. Its internal ret_vwx "
+        "value_signals_std the std panel does -- the pre-TRACE engine says so in as many "
+        "words, 'Both panels include value_signals_std' -- and no val_* is among the 68 "
+        "swapped columns. Its internal ret_vwx "
         "is an intermediate for vol12_x, shared across return types on purpose"),
     "steps/step7_final.py": (
         "assembles the panel from blocks; it carries `tret` as a column and derives nothing"),
