@@ -69,9 +69,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     and `fisd_cashflow_terms.parquet` (`first_interest_date` / `last_interest_date` /
     `coupon_change_indicator`, which the Stage-0 FISD extract does not carry). Stage 0 is unchanged.
   - Before 1986 the long end of the Treasury curve is held flat beyond the longest tenor GSW
-    actually fitted, because no Treasury that long existed to price. Measured cost of that
-    convention: RMSE 15.8 bps, bias -0.3 bps, and exactly zero for any bond whose cash flows end
-    inside the fitted range.
+    actually fitted, because no Treasury that long existed to price. This is the convention of Gurkaynak, Sack and Wright (2007) and of Ghaderi, Plante, Roussanov and Seo (2026), whose Appendix A states it in as many words -- "we conservatively apply flat extrapolation when necessary". It is what makes a 1973 start possible at all: without it no bond outliving the fitted curve could be priced, and the early sample would simply be absent.
+    Measured cost of that convention: RMSE 15.8 bps, bias -0.3 bps, and exactly zero for any bond
+    whose cash flows end inside the fitted range.
 
 ### Stage 3 -- the exhibits use the data you built, and say which data that was
 
