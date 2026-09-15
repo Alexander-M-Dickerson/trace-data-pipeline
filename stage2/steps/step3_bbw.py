@@ -9,7 +9,13 @@ already done by steps 1-2.
 
 Inputs: step-1 blocks (all_returns, end_returns, end_signals, adj_signals) + step-2
 illiq_signals_adj + the cached quote panel (lib/quote) + FF5 rf (lib/ff5).
-Output: blocks/<mode>/bbw_factors.parquet (date + MKTB DRF CRF LRF MKTBx DRFx CRFx LRFx TERM).
+Output: blocks/<mode>/bbw_factors.parquet (date + MKTB DRF CRF LRF MKTBx DRFx CRFx LRFx TERM
+DEFB TERMB).
+
+With `--benchmark <bm>` it instead writes blocks/<mode>/bbw_factors_<bm>.parquet, carrying only the
+benchmark-dependent half -- MKTB_<bm>, DRF_<bm>, CRF_<bm>, LRF_<bm>, TERM_<bm> -- computed exactly
+as the `x` twins are, but on `ret_vw - tret_<bm>`. The raw (std) factors and DEFB/TERMB are built
+from total returns and do not move with the benchmark, so they are not recomputed.
 """
 from __future__ import annotations
 
@@ -29,24 +35,27 @@ FACTOR_NAME_MAP = {"var_95": "DRF", "ilq_adj": "LRF"}
 FACTOR_NAME_MAP_X = {"var_95x": "DRFx", "ilq_adj": "LRFx"}
 
 
-def _prep_bbw_panel(blocks_dir: Path) -> pd.DataFrame:
-    """Upstream prep_bbw_data: quote+all_returns VaR, end_returns base, signal merges. No USA filter."""
+def _prep_bbw_panel(blocks_dir: Path, tret_col: str = "tret") -> pd.DataFrame:
+    """Upstream prep_bbw_data: quote+all_returns VaR, end_returns base, signal merges. No USA filter.
+
+    `tret_col` is the benchmark subtracted to form the duration-adjusted side. The default is the
+    incumbent `tret`, which reproduces the shipped block exactly."""
     # -- 1. quote (pre-2002-07) + all_returns; rolling VaR on ret_vw and ret_vwx ------------------
     q = quote.load_quote()
     q.columns = q.columns.str.lower()
-    q = q.rename(columns={"cusip_id": "cusip"})[["cusip", "date", "ret_vw", "tret"]].copy()
+    q = q.rename(columns={"cusip_id": "cusip"})[["cusip", "date", "ret_vw", tret_col]].copy()
     q["date"] = pd.to_datetime(q["date"])
     q = q[q["date"] < "2002-07-01"].copy()
 
     all_ret = pd.read_parquet(blocks_dir / "all_returns.parquet",
-                              columns=["cusip", "date", "ret_vw", "tret"])
+                              columns=["cusip", "date", "ret_vw", tret_col])
     all_ret["cusip"] = all_ret["cusip"].astype(str)
     all_ret["date"] = pd.to_datetime(all_ret["date"])
 
     combined = pd.concat([q, all_ret], ignore_index=True)
     combined = combined.drop_duplicates(subset=["cusip", "date"], keep="last")
     combined = combined.sort_values(["cusip", "date"]).reset_index(drop=True)
-    combined["ret_vwx"] = combined["ret_vw"] - combined["tret"]
+    combined["ret_vwx"] = combined["ret_vw"] - combined[tret_col]
     combined = combined.rename(columns={"cusip": "cusip_id"})
 
     var_df = var_es.compute_rolling_var_es(combined, id_col="cusip_id", ret_col="ret_vw")
@@ -58,10 +67,11 @@ def _prep_bbw_panel(blocks_dir: Path) -> pd.DataFrame:
     del combined, q, all_ret, var_x
 
     # -- 3-5. base panel from end_returns + end_signals + adj_signals ------------------------------
-    out = pd.read_parquet(blocks_dir / "end_returns.parquet", columns=["cusip", "date", "ret_vw", "tret"])
+    out = pd.read_parquet(blocks_dir / "end_returns.parquet",
+                          columns=["cusip", "date", "ret_vw", tret_col])
     out["cusip"] = out["cusip"].astype(str)
     out["date"] = pd.to_datetime(out["date"])
-    out["ret_vwx"] = out["ret_vw"] - out["tret"]
+    out["ret_vwx"] = out["ret_vw"] - out[tret_col]
 
     sig = pd.read_parquet(blocks_dir / "end_signals.parquet",
                           columns=["cusip", "date", "mcap_s", "mcap_e", "sp_rat", "mdy_rat",
@@ -76,9 +86,9 @@ def _prep_bbw_panel(blocks_dir: Path) -> pd.DataFrame:
     adj["date"] = pd.to_datetime(adj["date"])
     out = out.merge(adj, on=["cusip", "date"], how="outer")
 
-    out["str1_adjx"] = out["str1_adj"] - out["tret"]
-    out["str2_adjx"] = out["str2_adj"] - out["tret"]
-    out.drop(columns=["tret"], inplace=True)
+    out["str1_adjx"] = out["str1_adj"] - out[tret_col]
+    out["str2_adjx"] = out["str2_adj"] - out[tret_col]
+    out.drop(columns=[tret_col], inplace=True)
 
     # -- 6. illiq_signals_adj (ilq_adj) -------------------------------------------------------------
     ilq = pd.read_parquet(blocks_dir / "illiq_signals_adj.parquet",
@@ -135,14 +145,19 @@ def _double_sort_factors(df: pd.DataFrame, signals: tuple, ret_field: str,
     return core, crf
 
 
-def build(con=None, mode: str | None = None, limit_cusips: int | None = None) -> dict[str, Path]:
-    """Build the bbw_factors block. `con`/`limit_cusips` unused (pandas step; kept for API parity)."""
+def build(con=None, mode: str | None = None, limit_cusips: int | None = None,
+          benchmark: str | None = None) -> dict[str, Path]:
+    """Build the bbw_factors block. `con`/`limit_cusips` unused (pandas step; kept for API parity).
+
+    `benchmark=None` reproduces the shipped block. Any other value builds only the twins that move
+    with the benchmark, from `ret_vw - tret_<benchmark>`."""
     mode = mode or cfg.INPUT_MODE
     t0 = time.time()
     blocks_dir = cfg.BLOCKS_DIR / mode
     out_dir = blocks_dir
+    tret_col = "tret" if benchmark is None else f"tret_{benchmark}"
 
-    df = _prep_bbw_panel(blocks_dir)
+    df = _prep_bbw_panel(blocks_dir, tret_col)
 
     # -- create_bbw_factors steps 2-5: dedup, unrated drop, composite rating, renames --------------
     n0 = len(df)
@@ -155,9 +170,13 @@ def build(con=None, mode: str | None = None, limit_cusips: int | None = None) ->
 
     rf_df = ff5.load_ff5()[["date", "rf"]].set_index("date")["rf"]
 
-    core_std, crf_std = _double_sort_factors(df, BBW_SIGNALS, "ret", FACTOR_NAME_MAP, "str1_adj")
+    # The raw (std) side is built from total returns and does not move with the benchmark, so for a
+    # benchmark run only the adjusted side is sorted -- half the PyBondLab work.
+    if benchmark is None:
+        core_std, crf_std = _double_sort_factors(df, BBW_SIGNALS, "ret", FACTOR_NAME_MAP,
+                                                 "str1_adj")
+        CRF_std = crf_std.to_frame(name="CRF")
     core_x, crf_x = _double_sort_factors(df, BBW_SIGNALS_X, "ret_x", FACTOR_NAME_MAP_X, "str1_adjx")
-    CRF_std = crf_std.to_frame(name="CRF")
     CRF_x = crf_x.to_frame(name="CRFx")
 
     # -- MKTB / MKTBx / TERM (VW by mcap_s over non-null return rows) ------------------------------
@@ -176,6 +195,27 @@ def build(con=None, mode: str | None = None, limit_cusips: int | None = None) ->
     MKT_all["MKTB"] = MKT_all["MKTB_raw"] - MKT_all["RF"]
     MKT_all = MKT_all.join(MKTBx_df, how="inner")
     MKT_all["TERM"] = MKT_all["MKTB_raw"] - MKT_all["MKTBx"]
+
+    if benchmark is not None:
+        # MKTB_raw and RF are benchmark-independent; TERM is not, because it is the gap between the
+        # raw market and the adjusted one. `dcapm`, `psbm` and `amdm` regress on `term` alongside
+        # `mktbx`, so a benchmark run that reused the tret TERM would mix two benchmarks on one
+        # right-hand side.
+        sfx = f"_{benchmark}"
+        bbw_bm = (core_x.join(CRF_x, how="inner")
+                  .join(MKT_all[["MKTBx", "TERM"]], how="inner")
+                  .rename(columns={"DRFx": "DRF", "LRFx": "LRF", "CRFx": "CRF",
+                                   "MKTBx": "MKTB", "TERM": "TERM"})
+                  .reset_index().rename(columns={"index": "date"}).set_index("date")
+                  .loc[:, ["MKTB", "DRF", "CRF", "LRF", "TERM"]]
+                  .add_suffix(sfx).sort_index())
+        out_path = out_dir / f"bbw_factors{sfx}.parquet"
+        bbw_bm.to_parquet(out_path, index=True)
+        (out_dir / f"step3_meta{sfx}.json").write_text(json.dumps(
+            {"wall_s": round(time.time() - t0, 2), "mode": mode, "benchmark": benchmark,
+             "tret_col": tret_col, "rows": len(bbw_bm), "panel_rows": int(n0),
+             "columns": list(bbw_bm.columns)}, indent=1))
+        return {f"bbw_factors{sfx}": out_path}
 
     # -- DEFB / TERMB: the default and term premia (Fama-French 1993; Gebhardt, Hvidkjaer &
     #    Swaminathan 2005) ---------------------------------------------------------------------

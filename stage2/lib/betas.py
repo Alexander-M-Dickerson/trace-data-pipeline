@@ -40,6 +40,12 @@ logger = logging.getLogger(__name__)
 SWAPPED_FACTORS = ("mktb", "drf", "crf", "lrf")
 FACTOR_SWAP_TRET = {f: f + "x" for f in SWAPPED_FACTORS}
 
+# TERM is MKTB_raw - MKTBx, so it moves with the benchmark as well -- and `dcapm`, `psbm` and
+# `amdm` all regress on `term` ALONGSIDE `mktbx`, so leaving it behind would put two different
+# benchmarks on one right-hand side. The tret variant needs no entry for it: there was never a
+# `termx`, because the historical `term` IS the tret-adjusted one.
+BENCHMARK_FACTORS = SWAPPED_FACTORS + ("term",)
+
 
 def factor_swap(benchmark: str | None) -> dict:
     """The factor twins to use for a benchmark. None means the raw factors (the `std` side)."""
@@ -47,7 +53,7 @@ def factor_swap(benchmark: str | None) -> dict:
         return {}
     if benchmark == "tret":
         return dict(FACTOR_SWAP_TRET)
-    return {f: f"{f}_{benchmark}" for f in SWAPPED_FACTORS}
+    return {f: f"{f}_{benchmark}" for f in BENCHMARK_FACTORS}
 
 
 # (key, return column, benchmark) -- the default reproduces the historical (betas_std, betas_x).
