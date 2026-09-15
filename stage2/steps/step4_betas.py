@@ -84,24 +84,28 @@ def build_factor_matrix(blocks_dir: Path) -> pd.DataFrame:
     return factors
 
 
-def build_combined_returns(blocks_dir: Path) -> pd.DataFrame:
-    """concat_data: quote panel (pre-2002-07) + all_returns, end rows win; + ret_vwx."""
+def build_combined_returns(blocks_dir: Path, tret_col: str = "tret") -> pd.DataFrame:
+    """concat_data: quote panel (pre-2002-07) + all_returns, end rows win; + ret_vwx.
+
+    `tret_col` selects the benchmark subtracted to form the excess return. The default is the
+    incumbent `tret`; both the quote panel and all_returns carry the alternatives too, which is
+    what lets a rolling window reach back to 1997 for any of them."""
     q = quote.load_quote()
     q.columns = q.columns.str.lower()
-    q = q.rename(columns={"cusip_id": "cusip"})[["cusip", "date", "ret_vw", "tret"]].copy()
+    q = q.rename(columns={"cusip_id": "cusip"})[["cusip", "date", "ret_vw", tret_col]].copy()
     q["date"] = pd.to_datetime(q["date"])
     q = q[q["date"] < "2002-07-01"].copy()
 
     all_ret = pd.read_parquet(blocks_dir / "all_returns.parquet",
-                              columns=["cusip", "date", "ret_vw", "tret"])
+                              columns=["cusip", "date", "ret_vw", tret_col])
     all_ret["cusip"] = all_ret["cusip"].astype(str)
     all_ret["date"] = pd.to_datetime(all_ret["date"])
 
     combined = pd.concat([q, all_ret], ignore_index=True)
     combined = combined.drop_duplicates(subset=["cusip", "date"], keep="last")
     combined = combined.sort_values(["cusip", "date"]).reset_index(drop=True)
-    combined = combined[["cusip", "date", "ret_vw", "tret"]]
-    combined["ret_vwx"] = combined["ret_vw"] - combined["tret"]
+    combined = combined[["cusip", "date", "ret_vw", tret_col]]
+    combined["ret_vwx"] = combined["ret_vw"] - combined[tret_col]
     return combined
 
 

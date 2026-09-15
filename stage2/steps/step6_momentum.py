@@ -22,7 +22,8 @@ from lib import var_es
 VAR_COLS = ["cusip", "date", "var_90", "es_90", "var_95"]
 
 
-def build(con=None, mode: str | None = None, limit_cusips: int | None = None) -> dict[str, Path]:
+def build(con=None, mode: str | None = None, limit_cusips: int | None = None,
+          tret_col: str = "tret") -> dict[str, Path]:
     mode = mode or cfg.INPUT_MODE
     t0 = time.time()
     blocks_dir = cfg.BLOCKS_DIR / mode
@@ -34,7 +35,7 @@ def build(con=None, mode: str | None = None, limit_cusips: int | None = None) ->
     fisd = pd.read_parquet(cfg.AUX["fisd"], columns=["complete_cusip", "sic_code"])
     fisd = fisd.drop_duplicates(subset=["complete_cusip"]).rename(columns={"complete_cusip": "cusip"})
     are = are.merge(fisd[["cusip", "sic_code"]], on="cusip", how="left")
-    are["ret_vwx"] = are["ret_vw"] - are["tret"]
+    are["ret_vwx"] = are["ret_vw"] - are[tret_col]
 
     mom_ret, mom_retx = momlib.build_mom_ltr_and_industry(are)
 

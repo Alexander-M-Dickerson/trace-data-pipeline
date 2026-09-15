@@ -41,9 +41,12 @@ def _prep_inputs(blocks_dir: Path) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataF
         df["date"] = pd.to_datetime(df["date"])
         return df
 
-    all_ret = _read("all_returns", ["cusip", "date", "ret_vw", "tret"])
-    all_returns_ext = pd.concat([q[["cusip", "date", "ret_vw", "tret"]], all_ret],
-                                ignore_index=True)
+    # The benchmark columns ride along so step 6 can roll momentum and VaR on any of them.
+    # They change nothing here: make_value_signals reads ret_vw and tret by name, and value
+    # signals are deliberately NOT duration-adjusted -- both panels share value_signals_std.
+    _RET = ["cusip", "date", "ret_vw", "tret", "tret_bns", "tret_cls"]
+    all_ret = _read("all_returns", _RET)
+    all_returns_ext = pd.concat([q[_RET], all_ret], ignore_index=True)
     all_returns_ext = all_returns_ext.drop_duplicates(subset=["cusip", "date"], keep="last")
     all_returns_ext = all_returns_ext.sort_values(["cusip", "date"]).reset_index(drop=True)
 
