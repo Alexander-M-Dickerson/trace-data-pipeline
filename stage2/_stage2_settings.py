@@ -157,9 +157,27 @@ PANEL_ZSTD_LEVEL = 3       # level 3 writes ~5x faster than 9 for ~7% larger fil
 # Published inputs, downloaded once and cached under stage2/data/.
 
 # Pre-TRACE quote returns (1997-01 -> 2002-06). Lets rolling signals reach a common
-# 2002-08 start. Static content -- it never changes.
-QUOTE_URL = "https://openbondassetpricing.com/wp-content/uploads/2025/12/quote_returns_quantlib.zip"
+# 2002-08 start.
+#
+# 2026-09: extended from 9 to 14 columns, adding the five Treasury benchmarks
+# (tret_bns / tret_cfm / tret_gprs / tret_cls / tret_mat) so the rolling windows behind the
+# duration-adjusted blocks have the same pre-history for those benchmarks that they already had
+# for `tret`. The original nine columns are byte-identical -- the file was extended by a join
+# against the Lehman-ICE panel, not rebuilt. The zip member keeps its old name, so QUOTE_ZIPKEY
+# is unchanged and nothing that reads this file by name needs to move.
+QUOTE_URL = "https://openbondassetpricing.com/wp-content/uploads/2026/09/quote_returns_quantlib_tret.zip"
 QUOTE_ZIPKEY = "quote_returns_quantlib.parquet"
+
+# The columns this file is REQUIRED to carry. Steps 3/4/5 each select an explicit subset of these
+# by name, so a wider file cannot change any computation -- but a NARROWER one silently produces
+# short rolling windows, which is the failure this pins.
+QUOTE_REQUIRED_COLS = ("cusip_id", "date", "ret_vw", "tret", "cs", "bbtm", "sze")
+
+# The benchmark block the 2026 file adds. QUOTE_HAS_BENCHMARKS declares what QUOTE_URL points at;
+# lib/quote.py refuses a cached copy that disagrees with it rather than using the stale one. Set
+# this False alongside reverting QUOTE_URL if you ever need the nine-column file back.
+QUOTE_BENCHMARK_COLS = ("tret_bns", "tret_cfm", "tret_gprs", "tret_cls", "tret_mat")
+QUOTE_HAS_BENCHMARKS = True
 
 # Extended "modified" BBW factor series, used ONLY to backfill factor history before
 # 2002-08-31 (rows from 2002-08 on are recomputed from TRACE and overwritten).

@@ -51,7 +51,9 @@ SOURCES: list = [
      "EPU_URL", FC / "epu_categorical.parquet", "date"),
     ("OSBAP extended BBW (pre-2002)", "web", "pre-2002-08 BBW factor backfill (published series)",
      "BBW_EXTENDED_URL", D / "bbw_factors_extended_1973_2023.parquet", "date"),
-    ("Quote returns 1997-2002", "web", "pre-2002-07 quote-based returns for BBW VaR / value",
+    ("Quote returns 1997-2002", "web",
+     "pre-2002-07 quote-based returns for BBW VaR / value, and the tret_* pre-history the "
+     "duration-adjusted blocks roll over",
      "QUOTE_URL", D / "quote_returns_quantlib.parquet", "date"),
     ("NYSE session calendar", "web", "business-day gaps / month-end sessions (mcal-generated)",
      "pandas_market_calendars NYSE", D / "nyse_calendar.parquet", None),

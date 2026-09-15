@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The published 1997-2002 quote panel now carries the five `tret_*` benchmarks** (9 -> 14
+  columns). `stage2/lib/quote.py` downloads it and steps 3/4/5 concatenate it ahead of
+  `all_returns` so rolling 36-month windows have a pre-history; it previously carried only
+  `tret`, which would have left any duration-adjusted rolling statistic on another benchmark
+  without a warm-up. `QUOTE_URL` moves to the 2026-09 upload; the zip member keeps its name, so
+  `QUOTE_ZIPKEY` is unchanged.
+  - **The original nine columns are untouched** -- values, dtypes and row order all preserved. The
+    file was extended by a join against our Lehman-ICE panel, not rebuilt. Verified: steps 3, 4 and
+    5 consume byte-identical frames either way, because each selects its columns by name and then
+    sorts by (cusip, date).
+  - Coverage 99.92% (288,709 of 288,939); the 230 gaps are bonds in their first observed month,
+    which the 15-45 day window screen drops. All 230 still carry `tret`.
+  - **`load_quote` now validates the cache against the settings and refetches when it disagrees.**
+    Repointing `QUOTE_URL` previously changed nothing on a machine that already held the old file,
+    because the cache is keyed on the member name and that did not change -- the build would have
+    kept running on stale data and produced entirely reasonable-looking numbers. New settings
+    `QUOTE_REQUIRED_COLS` / `QUOTE_BENCHMARK_COLS` / `QUOTE_HAS_BENCHMARKS` declare the contract,
+    and `stage2/tests/test_quote_panel.py` pins it.
+
 - **A fifth Treasury benchmark, `tret_cls`**, placed immediately after `tret_gprs`. **This takes
   the panel from 144 to 145 columns and is a public API change.** Cui, S., Lu, Y. and Song, Y.
   (2026), "Understanding Corporate Bond Excess Returns", Eqs. (3)-(6).

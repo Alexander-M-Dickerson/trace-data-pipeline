@@ -166,7 +166,7 @@ Stage 2 downloads and caches a few published inputs into `stage2/data/` on first
 
 | Input | Why |
 |---|---|
-| Pre-2002 quote returns | Lets rolling signals reach a common 2002-08 start |
+| Pre-2002 quote returns | Lets rolling signals reach a common 2002-08 start. Carries the five `tret_*` benchmarks as well as `tret`, so the duration-adjusted blocks have the same pre-history whichever benchmark they use |
 | Extended BBW factor series | Backfills factor history before 2002-08 |
 | Fama-French, FRED, He-Kelly-Manela, Ludvigson, Policy Uncertainty | The monthly factor matrix |
 
