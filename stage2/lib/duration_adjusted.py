@@ -98,6 +98,13 @@ _CF_LO, _CF_HI = "1960-01-01", "2130-01-01"
 REQUIRED_COLS = ("cusip_id", "dt_s", "dt", "ytm", "mod_dur", "bond_maturity")
 
 
+def required_cols(start_col: str = "dt_s") -> tuple:
+    """REQUIRED_COLS with the window-start column named. The END frame calls it `dt_s`; the
+    BEGIN frame calls the same thing `date_start`, and both are attached now that `all_returns`
+    -- which the rolling betas read -- is a union of the two."""
+    return tuple(start_col if c == "dt_s" else c for c in REQUIRED_COLS)
+
+
 GSW_URL = "https://www.federalreserve.gov/data/yield-curve-tables/feds200628.csv"
 _GSW_SKIP = 9   # the Fed prepends a provenance preamble before the real header row
 
@@ -297,7 +304,7 @@ def build_cashflows(con, fisd_path: Path, terms_path: Path, table: str = "da_cf"
     """)
 
 
-def _ladder_sql(table: str, date_col: str, daily_path: Path) -> str:
+def _ladder_sql(table: str, date_col: str, daily_path: Path, start_col: str = "dt_s") -> str:
     """(bond-month x remaining cash flow), materialised.
 
     The discount yield is the bond's own YTM observed on `dt_s` -- the day the return window opens,
@@ -315,7 +322,7 @@ def _ladder_sql(table: str, date_col: str, daily_path: Path) -> str:
     return f"""
     WITH pm AS (
         SELECT cusip_id, {date_col} AS d,
-               CAST(dt_s AS DATE) AS a0, CAST(dt AS DATE) AS a1,
+               CAST({start_col} AS DATE) AS a0, CAST(dt AS DATE) AS a1,
                lag(ytm) OVER w AS y0_lag,
                mod_dur, bond_maturity
         FROM {table}
@@ -427,7 +434,8 @@ def _attach_tret_mat(con, table: str, date_col: str, treasury_mod, mode: str | N
 def attach(con, table: str, date_col: str, out_table: str, *,
            treasury_mod, mode: str | None = None,
            gsw_path: Path | None = None, fisd_path: Path | None = None,
-           terms_path: Path | None = None, daily_path: Path | None = None) -> dict:
+           terms_path: Path | None = None, daily_path: Path | None = None,
+           start_col: str = "dt_s") -> dict:
     """Add tret_bns / tret_cfm / tret_gprs / tret_mat to `table`, writing `out_table`.
 
     Mirrors `_attach_tret`: keyed exactly by (cusip_id, {date_col}), LEFT JOINed so no row is lost.
@@ -438,9 +446,10 @@ def attach(con, table: str, date_col: str, out_table: str, *,
     fisd_path = Path(fisd_path or cfg.AUX["fisd"])
 
     have = {r[0] for r in con.execute(f"DESCRIBE SELECT * FROM {table}").fetchall()}
-    missing = [c for c in REQUIRED_COLS if c not in have]
+    need = required_cols(start_col)
+    missing = [c for c in need if c not in have]
     if missing:
-        raise RuntimeError(f"{table} is missing {missing}; duration_adjusted.attach needs {list(REQUIRED_COLS)}")
+        raise RuntimeError(f"{table} is missing {missing}; duration_adjusted.attach needs {list(need)}")
     if not Path(fisd_path).exists():
         raise RuntimeError(f"FISD extract not found: {fisd_path}")
 
@@ -448,7 +457,7 @@ def attach(con, table: str, date_col: str, out_table: str, *,
     con.execute(sven_macro_sql())
     build_curve(con, Path(gsw_path))
     build_cashflows(con, Path(fisd_path), Path(terms_path))
-    con.execute(f"CREATE OR REPLACE TEMP TABLE da_lad AS {_ladder_sql(table, date_col, Path(daily_path or cfg.daily_input()))}")
+    con.execute(f"CREATE OR REPLACE TEMP TABLE da_lad AS {_ladder_sql(table, date_col, Path(daily_path or cfg.daily_input()), start_col)}")
     for stmt in _gprs_statements():
         con.execute(stmt)
     con.execute("""

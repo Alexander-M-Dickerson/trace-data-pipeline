@@ -238,15 +238,26 @@ SELECT * FROM t_bgn_ret2 WHERE hprd > 0 AND month_end_cal >= DATE '{cfg.START_DA
     _attach_tret(con, "t_end_f", "date_end_ref", mode=mode)
     _attach_tret(con, "t_bgn_f", "month_end_cal", mode=mode)
 
-    # Four more Treasury benchmarks, built from each bond's own cash flows -- see
-    # lib/duration_adjusted.py for the equations and citations. Attached to the END frame only: the
-    # shipped `tret` users subtract comes from t_end_f_t and these are its alternatives, so a
-    # `_bgn` twin would be a column nobody reads.
+    # Five more Treasury benchmarks, built from each bond's own cash flows -- see
+    # lib/duration_adjusted.py for the equations and citations.
+    #
+    # Attached to BOTH frames, exactly as `tret` is. It was the end frame only while these were
+    # just panel columns -- the shipped ones are end-timed, so a `_bgn` twin had no reader. That
+    # stopped being true when `all_returns` became the input to duration-adjusted rolling betas:
+    # it unions the two frames, and 8.1% of its rows come from bgn alone. Leaving those without a
+    # benchmark would estimate the alternative-benchmark betas on a non-random 92% subsample of
+    # the rows the `tret` ones use, which is a confound in precisely the comparison the
+    # alternatives exist to support. The bgn frame calls its window start `date_start`.
     _da = duration_adjusted.attach(
         con, "t_end_f_t", "date_end_ref", "t_end_f_td",
         treasury_mod=treasury, mode=mode)
-    print(f"  duration-adjusted benchmarks: {_da['tret_bns']:,}/{_da['rows']:,} rows "
+    print(f"  duration-adjusted benchmarks [end]: {_da['tret_bns']:,}/{_da['rows']:,} rows "
           f"(tret_mat {_da['tret_mat']:,})")
+    _dab = duration_adjusted.attach(
+        con, "t_bgn_f_t", "month_end_cal", "t_bgn_f_td",
+        treasury_mod=treasury, mode=mode, start_col="date_start")
+    print(f"  duration-adjusted benchmarks [bgn]: {_dab['tret_bns']:,}/{_dab['rows']:,} rows "
+          f"(tret_mat {_dab['tret_mat']:,})")
 
     # ============ upstream steps 16/16.6: end_signals (PRE n<=31 frame, point-in-time) ============
     # bbtm = 100/pr (float32); sze = mcap; fce_val = round(ao); short-name renames per SIGNAL_NAME_MAP
@@ -347,17 +358,35 @@ SELECT cusip_id AS cusip, month_end_cal AS date, date_start AS dt_s, dt AS dt_e,
        hprd, igap, ret_std, ret_type, mcap_s, mcap AS mcap_e,
        sp_rating AS sp_rat, mdy_rating AS mdy_rat,
        spc_rating AS spc_rat, mdc_rating AS mdyc_rat, tret
-FROM t_bgn_f_t
+FROM t_bgn_f_td
 """)
 
     # all_returns: PRE-normalization ret_vw, end rows take precedence over bgn on (cusip, date)
+    # end_returns / bgn_returns are shipped blocks with fixed projections, so the benchmarks are
+    # taken from the extended frames rather than by widening those two.
+    con.execute("""
+CREATE OR REPLACE TEMP TABLE t_end_f_td_ar AS
+SELECT cusip_id AS cusip, date_end_ref AS date,
+       CASE WHEN ret_type = 'trad_in_def' AND ret_vw_adj > ret_std THEN ret_std
+            ELSE ret_vw_adj END AS ret_vw_x, ret_vw_adj AS ret_vw_pre,
+       tret, tret_bns, tret_cls, ret_std, ret_type
+FROM t_end_f_td
+""")
+    con.execute("""
+CREATE OR REPLACE TEMP TABLE t_bgn_f_td_ar AS
+SELECT cusip_id AS cusip, month_end_cal AS date,
+       ret_vw_adj AS ret_vw_pre, tret, tret_bns, tret_cls, ret_std, ret_type
+FROM t_bgn_f_td
+""")
     con.execute("""
 CREATE OR REPLACE TEMP TABLE all_returns AS
-SELECT cusip, date, ret_vw, tret, ret_std, ret_type FROM (
+SELECT cusip, date, ret_vw, tret, tret_bns, tret_cls, ret_std, ret_type FROM (
   SELECT *, row_number() OVER (PARTITION BY cusip, date ORDER BY src) AS rn FROM (
-    SELECT cusip, date, ret_vw_pre AS ret_vw, tret, ret_std, ret_type, 0 AS src FROM end_returns
+    SELECT cusip, date, ret_vw_pre AS ret_vw, tret, tret_bns, tret_cls,
+           ret_std, ret_type, 0 AS src FROM t_end_f_td_ar
     UNION ALL
-    SELECT cusip, date, ret_vw_pre, tret, ret_std, ret_type, 1 FROM bgn_returns
+    SELECT cusip, date, ret_vw_pre, tret, tret_bns, tret_cls,
+           ret_std, ret_type, 1 FROM t_bgn_f_td_ar
   )
 ) WHERE rn = 1
 """)
@@ -394,7 +423,7 @@ SELECT cusip, date, ret_vw, tret, ret_std, ret_type FROM (
                ytm_adj, md_dur_adj, convx_adj, cs_adj, str1_adj, str2_adj, bbtm_adj, sze_adj
         FROM t_adj ORDER BY cusip, date""")
     _copy("all_returns", """
-        SELECT cusip, date::TIMESTAMP AS date, ret_vw, tret, ret_std, ret_type
+        SELECT cusip, date::TIMESTAMP AS date, ret_vw, tret, tret_bns, tret_cls, ret_std, ret_type
         FROM all_returns ORDER BY cusip, date""")
     # firm_ids: Stage 1's permno/permco/gvkey collapsed to one row per bond-month, taken at
     # the same month-end trade t_sig uses. Stage 7 merges this instead of re-deriving the

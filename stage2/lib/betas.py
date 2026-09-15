@@ -26,6 +26,33 @@ from lib.rolling_kernels import (
 
 logger = logging.getLogger(__name__)
 
+# ----------------------------------------------------------------------------------------------
+# BENCHMARK VARIANTS
+#
+# A duration-adjusted beta is not just "the same regression on a different y". The four bond-market
+# factors are swapped for twins estimated on the SAME excess return -- step 3 builds them by
+# re-running the BBW double-sorts. So a variant is a (return column, factor swap) pair, and adding
+# a benchmark means adding both halves, not just the left-hand side.
+#
+# `tret` is the incumbent and its twins are the historical `*x` names. Any other benchmark uses
+# `<factor>_<benchmark>`, which is what steps 3 emits for it.
+# ----------------------------------------------------------------------------------------------
+SWAPPED_FACTORS = ("mktb", "drf", "crf", "lrf")
+FACTOR_SWAP_TRET = {f: f + "x" for f in SWAPPED_FACTORS}
+
+
+def factor_swap(benchmark: str | None) -> dict:
+    """The factor twins to use for a benchmark. None means the raw factors (the `std` side)."""
+    if benchmark is None:
+        return {}
+    if benchmark == "tret":
+        return dict(FACTOR_SWAP_TRET)
+    return {f: f"{f}_{benchmark}" for f in SWAPPED_FACTORS}
+
+
+# (key, return column, benchmark) -- the default reproduces the historical (betas_std, betas_x).
+DEFAULT_VARIANTS = (("std", "ret_vw", None), ("x", "ret_vwx", "tret"))
+
 # thread fan-out for the per-model kernel calls (kernels are nogil; pandas glue is brief)
 N_JOBS = min(12, os.cpu_count() or 1)
 RIDGE_DEFAULT = 1e-12   # K>1 rolling-OLS regularization (upstream compute_rolling_betas_panel default)
@@ -301,6 +328,7 @@ def compute_all_betas(
     window: int = 36,
     min_obs: int = 12,
     verbose: bool = True,
+    variants: tuple = DEFAULT_VARIANTS,
 ) -> tuple:
     """
     Compute rolling betas for all factor models.
@@ -317,11 +345,15 @@ def compute_all_betas(
         Minimum observations required
     verbose : bool, default True
         If True, log progress
+    variants : tuple, default DEFAULT_VARIANTS
+        One (key, return column, benchmark) triple per set of betas to produce. The benchmark
+        selects the factor twins via `factor_swap`; None means the raw factors. Pass a single
+        triple to compute one set and pay a fraction of the default's cost.
 
     Returns
     -------
-    tuple of (pd.DataFrame, pd.DataFrame)
-        (betas_std, betas_x) - betas from normal and duration-adjusted returns
+    tuple of pd.DataFrame, one per variant, in the order given
+        With the default variants this is (betas_std, betas_x), unchanged.
     """
     # Beta model configuration
     BETA_MODELS = [
@@ -430,18 +462,25 @@ def compute_all_betas(
          "out": {"eput": "eput"}},
     ]
 
-    # Factor swap mapping for duration-adjusted returns
-    FACTOR_SWAP = {"mktb": "mktbx", "drf": "drfx", "crf": "crfx", "lrf": "lrfx"}
+    swaps = {key: factor_swap(bm) for key, _ret, bm in variants}
 
-    # every factor column any model can touch, normal + swapped (one base carries them all)
+    # every factor column any model can touch, raw + every variant's twins (one base carries them
+    # all, so the merge is paid once however many variants are asked for)
     factor_cols_all = sorted({f for m in BETA_MODELS for f in m["factors"]}
-                             | {FACTOR_SWAP.get(f, f) for m in BETA_MODELS for f in m["factors"]})
+                             | {sw.get(f, f) for sw in swaps.values()
+                                for m in BETA_MODELS for f in m["factors"]})
+    missing = [c for c in factor_cols_all if c not in factors.columns]
+    if missing:
+        raise KeyError(
+            f"the factor panel is missing {missing}. A benchmark variant needs its OWN bond-market "
+            f"factor twins -- step 3 emits them as bbw_factors_<benchmark>.parquet. Computing it "
+            f"against the wrong twins would produce plausible, wrong betas.")
 
-    def _submit_model(ex: ThreadPoolExecutor, base: _PanelBase, model: dict, is_x: bool):
+    def _submit_model(ex: ThreadPoolExecutor, base: _PanelBase, model: dict, swap: dict):
         """Stage A: mask the base for this model and submit one kernel task per group-aligned
         chunk. Returns (idx, facs_use, futures) for _finish_model."""
         facs = model["factors"]
-        facs_use = [FACTOR_SWAP.get(f, f) for f in facs] if is_x else facs
+        facs_use = [swap.get(f, f) for f in facs]
         idx, gid, y, xs = base.view(facs_use)
         chunks = _group_chunks(gid, N_CHUNKS)
         if len(facs_use) == 1:
@@ -454,7 +493,7 @@ def compute_all_betas(
                               int(window), int(min_obs), RIDGE_DEFAULT) for s, e in chunks]
         return idx, facs_use, futs
 
-    def _finish_model(base: _PanelBase, model: dict, is_x: bool, ret_col: str,
+    def _finish_model(base: _PanelBase, model: dict, swap: dict, ret_col: str,
                       idx: np.ndarray, facs_use: list[str], futs: list):
         """Stage B: concatenate the chunk outputs (value-identical to one full-pass kernel call --
         every kernel resets at group boundaries) and apply the model's naming spec."""
@@ -473,7 +512,7 @@ def compute_all_betas(
         sum_op = model["sum"]
         if sum_op is not None:
             out_name, sum_cols = sum_op
-            sum_cols_use = [FACTOR_SWAP.get(c, c) for c in sum_cols] if is_x else sum_cols
+            sum_cols_use = [swap.get(c, c) for c in sum_cols]
             acc = beta_by_fac[sum_cols_use[0]].copy()
             for c in sum_cols_use[1:]:
                 acc = acc + beta_by_fac[c]          # NaN propagates == sum(skipna=False)
@@ -486,7 +525,7 @@ def compute_all_betas(
                 named[f"b_{out_map.get(f_orig, f_orig)}"] = beta_by_fac[f_use]
         else:
             for f_orig in keep:
-                f_use = FACTOR_SWAP.get(f_orig, f_orig) if is_x else f_orig
+                f_use = swap.get(f_orig, f_orig)
                 named[f"b_{out_map.get(f_orig, f_orig)}"] = beta_by_fac[f_use]
         if sum_op is not None:
             out_name_sum, _ = sum_op
@@ -513,29 +552,34 @@ def compute_all_betas(
 
         return idx, named
 
-    bases = {False: _PanelBase(combined_returns, factors, "ret_vw", factor_cols_all),
-             True: _PanelBase(combined_returns, factors, "ret_vwx", factor_cols_all)}
+    ret_of = {key: ret for key, ret, _bm in variants}
+    missing_ret = [r for r in ret_of.values() if r not in combined_returns.columns]
+    if missing_ret:
+        raise KeyError(f"combined_returns is missing {missing_ret}")
+    bases = {key: _PanelBase(combined_returns, factors, ret_of[key], factor_cols_all)
+             for key, _ret, _bm in variants}
 
-    tasks = [(model, is_x) for model in BETA_MODELS for is_x in (False, True)]
+    tasks = [(model, key) for model in BETA_MODELS for key, _r, _b in variants]
     if verbose:
-        logger.info("  Computing %d model runs x %d chunks on %d threads...",
-                    len(tasks), N_CHUNKS, N_JOBS)
+        logger.info("  Computing %d model runs x %d chunks on %d threads (%d variant(s): %s)...",
+                    len(tasks), N_CHUNKS, N_JOBS, len(variants),
+                    ", ".join(k for k, _r, _b in variants))
     with ThreadPoolExecutor(max_workers=N_JOBS) as ex:
-        submitted = [(model, is_x, _submit_model(ex, bases[is_x], model, is_x))
-                     for model, is_x in tasks]
-        outputs = [_finish_model(bases[is_x], model, is_x, "ret_vwx" if is_x else "ret_vw",
+        submitted = [(model, key, _submit_model(ex, bases[key], model, swaps[key]))
+                     for model, key in tasks]
+        outputs = [_finish_model(bases[key], model, swaps[key], ret_of[key],
                                  idx, facs_use, futs)
-                   for model, is_x, (idx, facs_use, futs) in submitted]
+                   for model, key, (idx, facs_use, futs) in submitted]
 
     # scatter-assembly: union-of-masks presence + base-aligned columns reproduce the old outer-merge
     # chain exactly (values on keys identical; row order now fully (cusip,date)-sorted)
-    frames: dict[bool, pd.DataFrame] = {}
-    for side in (False, True):
+    frames: dict[str, pd.DataFrame] = {}
+    for side, _ret, _bm in variants:
         base = bases[side]
         present = np.zeros(base.n, dtype=bool)
         cols: dict[str, np.ndarray] = {}
-        for (model, is_x), (idx, named) in zip(tasks, outputs):
-            if is_x != side:
+        for (model, key), (idx, named) in zip(tasks, outputs):
+            if key != side:
                 continue
             present[idx] = True
             for name, vals in named.items():
@@ -549,12 +593,12 @@ def compute_all_betas(
             frame[name] = arr[keep_rows]
         frames[side] = frame
 
-    betas_std, betas_x = frames[False], frames[True]
+    out = tuple(frames[key] for key, _r, _b in variants)
     if verbose:
-        logger.info("  betas_std shape: %s", betas_std.shape)
-        logger.info("  betas_x shape: %s", betas_x.shape)
+        for (key, _r, _b), frame in zip(variants, out):
+            logger.info("  betas_%s shape: %s", key, frame.shape)
 
-    return betas_std, betas_x
+    return out
 
 
 def compute_sys_momentum(
@@ -565,6 +609,7 @@ def compute_sys_momentum(
     min_obs: int = 12,
     ridge: float = 1e-12,
     verbose: bool = True,
+    variants: tuple = DEFAULT_VARIANTS,
 ) -> tuple:
     """
     Compute systematic and idiosyncratic momentum using rolling factor model.
@@ -602,18 +647,10 @@ def compute_sys_momentum(
     if factor_cols is None:
         factor_cols = ["mktb"]
 
-    # Factor swap mapping for duration-adjusted returns
-    FACTOR_SWAP = {"mktb": "mktbx", "drf": "drfx", "crf": "crfx", "lrf": "lrfx"}
+    results: dict = {}
 
-    mom_std_list = []
-    mom_x_list = []
-
-    for ret_col, is_x in [("ret_vw", False), ("ret_vwx", True)]:
-        # Swap factors for duration-adjusted if needed
-        if is_x:
-            facs_use = [FACTOR_SWAP.get(f, f) for f in factor_cols]
-        else:
-            facs_use = factor_cols
+    for _key, ret_col, _bm in variants:
+        facs_use = [factor_swap(_bm).get(f, f) for f in factor_cols]
 
         if verbose:
             fac_str = ", ".join(facs_use)
@@ -666,14 +703,15 @@ def compute_sys_momentum(
             "idimom12_1": idimom12_1,
         })
 
-        if is_x:
-            mom_x_list.append(mom_df)
-        else:
-            mom_std_list.append(mom_df)
+        results[_key] = mom_df
 
-    # Combine results
-    mom_std = mom_std_list[0] if mom_std_list else pd.DataFrame()
-    mom_x = mom_x_list[0] if mom_x_list else pd.DataFrame()
+    # The historical contract is a (std, x) pair. For any other variant set, return the frames in
+    # the order asked for -- the caller knows which benchmark it requested.
+    if tuple(k for k, _r, _b in variants) == ("std", "x"):
+        mom_std = results.get("std", pd.DataFrame())
+        mom_x = results.get("x", pd.DataFrame())
+    else:
+        return tuple(results[k] for k, _r, _b in variants)
 
     if verbose:
         logger.info("  mom_std shape: %s", mom_std.shape)
