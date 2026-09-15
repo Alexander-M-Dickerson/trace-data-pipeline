@@ -185,8 +185,20 @@ QUOTE_HAS_BENCHMARKS = True
 # and high-yield constituent bonds distributed by ICE. Those bond data are licensed and
 # cannot be redistributed; the finished factor series can be, and is. Do not replace this
 # with a longer file: the build asserts every date in it exists in the factor panel.
-BBW_EXTENDED_URL = "https://openbondassetpricing.com/wp-content/uploads/2026/09/bbw_factors_extended_1973_2023.zip"
+# 2026-09: extended from 9 to 17 columns, adding the bond-market factor twins for the alternative
+# Treasury benchmarks (MKTB/DRF/CRF/TERM for each of bns and cls). build_factor_matrix splices this
+# series in before 2002-08-31, so without the twins a rolling beta on ret_vw - tret_bns has no
+# factor history to roll over and starts in 2003-08 where the tret one reaches 1997-01. The
+# original nine columns are unchanged, and the zip member keeps its name.
+BBW_EXTENDED_URL = "https://openbondassetpricing.com/wp-content/uploads/2026/09/bbw_factors_extended_1973_2023_tret.zip"
 BBW_EXTENDED_ZIPKEY = "bbw_factors_extended_1973_2023.parquet"
+
+# The twins the 2026-09 file adds, and the flag declaring that QUOTE_URL's sibling points at it.
+# Same contract as QUOTE_BENCHMARK_COLS / QUOTE_HAS_BENCHMARKS: lib/extended_factors.py refuses a
+# cached copy that disagrees rather than quietly splicing a series with no benchmark history.
+BBW_BENCHMARK_COLS = ("MKTB_bns", "DRF_bns", "CRF_bns", "TERM_bns",
+                      "MKTB_cls", "DRF_cls", "CRF_cls", "TERM_cls")
+BBW_HAS_BENCHMARKS = True
 
 # Public factor sources (used when FACTOR_SOURCE == "public").
 FF5_URL = ("https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/"

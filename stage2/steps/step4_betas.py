@@ -35,6 +35,13 @@ ICE_MAP = {"MKTB": "mktb", "DRF": "drf", "CRF": "crf",
            # the seven, and these two then fall through the `if ... in factors.columns` guard
            # below, leaving b_defb/b_termb TRACE-era only. Either file builds.
            "DEFB": "defb", "TERMB": "termb"}
+
+# The same splice for the alternative benchmarks. Built into the published series alongside the
+# tret twins, and mapped here so a rolling beta on ret_vw - tret_bns has the same pre-2002 factor
+# history the tret one has -- without this the extended file arrives and its twins are DROPPED by
+# the rename/select below, which looks exactly like the file not carrying them.
+ICE_MAP.update({f"{f}_{bm}": f"{f.lower()}_{bm}"
+                for bm in ("bns", "cls") for f in ("MKTB", "DRF", "CRF", "TERM")})
 ICE_CUTOFF = pd.Timestamp("2002-08-31")
 
 
@@ -52,6 +59,20 @@ def build_factor_matrix(blocks_dir: Path) -> pd.DataFrame:
         bbw = bbw.reset_index()
     bbw["date"] = pd.to_datetime(bbw["date"])
     factors = factors.merge(bbw, on="date", how="outer")
+
+    # The per-benchmark BBW blocks, when make_excess_blocks has built them. Merged here so the
+    # pre-2002 splice below has something to splice INTO: the extended series carries MKTB_bns and
+    # friends, but the splice only fires where the TRACE-native column is also present.
+    #
+    # Discovered rather than declared, because a benchmark whose block is absent must NOT silently
+    # fall back to the tret twins -- compute_all_betas raises on a missing twin instead, which is
+    # the loud half of this pair.
+    for bm_path in sorted(blocks_dir.glob("bbw_factors_*.parquet")):
+        bm = pd.read_parquet(bm_path)
+        if "date" not in bm.columns:
+            bm = bm.reset_index()
+        bm["date"] = pd.to_datetime(bm["date"])
+        factors = factors.merge(bm, on="date", how="outer")
 
     ext = extended_factors.load_extended_bbw().rename(columns=ICE_MAP)
     missing = set(ext["date"]) - set(factors["date"])

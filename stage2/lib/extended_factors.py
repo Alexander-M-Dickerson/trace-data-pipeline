@@ -45,9 +45,27 @@ def _normalize(df: pd.DataFrame) -> pd.DataFrame:
     if missing:
         raise ValueError(f"extended-BBW series is missing factor columns {missing}")
     have = [c for c in OPTIONAL_COLS if c in df.columns]
-    df = df[["date"] + COLS + have].copy()
+    # The benchmark twins ride through here too. This selection is a WHITELIST -- a column absent
+    # from it is silently dropped even when the published file carries it, which is how a correct
+    # download can still produce a series with no benchmark history.
+    twins = [c for c in getattr(cfg, "BBW_BENCHMARK_COLS", ()) if c in df.columns]
+    df = df[["date"] + COLS + have + twins].copy()
     df["date"] = pd.to_datetime(df["date"]) + pd.offsets.MonthEnd(0)
     return df
+
+
+def _missing_twins(df: pd.DataFrame) -> list[str]:
+    """Benchmark twins the settings say this series must carry and it does not.
+
+    ❗THE CACHE IS THE TRAP, exactly as it is in lib/quote.py. This module returns the cached
+    parquet whenever one exists, so repointing BBW_EXTENDED_URL changes nothing on a machine that
+    already holds the old file -- and the failure is invisible: the splice still works, the tret
+    factors are all present, and only the ALTERNATIVE benchmarks silently lose their pre-2002
+    history. Betas on them then start in 2003 instead of 1997 with nothing anywhere saying why.
+    """
+    if not getattr(cfg, "BBW_HAS_BENCHMARKS", False):
+        return []
+    return [c for c in cfg.BBW_BENCHMARK_COLS if c not in df.columns]
 
 
 def load_extended_bbw(force_fetch: bool = False) -> pd.DataFrame:
@@ -61,9 +79,15 @@ def load_extended_bbw(force_fetch: bool = False) -> pd.DataFrame:
     """
     if CACHE.exists() and not force_fetch:
         try:
-            return _normalize(pd.read_parquet(CACHE))
+            cached = _normalize(pd.read_parquet(CACHE))
         except ValueError:
-            pass                                   # corrupt/legacy cache -> refetch below
+            cached = None                          # corrupt/legacy cache -> refetch below
+        if cached is not None:
+            gone = _missing_twins(cached)
+            if not gone:
+                return cached
+            print(f"[bbw] cached {CACHE.name} is missing {gone} -- refetching from "
+                  f"BBW_EXTENDED_URL. The cache predates a settings change.", flush=True)
 
     url = getattr(cfg, "BBW_EXTENDED_URL", None)
     if not url or "TODO" in url:
@@ -76,6 +100,15 @@ def load_extended_bbw(force_fetch: bool = False) -> pd.DataFrame:
     resp.raise_for_status()
     with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
         df = _normalize(pd.read_parquet(io.BytesIO(zf.read(cfg.BBW_EXTENDED_ZIPKEY))))
+    gone = _missing_twins(df)
+    if gone:
+        # The download and the settings disagree. Stopping beats splicing a series that silently
+        # has no benchmark history.
+        raise RuntimeError(
+            f"the file at BBW_EXTENDED_URL is missing {gone}.\n"
+            f"  url : {url}\n"
+            f"  If you meant the nine-column series, set BBW_HAS_BENCHMARKS = False alongside "
+            f"reverting BBW_EXTENDED_URL.")
     cfg.ensure_dirs()
     df.to_parquet(CACHE, index=False)
     return df
