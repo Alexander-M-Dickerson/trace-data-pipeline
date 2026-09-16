@@ -179,6 +179,23 @@ QUOTE_REQUIRED_COLS = ("cusip_id", "date", "ret_vw", "tret", "cs", "bbtm", "sze"
 QUOTE_BENCHMARK_COLS = ("tret_bns", "tret_cfm", "tret_gprs", "tret_cls", "tret_mat")
 QUOTE_HAS_BENCHMARKS = True
 
+# --- the bond->firm linker ------------------------------------------------------------------
+# The SAME published file Stage 1 uses (stage1/_stage1_settings.py LINKER_URL). Stage 2 re-joins it
+# rather than inheriting Stage 1's ids through the pin, because the two stages were joining
+# DIFFERENT WINDOWS of it -- see lib/linker.py for the measured consequence.
+#
+# LINKER_WINDOW is the decision, named once. `fl_linker` carries two:
+#   ("w0", "w1")  EVIDENCE -- when the mapping is provable. For equity-side joins.
+#   ("i0", "i1")  IDENTITY -- whose bond it is. For firm LABELLING.
+# A bond-month panel labels firms, so the identity window is the default here. The authority is
+# the linker bundle's own SCHEMA.md / README.md, which ship inside LINKER_URL and state which
+# window answers which question. (Cited by the published docs, not a path -- a user of this
+# repo has the zip and nothing else.)
+LINKER_URL = "https://openbondassetpricing.com/wp-content/uploads/2026/09/bond_firm_linker_2026.zip"
+LINKER_ZIPKEY = "bond_firm_linker_2026/fl_linker.parquet"
+LINKER_REQUIRED_COLS = ("cusip9", "permno", "permco", "gvkey")
+LINKER_WINDOW = ("i0", "i1")
+
 # Extended "modified" BBW factor series, used ONLY to backfill factor history before
 # 2002-08-31 (rows from 2002-08 on are recomputed from TRACE and overwritten).
 # Estimated on the Lehman Brothers (Warga) Fixed Income Data and the BAML investment-grade
@@ -436,6 +453,9 @@ def get_config() -> dict:
         # External sources
         "quote_url": QUOTE_URL,
         "quote_zipkey": QUOTE_ZIPKEY,
+        "linker_url": LINKER_URL,
+        "linker_zipkey": LINKER_ZIPKEY,
+        "linker_window": list(LINKER_WINDOW),
         "bbw_extended_url": BBW_EXTENDED_URL,
         "bbw_extended_zipkey": BBW_EXTENDED_ZIPKEY,
     }

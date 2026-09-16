@@ -23,7 +23,7 @@ import numpy as np
 import pandas as pd
 
 import _stage2_settings as cfg
-from lib import duration_adjusted, month_boundaries, nyse_calendar, treasury
+from lib import duration_adjusted, linker, month_boundaries, nyse_calendar, treasury
 from lib import pin as pinlib
 
 # price column (pin name) -> return column. Upstream PRICE_MAP; its 'last_bid' key never matches the
@@ -425,29 +425,44 @@ SELECT cusip, date, ret_vw, tret, tret_bns, tret_cls, ret_std, ret_type FROM (
     _copy("all_returns", """
         SELECT cusip, date::TIMESTAMP AS date, ret_vw, tret, tret_bns, tret_cls, ret_std, ret_type
         FROM all_returns ORDER BY cusip, date""")
-    # firm_ids: Stage 1's permno/permco/gvkey collapsed to one row per bond-month, taken at
-    # the same month-end trade t_sig uses. Stage 7 merges this instead of re-deriving the
-    # identifiers from a separate issuer-level linker file.
+    # firm_ids: permno/permco/gvkey at one row per bond-month, taken at the month-end t_sig uses.
+    # Stage 7 merges this block; nothing else in stage 2 reads the identifiers.
     #
-    # ! Read STRAIGHT FROM THE PIN and joined on (cusip_id, dt), rather than carried through
-    #   t_src. Adding columns to t_src changes the physical row order, and several float32
-    #   illiquidity kernels downstream are order-sensitive -- doing it that way moved six
-    #   unrelated columns by ~1e-13 relative. Identifiers must not perturb the numeric path.
+    # ! Joined into its OWN block, never carried through t_src. Adding columns to t_src changes the
+    #   physical row order, and several float32 illiquidity kernels downstream are order-sensitive
+    #   -- doing it that way moved six unrelated columns by ~1e-13 relative. Identifiers must not
+    #   perturb the numeric path.
+    #
+    # ❗THE IDS COME FROM THE PUBLISHED LINKER, JOINED ON THE DECLARED WINDOW -- not from the pin.
+    #   Stage 1 attaches its own ids by joining the EVIDENCE window (w0/w1, "when is the mapping
+    #   provable"), which is right for an equity join and wrong for labelling a firm in a panel.
+    #   Inheriting them here made stage 2 disagree with our combined panel -- which joins the
+    #   IDENTITY window -- about firm membership on 2.14% of bond-months, moving every within-firm
+    #   portfolio while single sorts matched exactly. lib/linker.py has the measurement; the rule is
+    #   cfg.LINKER_WINDOW, and its authority is the linker's own contract (CONTRACTS.md s4).
+    lo, hi = linker.register(con, "_linker")
     _copy("firm_ids", f"""
         SELECT e.cusip_id AS cusip, e.date_end_ref::TIMESTAMP AS date,
-               p.permno, p.permco, p.gvkey
+               l.permno, l.permco, l.gvkey
         FROM (
             SELECT cusip_id, dt, date_end_ref FROM t_end_full
             WHERE date_end_ref >= DATE '{cfg.START_DATE}'
             QUALIFY row_number() OVER (PARTITION BY cusip_id, date_end_ref ORDER BY dt) = 1
         ) e
-        JOIN (
-            SELECT cusip_id, dt, permno, permco, gvkey
-            FROM read_parquet('{pin_path.as_posix()}')
-            WHERE pr IS NOT NULL
-            QUALIFY row_number() OVER (PARTITION BY cusip_id, dt ORDER BY frn) = 1
-        ) p ON p.cusip_id = e.cusip_id AND p.dt = e.dt
+        LEFT JOIN _linker l
+          ON l.cusip9 = e.cusip_id
+         AND e.date_end_ref >= l.{lo} AND e.date_end_ref <= l.{hi}
         ORDER BY cusip, date""")
+    # Step 7 merges this with validate="1:1", so a duplicate here would surface far from its cause.
+    # The linker's own G39c proves identity windows are disjoint per cusip9; assert it landed.
+    _dup = con.execute(
+        f"SELECT count(*) FROM (SELECT cusip, date FROM read_parquet("
+        f"'{(out_dir / 'firm_ids.parquet').as_posix()}') GROUP BY 1,2 HAVING count(*) > 1)"
+    ).fetchone()[0]
+    assert _dup == 0, (
+        f"firm_ids: {_dup:,} duplicate (cusip, date) rows after the dated linker join. "
+        f"That means two {cfg.LINKER_WINDOW} windows overlap for one bond -- the linker's G39c "
+        f"should have caught it upstream.")
     # returns_alt: the returns validation target (wrangle_returns step 4 slice, float32)
     _copy("returns_alt", """
         SELECT cusip, date::TIMESTAMP AS date,
