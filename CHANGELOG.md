@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The 68 beta and momentum columns can now be rebuilt on any Treasury benchmark**, as an
+  optional step after a Stage 2 build: `stage2/make_excess_blocks.py --mode stage1 --benchmark
+  {bns,cls,all}`. It writes `betas_<bm>.parquet` and `mom_retx_<bm>.parquet` beside the existing
+  `betas_x` / `mom_retx`, with canonical column names inside so a block swaps in wholesale. No
+  panel changes and nothing is overwritten.
+  - The panel already shipped five Treasury benchmarks, but every duration-adjusted quantity was
+    still built from `ret_vw - tret` -- alternative benchmarks, not alternative systems. Nothing
+    could be sorted on a `tret_bns`-adjusted beta.
+  - ❗A benchmark's betas regress on that benchmark's OWN bond-market factor twins, and `term`
+    moves with them, so the BBW double sorts are rebuilt per benchmark first. `compute_all_betas`
+    raises on a missing twin rather than falling back to the `tret` ones, because a fallback
+    yields `b_*` columns that look normal and mean nothing.
+  - `--verify` runs the incumbent `tret` through the same generalised code and requires
+    bit-identity with the shipped `betas_x` / `mom_retx`. Run it before believing any benchmark
+    output.
+
 - **The published 1997-2002 quote panel now carries the five `tret_*` benchmarks** (9 -> 14
   columns). `stage2/lib/quote.py` downloads it and steps 3/4/5 concatenate it ahead of
   `all_returns` so rolling 36-month windows have a pre-history; it previously carried only

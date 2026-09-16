@@ -17,6 +17,7 @@ returns, bond characteristics, ~100 signals, factor time series, and rolling fac
 - [Quick start](#quick-start)
 - [Configuration](#configuration)
 - [What Stage 2 produces](#what-stage-2-produces)
+- [Alternative Treasury benchmarks: rebuilding the betas](#alternative-treasury-benchmarks-rebuilding-the-betas)
 - [External data](#external-data)
 - [Troubleshooting](#troubleshooting)
 - [Support](#support)
@@ -118,9 +119,10 @@ testing without editing the file.
 
 | Output | Contents |
 |---|---|
-| `output/panel/main_panel_<mode>.parquet` | The main panel — 140 columns, MMN-adjusted signals, used with `ret_vw` |
+| `output/panel/main_panel_<mode>.parquet` | The main panel — 145 columns, MMN-adjusted signals, used with `ret_vw` |
 | `output/blocks/<mode>/mmn_price_based_signals_<stamp>.parquet` | The 38 unadjusted twins (`*_mmn`), used with `ret_vw_bgn` |
 | `output/blocks/<mode>/` | Per-step intermediates: `betas_std`, `betas_x`, `mom_ret`, `mom_retx`, `returns_alt`, `factors`, `factors_merged`, `bbw_factors`, `illiq_factors` |
+| `output/blocks/<mode>/betas_<bm>`, `mom_retx_<bm>` | **Optional.** The 68 beta/momentum columns re-estimated on an alternative Treasury benchmark — only if you run `make_excess_blocks.py`. See below |
 | `data_reports/` | The LaTeX data report, its figures and the PDF |
 | `manifests/` | A JSON run manifest per build: inputs, hashes, config, timings |
 | `release/` | What `make_release.py` packages for publication |
@@ -157,6 +159,50 @@ adjusted / unadjusted signal split.
 ❗**The two-panel rule.** Use the main panel's signals with `ret_vw`, or the `_mmn`
 signals with `ret_vw_bgn` — never mix them. Mixing reintroduces the microstructure bias
 the split exists to remove.
+
+## Alternative Treasury benchmarks: rebuilding the betas
+
+The panel ships five Treasury benchmarks beside `tret`, but every duration-adjusted quantity in
+it -- the 68 beta and momentum columns, plus `ret_vwx` and `str` -- is built from
+`ret_vw - tret`. So out of the box the panel offers alternative *benchmarks* and not alternative
+*systems*: nothing can be sorted on a `tret_bns`-adjusted beta.
+
+`make_excess_blocks.py` closes that. It is **optional** and runs **after** a normal Stage 2
+build, reading the blocks that build already wrote. It changes no panel and overwrites nothing.
+
+```bash
+cd stage2
+python make_excess_blocks.py --mode stage1 --verify              # gate first (see below)
+python make_excess_blocks.py --mode stage1 --benchmark bns       # one benchmark
+python make_excess_blocks.py --mode stage1 --benchmark all       # bns + cls
+```
+
+It writes `output/blocks/<mode>/betas_<bm>.parquet` and `mom_retx_<bm>.parquet` beside the
+existing `betas_x` / `mom_retx`. The column names **inside** are canonical -- `b_amd`, not
+`b_amd_bns` -- so a block drops into the same recipe the duration-adjusted panel already uses:
+drop the 68 columns from the standard panel, merge the two blocks back on `(cusip, date)`, and
+set `ret_vwx = ret_vw - tret_<bm>` and `str = str - tret_<bm>`.
+
+**Run `--verify` first.** It puts the incumbent `tret` through the same generalised code and
+requires the result to reproduce the shipped `betas_x` and `mom_retx` bit-for-bit. Same
+arithmetic, same order, so exact equality is achievable, and anything less means the code moved
+something it should not have.
+
+❗**A benchmark's betas need that benchmark's own factors.** A duration-adjusted regression does
+not simply change the left-hand side: the bond-market factors are replaced by twins estimated on
+the same excess return, and `term` moves with them. `make_excess_blocks.py` therefore rebuilds
+the BBW double sorts per benchmark before it rebuilds any beta, and `compute_all_betas` **raises**
+if a benchmark's factor twins are missing rather than falling back to the `tret` ones -- a
+fallback would produce `b_*` columns that look entirely normal and mean nothing.
+
+**Cost.** One benchmark is roughly half a full beta run (~33 s of beta work on 2.4M bond-months),
+plus its factor sorts; the output is comparable in size to `betas_x`.
+
+**A sanity check worth running.** `corr(b_mktb, b_mktb)` between a benchmark block and `betas_x`
+should be high but never exactly 1.0. Exactly 1.0 means the factor swap did not take. Expect
+about 0.98 on the TRACE era, and materially lower before it -- pre-1986 the long end of the
+Treasury curve is extrapolated flat, so the benchmarks diverge most where the curve is least
+anchored.
 
 ---
 
