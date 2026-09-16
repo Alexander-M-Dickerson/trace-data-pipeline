@@ -194,7 +194,7 @@ For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month r
 | `md_dur` | Modified Duration | Modified duration measuring price sensitivity to yield changes. |
 | `convx` | Convexity | Second-order price sensitivity to yield changes. |
 | `sze` | Bond Size | Bond market capitalization: dirty price times amount outstanding ($ millions). |
-| `dcs6` | 6-Month Spread Change | Log change in credit spread over prior 6 months: $\log(cs_{t-6}) - \log(cs_t)$. If spread is missing exactly 6 months ago, searches ±1 month, taking the EARLIER month first (`_stage2_settings.DSPREAD_BANDWIDTH = 1`; `lib/value.py` builds `offsets = [0, -1, +1]` and takes the first hit). |
+| `dcs6` | 6-Month Spread Narrowing (log) | Log change in credit spread over prior 6 months: $\log(cs_{t-6}) - \log(cs_t)$. If spread is missing exactly 6 months ago, searches ±1 month, taking the EARLIER month first (`_stage2_settings.DSPREAD_BANDWIDTH = 1`; `lib/value.py` builds `offsets = [0, -1, +1]` and takes the first hit). |
 | `cs_mu12_1` | 12-Month Average Spread | Rolling 12-month average credit spread, skipping the prior month. Requires minimum 6 observations. |
 
 ---
@@ -252,10 +252,10 @@ For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month r
 | `spd_abs` | Absolute Bid-Ask Spread | Volume-weighted $(P^{ask} - P^{bid})$ in dollars. Requires a minimum of 5 prices. |
 | `cs_sprd` | Corwin-Schultz Spread | High-low spread estimator using two-day price ranges. Requires a minimum of 5 prices. |
 | `ar_sprd` | Abdi-Ranaldo Spread | Closing price spread estimator. Requires a minimum of 5 prices. |
-| `p_zro` | Zero-Return Proportion | Fraction of business days with no valid price. |
+| `p_zro` | No-Trade Day Proportion | Fraction of business days with no valid price. ❗Returns are never inspected, so the old name "Zero-Return" contradicted this very description. |
 | `p_fht` | FHT Spread | Spread derived from zero-return proportion: $2\sigma\Phi^{-1}((1+p_{zro})/2)$. Requires a minimum of 5 daily returns. |
-| `vov` | Volatility of Volume | Liquidity proxy: $2.5 \times \sigma^{0.6} / \bar{V}^{0.25}$. Requires a minimum of 5 daily returns. |
-| `lix` | LIX Liquidity | $\log_{10}[(V \times P_{close}) / (P_{high} - P_{low})]$. Requires a minimum of 5 prices. |
+| `vov` | Volatility-over-Volume | Liquidity proxy: $2.5 \times \sigma^{0.6} / \bar{V}^{0.25}$, where $\sigma$ is the volatility of daily RETURNS and $\bar{V}$ mean volume. Requires a minimum of 5 daily returns. ❗Not the volatility OF volume. |
+| `lix` | Negative LIX (Illiquidity) | $-\log_{10}[(V \times P_{close}) / (P_{high} - P_{low})]$. Requires a minimum of 5 prices. ❗Stored NEGATED (`lib/illiq_pandas.py`), so it rises with ILLIQUIDITY -- 99.29% of non-null values are negative, median -2.181. |
 
 ---
 
@@ -350,7 +350,7 @@ For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month r
 | `b_ysp` | Yield Spread Beta | Beta on yield spread factor. |
 | `b_epu` | Economic Policy Uncertainty Beta | Beta on EPU index level. |
 | `b_epum` | Monetary Policy Uncertainty Beta | Beta on monetary policy uncertainty index level. |
-| `b_eput` | Trade Policy Uncertainty Beta | Beta on trade policy uncertainty index level. |
+| `b_eput` | Tax Policy Uncertainty Beta | Beta on the tax policy uncertainty index level (Baker-Bloom-Davis categorical EPU, column "3. Taxes"). ❗NOT trade policy: that is a separate category in the same workbook and is never read (`lib/factor_fetch.py`). |
 
 ---
 
@@ -1146,7 +1146,7 @@ $$r_{i,t} = \alpha + \beta^{b} \cdot MKTB_t + \beta^{epu} \cdot EPU_t + \varepsi
 |------------------|--------|--------|
 | Overall EPU | epu | `b_epu` |
 | Monetary Policy | epum | `b_epum` |
-| Trade Policy | eput | `b_eput` |
+| Taxes ("3. Taxes") | eput | `b_eput` |
 
 ---
 
@@ -1498,7 +1498,7 @@ $$\text{ar}_{i,t} = \sqrt{\max(s^2, 0)}$$
 
 Monthly `ar_sprd` is the mean of daily estimates.
 
-#### Zero-Return Proportion (P_ZRO)
+#### No-Trade Day Proportion (P_ZRO)
 
 Fraction of potential trading days with no valid price (Fong, Holden & Trzcinka, 2017).
 
@@ -1514,7 +1514,7 @@ $$\text{p-fht}_{i,m} = 2 \sigma_{i,m} \cdot \Phi^{-1}\left(\frac{1 + \text{p-zro
 
 where $\sigma_{i,m}$ is the within-month return volatility and $\Phi^{-1}$ is the inverse standard normal CDF.
 
-#### Volatility of Volume (VOV)
+#### Volatility-over-Volume (VOV)
 
 Liquidity proxy combining return volatility and trading volume (Tobek, 2016).
 
@@ -1648,17 +1648,17 @@ the signal gap. The definitions are therefore the base signal's; see the tables 
 | `cs_mu12_1_mmn` | `cs_mu12_1` | 12-Month Average Spread |
 | `cs_sprd_mmn` | `cs_sprd` | Corwin-Schultz Spread |
 | `db_mkt_mmn` | `db_mkt` | Daily Market Beta |
-| `dcs6_mmn` | `dcs6` | 6-Month Spread Change |
+| `dcs6_mmn` | `dcs6` | 6-Month Spread Narrowing (log) |
 | `dkurt_mmn` | `dkurt` | Daily Kurtosis |
 | `dskew_mmn` | `dskew` | Daily Skewness |
 | `dvol_idio_mmn` | `dvol_idio` | Idiosyncratic Volatility |
 | `dvol_mmn` | `dvol` | Daily Volatility |
 | `dvol_sys_mmn` | `dvol_sys` | Systematic Volatility |
 | `ilq_mmn` | `ilq` | Roll Autocovariance |
-| `lix_mmn` | `lix` | LIX Liquidity |
+| `lix_mmn` | `lix` | Negative LIX (Illiquidity) |
 | `md_dur_mmn` | `md_dur` | Modified Duration |
 | `p_fht_mmn` | `p_fht` | FHT Spread |
-| `p_zro_mmn` | `p_zro` | Zero-Return Proportion |
+| `p_zro_mmn` | `p_zro` | No-Trade Day Proportion |
 | `pi_mmn` | `pi` | Price Impact |
 | `rkt_mmn` | `rkt` | Realized Kurtosis |
 | `roll_mmn` | `roll` | Roll Spread |
@@ -1673,7 +1673,7 @@ the signal gap. The definitions are therefore the base signal's; see the tables 
 | `val_hz_mmn` | `val_hz` | Value (HZ) |
 | `val_ipr_dts_mmn` | `val_ipr_dts` | Value (IPR, DtS-adjusted) |
 | `val_ipr_mmn` | `val_ipr` | Value (IPR) |
-| `vov_mmn` | `vov` | Volatility of Volume |
+| `vov_mmn` | `vov` | Volatility-over-Volume |
 | `ytm_mmn` | `ytm` | Yield to Maturity |
 
 ---

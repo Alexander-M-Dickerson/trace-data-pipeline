@@ -678,3 +678,9 @@ def print_config_summary(config: dict) -> None:
     print(f"  Output directory     : {config['output_dir']}")
     print(f"  Reports              : {config['report_dir']}")
     print(line)
+
+# ❗Accepting a final month that is NOT a cross-section. The build refuses by default
+# (step7): a month carried by one source alone -- typically 144A after Enhanced's cut-off --
+# looks like a normal month and is not one. Set this True only to inspect such a build
+# deliberately; publishing it is refused separately by make_release.py.
+ALLOW_DEGENERATE_FRONTIER = False

@@ -125,6 +125,60 @@ def test_every_twinned_signal_is_a_real_panel_column():
     assert not unknown, f"twinned but not in the panel: {unknown}"
 
 
+def test_an_undeclared_twin_in_the_sidecar_fails():
+    """D25: a NEW price-based signal nobody added to MMN_TWINNED must not slip past.
+
+    The twin gate iterates the declared set, so a name outside it is invisible to it. This is
+    the other direction: the sidecar is checked against the set, not only the set against the
+    sidecar.
+    """
+    sidecar = [f"{c}_mmn" for c in C.MMN_TWINNED] + ["brandnew_mmn"]
+    with pytest.raises(AssertionError, match="brandnew"):
+        C.assert_mmn_twins_are_declared(sidecar)
+
+
+def test_a_sidecar_of_only_declared_twins_passes():
+    C.assert_mmn_twins_are_declared([f"{c}_mmn" for c in C.MMN_TWINNED])
+
+
+# ----------------------------------------------- step: WHICH form is in the main panel
+def _mmn_pair(panel_values, sidecar_values, col="cs"):
+    """One twinned signal in both frames, keyed so the assertion can join them."""
+    n = len(panel_values)
+    keys = {"cusip": [f"{i:09d}" for i in range(n)],
+            "date": pd.date_range("2010-01-31", periods=n, freq="ME")}
+    return (pd.DataFrame({**keys, col: panel_values}),
+            pd.DataFrame({**keys, f"{col}_mmn": sidecar_values}))
+
+
+def test_the_unadjusted_form_in_the_main_panel_fails():
+    """D20: `assert_mmn_twins` passes happily when the WRONG form is in the panel.
+
+    This is the basrev v1 failure -- AR(1) -0.05 adjusted vs -0.22 unadjusted, four fifths of
+    the raw reversal being bid-ask bounce -- and it produces a complete, normal-looking panel.
+    """
+    vals = [0.01 * i for i in range(2000)]
+    panel, sidecar = _mmn_pair(vals, vals)          # the panel IS the sidecar's column
+    with pytest.raises(AssertionError, match="UNADJUSTED"):
+        C.assert_main_panel_is_adjusted(panel, sidecar)
+
+
+def test_the_adjusted_form_passes_even_when_many_rows_coincide():
+    """Coincidence is normal and must NOT fire: `lix` matches on 23.8% of real rows."""
+    n = 2000
+    panel_v = [0.01 * i for i in range(n)]
+    side_v = [v if i % 4 else v + 0.5 for i, v in enumerate(panel_v)]   # 75% identical
+    panel, sidecar = _mmn_pair(panel_v, side_v)
+    C.assert_main_panel_is_adjusted(panel, sidecar)
+
+
+def test_comparing_nothing_is_not_a_pass():
+    """A gate over an empty population must fail, not report green."""
+    panel = pd.DataFrame({"cusip": ["x"], "date": pd.to_datetime(["2010-01-31"])})
+    with pytest.raises(AssertionError, match="nothing was compared"):
+        C.assert_main_panel_is_adjusted(panel, panel)
+
+
 def test_the_message_names_what_is_missing():
     try:
         C.assert_mmn_twins([f"{c}_mmn" for c in C.MMN_TWINNED if c != "cs"])

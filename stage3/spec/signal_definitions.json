@@ -1,1478 +1,1478 @@
 {
- "_about": "Table IA.VIII, Signal Definitions and Citations. One row per column of the 145-column Stage-2 panel: 108 sorted signals plus 37 identifiers, returns and characteristics. Extracted from the paper's longtable, then reconciled against Stage 2's DATA_DICTIONARY.md and the code that computes each signal. A row carrying `paper_prints` or `paper_prints_citation` is one where the two disagreed and the code settled it; `why_corrected` says what settled it. Everything else is the paper's text unchanged. See RECONCILIATION_ia08.md.",
- "rows": [
-  {
-   "mnemonic": "cusip",
-   "group": "Bond Identifiers and Return Metrics",
-   "name": "Bond Identifier",
-   "description": "9-digit CUSIP bond identifier.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "date",
-   "group": "Bond Identifiers and Return Metrics",
-   "name": "Date",
-   "description": "True month-end date (YYYY-MM-DD).",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "issuer_cusip",
-   "group": "Bond Identifiers and Return Metrics",
-   "name": "Issuer CUSIP",
-   "description": "6-digit firm identifier (first 6 digits of CUSIP).",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "permno",
-   "group": "Bond Identifiers and Return Metrics",
-   "name": "CRSP PERMNO",
-   "description": "CRSP permanent security identifier.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "permco",
-   "group": "Bond Identifiers and Return Metrics",
-   "name": "CRSP PERMCO",
-   "description": "CRSP permanent company identifier.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "gvkey",
-   "group": "Bond Identifiers and Return Metrics",
-   "name": "Compustat GVKEY",
-   "description": "Compustat global company key.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "hprd",
-   "group": "Bond Identifiers and Return Metrics",
-   "name": "Holding Period",
-   "description": "Month-end holding period in calendar days (see Fig. \\ref{fig:return_timeline}).",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "lib",
-   "group": "Bond Identifiers and Return Metrics",
-   "name": "Latent Implementation Bias",
-   "description": "Clean price return from month-end to month-begin: $\\text{LIB} = P_t^{\\text{bgn}} / P_{t-1}^{\\text{end}} - 1$ (see Fig. \\ref{fig:return_timeline}).",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "libd",
-   "group": "Bond Identifiers and Return Metrics",
-   "name": "LIB (Dirty)",
-   "description": "LIB computed using dirty prices (includes accrued interest and coupon).",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "ret_type",
-   "group": "Bond Identifiers and Return Metrics",
-   "name": "Return Type",
-   "description": "Return classification: standard, trad_in_def, or default_evnt.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "ff17num",
-   "group": "Bond Identifiers and Return Metrics",
-   "name": "FF17 Industry",
-   "description": "Fama-French 17-industry classification.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "ff30num",
-   "group": "Bond Identifiers and Return Metrics",
-   "name": "FF30 Industry",
-   "description": "Fama-French 30-industry classification.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "mcap_s",
-   "group": "Bond Identifiers and Return Metrics",
-   "name": "Market Cap (Start)",
-   "description": "Bond market capitalization at end of month $t{-}1$.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "mcap_e",
-   "group": "Bond Identifiers and Return Metrics",
-   "name": "Market Cap (End)",
-   "description": "Bond market capitalization at end of month $t$.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "tret",
-   "group": "Bond Identifiers and Return Metrics",
-   "name": "Treasury Return",
-   "description": "Duration-matched U.S. Treasury portfolio return. Used to compute duration-adjusted returns: $r^x = r - tret$.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "tret_bns",
-   "group": "Bond Identifiers and Return Metrics",
-   "name": "Treasury Return, Duration-Weighted Cash Flows",
-   "description": "Treasury benchmark built from the bond's own cash flows, weighted by their present-value shares (Macaulay duration weights) and applied to zero-coupon Treasury returns from the Gurkaynak-Sack-Wright curve. Subtract from `ret_vw` for a duration-adjusted return.",
-   "citation": "van Binsbergen, Nozawa, and Schwert (2025)",
-   "citation_keys": [],
-   "citation_text": "van Binsbergen, Nozawa, and Schwert (2025)"
-  },
-  {
-   "mnemonic": "tret_cfm",
-   "group": "Bond Identifiers and Return Metrics",
-   "name": "Treasury Return, Cash-Flow-Weighted",
-   "description": "As `tret_bns`, but weighting the same cash flows by their future value rather than their present value. Places more weight on long-dated cash flows and so overstates a bond's interest rate risk; reported as the authors' own robustness alternative.",
-   "citation": "van Binsbergen, Nozawa, and Schwert (2025), Internet Appendix A1",
-   "citation_keys": [],
-   "citation_text": "van Binsbergen, Nozawa, and Schwert (2025), Internet Appendix A1"
-  },
-  {
-   "mnemonic": "tret_gprs",
-   "group": "Bond Identifiers and Return Metrics",
-   "name": "Treasury Return, Exact Duration Match",
-   "description": "As `tret_bns`, refined so the Treasury portfolio's duration equals the bond's exactly. The present-value weights are duration-matched only when the term structure is flat; this solves for the Treasury yield that restores the match and reweights accordingly.",
-   "citation": "Ghaderi, Plante, Roussanov, and Seo (2026), Appendix B.2",
-   "citation_keys": [],
-   "citation_text": "Ghaderi, Plante, Roussanov, and Seo (2026), Appendix B.2"
-  },
-  {
-   "mnemonic": "tret_cls",
-   "group": "Bond Identifiers and Return Metrics",
-   "name": "Treasury Return, Cash-Flow-Matched",
-   "description": "As `tret_bns`, but discounting the same cash flows on the Treasury zero curve instead of at the bond's own yield to maturity. This replicates the bond's cash flows rather than its duration, so it removes slope and curvature effects as well as parallel shifts. The difference from `tret_bns` is the authors' higher-order component.",
-   "citation": "Cui, Lu, and Song (2026)",
-   "citation_keys": [],
-   "citation_text": "Cui, Lu, and Song (2026)"
-  },
-  {
-   "mnemonic": "tret_mat",
-   "group": "Bond Identifiers and Return Metrics",
-   "name": "Treasury Return, Maturity-Matched",
-   "description": "The twin of `tret`: the same key-rate Treasury index returns, the same interpolation nodes and rounding, but interpolated at the bond's remaining MATURITY rather than its modified duration. Included as the maturity-matched comparator; duration matching is the more precise of the two.",
-   "citation": "Bessembinder, Kahle, Maxwell, and Xu (2009)",
-   "citation_keys": [],
-   "citation_text": "Bessembinder, Kahle, Maxwell, and Xu (2009)"
-  },
-  {
-   "mnemonic": "ret_vw",
-   "group": "Bond Identifiers and Return Metrics",
-   "name": "Total Return (End)",
-   "description": "Month-end to month-end total return (see Fig. \\ref{fig:return_timeline}).",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "ret_vw_bgn",
-   "group": "Bond Identifiers and Return Metrics",
-   "name": "Total Return (Begin)",
-   "description": "Month-begin to month-end total return within the same month (see Fig. \\ref{fig:return_timeline}).",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "dt_s",
-   "group": "Bond Identifiers and Return Metrics",
-   "name": "Date Start",
-   "description": "Trade date for month-end price in month $t{-}1$ (last 5 BD); refer to Panel A of Fig. \\ref{fig:return_timeline}.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "dt_e",
-   "group": "Bond Identifiers and Return Metrics",
-   "name": "Date End",
-   "description": "Trade date for month-end price in month $t$ (last 5 BD); refer to Panel A of Fig. \\ref{fig:return_timeline}.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "dt_s_bgn",
-   "group": "Bond Identifiers and Return Metrics",
-   "name": "Date Start (Begin)",
-   "description": "Trade date for month-begin price in month $t$ (first 5 BD); refer to Panel C of Fig. \\ref{fig:return_timeline}.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "dt_e_bgn",
-   "group": "Bond Identifiers and Return Metrics",
-   "name": "Date End (Begin)",
-   "description": "Trade date for month-end price in month $t$ (last 5 BD) for begin returns; refer to Panel C of Fig. \\ref{fig:return_timeline}.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "hprd_bgn",
-   "group": "Bond Identifiers and Return Metrics",
-   "name": "Holding Period (Begin)",
-   "description": "Month-begin holding period in calendar days.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "igap_bgn",
-   "group": "Bond Identifiers and Return Metrics",
-   "name": "Implementation Gap",
-   "description": "Business days between month-end price ($t{-}1$) and month-begin price ($t$); capped at 5 BD. Refer to Panel D of Fig. \\ref{fig:return_timeline}.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "sig_dt",
-   "group": "Bond Identifiers and Return Metrics",
-   "name": "Signal Date",
-   "description": "Date when price-based signal was observed (minimum 1 BD before month-end price). Refer to Panel B of Fig. \\ref{fig:return_timeline}.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "sig_gap",
-   "group": "Bond Identifiers and Return Metrics",
-   "name": "Signal Gap",
-   "description": "Business days between signal observation and month-end price; ranges 1--10 BD. Refer to Panel B of Fig. \\ref{fig:return_timeline}.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "rfret",
-   "group": "Bond Identifiers and Return Metrics",
-   "name": "Risk-Free Rate",
-   "description": "Monthly risk-free rate from Fama-French. Used for excess returns: $r^x = r - r^f$.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "spc_rat",
-   "group": "Bond Characteristics",
-   "name": "S&P Composite Rating",
-   "description": "Composite credit rating: S&P rating if available, otherwise Moody's rating. Scale: 1 (AAA) to 21 (CCC-), 22 = Default.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "mdc_rat",
-   "group": "Bond Characteristics",
-   "name": "Moody's Composite Rating",
-   "description": "Composite credit rating: Moody's rating if available, otherwise S&P rating. Scale: 1 (AAA) to 21 (CCC-), 22 = Default.",
-   "citation": "--",
-   "citation_keys": [],
-   "paper_prints": "Composite credit rating: Moody's rating if available, otherwise S&P rating. Scale: 1 (AAA) to 20 (CCC-), 21 = Default.",
-   "why_corrected": "The printed row says 1--20 with 21 = Default. Its own `spc_rat` row, one line above, says 1--21 with 22 = Default for the identical scale, and so does Stage 2's data dictionary. The paper contradicts itself; the 21/22 scale is the one the data uses.",
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "call",
-   "group": "Bond Characteristics",
-   "name": "Callable Indicator",
-   "description": "Indicator for embedded call option (1 = callable, 0 = non-callable).",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "fce_val",
-   "group": "Bond Characteristics",
-   "name": "Face Value",
-   "description": "Bond amount outstanding (face value); units of the bond outstanding.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "144a",
-   "group": "Bond Characteristics",
-   "name": "Rule 144A Indicator",
-   "description": "Dummy variable: 1 if bond is Rule 144A, 0 otherwise.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "country",
-   "group": "Bond Characteristics",
-   "name": "Country",
-   "description": "Country of issuance (e.g., USA for U.S. bonds).",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "tmat",
-   "group": "Cluster I: Spreads, Yields, Size",
-   "name": "Time to Maturity",
-   "description": "Years remaining until bond maturity.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "age",
-   "group": "Cluster I: Spreads, Yields, Size",
-   "name": "Bond Age",
-   "description": "Years since bond issuance.",
-   "citation": "\\citet{KPP2023}",
-   "citation_keys": [
-    "KPP2023"
-   ],
-   "citation_text": "Kelly, Palhares and Pruitt (2023)"
-  },
-  {
-   "mnemonic": "ytm",
-   "group": "Cluster I: Spreads, Yields, Size",
-   "name": "Yield to Maturity",
-   "description": "Annualized yield to maturity. Computed with QuantLib.",
-   "citation": "\\citet{gebhardt2005cross}",
-   "citation_keys": [
-    "gebhardt2005cross"
-   ],
-   "citation_text": "Gebhardt, Hvidkjaer and Swaminathan (2005)"
-  },
-  {
-   "mnemonic": "cs",
-   "group": "Cluster I: Spreads, Yields, Size",
-   "name": "Credit Spread",
-   "description": "Annualized credit spread: yield minus maturity-matched U.S. Treasury yield.",
-   "citation": "\\citet{KPP2023}",
-   "citation_keys": [
-    "KPP2023"
-   ],
-   "citation_text": "Kelly, Palhares and Pruitt (2023)"
-  },
-  {
-   "mnemonic": "md_dur",
-   "group": "Cluster I: Spreads, Yields, Size",
-   "name": "Modified Duration",
-   "description": "Modified duration measuring price sensitivity to yield changes. Computed with QuantLib.",
-   "citation": "\\citet{KPP2023}",
-   "citation_keys": [
-    "KPP2023"
-   ],
-   "citation_text": "Kelly, Palhares and Pruitt (2023)"
-  },
-  {
-   "mnemonic": "convx",
-   "group": "Cluster I: Spreads, Yields, Size",
-   "name": "Convexity",
-   "description": "Second-order price sensitivity to yield changes. Computed with QuantLib.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "sze",
-   "group": "Cluster I: Spreads, Yields, Size",
-   "name": "Bond Size",
-   "description": "Bond market capitalization: dirty price times amount outstanding (\\$ millions).",
-   "citation": "\\citet{houweling2017factor}",
-   "citation_keys": [
-    "houweling2017factor"
-   ],
-   "citation_text": "Houweling and Van Zundert (2017)"
-  },
-  {
-   "mnemonic": "dcs6",
-   "group": "Cluster I: Spreads, Yields, Size",
-   "name": "6-Month Spread Change",
-   "description": "Log change in credit spread over prior 6 months: $\\log(cs_{t-6}) - \\log(cs_t)$. If the spread is missing exactly 6 months ago, the nearest adjacent month is used within a $\\pm$1 month band, the EARLIER month first.",
-   "citation": "\\citet{KPP2023}",
-   "citation_keys": [
-    "KPP2023"
-   ],
-   "paper_prints": "Log change in credit spread over prior 6 months: $\\log(cs_{t-6}) - \\log(cs_t)$. If spread is missing exactly 6 months ago, the nearest adjacent spread is used within a $\\pm$2 month band, with $+$ favored over $-$.",
-   "why_corrected": "Measured in the code, not inferred: `_stage2_settings.DSPREAD_BANDWIDTH = 1`, and `lib/value.py` builds `offsets = [0, -1, +1]`, so the search is one month either side and prefers the earlier month (the longer lag). The printed row says a $\\pm$2 band with `+` favoured over `-` -- wrong in the width AND backwards in the tie-break. `dcs6` is an FDR survivor, so this is not cosmetic.",
-   "citation_text": "Kelly, Palhares and Pruitt (2023)"
-  },
-  {
-   "mnemonic": "cs_mu12_1",
-   "group": "Cluster I: Spreads, Yields, Size",
-   "name": "12-Month Average Spread",
-   "description": "Rolling 12-month average credit spread, skipping the prior month. Requires minimum 6 observations.",
-   "citation": "\\citet{elkamhi2022one}",
-   "citation_keys": [
-    "elkamhi2022one"
-   ],
-   "citation_text": "Elkamhi, Jo and Nozawa (2024)"
-  },
-  {
-   "mnemonic": "bbtm",
-   "group": "Cluster II: Value",
-   "name": "Bond Book-to-Market",
-   "description": "Par price divided by market price of the bond. All bonds have a par value of \\$1,000 (100%).",
-   "citation": "\\citet{Bartram-Grinblatt-Nozawa-2021}",
-   "citation_keys": [
-    "Bartram-Grinblatt-Nozawa-2021"
-   ],
-   "citation_text": "Bartram, Grinblatt and Nozawa (2025)"
-  },
-  {
-   "mnemonic": "val_hz",
-   "group": "Cluster II: Value",
-   "name": "Value (HZ)",
-   "description": "Percentage deviation of observed credit spread from fitted ``fair'' spread: $(cs - \\widehat{cs}) / \\widehat{cs}$. Controls: rating, industry, maturity, spread change, callable. Fitted spread is estimated each month via cross-sectional regression; because cs is used, this signal is also exposed to microstructure noise.",
-   "citation": "\\citet{houweling2017factor}",
-   "citation_keys": [
-    "houweling2017factor"
-   ],
-   "citation_text": "Houweling and Van Zundert (2017)"
-  },
-  {
-   "mnemonic": "val_hz_dts",
-   "group": "Cluster II: Value",
-   "name": "Value (HZ, DtS-adjusted)",
-   "description": "HZ value signal demeaned within duration-times-spread quintiles to control for systematic spread-duration risk.",
-   "citation": "\\citet{houweling2017factor}",
-   "citation_keys": [
-    "houweling2017factor"
-   ],
-   "citation_text": "Houweling and Van Zundert (2017)"
-  },
-  {
-   "mnemonic": "val_ipr",
-   "group": "Cluster II: Value",
-   "name": "Value (IPR)",
-   "description": "Log-spread residual from fair-value regression: $\\log(cs) - X'\\hat{\\beta}$. Controls: rating, industry, log duration, volatility, callable. Fitted spread is estimated each month via cross-sectional regression; because cs is used, this signal is also exposed to microstructure noise.",
-   "citation": "\\citet{IPR2018}",
-   "citation_keys": [
-    "IPR2018"
-   ],
-   "citation_text": "Israel, Palhares and Richardson (2018)"
-  },
-  {
-   "mnemonic": "val_ipr_dts",
-   "group": "Cluster II: Value",
-   "name": "Value (IPR, DtS-adjusted)",
-   "description": "IPR value signal demeaned within duration-times-spread quintiles.",
-   "citation": "\\citet{IPR2018}",
-   "citation_keys": [
-    "IPR2018"
-   ],
-   "citation_text": "Israel, Palhares and Richardson (2018)"
-  },
-  {
-   "mnemonic": "mom3_1",
-   "group": "Cluster III: Momentum & Reversal",
-   "name": "3-Month Momentum",
-   "description": "Cumulative return months $t{-}2$ to $t{-}1$, skipping prior month.",
-   "citation": "\\citet{gebhardt2005stock}",
-   "citation_keys": [
-    "gebhardt2005stock"
-   ],
-   "paper_prints_citation": "\\citet{gebhardt2005cross}",
-   "why_corrected": "The printed row cites `gebhardt2005cross` -- Gebhardt, Hvidkjaer and Swaminathan (2005), *The cross-section of expected corporate bond returns: betas or characteristics?*. Bond momentum is the OTHER GHS 2005 paper, *Stock and bond market interaction: does momentum spill over?*, which is in references.bib as `gebhardt2005stock` and is cited nowhere else. Same authors, same year, same journal, different result.",
-   "citation_text": "Gebhardt, Hvidkjaer and Swaminathan (2005)"
-  },
-  {
-   "mnemonic": "mom6_1",
-   "group": "Cluster III: Momentum & Reversal",
-   "name": "6-Month Momentum",
-   "description": "Cumulative return months $t{-}5$ to $t{-}1$.",
-   "citation": "\\citet{gebhardt2005stock}",
-   "citation_keys": [
-    "gebhardt2005stock"
-   ],
-   "paper_prints_citation": "\\citet{gebhardt2005cross}",
-   "why_corrected": "The printed row cites `gebhardt2005cross` -- Gebhardt, Hvidkjaer and Swaminathan (2005), *The cross-section of expected corporate bond returns: betas or characteristics?*. Bond momentum is the OTHER GHS 2005 paper, *Stock and bond market interaction: does momentum spill over?*, which is in references.bib as `gebhardt2005stock` and is cited nowhere else. Same authors, same year, same journal, different result.",
-   "citation_text": "Gebhardt, Hvidkjaer and Swaminathan (2005)"
-  },
-  {
-   "mnemonic": "mom12_1",
-   "group": "Cluster III: Momentum & Reversal",
-   "name": "12-Month Momentum",
-   "description": "Cumulative return months $t{-}11$ to $t{-}1$.",
-   "citation": "\\citet{gebhardt2005stock}",
-   "citation_keys": [
-    "gebhardt2005stock"
-   ],
-   "paper_prints_citation": "\\citet{gebhardt2005cross}",
-   "why_corrected": "The printed row cites `gebhardt2005cross` -- Gebhardt, Hvidkjaer and Swaminathan (2005), *The cross-section of expected corporate bond returns: betas or characteristics?*. Bond momentum is the OTHER GHS 2005 paper, *Stock and bond market interaction: does momentum spill over?*, which is in references.bib as `gebhardt2005stock` and is cited nowhere else. Same authors, same year, same journal, different result.",
-   "citation_text": "Gebhardt, Hvidkjaer and Swaminathan (2005)"
-  },
-  {
-   "mnemonic": "mom12_7",
-   "group": "Cluster III: Momentum & Reversal",
-   "name": "Intermediate Momentum",
-   "description": "Cumulative return months $t{-}11$ to $t{-}7$, excluding recent returns.",
-   "citation": "\\citet{novy2012momentum}",
-   "citation_keys": [
-    "novy2012momentum"
-   ],
-   "citation_text": "Novy-Marx (2012)"
-  },
-  {
-   "mnemonic": "sysmom6_1",
-   "group": "Cluster III: Momentum & Reversal",
-   "name": "Systematic Momentum (6-1)",
-   "description": "Sum of fitted values over months $t{-}5$ to $t{-}1$ from a 36(12) rolling CAPMB regression (bond market factor).",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "idimom6_1",
-   "group": "Cluster III: Momentum & Reversal",
-   "name": "Idiosyncratic Momentum (6-1)",
-   "description": "Sum of residuals over months $t{-}5$ to $t{-}1$ from a 36(12) rolling CAPMB regression (bond market factor).",
-   "citation": "\\citet{blitz2011residual}",
-   "citation_keys": [
-    "blitz2011residual"
-   ],
-   "citation_text": "Blitz, Huij and Martens (2011)"
-  },
-  {
-   "mnemonic": "imom12_1",
-   "group": "Cluster III: Momentum & Reversal",
-   "name": "Industry Momentum (12-1)",
-   "description": "Equal-weighted average 12-1 momentum of other bonds in the same FF17 industry.",
-   "citation": "\\citet{wang2024industry}",
-   "citation_keys": [
-    "wang2024industry"
-   ],
-   "citation_text": "Wang, Wu and Yang (2024)"
-  },
-  {
-   "mnemonic": "ltr48_12",
-   "group": "Cluster III: Momentum & Reversal",
-   "name": "Long-Term Reversal (48-12)",
-   "description": "Cumulative return months $t{-}47$ to $t{-}12$. Uses expanding window starting at 12-3, ramping to 48-12.",
-   "citation": "\\citet{bali2021long}",
-   "citation_keys": [
-    "bali2021long"
-   ],
-   "citation_text": "Bali, Subrahmanyam and Wen (2021)"
-  },
-  {
-   "mnemonic": "ltr30_6",
-   "group": "Cluster III: Momentum & Reversal",
-   "name": "Long-Term Reversal (30-6)",
-   "description": "Cumulative return months $t{-}29$ to $t{-}6$. Uses expanding window starting at 12-3, ramping to 30-6.",
-   "citation": "\\citet{subrahmanyam2023corporatebonddata}",
-   "citation_keys": [
-    "subrahmanyam2023corporatebonddata"
-   ],
-   "citation_text": "Subrahmanyam (2023)"
-  },
-  {
-   "mnemonic": "iltr48_12",
-   "group": "Cluster III: Momentum & Reversal",
-   "name": "Industry LTR (48-12)",
-   "description": "Equal-weighted average 48-12 LTR of other bonds in the same FF17 industry.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "str",
-   "group": "Cluster III: Momentum & Reversal",
-   "name": "Short-Term Reversal",
-   "description": "Prior month return $r_{t-1}$.",
-   "citation": "\\citet{BaiBaliWen_2019}",
-   "citation_keys": [
-    "BaiBaliWen_2019"
-   ],
-   "citation_text": "Bai, Bali and Wen (2019)"
-  },
-  {
-   "mnemonic": "mom9_1",
-   "group": "Cluster III: Momentum & Reversal",
-   "name": "9-Month Momentum",
-   "description": "Cumulative return months $t{-}8$ to $t{-}1$.",
-   "citation": "\\citet{gebhardt2005stock}",
-   "citation_keys": [
-    "gebhardt2005stock"
-   ],
-   "paper_prints_citation": "\\citet{gebhardt2005cross}",
-   "why_corrected": "The printed row cites `gebhardt2005cross` -- Gebhardt, Hvidkjaer and Swaminathan (2005), *The cross-section of expected corporate bond returns: betas or characteristics?*. Bond momentum is the OTHER GHS 2005 paper, *Stock and bond market interaction: does momentum spill over?*, which is in references.bib as `gebhardt2005stock` and is cited nowhere else. Same authors, same year, same journal, different result.",
-   "citation_text": "Gebhardt, Hvidkjaer and Swaminathan (2005)"
-  },
-  {
-   "mnemonic": "sysmom3_1",
-   "group": "Cluster III: Momentum & Reversal",
-   "name": "Systematic Momentum (3-1)",
-   "description": "Sum of fitted values over months $t{-}2$ to $t{-}1$ from a 36(12) rolling CAPMB regression.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "sysmom12_1",
-   "group": "Cluster III: Momentum & Reversal",
-   "name": "Systematic Momentum (12-1)",
-   "description": "Sum of fitted values over months $t{-}11$ to $t{-}1$ from a 36(12) rolling CAPMB regression.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "idimom3_1",
-   "group": "Cluster III: Momentum & Reversal",
-   "name": "Idiosyncratic Momentum (3-1)",
-   "description": "Sum of residuals over months $t{-}2$ to $t{-}1$ from a 36(12) rolling CAPMB regression.",
-   "citation": "\\citet{blitz2011residual}",
-   "citation_keys": [
-    "blitz2011residual"
-   ],
-   "citation_text": "Blitz, Huij and Martens (2011)"
-  },
-  {
-   "mnemonic": "idimom12_1",
-   "group": "Cluster III: Momentum & Reversal",
-   "name": "Idiosyncratic Momentum (12-1)",
-   "description": "Sum of residuals over months $t{-}11$ to $t{-}1$ from a 36(12) rolling CAPMB regression.",
-   "citation": "\\citet{blitz2011residual}",
-   "citation_keys": [
-    "blitz2011residual"
-   ],
-   "citation_text": "Blitz, Huij and Martens (2011)"
-  },
-  {
-   "mnemonic": "imom1",
-   "group": "Cluster III: Momentum & Reversal",
-   "name": "Industry Momentum (1)",
-   "description": "Equal-weighted average prior-month return of other bonds in the same FF17 industry.",
-   "citation": "\\citet{wang2024industry}",
-   "citation_keys": [
-    "wang2024industry"
-   ],
-   "citation_text": "Wang, Wu and Yang (2024)"
-  },
-  {
-   "mnemonic": "imom3_1",
-   "group": "Cluster III: Momentum & Reversal",
-   "name": "Industry Momentum (3-1)",
-   "description": "Equal-weighted average 3-1 momentum of other bonds in the same FF17 industry.",
-   "citation": "\\citet{wang2024industry}",
-   "citation_keys": [
-    "wang2024industry"
-   ],
-   "citation_text": "Wang, Wu and Yang (2024)"
-  },
-  {
-   "mnemonic": "ltr24_3",
-   "group": "Cluster III: Momentum & Reversal",
-   "name": "Long-Term Reversal (24-3)",
-   "description": "Cumulative return months $t{-}23$ to $t{-}3$. Uses expanding window starting at 12-3.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "iltr30_6",
-   "group": "Cluster III: Momentum & Reversal",
-   "name": "Industry LTR (30-6)",
-   "description": "Equal-weighted average 30-6 LTR of other bonds in the same FF17 industry.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "iltr24_3",
-   "group": "Cluster III: Momentum & Reversal",
-   "name": "Industry LTR (24-3)",
-   "description": "Equal-weighted average 24-3 LTR of other bonds in the same FF17 industry.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "pi",
-   "group": "Cluster IV: Illiquidity",
-   "name": "Price Impact",
-   "description": "Pastor-Stambaugh liquidity: negated coefficient from return reversal regression on signed volume. Requires a minimum of 5 daily returns.",
-   "citation": "\\citet{PS2003}",
-   "citation_keys": [
-    "PS2003"
-   ],
-   "citation_text": "P\\'astor and Stambaugh (2003)"
-  },
-  {
-   "mnemonic": "ami",
-   "group": "Cluster IV: Illiquidity",
-   "name": "Amihud Illiquidity",
-   "description": "Within-month mean of daily $|r_t|/\\text{dvol}_t$. Requires a minimum of 5 daily returns.",
-   "citation": "\\citet{AM2002}",
-   "citation_keys": [
-    "AM2002"
-   ],
-   "citation_text": "Amihud (2002)"
-  },
-  {
-   "mnemonic": "ami_v",
-   "group": "Cluster IV: Illiquidity",
-   "name": "Amihud Volatility",
-   "description": "Monthly standard deviation of daily Amihud ratios. Requires a minimum of 5 daily returns.",
-   "citation": "\\citet{dick2012corporate}",
-   "citation_keys": [
-    "dick2012corporate"
-   ],
-   "citation_text": "Dick-Nielsen, Feldh\\\"utter and Lando (2012)"
-  },
-  {
-   "mnemonic": "roll",
-   "group": "Cluster IV: Illiquidity",
-   "name": "Roll Spread",
-   "description": "Implicit bid-ask spread: $2\\sqrt{\\max(-\\text{Cov}(r_t, r_{t-1}), 0)}$. Requires a minimum of 5 daily returns.",
-   "citation": "\\citet{roll1984simple}",
-   "citation_keys": [
-    "roll1984simple"
-   ],
-   "citation_text": "Roll (1984)"
-  },
-  {
-   "mnemonic": "ilq",
-   "group": "Cluster IV: Illiquidity",
-   "name": "Roll Autocovariance",
-   "description": "Negative autocovariance of log returns $\\times 100$. Requires a minimum of 5 daily returns.",
-   "citation": "\\citet{bao2011illiquidity}",
-   "citation_keys": [
-    "bao2011illiquidity"
-   ],
-   "citation_text": "Bao, Pan and Wang (2011)"
-  },
-  {
-   "mnemonic": "spd_rel",
-   "group": "Cluster IV: Illiquidity",
-   "name": "Relative Bid-Ask Spread",
-   "description": "Volume-weighted $(P^{ask} - P^{bid})/\\text{mid}$. Requires a minimum of 5 prices.",
-   "citation": "\\citet{hong2000empirical}",
-   "citation_keys": [
-    "hong2000empirical"
-   ],
-   "citation_text": "Hong and Warga (2000)"
-  },
-  {
-   "mnemonic": "cs_sprd",
-   "group": "Cluster IV: Illiquidity",
-   "name": "Corwin-Schultz Spread",
-   "description": "High-low spread estimator using two-day price ranges. Requires a minimum of 5 prices.",
-   "citation": "\\citet{corwin2012simple}",
-   "citation_keys": [
-    "corwin2012simple"
-   ],
-   "citation_text": "Corwin and Schultz (2012)"
-  },
-  {
-   "mnemonic": "ar_sprd",
-   "group": "Cluster IV: Illiquidity",
-   "name": "Abdi-Ranaldo Spread",
-   "description": "Closing price spread estimator. Requires a minimum of 5 prices.",
-   "citation": "\\citet{abdi2017simple}",
-   "citation_keys": [
-    "abdi2017simple"
-   ],
-   "citation_text": "Abdi and Ranaldo (2017)"
-  },
-  {
-   "mnemonic": "p_zro",
-   "group": "Cluster IV: Illiquidity",
-   "name": "Zero-Return Proportion",
-   "description": "Fraction of business days with no valid price.",
-   "citation": "\\citet{fong2017}",
-   "citation_keys": [
-    "fong2017"
-   ],
-   "citation_text": "Fong, Holden and Trzcinka (2017)"
-  },
-  {
-   "mnemonic": "p_fht",
-   "group": "Cluster IV: Illiquidity",
-   "name": "FHT Spread",
-   "description": "Spread derived from zero-return proportion: $2\\sigma\\Phi^{-1}((1+p_{zro})/2)$. Requires a minimum of 5 daily returns.",
-   "citation": "\\citet{fong2017}",
-   "citation_keys": [
-    "fong2017"
-   ],
-   "citation_text": "Fong, Holden and Trzcinka (2017)"
-  },
-  {
-   "mnemonic": "vov",
-   "group": "Cluster IV: Illiquidity",
-   "name": "Volatility of Volume",
-   "description": "Liquidity proxy: $2.5 \\times \\sigma^{0.6} / \\bar{V}^{0.25}$. Requires a minimum of 5 daily returns.",
-   "citation": "\\citet{tobek2016}",
-   "citation_keys": [
-    "tobek2016"
-   ],
-   "citation_text": "Tobek (2016)"
-  },
-  {
-   "mnemonic": "lix",
-   "group": "Cluster IV: Illiquidity",
-   "name": "LIX Liquidity",
-   "description": "$\\log_{10}[(V \\times P_{\\text{close}}) / (P_{\\text{high}} - P_{\\text{low}})]$. Requires a minimum of 5 prices.",
-   "citation": "\\citet{danyliv2014convenient}",
-   "citation_keys": [
-    "danyliv2014convenient"
-   ],
-   "citation_text": "Danyliv, Bland and Nicholass (2014)"
-  },
-  {
-   "mnemonic": "spd_abs",
-   "group": "Cluster IV: Illiquidity",
-   "name": "Absolute Bid-Ask Spread",
-   "description": "Volume-weighted $(P^{ask} - P^{bid})$ in dollars. Requires a minimum of 5 prices.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "dvol",
-   "group": "Cluster V: Volatility & Risk",
-   "name": "Daily Volatility",
-   "description": "Standard deviation of daily returns within the month.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "dskew",
-   "group": "Cluster V: Volatility & Risk",
-   "name": "Daily Skewness",
-   "description": "Central skewness of daily returns within the month.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "dkurt",
-   "group": "Cluster V: Volatility & Risk",
-   "name": "Daily Kurtosis",
-   "description": "Excess kurtosis of daily returns within the month.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "rvol",
-   "group": "Cluster V: Volatility & Risk",
-   "name": "Realized Volatility",
-   "description": "Within-month square root of sum of squared daily returns: $\\sqrt{\\sum r_t^2}$. Requires a minimum of 5 daily returns.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "rsj",
-   "group": "Cluster V: Volatility & Risk",
-   "name": "Realized Signed Jump",
-   "description": "Within-month asymmetry in positive vs.\\ negative squared returns: $(RV^+ - RV^-)/RV$. Requires a minimum of 5 daily returns.",
-   "citation": "\\citet{bollerslev2020}",
-   "citation_keys": [
-    "bollerslev2020"
-   ],
-   "citation_text": "Bollerslev, Li and Zhao (2020)"
-  },
-  {
-   "mnemonic": "rsk",
-   "group": "Cluster V: Volatility & Risk",
-   "name": "Realized Skewness",
-   "description": "Within-month third moment of daily returns scaled by realized volatility. Requires a minimum of 5 daily returns.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "rkt",
-   "group": "Cluster V: Volatility & Risk",
-   "name": "Realized Kurtosis",
-   "description": "Within-month fourth moment of daily returns scaled by realized volatility. Requires a minimum of 5 daily returns.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "var_95",
-   "group": "Cluster V: Volatility & Risk",
-   "name": "95% Value-at-Risk",
-   "description": "5th percentile loss from empirical daily return distribution over a 36(12) rolling window.",
-   "citation": "\\citet{BaiBaliWen_2019}",
-   "citation_keys": [
-    "BaiBaliWen_2019"
-   ],
-   "citation_text": "Bai, Bali and Wen (2019)"
-  },
-  {
-   "mnemonic": "es_90",
-   "group": "Cluster V: Volatility & Risk",
-   "name": "90% Expected Shortfall",
-   "description": "Mean of worst 10% of daily returns over a 36(12) rolling window.",
-   "citation": "\\citet{BaiBaliWen_2019}",
-   "citation_keys": [
-    "BaiBaliWen_2019"
-   ],
-   "citation_text": "Bai, Bali and Wen (2019)"
-  },
-  {
-   "mnemonic": "var_90",
-   "group": "Cluster V: Volatility & Risk",
-   "name": "90% Value-at-Risk",
-   "description": "10th percentile loss from empirical daily return distribution over a 36(12) rolling window.",
-   "citation": "\\citet{BaiBaliWen_2019}",
-   "citation_keys": [
-    "BaiBaliWen_2019"
-   ],
-   "citation_text": "Bai, Bali and Wen (2019)"
-  },
-  {
-   "mnemonic": "dvol_sys",
-   "group": "Cluster V: Volatility & Risk",
-   "name": "Systematic Volatility",
-   "description": "Standard deviation of systematic returns (CAPMB fitted values) within the month. Requires a minimum of 5 daily returns.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "dvol_idio",
-   "group": "Cluster V: Volatility & Risk",
-   "name": "Idiosyncratic Volatility",
-   "description": "Standard deviation of idiosyncratic returns (CAPMB residuals) within the month. Requires a minimum of 5 daily returns.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "ivol_mkt",
-   "group": "Cluster V: Volatility & Risk",
-   "name": "Idiosyncratic Volatility (MKT)",
-   "description": "Residual volatility from joint MKTRF+MKTB regression.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "ivol_bbw",
-   "group": "Cluster V: Volatility & Risk",
-   "name": "Idiosyncratic Volatility (BBW)",
-   "description": "Residual volatility from BBW 4-factor regression.",
-   "citation": "\\citet{BaiBaliWen_2019}",
-   "citation_keys": [
-    "BaiBaliWen_2019"
-   ],
-   "citation_text": "Bai, Bali and Wen (2019)"
-  },
-  {
-   "mnemonic": "ivol_vp",
-   "group": "Cluster V: Volatility & Risk",
-   "name": "Idiosyncratic Volatility (VP)",
-   "description": "Residual volatility from VOLPSB regression.",
-   "citation": "\\citet{ChungWangWu_2019}",
-   "citation_keys": [
-    "ChungWangWu_2019"
-   ],
-   "citation_text": "Chung, Wang and Wu (2019)"
-  },
-  {
-   "mnemonic": "iskew",
-   "group": "Cluster V: Volatility & Risk",
-   "name": "Idiosyncratic Skewness",
-   "description": "Skewness of residuals from coskewness regression.",
-   "citation": "\\citet{harvey2000conditional}",
-   "citation_keys": [
-    "harvey2000conditional"
-   ],
-   "citation_text": "Harvey and Siddique (2000)"
-  },
-  {
-   "mnemonic": "b_mktrf_mkt",
-   "group": "Cluster VI: Market Risk",
-   "name": "Equity Market Beta",
-   "description": "Beta on MKTRF from joint regression with MKTB (36-month rolling).",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "b_mktb_mkt",
-   "group": "Cluster VI: Market Risk",
-   "name": "Bond Market Beta",
-   "description": "Beta on MKTB from joint regression with MKTRF (36-month rolling).",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "b_mktb",
-   "group": "Cluster VI: Market Risk",
-   "name": "Bond Market Beta (Univariate)",
-   "description": "Beta from univariate regression on MKTB.",
-   "citation": "\\citet{dickerson2023priced}",
-   "citation_keys": [
-    "dickerson2023priced"
-   ],
-   "citation_text": "Dickerson, Mueller and Robotti (2023)"
-  },
-  {
-   "mnemonic": "b_mktbx_dcapm",
-   "group": "Cluster VI: Market Risk",
-   "name": "Duration-Adj Market Beta",
-   "description": "Beta on MKTBX from duration-adjusted CAPM.",
-   "citation": "\\citet{Binsbergen-Schwert-Nozawa-2023}",
-   "citation_keys": [
-    "Binsbergen-Schwert-Nozawa-2023"
-   ],
-   "citation_text": "van Binsbergen, Nozawa and Schwert (2025)"
-  },
-  {
-   "mnemonic": "b_term_dcapm",
-   "group": "Cluster VI: Market Risk",
-   "name": "Term Premium Beta",
-   "description": "Beta on TERM $=$ MKTB $-$ MKTBX from duration-adjusted CAPM.",
-   "citation": "\\citet{Binsbergen-Schwert-Nozawa-2023}",
-   "citation_keys": [
-    "Binsbergen-Schwert-Nozawa-2023"
-   ],
-   "citation_text": "van Binsbergen, Nozawa and Schwert (2025)"
-  },
-  {
-   "mnemonic": "b_mktb_dn",
-   "group": "Cluster VI: Market Risk",
-   "name": "Downside Market Beta",
-   "description": "Beta on $\\min(\\text{MKTB}, 0)$ from asymmetric market model.",
-   "citation": "\\citet{ang2006downside}",
-   "citation_keys": [
-    "ang2006downside"
-   ],
-   "citation_text": "Ang, Chen and Xing (2006)"
-  },
-  {
-   "mnemonic": "b_mktb_up",
-   "group": "Cluster VI: Market Risk",
-   "name": "Upside Market Beta",
-   "description": "Beta on $\\max(\\text{MKTB}, 0)$ from asymmetric market model.",
-   "citation": "\\citet{ang2006downside}",
-   "citation_keys": [
-    "ang2006downside"
-   ],
-   "citation_text": "Ang, Chen and Xing (2006)"
-  },
-  {
-   "mnemonic": "b_termb",
-   "group": "Cluster VI: Market Risk",
-   "name": "Term Beta",
-   "description": "Beta on TERMB from market regression.",
-   "citation": "\\citet{gebhardt2005cross}",
-   "citation_keys": [
-    "gebhardt2005cross"
-   ],
-   "citation_text": "Gebhardt, Hvidkjaer and Swaminathan (2005)"
-  },
-  {
-   "mnemonic": "db_mkt",
-   "group": "Cluster VI: Market Risk",
-   "name": "Daily Market Beta",
-   "description": "Beta from within-month daily regression on cross-sectional mean return.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "b_drf",
-   "group": "Cluster VII: Credit & Default Betas",
-   "name": "Downside Risk Beta (Univariate)",
-   "description": "Beta from univariate regression on DRF.",
-   "citation": "\\citet{dickerson2023priced}",
-   "citation_keys": [
-    "dickerson2023priced"
-   ],
-   "citation_text": "Dickerson, Mueller and Robotti (2023)"
-  },
-  {
-   "mnemonic": "b_crf",
-   "group": "Cluster VII: Credit & Default Betas",
-   "name": "Credit Risk Beta (Univariate)",
-   "description": "Beta from univariate regression on CRF.",
-   "citation": "\\citet{dickerson2023priced}",
-   "citation_keys": [
-    "dickerson2023priced"
-   ],
-   "citation_text": "Dickerson, Mueller and Robotti (2023)"
-  },
-  {
-   "mnemonic": "b_lrf",
-   "group": "Cluster VII: Credit & Default Betas",
-   "name": "Liquidity Risk Beta (Univariate)",
-   "description": "Beta from univariate regression on LRF.",
-   "citation": "\\citet{dickerson2023priced}",
-   "citation_keys": [
-    "dickerson2023priced"
-   ],
-   "citation_text": "Dickerson, Mueller and Robotti (2023)"
-  },
-  {
-   "mnemonic": "b_defb",
-   "group": "Cluster VII: Credit & Default Betas",
-   "name": "Default Beta",
-   "description": "Beta on DEFB from duration-adjusted market regression.",
-   "citation": "\\citet{gebhardt2005cross}",
-   "citation_keys": [
-    "gebhardt2005cross"
-   ],
-   "citation_text": "Gebhardt, Hvidkjaer and Swaminathan (2005)"
-  },
-  {
-   "mnemonic": "b_dvix",
-   "group": "Cluster VIII: Volatility & Liquidity Betas",
-   "name": "VIX Innovation Beta",
-   "description": "Sum of contemporaneous and lagged $\\Delta$VIX betas from MKTB+MKTRF regression.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "b_dvix_va",
-   "group": "Cluster VIII: Volatility & Liquidity Betas",
-   "name": "VIX Beta (Amihud)",
-   "description": "$\\Delta$VIX beta from FF3+VIX+Amihud specification.",
-   "citation": "\\citet{ChungWangWu_2019}",
-   "citation_keys": [
-    "ChungWangWu_2019"
-   ],
-   "citation_text": "Chung, Wang and Wu (2019)"
-  },
-  {
-   "mnemonic": "b_dvix_vp",
-   "group": "Cluster VIII: Volatility & Liquidity Betas",
-   "name": "VIX Beta (PSB)",
-   "description": "$\\Delta$VIX beta from FF3+VIX+PSB specification.",
-   "citation": "\\citet{ChungWangWu_2019}",
-   "citation_keys": [
-    "ChungWangWu_2019"
-   ],
-   "citation_text": "Chung, Wang and Wu (2019)"
-  },
-  {
-   "mnemonic": "b_dvix_dn",
-   "group": "Cluster VIII: Volatility & Liquidity Betas",
-   "name": "Downside VIX Beta",
-   "description": "Beta on $\\min(\\Delta\\text{VIX}, 0)$ from asymmetric VIX model.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "b_dvix_up",
-   "group": "Cluster VIII: Volatility & Liquidity Betas",
-   "name": "Upside VIX Beta",
-   "description": "Beta on $\\max(\\Delta\\text{VIX}, 0)$ from asymmetric VIX model.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "b_psb",
-   "group": "Cluster VIII: Volatility & Liquidity Betas",
-   "name": "Pastor-Stambaugh Beta",
-   "description": "Beta on bond market liquidity factor PSB.",
-   "citation": "\\citet{LinWangWu_2011}",
-   "citation_keys": [
-    "LinWangWu_2011"
-   ],
-   "citation_text": "Lin, Wang and Wu (2011)"
-  },
-  {
-   "mnemonic": "b_psb_m",
-   "group": "Cluster VIII: Volatility & Liquidity Betas",
-   "name": "PSB Beta (Multi-Factor)",
-   "description": "PSB beta controlling for FF3+MKTBX+TERM.",
-   "citation": "\\citet{LinWangWu_2011}",
-   "citation_keys": [
-    "LinWangWu_2011"
-   ],
-   "citation_text": "Lin, Wang and Wu (2011)"
-  },
-  {
-   "mnemonic": "b_amd_m",
-   "group": "Cluster VIII: Volatility & Liquidity Betas",
-   "name": "Amihud Beta (Multi-Factor)",
-   "description": "Amihud beta controlling for FF3+MKTBX+TERM.",
-   "citation": "\\citet{LinWangWu_2011}",
-   "citation_keys": [
-    "LinWangWu_2011"
-   ],
-   "citation_text": "Lin, Wang and Wu (2011)"
-  },
-  {
-   "mnemonic": "b_amd",
-   "group": "Cluster VIII: Volatility & Liquidity Betas",
-   "name": "Amihud Beta",
-   "description": "Beta on aggregate Amihud illiquidity factor.",
-   "citation": "\\citet{LinWangWu_2011}",
-   "citation_keys": [
-    "LinWangWu_2011"
-   ],
-   "citation_text": "Lin, Wang and Wu (2011)"
-  },
-  {
-   "mnemonic": "b_coskew",
-   "group": "Cluster VIII: Volatility & Liquidity Betas",
-   "name": "Coskewness Beta",
-   "description": "Beta on $\\text{MKTB}^2$ from coskewness regression.",
-   "citation": "\\citet{harvey2000conditional}",
-   "citation_keys": [
-    "harvey2000conditional"
-   ],
-   "citation_text": "Harvey and Siddique (2000)"
-  },
-  {
-   "mnemonic": "b_vix",
-   "group": "Cluster VIII: Volatility & Liquidity Betas",
-   "name": "VIX Level Beta",
-   "description": "Beta on VIX level from monthly regression.",
-   "citation": "\\citet{ChungWangWu_2019}",
-   "citation_keys": [
-    "ChungWangWu_2019"
-   ],
-   "citation_text": "Chung, Wang and Wu (2019)"
-  },
-  {
-   "mnemonic": "b_dvixd",
-   "group": "Cluster VIII: Volatility & Liquidity Betas",
-   "name": "Daily VIX Innovation Beta",
-   "description": "Beta on daily $\\Delta$VIX within the month. Requires a minimum of 5 daily returns.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "b_illiq",
-   "group": "Cluster VIII: Volatility & Liquidity Betas",
-   "name": "Illiquidity Beta",
-   "description": "Beta on aggregate bond market illiquidity factor.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "b_dunc",
-   "group": "Cluster IX: Macro & Other Betas",
-   "name": "Macro Uncertainty Beta",
-   "description": "Beta on changes in Jurado, Ludvigson, and Ng (2015) macro uncertainty index.",
-   "citation": "\\citet{bali2021macroeconomic}",
-   "citation_keys": [
-    "bali2021macroeconomic"
-   ],
-   "citation_text": "Bali, Subrahmanyam and Wen (2021)"
-  },
-  {
-   "mnemonic": "b_duncr",
-   "group": "Cluster IX: Macro & Other Betas",
-   "name": "Real Uncertainty Beta",
-   "description": "Beta on changes in Jurado, Ludvigson, and Ng (2015) real uncertainty component.",
-   "citation": "\\citet{bali2021macroeconomic}",
-   "citation_keys": [
-    "bali2021macroeconomic"
-   ],
-   "citation_text": "Bali, Subrahmanyam and Wen (2021)"
-  },
-  {
-   "mnemonic": "b_duncf",
-   "group": "Cluster IX: Macro & Other Betas",
-   "name": "Financial Uncertainty Beta",
-   "description": "Beta on changes in Jurado, Ludvigson, and Ng (2015) financial uncertainty component.",
-   "citation": "\\citet{bali2021macroeconomic}",
-   "citation_keys": [
-    "bali2021macroeconomic"
-   ],
-   "citation_text": "Bali, Subrahmanyam and Wen (2021)"
-  },
-  {
-   "mnemonic": "b_unc",
-   "group": "Cluster IX: Macro & Other Betas",
-   "name": "Uncertainty Level Beta",
-   "description": "Beta on Jurado, Ludvigson, and Ng (2015) macro uncertainty level.",
-   "citation": "\\citet{bali2021macroeconomic}",
-   "citation_keys": [
-    "bali2021macroeconomic"
-   ],
-   "citation_text": "Bali, Subrahmanyam and Wen (2021)"
-  },
-  {
-   "mnemonic": "b_dunc3",
-   "group": "Cluster IX: Macro & Other Betas",
-   "name": "3-Month Uncertainty Change Beta",
-   "description": "Beta on 3-month change in Jurado, Ludvigson, and Ng (2015) macro uncertainty.",
-   "citation": "\\citet{bali2021macroeconomic}",
-   "citation_keys": [
-    "bali2021macroeconomic"
-   ],
-   "citation_text": "Bali, Subrahmanyam and Wen (2021)"
-  },
-  {
-   "mnemonic": "b_dunc6",
-   "group": "Cluster IX: Macro & Other Betas",
-   "name": "6-Month Uncertainty Change Beta",
-   "description": "Beta on 6-month change in Jurado, Ludvigson, and Ng (2015) macro uncertainty.",
-   "citation": "\\citet{bali2021macroeconomic}",
-   "citation_keys": [
-    "bali2021macroeconomic"
-   ],
-   "citation_text": "Bali, Subrahmanyam and Wen (2021)"
-  },
-  {
-   "mnemonic": "b_dcpi",
-   "group": "Cluster IX: Macro & Other Betas",
-   "name": "Inflation Beta",
-   "description": "Beta on monthly CPI changes.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "b_cpi_vol6",
-   "group": "Cluster IX: Macro & Other Betas",
-   "name": "Inflation Volatility Beta",
-   "description": "Beta on 6-month rolling CPI volatility.",
-   "citation": "\\citet{ceballos2021inflation}",
-   "citation_keys": [
-    "ceballos2021inflation"
-   ],
-   "citation_text": "Ceballos (2022)"
-  },
-  {
-   "mnemonic": "b_dcredit",
-   "group": "Cluster IX: Macro & Other Betas",
-   "name": "Credit Spread Change Beta",
-   "description": "Beta on monthly changes in BAA-AAA spread.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "b_credit",
-   "group": "Cluster IX: Macro & Other Betas",
-   "name": "Credit Spread Level Beta",
-   "description": "Beta on BAA-AAA credit spread level.",
-   "citation": "\\citet{dickerson2023priced}",
-   "citation_keys": [
-    "dickerson2023priced"
-   ],
-   "citation_text": "Dickerson, Mueller and Robotti (2023)"
-  },
-  {
-   "mnemonic": "b_cptlt",
-   "group": "Cluster IX: Macro & Other Betas",
-   "name": "Intermediary Capital Beta",
-   "description": "Beta on traded intermediary capital ratio.",
-   "citation": "\\citet{he2017intermediary}",
-   "citation_keys": [
-    "he2017intermediary"
-   ],
-   "citation_text": "He, Kelly and Manela (2017)"
-  },
-  {
-   "mnemonic": "b_rvol",
-   "group": "Cluster IX: Macro & Other Betas",
-   "name": "Realized Volatility Beta",
-   "description": "Beta on aggregate realized volatility factor.",
-   "citation": "--",
-   "citation_keys": [],
-   "citation_text": "--"
-  },
-  {
-   "mnemonic": "b_rsj",
-   "group": "Cluster IX: Macro & Other Betas",
-   "name": "Realized Jump Beta",
-   "description": "Beta on aggregate realized signed jump factor.",
-   "citation": "\\citet{bollerslev2020}",
-   "citation_keys": [
-    "bollerslev2020"
-   ],
-   "citation_text": "Bollerslev, Li and Zhao (2020)"
-  },
-  {
-   "mnemonic": "b_lvl",
-   "group": "Cluster IX: Macro & Other Betas",
-   "name": "Level Factor Beta",
-   "description": "Beta on the average over key-rate U.S. Treasury yields.",
-   "citation": "\\citet{koijen2017}",
-   "citation_keys": [
-    "koijen2017"
-   ],
-   "citation_text": "Koijen, Lustig and Van Nieuwerburgh (2017)"
-  },
-  {
-   "mnemonic": "b_ysp",
-   "group": "Cluster IX: Macro & Other Betas",
-   "name": "Yield Spread Beta",
-   "description": "Beta on yield spread factor.",
-   "citation": "\\citet{koijen2017}",
-   "citation_keys": [
-    "koijen2017"
-   ],
-   "citation_text": "Koijen, Lustig and Van Nieuwerburgh (2017)"
-  },
-  {
-   "mnemonic": "b_epu",
-   "group": "Cluster IX: Macro & Other Betas",
-   "name": "Economic Policy Uncertainty Beta",
-   "description": "Beta on EPU index level.",
-   "citation": "\\citet{baker2016measuring}",
-   "citation_keys": [
-    "baker2016measuring"
-   ],
-   "citation_text": "Baker, Bloom and Davis (2016)"
-  },
-  {
-   "mnemonic": "b_epum",
-   "group": "Cluster IX: Macro & Other Betas",
-   "name": "Monetary Policy Uncertainty Beta",
-   "description": "Beta on monetary policy uncertainty index level.",
-   "citation": "\\citet{baker2016measuring}",
-   "citation_keys": [
-    "baker2016measuring"
-   ],
-   "citation_text": "Baker, Bloom and Davis (2016)"
-  },
-  {
-   "mnemonic": "b_eput",
-   "group": "Cluster IX: Macro & Other Betas",
-   "name": "Trade Policy Uncertainty Beta",
-   "description": "Beta on trade policy uncertainty index level.",
-   "citation": "\\citet{baker2016measuring}",
-   "citation_keys": [
-    "baker2016measuring"
-   ],
-   "citation_text": "Baker, Bloom and Davis (2016)"
-  }
- ]
+  "_about": "Table IA.VIII, Signal Definitions and Citations. One row per column of the 145-column Stage-2 panel: 108 sorted signals plus 37 identifiers, returns and characteristics. Extracted from the paper's longtable, then reconciled against Stage 2's DATA_DICTIONARY.md and the code that computes each signal. A row carrying `paper_prints` or `paper_prints_citation` is one where the two disagreed and the code settled it; `why_corrected` says what settled it. Everything else is the paper's text unchanged. See RECONCILIATION_ia08.md.",
+  "rows": [
+    {
+      "mnemonic": "cusip",
+      "group": "Bond Identifiers and Return Metrics",
+      "name": "Bond Identifier",
+      "description": "9-digit CUSIP bond identifier.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "date",
+      "group": "Bond Identifiers and Return Metrics",
+      "name": "Date",
+      "description": "True month-end date (YYYY-MM-DD).",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "issuer_cusip",
+      "group": "Bond Identifiers and Return Metrics",
+      "name": "Issuer CUSIP",
+      "description": "6-digit firm identifier (first 6 digits of CUSIP).",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "permno",
+      "group": "Bond Identifiers and Return Metrics",
+      "name": "CRSP PERMNO",
+      "description": "CRSP permanent security identifier.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "permco",
+      "group": "Bond Identifiers and Return Metrics",
+      "name": "CRSP PERMCO",
+      "description": "CRSP permanent company identifier.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "gvkey",
+      "group": "Bond Identifiers and Return Metrics",
+      "name": "Compustat GVKEY",
+      "description": "Compustat global company key.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "hprd",
+      "group": "Bond Identifiers and Return Metrics",
+      "name": "Holding Period",
+      "description": "Month-end holding period in calendar days (see Fig. \\ref{fig:return_timeline}).",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "lib",
+      "group": "Bond Identifiers and Return Metrics",
+      "name": "Latent Implementation Bias",
+      "description": "Clean price return from month-end to month-begin: $\\text{LIB} = P_t^{\\text{bgn}} / P_{t-1}^{\\text{end}} - 1$ (see Fig. \\ref{fig:return_timeline}).",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "libd",
+      "group": "Bond Identifiers and Return Metrics",
+      "name": "LIB (Dirty)",
+      "description": "LIB computed using dirty prices (includes accrued interest and coupon).",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "ret_type",
+      "group": "Bond Identifiers and Return Metrics",
+      "name": "Return Type",
+      "description": "Return classification: standard, trad_in_def, or default_evnt.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "ff17num",
+      "group": "Bond Identifiers and Return Metrics",
+      "name": "FF17 Industry",
+      "description": "Fama-French 17-industry classification.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "ff30num",
+      "group": "Bond Identifiers and Return Metrics",
+      "name": "FF30 Industry",
+      "description": "Fama-French 30-industry classification.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "mcap_s",
+      "group": "Bond Identifiers and Return Metrics",
+      "name": "Market Cap (Start)",
+      "description": "Bond market capitalization at end of month $t{-}1$.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "mcap_e",
+      "group": "Bond Identifiers and Return Metrics",
+      "name": "Market Cap (End)",
+      "description": "Bond market capitalization at end of month $t$.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "tret",
+      "group": "Bond Identifiers and Return Metrics",
+      "name": "Treasury Return",
+      "description": "Duration-matched U.S. Treasury portfolio return. Used to compute duration-adjusted returns: $r^x = r - tret$.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "tret_bns",
+      "group": "Bond Identifiers and Return Metrics",
+      "name": "Treasury Return, Duration-Weighted Cash Flows",
+      "description": "Treasury benchmark built from the bond's own cash flows, weighted by their present-value shares (Macaulay duration weights) and applied to zero-coupon Treasury returns from the Gurkaynak-Sack-Wright curve. Subtract from `ret_vw` for a duration-adjusted return.",
+      "citation": "van Binsbergen, Nozawa, and Schwert (2025)",
+      "citation_keys": [],
+      "citation_text": "van Binsbergen, Nozawa, and Schwert (2025)"
+    },
+    {
+      "mnemonic": "tret_cfm",
+      "group": "Bond Identifiers and Return Metrics",
+      "name": "Treasury Return, Cash-Flow-Weighted",
+      "description": "As `tret_bns`, but weighting the same cash flows by their future value rather than their present value. Places more weight on long-dated cash flows and so overstates a bond's interest rate risk; reported as the authors' own robustness alternative.",
+      "citation": "van Binsbergen, Nozawa, and Schwert (2025), Internet Appendix A1",
+      "citation_keys": [],
+      "citation_text": "van Binsbergen, Nozawa, and Schwert (2025), Internet Appendix A1"
+    },
+    {
+      "mnemonic": "tret_gprs",
+      "group": "Bond Identifiers and Return Metrics",
+      "name": "Treasury Return, Exact Duration Match",
+      "description": "As `tret_bns`, refined so the Treasury portfolio's duration equals the bond's exactly. The present-value weights are duration-matched only when the term structure is flat; this solves for the Treasury yield that restores the match and reweights accordingly.",
+      "citation": "Ghaderi, Plante, Roussanov, and Seo (2026), Appendix B.2",
+      "citation_keys": [],
+      "citation_text": "Ghaderi, Plante, Roussanov, and Seo (2026), Appendix B.2"
+    },
+    {
+      "mnemonic": "tret_cls",
+      "group": "Bond Identifiers and Return Metrics",
+      "name": "Treasury Return, Cash-Flow-Matched",
+      "description": "As `tret_bns`, but discounting the same cash flows on the Treasury zero curve instead of at the bond's own yield to maturity. This replicates the bond's cash flows rather than its duration, so it removes slope and curvature effects as well as parallel shifts. The difference from `tret_bns` is the authors' higher-order component.",
+      "citation": "Cui, Lu, and Song (2026)",
+      "citation_keys": [],
+      "citation_text": "Cui, Lu, and Song (2026)"
+    },
+    {
+      "mnemonic": "tret_mat",
+      "group": "Bond Identifiers and Return Metrics",
+      "name": "Treasury Return, Maturity-Matched",
+      "description": "The twin of `tret`: the same key-rate Treasury index returns, the same interpolation nodes and rounding, but interpolated at the bond's remaining MATURITY rather than its modified duration. Included as the maturity-matched comparator; duration matching is the more precise of the two.",
+      "citation": "Bessembinder, Kahle, Maxwell, and Xu (2009)",
+      "citation_keys": [],
+      "citation_text": "Bessembinder, Kahle, Maxwell, and Xu (2009)"
+    },
+    {
+      "mnemonic": "ret_vw",
+      "group": "Bond Identifiers and Return Metrics",
+      "name": "Total Return (End)",
+      "description": "Month-end to month-end total return (see Fig. \\ref{fig:return_timeline}).",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "ret_vw_bgn",
+      "group": "Bond Identifiers and Return Metrics",
+      "name": "Total Return (Begin)",
+      "description": "Month-begin to month-end total return within the same month (see Fig. \\ref{fig:return_timeline}).",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "dt_s",
+      "group": "Bond Identifiers and Return Metrics",
+      "name": "Date Start",
+      "description": "Trade date for month-end price in month $t{-}1$ (last 5 BD); refer to Panel A of Fig. \\ref{fig:return_timeline}.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "dt_e",
+      "group": "Bond Identifiers and Return Metrics",
+      "name": "Date End",
+      "description": "Trade date for month-end price in month $t$ (last 5 BD); refer to Panel A of Fig. \\ref{fig:return_timeline}.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "dt_s_bgn",
+      "group": "Bond Identifiers and Return Metrics",
+      "name": "Date Start (Begin)",
+      "description": "Trade date for month-begin price in month $t$ (first 5 BD); refer to Panel C of Fig. \\ref{fig:return_timeline}.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "dt_e_bgn",
+      "group": "Bond Identifiers and Return Metrics",
+      "name": "Date End (Begin)",
+      "description": "Trade date for month-end price in month $t$ (last 5 BD) for begin returns; refer to Panel C of Fig. \\ref{fig:return_timeline}.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "hprd_bgn",
+      "group": "Bond Identifiers and Return Metrics",
+      "name": "Holding Period (Begin)",
+      "description": "Month-begin holding period in calendar days.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "igap_bgn",
+      "group": "Bond Identifiers and Return Metrics",
+      "name": "Implementation Gap",
+      "description": "Business days between month-end price ($t{-}1$) and month-begin price ($t$); capped at 5 BD. Refer to Panel D of Fig. \\ref{fig:return_timeline}.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "sig_dt",
+      "group": "Bond Identifiers and Return Metrics",
+      "name": "Signal Date",
+      "description": "Date when price-based signal was observed (minimum 1 BD before month-end price). Refer to Panel B of Fig. \\ref{fig:return_timeline}.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "sig_gap",
+      "group": "Bond Identifiers and Return Metrics",
+      "name": "Signal Gap",
+      "description": "Business days between signal observation and month-end price; ranges 1--10 BD. Refer to Panel B of Fig. \\ref{fig:return_timeline}.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "rfret",
+      "group": "Bond Identifiers and Return Metrics",
+      "name": "Risk-Free Rate",
+      "description": "Monthly risk-free rate from Fama-French. Used for excess returns: $r^x = r - r^f$.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "spc_rat",
+      "group": "Bond Characteristics",
+      "name": "S&P Composite Rating",
+      "description": "Composite credit rating: S&P rating if available, otherwise Moody's rating. Scale: 1 (AAA) to 21 (CCC-), 22 = Default.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "mdc_rat",
+      "group": "Bond Characteristics",
+      "name": "Moody's Composite Rating",
+      "description": "Composite credit rating: Moody's rating if available, otherwise S&P rating. Scale: 1 (AAA) to 21 (CCC-), 22 = Default.",
+      "citation": "--",
+      "citation_keys": [],
+      "paper_prints": "Composite credit rating: Moody's rating if available, otherwise S&P rating. Scale: 1 (AAA) to 20 (CCC-), 21 = Default.",
+      "why_corrected": "The printed row says 1--20 with 21 = Default. Its own `spc_rat` row, one line above, says 1--21 with 22 = Default for the identical scale, and so does Stage 2's data dictionary. The paper contradicts itself; the 21/22 scale is the one the data uses.",
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "call",
+      "group": "Bond Characteristics",
+      "name": "Callable Indicator",
+      "description": "Indicator for embedded call option (1 = callable, 0 = non-callable).",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "fce_val",
+      "group": "Bond Characteristics",
+      "name": "Face Value",
+      "description": "Bond amount outstanding (face value); units of the bond outstanding.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "144a",
+      "group": "Bond Characteristics",
+      "name": "Rule 144A Indicator",
+      "description": "Dummy variable: 1 if bond is Rule 144A, 0 otherwise.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "country",
+      "group": "Bond Characteristics",
+      "name": "Country",
+      "description": "Country of issuance (e.g., USA for U.S. bonds).",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "tmat",
+      "group": "Cluster I: Spreads, Yields, Size",
+      "name": "Time to Maturity",
+      "description": "Years remaining until bond maturity.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "age",
+      "group": "Cluster I: Spreads, Yields, Size",
+      "name": "Bond Age",
+      "description": "Years since bond issuance.",
+      "citation": "\\citet{KPP2023}",
+      "citation_keys": [
+        "KPP2023"
+      ],
+      "citation_text": "Kelly, Palhares and Pruitt (2023)"
+    },
+    {
+      "mnemonic": "ytm",
+      "group": "Cluster I: Spreads, Yields, Size",
+      "name": "Yield to Maturity",
+      "description": "Annualized yield to maturity. Computed with QuantLib.",
+      "citation": "\\citet{gebhardt2005cross}",
+      "citation_keys": [
+        "gebhardt2005cross"
+      ],
+      "citation_text": "Gebhardt, Hvidkjaer and Swaminathan (2005)"
+    },
+    {
+      "mnemonic": "cs",
+      "group": "Cluster I: Spreads, Yields, Size",
+      "name": "Credit Spread",
+      "description": "Annualized credit spread: yield minus maturity-matched U.S. Treasury yield.",
+      "citation": "\\citet{KPP2023}",
+      "citation_keys": [
+        "KPP2023"
+      ],
+      "citation_text": "Kelly, Palhares and Pruitt (2023)"
+    },
+    {
+      "mnemonic": "md_dur",
+      "group": "Cluster I: Spreads, Yields, Size",
+      "name": "Modified Duration",
+      "description": "Modified duration measuring price sensitivity to yield changes. Computed with QuantLib.",
+      "citation": "\\citet{KPP2023}",
+      "citation_keys": [
+        "KPP2023"
+      ],
+      "citation_text": "Kelly, Palhares and Pruitt (2023)"
+    },
+    {
+      "mnemonic": "convx",
+      "group": "Cluster I: Spreads, Yields, Size",
+      "name": "Convexity",
+      "description": "Second-order price sensitivity to yield changes. Computed with QuantLib.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "sze",
+      "group": "Cluster I: Spreads, Yields, Size",
+      "name": "Bond Size",
+      "description": "Bond market capitalization: dirty price times amount outstanding (\\$ millions).",
+      "citation": "\\citet{houweling2017factor}",
+      "citation_keys": [
+        "houweling2017factor"
+      ],
+      "citation_text": "Houweling and Van Zundert (2017)"
+    },
+    {
+      "mnemonic": "dcs6",
+      "group": "Cluster I: Spreads, Yields, Size",
+      "name": "6-Month Spread Narrowing (log)",
+      "description": "Log change in credit spread over prior 6 months: $\\log(cs_{t-6}) - \\log(cs_t)$. If the spread is missing exactly 6 months ago, the nearest adjacent month is used within a $\\pm$1 month band, the EARLIER month first.",
+      "citation": "\\citet{KPP2023}",
+      "citation_keys": [
+        "KPP2023"
+      ],
+      "paper_prints": "Log change in credit spread over prior 6 months: $\\log(cs_{t-6}) - \\log(cs_t)$. If spread is missing exactly 6 months ago, the nearest adjacent spread is used within a $\\pm$2 month band, with $+$ favored over $-$.",
+      "why_corrected": "Measured in the code, not inferred: `_stage2_settings.DSPREAD_BANDWIDTH = 1`, and `lib/value.py` builds `offsets = [0, -1, +1]`, so the search is one month either side and prefers the earlier month (the longer lag). The printed row says a $\\pm$2 band with `+` favoured over `-` -- wrong in the width AND backwards in the tie-break. `dcs6` is an FDR survivor, so this is not cosmetic.",
+      "citation_text": "Kelly, Palhares and Pruitt (2023)"
+    },
+    {
+      "mnemonic": "cs_mu12_1",
+      "group": "Cluster I: Spreads, Yields, Size",
+      "name": "12-Month Average Spread",
+      "description": "Rolling 12-month average credit spread, skipping the prior month. Requires minimum 6 observations.",
+      "citation": "\\citet{elkamhi2022one}",
+      "citation_keys": [
+        "elkamhi2022one"
+      ],
+      "citation_text": "Elkamhi, Jo and Nozawa (2024)"
+    },
+    {
+      "mnemonic": "bbtm",
+      "group": "Cluster II: Value",
+      "name": "Bond Book-to-Market",
+      "description": "Par price divided by market price of the bond. All bonds have a par value of \\$1,000 (100%).",
+      "citation": "\\citet{Bartram-Grinblatt-Nozawa-2021}",
+      "citation_keys": [
+        "Bartram-Grinblatt-Nozawa-2021"
+      ],
+      "citation_text": "Bartram, Grinblatt and Nozawa (2025)"
+    },
+    {
+      "mnemonic": "val_hz",
+      "group": "Cluster II: Value",
+      "name": "Value (HZ)",
+      "description": "Percentage deviation of observed credit spread from fitted ``fair'' spread: $(cs - \\widehat{cs}) / \\widehat{cs}$. Controls: rating, industry, maturity, spread change, callable. Fitted spread is estimated each month via cross-sectional regression; because cs is used, this signal is also exposed to microstructure noise.",
+      "citation": "\\citet{houweling2017factor}",
+      "citation_keys": [
+        "houweling2017factor"
+      ],
+      "citation_text": "Houweling and Van Zundert (2017)"
+    },
+    {
+      "mnemonic": "val_hz_dts",
+      "group": "Cluster II: Value",
+      "name": "Value (HZ, DtS-adjusted)",
+      "description": "HZ value signal demeaned within duration-times-spread quintiles to control for systematic spread-duration risk.",
+      "citation": "\\citet{houweling2017factor}",
+      "citation_keys": [
+        "houweling2017factor"
+      ],
+      "citation_text": "Houweling and Van Zundert (2017)"
+    },
+    {
+      "mnemonic": "val_ipr",
+      "group": "Cluster II: Value",
+      "name": "Value (IPR)",
+      "description": "Log-spread residual from fair-value regression: $\\log(cs) - X'\\hat{\\beta}$. Controls: rating, industry, log duration, volatility, callable. Fitted spread is estimated each month via cross-sectional regression; because cs is used, this signal is also exposed to microstructure noise.",
+      "citation": "\\citet{IPR2018}",
+      "citation_keys": [
+        "IPR2018"
+      ],
+      "citation_text": "Israel, Palhares and Richardson (2018)"
+    },
+    {
+      "mnemonic": "val_ipr_dts",
+      "group": "Cluster II: Value",
+      "name": "Value (IPR, DtS-adjusted)",
+      "description": "IPR value signal demeaned within duration-times-spread quintiles.",
+      "citation": "\\citet{IPR2018}",
+      "citation_keys": [
+        "IPR2018"
+      ],
+      "citation_text": "Israel, Palhares and Richardson (2018)"
+    },
+    {
+      "mnemonic": "mom3_1",
+      "group": "Cluster III: Momentum & Reversal",
+      "name": "3-Month Momentum",
+      "description": "Cumulative return months $t{-}2$ to $t{-}1$, skipping prior month.",
+      "citation": "\\citet{gebhardt2005stock}",
+      "citation_keys": [
+        "gebhardt2005stock"
+      ],
+      "paper_prints_citation": "\\citet{gebhardt2005cross}",
+      "why_corrected": "The printed row cites `gebhardt2005cross` -- Gebhardt, Hvidkjaer and Swaminathan (2005), *The cross-section of expected corporate bond returns: betas or characteristics?*. Bond momentum is the OTHER GHS 2005 paper, *Stock and bond market interaction: does momentum spill over?*, which is in references.bib as `gebhardt2005stock` and is cited nowhere else. Same authors, same year, same journal, different result.",
+      "citation_text": "Gebhardt, Hvidkjaer and Swaminathan (2005)"
+    },
+    {
+      "mnemonic": "mom6_1",
+      "group": "Cluster III: Momentum & Reversal",
+      "name": "6-Month Momentum",
+      "description": "Cumulative return months $t{-}5$ to $t{-}1$.",
+      "citation": "\\citet{gebhardt2005stock}",
+      "citation_keys": [
+        "gebhardt2005stock"
+      ],
+      "paper_prints_citation": "\\citet{gebhardt2005cross}",
+      "why_corrected": "The printed row cites `gebhardt2005cross` -- Gebhardt, Hvidkjaer and Swaminathan (2005), *The cross-section of expected corporate bond returns: betas or characteristics?*. Bond momentum is the OTHER GHS 2005 paper, *Stock and bond market interaction: does momentum spill over?*, which is in references.bib as `gebhardt2005stock` and is cited nowhere else. Same authors, same year, same journal, different result.",
+      "citation_text": "Gebhardt, Hvidkjaer and Swaminathan (2005)"
+    },
+    {
+      "mnemonic": "mom12_1",
+      "group": "Cluster III: Momentum & Reversal",
+      "name": "12-Month Momentum",
+      "description": "Cumulative return months $t{-}11$ to $t{-}1$.",
+      "citation": "\\citet{gebhardt2005stock}",
+      "citation_keys": [
+        "gebhardt2005stock"
+      ],
+      "paper_prints_citation": "\\citet{gebhardt2005cross}",
+      "why_corrected": "The printed row cites `gebhardt2005cross` -- Gebhardt, Hvidkjaer and Swaminathan (2005), *The cross-section of expected corporate bond returns: betas or characteristics?*. Bond momentum is the OTHER GHS 2005 paper, *Stock and bond market interaction: does momentum spill over?*, which is in references.bib as `gebhardt2005stock` and is cited nowhere else. Same authors, same year, same journal, different result.",
+      "citation_text": "Gebhardt, Hvidkjaer and Swaminathan (2005)"
+    },
+    {
+      "mnemonic": "mom12_7",
+      "group": "Cluster III: Momentum & Reversal",
+      "name": "Intermediate Momentum",
+      "description": "Cumulative return months $t{-}11$ to $t{-}7$, excluding recent returns.",
+      "citation": "\\citet{novy2012momentum}",
+      "citation_keys": [
+        "novy2012momentum"
+      ],
+      "citation_text": "Novy-Marx (2012)"
+    },
+    {
+      "mnemonic": "sysmom6_1",
+      "group": "Cluster III: Momentum & Reversal",
+      "name": "Systematic Momentum (6-1)",
+      "description": "Sum of fitted values over months $t{-}5$ to $t{-}1$ from a 36(12) rolling CAPMB regression (bond market factor).",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "idimom6_1",
+      "group": "Cluster III: Momentum & Reversal",
+      "name": "Idiosyncratic Momentum (6-1)",
+      "description": "Sum of residuals over months $t{-}5$ to $t{-}1$ from a 36(12) rolling CAPMB regression (bond market factor).",
+      "citation": "\\citet{blitz2011residual}",
+      "citation_keys": [
+        "blitz2011residual"
+      ],
+      "citation_text": "Blitz, Huij and Martens (2011)"
+    },
+    {
+      "mnemonic": "imom12_1",
+      "group": "Cluster III: Momentum & Reversal",
+      "name": "Industry Momentum (12-1)",
+      "description": "Equal-weighted average 12-1 momentum of other bonds in the same FF17 industry.",
+      "citation": "\\citet{wang2024industry}",
+      "citation_keys": [
+        "wang2024industry"
+      ],
+      "citation_text": "Wang, Wu and Yang (2024)"
+    },
+    {
+      "mnemonic": "ltr48_12",
+      "group": "Cluster III: Momentum & Reversal",
+      "name": "Long-Term Reversal (48-12)",
+      "description": "Cumulative return months $t{-}47$ to $t{-}12$. Uses expanding window starting at 12-3, ramping to 48-12.",
+      "citation": "\\citet{bali2021long}",
+      "citation_keys": [
+        "bali2021long"
+      ],
+      "citation_text": "Bali, Subrahmanyam and Wen (2021)"
+    },
+    {
+      "mnemonic": "ltr30_6",
+      "group": "Cluster III: Momentum & Reversal",
+      "name": "Long-Term Reversal (30-6)",
+      "description": "Cumulative return months $t{-}29$ to $t{-}6$. Uses expanding window starting at 12-3, ramping to 30-6.",
+      "citation": "\\citet{subrahmanyam2023corporatebonddata}",
+      "citation_keys": [
+        "subrahmanyam2023corporatebonddata"
+      ],
+      "citation_text": "Subrahmanyam (2023)"
+    },
+    {
+      "mnemonic": "iltr48_12",
+      "group": "Cluster III: Momentum & Reversal",
+      "name": "Industry LTR (48-12)",
+      "description": "Equal-weighted average 48-12 LTR of other bonds in the same FF17 industry.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "str",
+      "group": "Cluster III: Momentum & Reversal",
+      "name": "Short-Term Reversal",
+      "description": "Prior month return $r_{t-1}$.",
+      "citation": "\\citet{BaiBaliWen_2019}",
+      "citation_keys": [
+        "BaiBaliWen_2019"
+      ],
+      "citation_text": "Bai, Bali and Wen (2019)"
+    },
+    {
+      "mnemonic": "mom9_1",
+      "group": "Cluster III: Momentum & Reversal",
+      "name": "9-Month Momentum",
+      "description": "Cumulative return months $t{-}8$ to $t{-}1$.",
+      "citation": "\\citet{gebhardt2005stock}",
+      "citation_keys": [
+        "gebhardt2005stock"
+      ],
+      "paper_prints_citation": "\\citet{gebhardt2005cross}",
+      "why_corrected": "The printed row cites `gebhardt2005cross` -- Gebhardt, Hvidkjaer and Swaminathan (2005), *The cross-section of expected corporate bond returns: betas or characteristics?*. Bond momentum is the OTHER GHS 2005 paper, *Stock and bond market interaction: does momentum spill over?*, which is in references.bib as `gebhardt2005stock` and is cited nowhere else. Same authors, same year, same journal, different result.",
+      "citation_text": "Gebhardt, Hvidkjaer and Swaminathan (2005)"
+    },
+    {
+      "mnemonic": "sysmom3_1",
+      "group": "Cluster III: Momentum & Reversal",
+      "name": "Systematic Momentum (3-1)",
+      "description": "Sum of fitted values over months $t{-}2$ to $t{-}1$ from a 36(12) rolling CAPMB regression.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "sysmom12_1",
+      "group": "Cluster III: Momentum & Reversal",
+      "name": "Systematic Momentum (12-1)",
+      "description": "Sum of fitted values over months $t{-}11$ to $t{-}1$ from a 36(12) rolling CAPMB regression.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "idimom3_1",
+      "group": "Cluster III: Momentum & Reversal",
+      "name": "Idiosyncratic Momentum (3-1)",
+      "description": "Sum of residuals over months $t{-}2$ to $t{-}1$ from a 36(12) rolling CAPMB regression.",
+      "citation": "\\citet{blitz2011residual}",
+      "citation_keys": [
+        "blitz2011residual"
+      ],
+      "citation_text": "Blitz, Huij and Martens (2011)"
+    },
+    {
+      "mnemonic": "idimom12_1",
+      "group": "Cluster III: Momentum & Reversal",
+      "name": "Idiosyncratic Momentum (12-1)",
+      "description": "Sum of residuals over months $t{-}11$ to $t{-}1$ from a 36(12) rolling CAPMB regression.",
+      "citation": "\\citet{blitz2011residual}",
+      "citation_keys": [
+        "blitz2011residual"
+      ],
+      "citation_text": "Blitz, Huij and Martens (2011)"
+    },
+    {
+      "mnemonic": "imom1",
+      "group": "Cluster III: Momentum & Reversal",
+      "name": "Industry Momentum (1)",
+      "description": "Equal-weighted average prior-month return of other bonds in the same FF17 industry.",
+      "citation": "\\citet{wang2024industry}",
+      "citation_keys": [
+        "wang2024industry"
+      ],
+      "citation_text": "Wang, Wu and Yang (2024)"
+    },
+    {
+      "mnemonic": "imom3_1",
+      "group": "Cluster III: Momentum & Reversal",
+      "name": "Industry Momentum (3-1)",
+      "description": "Equal-weighted average 3-1 momentum of other bonds in the same FF17 industry.",
+      "citation": "\\citet{wang2024industry}",
+      "citation_keys": [
+        "wang2024industry"
+      ],
+      "citation_text": "Wang, Wu and Yang (2024)"
+    },
+    {
+      "mnemonic": "ltr24_3",
+      "group": "Cluster III: Momentum & Reversal",
+      "name": "Long-Term Reversal (24-3)",
+      "description": "Cumulative return months $t{-}23$ to $t{-}3$. Uses expanding window starting at 12-3.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "iltr30_6",
+      "group": "Cluster III: Momentum & Reversal",
+      "name": "Industry LTR (30-6)",
+      "description": "Equal-weighted average 30-6 LTR of other bonds in the same FF17 industry.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "iltr24_3",
+      "group": "Cluster III: Momentum & Reversal",
+      "name": "Industry LTR (24-3)",
+      "description": "Equal-weighted average 24-3 LTR of other bonds in the same FF17 industry.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "pi",
+      "group": "Cluster IV: Illiquidity",
+      "name": "Price Impact",
+      "description": "Pastor-Stambaugh liquidity: negated coefficient from return reversal regression on signed volume. Requires a minimum of 5 daily returns.",
+      "citation": "\\citet{PS2003}",
+      "citation_keys": [
+        "PS2003"
+      ],
+      "citation_text": "P\\'astor and Stambaugh (2003)"
+    },
+    {
+      "mnemonic": "ami",
+      "group": "Cluster IV: Illiquidity",
+      "name": "Amihud Illiquidity",
+      "description": "Within-month mean of daily $|r_t|/\\text{dvol}_t$. Requires a minimum of 5 daily returns.",
+      "citation": "\\citet{AM2002}",
+      "citation_keys": [
+        "AM2002"
+      ],
+      "citation_text": "Amihud (2002)"
+    },
+    {
+      "mnemonic": "ami_v",
+      "group": "Cluster IV: Illiquidity",
+      "name": "Amihud Volatility",
+      "description": "Monthly standard deviation of daily Amihud ratios. Requires a minimum of 5 daily returns.",
+      "citation": "\\citet{dick2012corporate}",
+      "citation_keys": [
+        "dick2012corporate"
+      ],
+      "citation_text": "Dick-Nielsen, Feldh\\\"utter and Lando (2012)"
+    },
+    {
+      "mnemonic": "roll",
+      "group": "Cluster IV: Illiquidity",
+      "name": "Roll Spread",
+      "description": "Implicit bid-ask spread: $2\\sqrt{\\max(-\\text{Cov}(r_t, r_{t-1}), 0)}$. Requires a minimum of 5 daily returns.",
+      "citation": "\\citet{roll1984simple}",
+      "citation_keys": [
+        "roll1984simple"
+      ],
+      "citation_text": "Roll (1984)"
+    },
+    {
+      "mnemonic": "ilq",
+      "group": "Cluster IV: Illiquidity",
+      "name": "Roll Autocovariance",
+      "description": "Negative autocovariance of log returns $\\times 100$. Requires a minimum of 5 daily returns.",
+      "citation": "\\citet{bao2011illiquidity}",
+      "citation_keys": [
+        "bao2011illiquidity"
+      ],
+      "citation_text": "Bao, Pan and Wang (2011)"
+    },
+    {
+      "mnemonic": "spd_rel",
+      "group": "Cluster IV: Illiquidity",
+      "name": "Relative Bid-Ask Spread",
+      "description": "Volume-weighted $(P^{ask} - P^{bid})/\\text{mid}$. Requires a minimum of 5 prices.",
+      "citation": "\\citet{hong2000empirical}",
+      "citation_keys": [
+        "hong2000empirical"
+      ],
+      "citation_text": "Hong and Warga (2000)"
+    },
+    {
+      "mnemonic": "cs_sprd",
+      "group": "Cluster IV: Illiquidity",
+      "name": "Corwin-Schultz Spread",
+      "description": "High-low spread estimator using two-day price ranges. Requires a minimum of 5 prices.",
+      "citation": "\\citet{corwin2012simple}",
+      "citation_keys": [
+        "corwin2012simple"
+      ],
+      "citation_text": "Corwin and Schultz (2012)"
+    },
+    {
+      "mnemonic": "ar_sprd",
+      "group": "Cluster IV: Illiquidity",
+      "name": "Abdi-Ranaldo Spread",
+      "description": "Closing price spread estimator. Requires a minimum of 5 prices.",
+      "citation": "\\citet{abdi2017simple}",
+      "citation_keys": [
+        "abdi2017simple"
+      ],
+      "citation_text": "Abdi and Ranaldo (2017)"
+    },
+    {
+      "mnemonic": "p_zro",
+      "group": "Cluster IV: Illiquidity",
+      "name": "No-Trade Day Proportion",
+      "description": "Fraction of business days with no valid price. Returns are never inspected, so the old name \"Zero-Return Proportion\" contradicted this description.",
+      "citation": "\\citet{fong2017}",
+      "citation_keys": [
+        "fong2017"
+      ],
+      "citation_text": "Fong, Holden and Trzcinka (2017)"
+    },
+    {
+      "mnemonic": "p_fht",
+      "group": "Cluster IV: Illiquidity",
+      "name": "FHT Spread",
+      "description": "Spread derived from zero-return proportion: $2\\sigma\\Phi^{-1}((1+p_{zro})/2)$. Requires a minimum of 5 daily returns.",
+      "citation": "\\citet{fong2017}",
+      "citation_keys": [
+        "fong2017"
+      ],
+      "citation_text": "Fong, Holden and Trzcinka (2017)"
+    },
+    {
+      "mnemonic": "vov",
+      "group": "Cluster IV: Illiquidity",
+      "name": "Volatility-over-Volume",
+      "description": "Liquidity proxy: $2.5 \\times \\sigma^{0.6} / \\bar{V}^{0.25}$, where $\\sigma$ is the volatility of daily RETURNS and $\\bar{V}$ mean volume. Requires a minimum of 5 daily returns. Not the volatility OF volume.",
+      "citation": "\\citet{tobek2016}",
+      "citation_keys": [
+        "tobek2016"
+      ],
+      "citation_text": "Tobek (2016)"
+    },
+    {
+      "mnemonic": "lix",
+      "group": "Cluster IV: Illiquidity",
+      "name": "Negative LIX (Illiquidity)",
+      "description": "$-\\log_{10}[(V \\times P_{\\text{close}}) / (P_{\\text{high}} - P_{\\text{low}})]$. Requires a minimum of 5 prices. Stored NEGATED (lib/illiq_pandas.py), so it rises with ILLIQUIDITY -- 99.29% of non-null values are negative, median -2.181.",
+      "citation": "\\citet{danyliv2014convenient}",
+      "citation_keys": [
+        "danyliv2014convenient"
+      ],
+      "citation_text": "Danyliv, Bland and Nicholass (2014)"
+    },
+    {
+      "mnemonic": "spd_abs",
+      "group": "Cluster IV: Illiquidity",
+      "name": "Absolute Bid-Ask Spread",
+      "description": "Volume-weighted $(P^{ask} - P^{bid})$ in dollars. Requires a minimum of 5 prices.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "dvol",
+      "group": "Cluster V: Volatility & Risk",
+      "name": "Daily Volatility",
+      "description": "Standard deviation of daily returns within the month.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "dskew",
+      "group": "Cluster V: Volatility & Risk",
+      "name": "Daily Skewness",
+      "description": "Central skewness of daily returns within the month.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "dkurt",
+      "group": "Cluster V: Volatility & Risk",
+      "name": "Daily Kurtosis",
+      "description": "Excess kurtosis of daily returns within the month.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "rvol",
+      "group": "Cluster V: Volatility & Risk",
+      "name": "Realized Volatility",
+      "description": "Within-month square root of sum of squared daily returns: $\\sqrt{\\sum r_t^2}$. Requires a minimum of 5 daily returns.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "rsj",
+      "group": "Cluster V: Volatility & Risk",
+      "name": "Realized Signed Jump",
+      "description": "Within-month asymmetry in positive vs.\\ negative squared returns: $(RV^+ - RV^-)/RV$. Requires a minimum of 5 daily returns.",
+      "citation": "\\citet{bollerslev2020}",
+      "citation_keys": [
+        "bollerslev2020"
+      ],
+      "citation_text": "Bollerslev, Li and Zhao (2020)"
+    },
+    {
+      "mnemonic": "rsk",
+      "group": "Cluster V: Volatility & Risk",
+      "name": "Realized Skewness",
+      "description": "Within-month third moment of daily returns scaled by realized volatility. Requires a minimum of 5 daily returns.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "rkt",
+      "group": "Cluster V: Volatility & Risk",
+      "name": "Realized Kurtosis",
+      "description": "Within-month fourth moment of daily returns scaled by realized volatility. Requires a minimum of 5 daily returns.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "var_95",
+      "group": "Cluster V: Volatility & Risk",
+      "name": "95% Value-at-Risk",
+      "description": "5th percentile loss from empirical daily return distribution over a 36(12) rolling window.",
+      "citation": "\\citet{BaiBaliWen_2019}",
+      "citation_keys": [
+        "BaiBaliWen_2019"
+      ],
+      "citation_text": "Bai, Bali and Wen (2019)"
+    },
+    {
+      "mnemonic": "es_90",
+      "group": "Cluster V: Volatility & Risk",
+      "name": "90% Expected Shortfall",
+      "description": "Mean of worst 10% of daily returns over a 36(12) rolling window.",
+      "citation": "\\citet{BaiBaliWen_2019}",
+      "citation_keys": [
+        "BaiBaliWen_2019"
+      ],
+      "citation_text": "Bai, Bali and Wen (2019)"
+    },
+    {
+      "mnemonic": "var_90",
+      "group": "Cluster V: Volatility & Risk",
+      "name": "90% Value-at-Risk",
+      "description": "10th percentile loss from empirical daily return distribution over a 36(12) rolling window.",
+      "citation": "\\citet{BaiBaliWen_2019}",
+      "citation_keys": [
+        "BaiBaliWen_2019"
+      ],
+      "citation_text": "Bai, Bali and Wen (2019)"
+    },
+    {
+      "mnemonic": "dvol_sys",
+      "group": "Cluster V: Volatility & Risk",
+      "name": "Systematic Volatility",
+      "description": "Standard deviation of systematic returns (CAPMB fitted values) within the month. Requires a minimum of 5 daily returns.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "dvol_idio",
+      "group": "Cluster V: Volatility & Risk",
+      "name": "Idiosyncratic Volatility",
+      "description": "Standard deviation of idiosyncratic returns (CAPMB residuals) within the month. Requires a minimum of 5 daily returns.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "ivol_mkt",
+      "group": "Cluster V: Volatility & Risk",
+      "name": "Idiosyncratic Volatility (MKT)",
+      "description": "Residual volatility from joint MKTRF+MKTB regression.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "ivol_bbw",
+      "group": "Cluster V: Volatility & Risk",
+      "name": "Idiosyncratic Volatility (BBW)",
+      "description": "Residual volatility from BBW 4-factor regression.",
+      "citation": "\\citet{BaiBaliWen_2019}",
+      "citation_keys": [
+        "BaiBaliWen_2019"
+      ],
+      "citation_text": "Bai, Bali and Wen (2019)"
+    },
+    {
+      "mnemonic": "ivol_vp",
+      "group": "Cluster V: Volatility & Risk",
+      "name": "Idiosyncratic Volatility (VP)",
+      "description": "Residual volatility from VOLPSB regression.",
+      "citation": "\\citet{ChungWangWu_2019}",
+      "citation_keys": [
+        "ChungWangWu_2019"
+      ],
+      "citation_text": "Chung, Wang and Wu (2019)"
+    },
+    {
+      "mnemonic": "iskew",
+      "group": "Cluster V: Volatility & Risk",
+      "name": "Idiosyncratic Skewness",
+      "description": "Skewness of residuals from coskewness regression.",
+      "citation": "\\citet{harvey2000conditional}",
+      "citation_keys": [
+        "harvey2000conditional"
+      ],
+      "citation_text": "Harvey and Siddique (2000)"
+    },
+    {
+      "mnemonic": "b_mktrf_mkt",
+      "group": "Cluster VI: Market Risk",
+      "name": "Equity Market Beta",
+      "description": "Beta on MKTRF from joint regression with MKTB (36-month rolling).",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "b_mktb_mkt",
+      "group": "Cluster VI: Market Risk",
+      "name": "Bond Market Beta",
+      "description": "Beta on MKTB from joint regression with MKTRF (36-month rolling).",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "b_mktb",
+      "group": "Cluster VI: Market Risk",
+      "name": "Bond Market Beta (Univariate)",
+      "description": "Beta from univariate regression on MKTB.",
+      "citation": "\\citet{dickerson2023priced}",
+      "citation_keys": [
+        "dickerson2023priced"
+      ],
+      "citation_text": "Dickerson, Mueller and Robotti (2023)"
+    },
+    {
+      "mnemonic": "b_mktbx_dcapm",
+      "group": "Cluster VI: Market Risk",
+      "name": "Duration-Adj Market Beta",
+      "description": "Beta on MKTBX from duration-adjusted CAPM.",
+      "citation": "\\citet{Binsbergen-Schwert-Nozawa-2023}",
+      "citation_keys": [
+        "Binsbergen-Schwert-Nozawa-2023"
+      ],
+      "citation_text": "van Binsbergen, Nozawa and Schwert (2025)"
+    },
+    {
+      "mnemonic": "b_term_dcapm",
+      "group": "Cluster VI: Market Risk",
+      "name": "Term Premium Beta",
+      "description": "Beta on TERM $=$ MKTB $-$ MKTBX from duration-adjusted CAPM.",
+      "citation": "\\citet{Binsbergen-Schwert-Nozawa-2023}",
+      "citation_keys": [
+        "Binsbergen-Schwert-Nozawa-2023"
+      ],
+      "citation_text": "van Binsbergen, Nozawa and Schwert (2025)"
+    },
+    {
+      "mnemonic": "b_mktb_dn",
+      "group": "Cluster VI: Market Risk",
+      "name": "Downside Market Beta",
+      "description": "Beta on $\\min(\\text{MKTB}, 0)$ from asymmetric market model.",
+      "citation": "\\citet{ang2006downside}",
+      "citation_keys": [
+        "ang2006downside"
+      ],
+      "citation_text": "Ang, Chen and Xing (2006)"
+    },
+    {
+      "mnemonic": "b_mktb_up",
+      "group": "Cluster VI: Market Risk",
+      "name": "Upside Market Beta",
+      "description": "Beta on $\\max(\\text{MKTB}, 0)$ from asymmetric market model.",
+      "citation": "\\citet{ang2006downside}",
+      "citation_keys": [
+        "ang2006downside"
+      ],
+      "citation_text": "Ang, Chen and Xing (2006)"
+    },
+    {
+      "mnemonic": "b_termb",
+      "group": "Cluster VI: Market Risk",
+      "name": "Term Beta",
+      "description": "Beta on TERMB from market regression.",
+      "citation": "\\citet{gebhardt2005cross}",
+      "citation_keys": [
+        "gebhardt2005cross"
+      ],
+      "citation_text": "Gebhardt, Hvidkjaer and Swaminathan (2005)"
+    },
+    {
+      "mnemonic": "db_mkt",
+      "group": "Cluster VI: Market Risk",
+      "name": "Daily Market Beta",
+      "description": "Beta from within-month daily regression on cross-sectional mean return.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "b_drf",
+      "group": "Cluster VII: Credit & Default Betas",
+      "name": "Downside Risk Beta (Univariate)",
+      "description": "Beta from univariate regression on DRF.",
+      "citation": "\\citet{dickerson2023priced}",
+      "citation_keys": [
+        "dickerson2023priced"
+      ],
+      "citation_text": "Dickerson, Mueller and Robotti (2023)"
+    },
+    {
+      "mnemonic": "b_crf",
+      "group": "Cluster VII: Credit & Default Betas",
+      "name": "Credit Risk Beta (Univariate)",
+      "description": "Beta from univariate regression on CRF.",
+      "citation": "\\citet{dickerson2023priced}",
+      "citation_keys": [
+        "dickerson2023priced"
+      ],
+      "citation_text": "Dickerson, Mueller and Robotti (2023)"
+    },
+    {
+      "mnemonic": "b_lrf",
+      "group": "Cluster VII: Credit & Default Betas",
+      "name": "Liquidity Risk Beta (Univariate)",
+      "description": "Beta from univariate regression on LRF.",
+      "citation": "\\citet{dickerson2023priced}",
+      "citation_keys": [
+        "dickerson2023priced"
+      ],
+      "citation_text": "Dickerson, Mueller and Robotti (2023)"
+    },
+    {
+      "mnemonic": "b_defb",
+      "group": "Cluster VII: Credit & Default Betas",
+      "name": "Default Beta",
+      "description": "Beta on DEFB from duration-adjusted market regression.",
+      "citation": "\\citet{gebhardt2005cross}",
+      "citation_keys": [
+        "gebhardt2005cross"
+      ],
+      "citation_text": "Gebhardt, Hvidkjaer and Swaminathan (2005)"
+    },
+    {
+      "mnemonic": "b_dvix",
+      "group": "Cluster VIII: Volatility & Liquidity Betas",
+      "name": "VIX Innovation Beta",
+      "description": "Sum of contemporaneous and lagged $\\Delta$VIX betas from MKTB+MKTRF regression.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "b_dvix_va",
+      "group": "Cluster VIII: Volatility & Liquidity Betas",
+      "name": "VIX Beta (Amihud)",
+      "description": "$\\Delta$VIX beta from FF3+VIX+Amihud specification.",
+      "citation": "\\citet{ChungWangWu_2019}",
+      "citation_keys": [
+        "ChungWangWu_2019"
+      ],
+      "citation_text": "Chung, Wang and Wu (2019)"
+    },
+    {
+      "mnemonic": "b_dvix_vp",
+      "group": "Cluster VIII: Volatility & Liquidity Betas",
+      "name": "VIX Beta (PSB)",
+      "description": "$\\Delta$VIX beta from FF3+VIX+PSB specification.",
+      "citation": "\\citet{ChungWangWu_2019}",
+      "citation_keys": [
+        "ChungWangWu_2019"
+      ],
+      "citation_text": "Chung, Wang and Wu (2019)"
+    },
+    {
+      "mnemonic": "b_dvix_dn",
+      "group": "Cluster VIII: Volatility & Liquidity Betas",
+      "name": "Downside VIX Beta",
+      "description": "Beta on $\\min(\\Delta\\text{VIX}, 0)$ from asymmetric VIX model.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "b_dvix_up",
+      "group": "Cluster VIII: Volatility & Liquidity Betas",
+      "name": "Upside VIX Beta",
+      "description": "Beta on $\\max(\\Delta\\text{VIX}, 0)$ from asymmetric VIX model.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "b_psb",
+      "group": "Cluster VIII: Volatility & Liquidity Betas",
+      "name": "Pastor-Stambaugh Beta",
+      "description": "Beta on bond market liquidity factor PSB.",
+      "citation": "\\citet{LinWangWu_2011}",
+      "citation_keys": [
+        "LinWangWu_2011"
+      ],
+      "citation_text": "Lin, Wang and Wu (2011)"
+    },
+    {
+      "mnemonic": "b_psb_m",
+      "group": "Cluster VIII: Volatility & Liquidity Betas",
+      "name": "PSB Beta (Multi-Factor)",
+      "description": "PSB beta controlling for FF3+MKTBX+TERM.",
+      "citation": "\\citet{LinWangWu_2011}",
+      "citation_keys": [
+        "LinWangWu_2011"
+      ],
+      "citation_text": "Lin, Wang and Wu (2011)"
+    },
+    {
+      "mnemonic": "b_amd_m",
+      "group": "Cluster VIII: Volatility & Liquidity Betas",
+      "name": "Amihud Beta (Multi-Factor)",
+      "description": "Amihud beta controlling for FF3+MKTBX+TERM.",
+      "citation": "\\citet{LinWangWu_2011}",
+      "citation_keys": [
+        "LinWangWu_2011"
+      ],
+      "citation_text": "Lin, Wang and Wu (2011)"
+    },
+    {
+      "mnemonic": "b_amd",
+      "group": "Cluster VIII: Volatility & Liquidity Betas",
+      "name": "Amihud Beta",
+      "description": "Beta on aggregate Amihud illiquidity factor.",
+      "citation": "\\citet{LinWangWu_2011}",
+      "citation_keys": [
+        "LinWangWu_2011"
+      ],
+      "citation_text": "Lin, Wang and Wu (2011)"
+    },
+    {
+      "mnemonic": "b_coskew",
+      "group": "Cluster VIII: Volatility & Liquidity Betas",
+      "name": "Coskewness Beta",
+      "description": "Beta on $\\text{MKTB}^2$ from coskewness regression.",
+      "citation": "\\citet{harvey2000conditional}",
+      "citation_keys": [
+        "harvey2000conditional"
+      ],
+      "citation_text": "Harvey and Siddique (2000)"
+    },
+    {
+      "mnemonic": "b_vix",
+      "group": "Cluster VIII: Volatility & Liquidity Betas",
+      "name": "VIX Level Beta",
+      "description": "Beta on VIX level from monthly regression.",
+      "citation": "\\citet{ChungWangWu_2019}",
+      "citation_keys": [
+        "ChungWangWu_2019"
+      ],
+      "citation_text": "Chung, Wang and Wu (2019)"
+    },
+    {
+      "mnemonic": "b_dvixd",
+      "group": "Cluster VIII: Volatility & Liquidity Betas",
+      "name": "Daily VIX Innovation Beta",
+      "description": "Beta on daily $\\Delta$VIX within the month. Requires a minimum of 5 daily returns.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "b_illiq",
+      "group": "Cluster VIII: Volatility & Liquidity Betas",
+      "name": "Illiquidity Beta",
+      "description": "Beta on aggregate bond market illiquidity factor.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "b_dunc",
+      "group": "Cluster IX: Macro & Other Betas",
+      "name": "Macro Uncertainty Beta",
+      "description": "Beta on changes in Jurado, Ludvigson, and Ng (2015) macro uncertainty index.",
+      "citation": "\\citet{bali2021macroeconomic}",
+      "citation_keys": [
+        "bali2021macroeconomic"
+      ],
+      "citation_text": "Bali, Subrahmanyam and Wen (2021)"
+    },
+    {
+      "mnemonic": "b_duncr",
+      "group": "Cluster IX: Macro & Other Betas",
+      "name": "Real Uncertainty Beta",
+      "description": "Beta on changes in Jurado, Ludvigson, and Ng (2015) real uncertainty component.",
+      "citation": "\\citet{bali2021macroeconomic}",
+      "citation_keys": [
+        "bali2021macroeconomic"
+      ],
+      "citation_text": "Bali, Subrahmanyam and Wen (2021)"
+    },
+    {
+      "mnemonic": "b_duncf",
+      "group": "Cluster IX: Macro & Other Betas",
+      "name": "Financial Uncertainty Beta",
+      "description": "Beta on changes in Jurado, Ludvigson, and Ng (2015) financial uncertainty component.",
+      "citation": "\\citet{bali2021macroeconomic}",
+      "citation_keys": [
+        "bali2021macroeconomic"
+      ],
+      "citation_text": "Bali, Subrahmanyam and Wen (2021)"
+    },
+    {
+      "mnemonic": "b_unc",
+      "group": "Cluster IX: Macro & Other Betas",
+      "name": "Uncertainty Level Beta",
+      "description": "Beta on Jurado, Ludvigson, and Ng (2015) macro uncertainty level.",
+      "citation": "\\citet{bali2021macroeconomic}",
+      "citation_keys": [
+        "bali2021macroeconomic"
+      ],
+      "citation_text": "Bali, Subrahmanyam and Wen (2021)"
+    },
+    {
+      "mnemonic": "b_dunc3",
+      "group": "Cluster IX: Macro & Other Betas",
+      "name": "3-Month Uncertainty Change Beta",
+      "description": "Beta on 3-month change in Jurado, Ludvigson, and Ng (2015) macro uncertainty.",
+      "citation": "\\citet{bali2021macroeconomic}",
+      "citation_keys": [
+        "bali2021macroeconomic"
+      ],
+      "citation_text": "Bali, Subrahmanyam and Wen (2021)"
+    },
+    {
+      "mnemonic": "b_dunc6",
+      "group": "Cluster IX: Macro & Other Betas",
+      "name": "6-Month Uncertainty Change Beta",
+      "description": "Beta on 6-month change in Jurado, Ludvigson, and Ng (2015) macro uncertainty.",
+      "citation": "\\citet{bali2021macroeconomic}",
+      "citation_keys": [
+        "bali2021macroeconomic"
+      ],
+      "citation_text": "Bali, Subrahmanyam and Wen (2021)"
+    },
+    {
+      "mnemonic": "b_dcpi",
+      "group": "Cluster IX: Macro & Other Betas",
+      "name": "Inflation Beta",
+      "description": "Beta on monthly CPI changes.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "b_cpi_vol6",
+      "group": "Cluster IX: Macro & Other Betas",
+      "name": "Inflation Volatility Beta",
+      "description": "Beta on 6-month rolling CPI volatility.",
+      "citation": "\\citet{ceballos2021inflation}",
+      "citation_keys": [
+        "ceballos2021inflation"
+      ],
+      "citation_text": "Ceballos (2022)"
+    },
+    {
+      "mnemonic": "b_dcredit",
+      "group": "Cluster IX: Macro & Other Betas",
+      "name": "Credit Spread Change Beta",
+      "description": "Beta on monthly changes in BAA-AAA spread.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "b_credit",
+      "group": "Cluster IX: Macro & Other Betas",
+      "name": "Credit Spread Level Beta",
+      "description": "Beta on BAA-AAA credit spread level.",
+      "citation": "\\citet{dickerson2023priced}",
+      "citation_keys": [
+        "dickerson2023priced"
+      ],
+      "citation_text": "Dickerson, Mueller and Robotti (2023)"
+    },
+    {
+      "mnemonic": "b_cptlt",
+      "group": "Cluster IX: Macro & Other Betas",
+      "name": "Intermediary Capital Beta",
+      "description": "Beta on traded intermediary capital ratio.",
+      "citation": "\\citet{he2017intermediary}",
+      "citation_keys": [
+        "he2017intermediary"
+      ],
+      "citation_text": "He, Kelly and Manela (2017)"
+    },
+    {
+      "mnemonic": "b_rvol",
+      "group": "Cluster IX: Macro & Other Betas",
+      "name": "Realized Volatility Beta",
+      "description": "Beta on aggregate realized volatility factor.",
+      "citation": "--",
+      "citation_keys": [],
+      "citation_text": "--"
+    },
+    {
+      "mnemonic": "b_rsj",
+      "group": "Cluster IX: Macro & Other Betas",
+      "name": "Realized Jump Beta",
+      "description": "Beta on aggregate realized signed jump factor.",
+      "citation": "\\citet{bollerslev2020}",
+      "citation_keys": [
+        "bollerslev2020"
+      ],
+      "citation_text": "Bollerslev, Li and Zhao (2020)"
+    },
+    {
+      "mnemonic": "b_lvl",
+      "group": "Cluster IX: Macro & Other Betas",
+      "name": "Level Factor Beta",
+      "description": "Beta on the average over key-rate U.S. Treasury yields.",
+      "citation": "\\citet{koijen2017}",
+      "citation_keys": [
+        "koijen2017"
+      ],
+      "citation_text": "Koijen, Lustig and Van Nieuwerburgh (2017)"
+    },
+    {
+      "mnemonic": "b_ysp",
+      "group": "Cluster IX: Macro & Other Betas",
+      "name": "Yield Spread Beta",
+      "description": "Beta on yield spread factor.",
+      "citation": "\\citet{koijen2017}",
+      "citation_keys": [
+        "koijen2017"
+      ],
+      "citation_text": "Koijen, Lustig and Van Nieuwerburgh (2017)"
+    },
+    {
+      "mnemonic": "b_epu",
+      "group": "Cluster IX: Macro & Other Betas",
+      "name": "Economic Policy Uncertainty Beta",
+      "description": "Beta on EPU index level.",
+      "citation": "\\citet{baker2016measuring}",
+      "citation_keys": [
+        "baker2016measuring"
+      ],
+      "citation_text": "Baker, Bloom and Davis (2016)"
+    },
+    {
+      "mnemonic": "b_epum",
+      "group": "Cluster IX: Macro & Other Betas",
+      "name": "Monetary Policy Uncertainty Beta",
+      "description": "Beta on monetary policy uncertainty index level.",
+      "citation": "\\citet{baker2016measuring}",
+      "citation_keys": [
+        "baker2016measuring"
+      ],
+      "citation_text": "Baker, Bloom and Davis (2016)"
+    },
+    {
+      "mnemonic": "b_eput",
+      "group": "Cluster IX: Macro & Other Betas",
+      "name": "Tax Policy Uncertainty Beta",
+      "description": "Beta on the tax policy uncertainty index level (Baker-Bloom-Davis categorical EPU, column \"3. Taxes\"). NOT trade policy -- a separate category in the same workbook, never read.",
+      "citation": "\\citet{baker2016measuring}",
+      "citation_keys": [
+        "baker2016measuring"
+      ],
+      "citation_text": "Baker, Bloom and Davis (2016)"
+    }
+  ]
 }

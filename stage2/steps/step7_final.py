@@ -157,6 +157,21 @@ def build(con=None, mode: str | None = None, limit_cusips: int | None = None) ->
     # Fail here rather than shipping a silently permuted file (lib/contract.py).
     contract.assert_panel_contract(main_panel, what=f"main_panel_{mode}")
 
+    # ❗The frontier guard, HERE rather than only at packaging. A month carried by one
+    # source alone is not a cross-section -- the usual cause is Stage 1's cut-off landing
+    # where Enhanced has a few days and 144A has the whole month -- and until 2026-09-16
+    # nothing in the build looked. `lib/frontier` was imported by make_release.py,
+    # validate_coverage.py and a test, and by no step, so the first thing to notice a bad
+    # final month was the packager, possibly weeks later.
+    #
+    # Measured before this was wired in, so it cannot fail a legitimate build: both current
+    # panels have ZERO degenerate tail months. Acceptance item A4 fires on the RAW stage-1
+    # input, which is why this vintage was truncated to 2025-11 before the panel was built.
+    if not getattr(cfg, "ALLOW_DEGENERATE_FRONTIER", False):
+        from lib import frontier as _frontier
+        _frontier.assert_frontier_is_a_cross_section(
+            main_panel[["cusip", "date"]], what=f"main panel ({mode})")
+
     panel_path = cfg.PANEL_DIR / f"main_panel_{mode}.parquet"
     with pt("save_panel"):
         wrangle.save_parquet(main_panel, panel_path, compress=True)
@@ -170,8 +185,18 @@ def build(con=None, mode: str | None = None, limit_cusips: int | None = None) ->
     # Checked against the file that was actually written, not the list we meant to write.
     if mmn_path.exists():
         import pyarrow.parquet as _pq
-        contract.assert_mmn_twins(_pq.ParquetFile(mmn_path).schema.names,
-                                  what=f"mmn_price_based_signals_{mode}")
+        _mmn_cols = _pq.ParquetFile(mmn_path).schema.names
+        contract.assert_mmn_twins(_mmn_cols, what=f"mmn_price_based_signals_{mode}")
+        # ❗The other direction: a twin that ships WITHOUT being declared in MMN_TWINNED is a
+        # signal the twin gate iterates straight past, because it iterates the declared set.
+        contract.assert_mmn_twins_are_declared(_mmn_cols,
+                                               what=f"mmn_price_based_signals_{mode}")
+        # ❗And WHICH form is in the panel. Existence of a twin says nothing about that, and
+        # the unadjusted form in the main panel is the basrev v1 failure -- a complete,
+        # normal-looking panel whose reversal signal is four fifths bounce.
+        _keep = [c for c in _mmn_cols if c in ("cusip", "date") or c.endswith("_mmn")]
+        contract.assert_main_panel_is_adjusted(
+            main_panel, pd.read_parquet(mmn_path, columns=_keep), what=f"main panel ({mode})")
 
     (blocks_dir / "step7_meta.json").write_text(json.dumps(
         {"wall_s": round(time.time() - t0, 2), "mode": mode, "phases": pt.phases,

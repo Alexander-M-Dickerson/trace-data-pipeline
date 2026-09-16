@@ -147,6 +147,77 @@ def assert_mmn_twins(sidecar_columns, *, what: str = "mmn sidecar") -> None:
     )
 
 
+# ❗A twinned signal's two forms COINCIDE on some rows and that is not a defect: a bond whose
+# price did not move between the two windows gives the same value either way. Measured on the
+# golden panel -- cs 0.000%, ytm 0.020%, str 0.021%, ami 2.020%, dvol 2.020%, and `lix` on
+# 23.819% of rows. A WHOLE COLUMN matching is the failure, so the bar sits four times above the
+# worst honest column.
+MMN_IDENTICAL_MAX = 0.99
+
+
+def assert_mmn_twins_are_declared(sidecar_columns, *, what: str = "mmn sidecar") -> None:
+    """Every `<col>_mmn` shipped must have its base declared in MMN_TWINNED.
+
+    ❗The other direction of `assert_mmn_twins`, and the one that catches a NEW signal.
+    MMN_TWINNED is hand-written, so a price-based signal nobody adds to it is examined by
+    nothing: the twin gate iterates the set and a name outside it is invisible. This makes the
+    set self-auditing against the file that was actually written.
+    """
+    twins = {c[:-4] for c in sidecar_columns if c.endswith("_mmn")}
+    undeclared = sorted(twins - MMN_TWINNED)
+    if not undeclared:
+        return
+    raise AssertionError(
+        f"{what}: {len(undeclared)} unadjusted twin(s) ship without being declared in "
+        f"MMN_TWINNED:\n    " + ", ".join(undeclared) + "\n\n"
+        "  Add them to MMN_TWINNED so the twin gate covers them. A twin that is shipped but\n"
+        "  not declared is a signal the gate iterates straight past."
+    )
+
+
+def assert_main_panel_is_adjusted(panel, sidecar, *, what: str = "main panel") -> None:
+    """The main panel must carry the MMN-ADJUSTED form, not the unadjusted twin.
+
+    ❗`assert_mmn_twins` proves a twin EXISTS. It cannot tell the two forms apart, so the
+    unadjusted form sitting in the main panel passes it. That pairing is the basrev v1 failure
+    -- AR(1) -0.05 adjusted against -0.22 unadjusted, four fifths of the raw reversal being
+    bid-ask bounce -- and it produces a complete, normal-looking panel.
+
+    Compared on a (cusip, date) JOIN, never positionally: the panel and the sidecar are written
+    by different steps and nothing guarantees a shared row order.
+    """
+    keys = ["cusip", "date"]
+    if not set(keys) <= set(panel.columns) or not set(keys) <= set(sidecar.columns):
+        raise AssertionError(f"{what}: need {keys} on both frames to compare forms")
+    shared = sorted(c for c in MMN_TWINNED
+                    if c in panel.columns and f"{c}_mmn" in sidecar.columns)
+    if not shared:
+        raise AssertionError(
+            f"{what}: no twinned signal is present on both sides -- nothing was compared. "
+            "A check over an empty population is not a pass.")
+
+    m = panel[keys + shared].merge(sidecar[keys + [f"{c}_mmn" for c in shared]],
+                                   on=keys, how="inner")
+    bad = []
+    for c in shared:
+        pair = m[[c, f"{c}_mmn"]].dropna()
+        if len(pair) < 1000:
+            continue
+        frac = float((pair[c] == pair[f"{c}_mmn"]).mean())
+        if frac > MMN_IDENTICAL_MAX:
+            bad.append(f"{c}: {frac:.4%} of {len(pair):,} rows identical to {c}_mmn")
+    if not bad:
+        return
+    raise AssertionError(
+        f"{what}: {len(bad)} signal(s) in the MAIN PANEL are the UNADJUSTED form:\n    "
+        + "\n    ".join(bad) + "\n\n"
+        "  The main panel carries the MMN-ADJUSTED form, read from a price at least one\n"
+        "  business day before the return window opens, and is used with ret_vw. What is\n"
+        "  here is the sidecar's form, which belongs with ret_vw_bgn. Pairing it with ret_vw\n"
+        "  imports the bid-ask bounce the split exists to remove."
+    )
+
+
 def assert_panel_contract(df, *, what: str = "main panel") -> None:
     """Raise unless `df` carries exactly PANEL_COLUMNS, in exactly that order."""
     actual = list(df.columns)
