@@ -77,6 +77,11 @@ DOC_FILES = [
 # legitimately absent from a fresh clone.
 RUNTIME_ARTIFACTS = {
     "fl_linker.parquet", "fl_verdicts.parquet", "firm_names.parquet",
+    # Ships inside bond_firm_linker_2026.zip alongside the parquets above, so it is present
+    # after `download_inputs.sh` and absent from a clean clone. Allowed by its BUNDLE-QUALIFIED
+    # path on purpose: a bare "SCHEMA.md" is too generic, and a doc naming one that does not
+    # exist should still fail this check.
+    "bond_firm_linker_2026/SCHEMA.md",
     "liu_wu_yields.xlsx", "Siccodes12.txt", "Siccodes17.txt", "Siccodes30.txt",
     "smoke_test.out", "smoke_test.err",
 }

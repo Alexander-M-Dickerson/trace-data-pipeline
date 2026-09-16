@@ -1186,6 +1186,16 @@ on the level would load mostly on the trend; the innovation is the priced quanti
 | `crfx` | Credit risk factor, duration-adjusted | BBW |
 | `lrfx` | Liquidity risk factor, duration-adjusted | BBW |
 | `term` | Term premium (MKTB - MKTBX) | Computed |
+| `mktb_bns` | Bond market excess return, on the `tret_bns` benchmark | BBW twin |
+| `drf_bns` | Downside risk factor, on the `tret_bns` benchmark | BBW twin |
+| `crf_bns` | Credit risk factor, on the `tret_bns` benchmark | BBW twin |
+| `lrf_bns` | Liquidity risk factor, on the `tret_bns` benchmark | BBW twin |
+| `term_bns` | Term premium against the `tret_bns` benchmark | Computed |
+| `mktb_cls` | Bond market excess return, on the `tret_cls` benchmark | BBW twin |
+| `drf_cls` | Downside risk factor, on the `tret_cls` benchmark | BBW twin |
+| `crf_cls` | Credit risk factor, on the `tret_cls` benchmark | BBW twin |
+| `lrf_cls` | Liquidity risk factor, on the `tret_cls` benchmark | BBW twin |
+| `term_cls` | Term premium against the `tret_cls` benchmark | Computed |
 | `vix` | VIX level (scaled: /100/sqrt(12)) | CBOE |
 | `dvix` | VIX first difference | Computed |
 | `dvixlag` | Lagged VIX first difference | Computed |
@@ -1224,6 +1234,15 @@ on the level would load mostly on the trend; the innovation is the priced quanti
 | `epu` | Economic policy uncertainty index level | BBD |
 | `epum` | Monetary policy uncertainty index level | BBD |
 | `eput` | Trade policy uncertainty index level | BBD |
+
+❗**The ten `_bns` / `_cls` series are OPTIONAL and only exist if you ran
+`stage2/make_excess_blocks.py --benchmark {bns,cls,all}`.** They are the BBW bond-market factors
+re-estimated on the alternative Treasury benchmark's excess return, and they exist because a
+benchmark's betas must regress on *that* benchmark's own factors. Pairing a `tret_bns` excess
+return with the `tret`-based factors produces `b_*` columns that look perfectly normal and mean
+nothing -- which is why `compute_all_betas` raises on a missing twin rather than falling back.
+`term` is swapped alongside the four bond factors for the same reason. A default build does not
+write them and nothing downstream requires them.
 
 ---
 

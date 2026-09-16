@@ -87,6 +87,23 @@ The equity identifiers come from the **bond-firm linker** published at
 through an acquisition, a spin-off or a rename -- points at the right firm in each
 period rather than at whichever firm owned it last.
 
+❗**The linker ships TWO dated windows, and this panel joins one of them.** `w0`/`w1` is the
+**evidence** window -- *when is this mapping provable* -- the bond's life intersected with the
+firm's CRSP listing. `i0`/`i1` is the **identity** window -- *whose bond is this* -- which stays
+open where no successor or acquisition contradicts it. Use evidence when you are joining
+**equity-side data** (CRSP returns, market cap), because outside it there is no listed firm to
+join to; use identity when the firm id is a **label** you group by.
+`bond_firm_linker_2026/SCHEMA.md`, shipped inside the bundle, is the authority.
+
+**This daily panel joins the EVIDENCE window**, which is right for an evidence-side artifact.
+
+❗**KNOWN, DATED GAP (2026-09-16).** The Stage 2 monthly panel joins the **identity** window,
+because a bond-month panel labels issuers. Until Stage 1 is next rebuilt from WRDS, **the daily
+and monthly panels carry different `permno` on roughly 2% of bond-months** -- monthly coverage is
+88.8%, daily 86.5%. If you join the two, reconcile on `cusip_id` and date, not on `permno`. This
+is deliberate and written down: the two windows drifted apart in the first place precisely
+because nobody had written down which one anything used.
+
 A consequence worth stating plainly: **`permno` is NULL for about 12% of bond-days**,
 and that is deliberate. It is NULL when the bond is outside every window we can
 support -- most often when the bond still trades after the firm's equity stopped

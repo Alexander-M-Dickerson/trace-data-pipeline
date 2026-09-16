@@ -123,6 +123,31 @@ the same PDF had been computed to 2025-11 and printed a 2025 row.
   construction rather than by each inferring the answer from whichever artifact it
   happened to open.
 
+### Changed
+
+- ❗**`permno` / `permco` / `gvkey` now come from the linker's IDENTITY window, and firm
+  coverage moved: 86.57% -> 88.81% of monthly bond-months.** On the 1,950,002-row panel,
+  **43,780** bond-months gained a firm id, **28** lost one and **103** changed id. Row count
+  and column set are unchanged.
+  - `bond_firm_linker_2026` ships **two dated windows** and they answer different questions.
+    `w0`/`w1` is **evidence** -- *when is this mapping provable* -- bounded by the bond's life
+    intersected with the firm's CRSP listing. `i0`/`i1` is **identity** -- *whose bond is
+    this* -- which stays open where no successor or acquisition contradicts it. The bundle's
+    `bond_firm_linker_2026/SCHEMA.md` carries the rule.
+  - Stage 2 previously inherited Stage 1's join, which uses the **evidence** window. A
+    bond-month panel **labels** the issuer rather than joining equity-side data, so identity
+    is the correct window: a bond does not stop being Ford's because Ford's CRSP listing
+    ended. Stage 2 now re-derives the ids itself (`stage2/lib/linker.py`,
+    `_stage2_settings.LINKER_WINDOW`) instead of inheriting them.
+  - ❗**If you group by `permno` -- within-firm sorts, issuer fixed effects -- your portfolio
+    MEMBERSHIP changes**, not just a value, and more so than the 2.2 points suggest: a common
+    `min_bonds_per_firm = 2` screen turns each recovered link into a whole newly-eligible
+    firm. Sorts that never touch `permno` are unaffected.
+  - **Stage 1 still joins the evidence window** and converges at the next annual rebuild, so
+    the daily and monthly panels disagree about `permno` until then. Recorded in
+    `stage1/DATA_DICTIONARY.md` rather than left silent -- that silence is what let the two
+    windows drift apart in the first place.
+
 ### Fixed
 
 - **Table IA.VIII's definitions, in six rows**, each settled by the code or by the paper
