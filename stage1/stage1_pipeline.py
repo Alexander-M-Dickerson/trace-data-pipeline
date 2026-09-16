@@ -1259,7 +1259,17 @@ def step7_merge_linker():
     # window could be applied -- millions of transient rows on a 24 GB node. merge_asof
     # takes the latest window that OPENED at or before the trade date and cannot fan
     # out; the closed-window rows are then nulled below.
-    logger.info("Merging linker on cusip_id within [w0, w1]...")
+    # window-choice: EVIDENCE (w0/w1) -- "when is this mapping provable". The linker also ships an
+    # IDENTITY window (i0/i1, "whose bond is this"), which is the right one when the firm id is a
+    # LABEL rather than a key into equity data. The daily panel here is the evidence-side artifact,
+    # so it stays on w0/w1.
+    #
+    # KNOWN, DATED GAP (2026-09-16): stage 2 now attaches its ids from the IDENTITY window, because
+    # a bond-month panel labels firms. Until this stage is next rebuilt from WRDS the daily and
+    # monthly panels will therefore carry DIFFERENT permno on ~2% of bond-months. That is deliberate
+    # and recorded rather than silent -- silence is how the two diverged unnoticed in the first
+    # place. See stage2/lib/linker.py and the linker bundle's SCHEMA.md.
+    logger.info("Merging linker on cusip_id within [w0, w1] (window-choice: evidence)...")
     before = len(final_df)
     # merge_asof requires the two `on` keys to have the SAME datetime resolution and
     # raises MergeError otherwise. The panel's dates come back from parquet as
