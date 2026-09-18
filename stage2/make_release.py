@@ -13,6 +13,7 @@ published number checkable.
     python3 make_release.py --mode prod_final                 # panel + factor bundles
     python3 make_release.py --mode prod_final --what panel    # just the panel
     python3 make_release.py --mode prod_final --out-dir dist  # somewhere else
+    python3 make_release.py --mode prod_final --what bbw      # the BBW four-factor bundle
 
 ❗**This script is for REDISTRIBUTION, and only redistribution.**
 
@@ -563,11 +564,309 @@ def release_factors(mode: str, out_dir: Path, vintage: str) -> int:
     return 0
 
 
+
+# =============================================================================================
+# THE BBW FOUR-FACTOR BUNDLE
+#
+# The corrected Bai, Bali and Wen (2019) factors -- MKTB, DRF, CRF, LRF -- for every return
+# definition the panel uses, on the TRACE sample and on the extended (Lehman-ICE + TRACE)
+# sample, with the authors' original series beside them so the correction can be measured.
+# Stage 2 builds these anyway (step 3, for the betas); this packages them for download.
+# =============================================================================================
+
+BBW_FACTORS = ("MKTB", "DRF", "CRF", "LRF")
+
+# Block suffix -> the public return-definition key. The keys are the ones the panel, the sorted
+# factors and FactorViz already use: exc is the return over the one-month T-bill, dur over the
+# duration-matched Treasury (`tret`, the Andreani-Palhares-Richardson key-rate benchmark),
+# dbns and dcls over the van Binsbergen-Nozawa-Schwert and Cui-Lu-Song benchmarks.
+BBW_RETURN_TYPES = (("", "exc"), ("x", "dur"), ("_bns", "dbns"), ("_cls", "dcls"))
+
+# The authors' original series, committed under reference/ and shipped unchanged. Pinned: a
+# file that hashes differently is a different claim, and the bundle refuses it.
+BBW_ORIGINAL = cfg.STAGE2_DIR / "reference" / "bbw_factors_original_2004_2021.csv"
+BBW_ORIGINAL_SHA256 = "4588e8ee406eb14510c05b2dd47e332c98b630abacd101acea009907987dbbb4"
+
+# Where the TRACE-built factors take over from the Lehman-ICE backfill -- step4_betas.ICE_CUTOFF.
+BBW_TRACE_START = pd.Timestamp("2002-08-31")
+
+
+def bbw_columns() -> list[tuple[str, str, str]]:
+    """(published name, TRACE block column, extended column) for the 16 factor series, in
+    return-definition order: mktb_exc drf_exc crf_exc lrf_exc, then _dur, _dbns, _dcls."""
+    out = []
+    for suffix, key in BBW_RETURN_TYPES:
+        for f in BBW_FACTORS:
+            out.append((f"{f.lower()}_{key}", f"{f}{suffix}", f"{f.lower()}{suffix}"))
+    return out
+
+
+def _bbw_trace(blocks: Path) -> pd.DataFrame:
+    """The TRACE-built factors, 2002-08 on: date + 16 columns, from the three step-3 blocks."""
+    parts = []
+    for name in ("bbw_factors.parquet", "bbw_factors_bns.parquet", "bbw_factors_cls.parquet"):
+        p = blocks / name
+        if not p.exists():
+            raise FileNotFoundError(f"no {p}; run step 3 (and make_excess_blocks for the "
+                                    f"benchmark twins) with --input-mode {blocks.name} first")
+        b = pd.read_parquet(p)
+        if "date" not in b.columns:
+            b = b.reset_index()
+        b["date"] = pd.to_datetime(b["date"])
+        parts.append(b.set_index("date").sort_index())
+    axes = [tuple(p.index) for p in parts]
+    if any(a != axes[0] for a in axes[1:]):
+        raise SystemExit("ERROR: the three BBW blocks do not share one date axis -- they were "
+                         "built from different runs. Rebuild step 3 for every benchmark.")
+    wide = pd.concat(parts, axis=1)
+    out = pd.DataFrame({"date": wide.index})
+    for pub, trace_col, _ in bbw_columns():
+        if trace_col not in wide.columns:
+            raise SystemExit(f"ERROR: {trace_col} is not in the BBW blocks; got {list(wide.columns)}")
+        out[pub] = wide[trace_col].to_numpy()
+    missing = out.drop(columns="date").isna().sum()
+    if int(missing.sum()):
+        raise SystemExit("ERROR: the TRACE factors have missing months, which they never have "
+                         f"had:\n{missing[missing > 0]}")
+    return out.reset_index(drop=True)
+
+
+def _bbw_extended(blocks: Path) -> pd.DataFrame:
+    """The extended factors, Lehman-ICE before 2002-08 and TRACE from it, as step 4 splices them
+    into factors_merged. Trimmed to the months where at least one of the 16 series exists, so
+    the macro columns' longer frontier does not pad the file with empty rows."""
+    p = blocks / "factors_merged.parquet"
+    if not p.exists():
+        raise FileNotFoundError(f"no {p}; run step 4 with --input-mode {blocks.name} first")
+    fm = pd.read_parquet(p)
+    fm["date"] = pd.to_datetime(fm["date"])
+    fm = fm.sort_values("date").reset_index(drop=True)
+    out = pd.DataFrame({"date": fm["date"]})
+    for pub, _, ext_col in bbw_columns():
+        if ext_col not in fm.columns:
+            raise SystemExit(f"ERROR: {ext_col} is not in factors_merged.parquet")
+        out[pub] = fm[ext_col].to_numpy()
+    have = out.drop(columns="date").notna().any(axis=1)
+    return out[have].reset_index(drop=True)
+
+
+def _gate_bbw(trace: pd.DataFrame, ext: pd.DataFrame) -> None:
+    """Refuse what would publish a wrong series.
+
+    ❗Extended after the cutoff IS the TRACE series -- step 4 keeps the TRACE-native columns
+    from 2002-08-31 and splices the backfill only before it. So the two tables must agree
+    exactly there; a difference means a block from a different run or mode. And LRF has no
+    pre-TRACE history at all (the extension is the modified, three-factor variant), so it must
+    be empty before the cutoff and complete from it."""
+    cols = [c for c in trace.columns if c != "date"]
+    post = ext[ext["date"] >= BBW_TRACE_START].reset_index(drop=True)
+    if list(post["date"]) != list(trace["date"]):
+        raise SystemExit("ERROR: the extended series from 2002-08 does not carry the TRACE "
+                         f"months ({len(post)} vs {len(trace)})")
+    d = (post[cols].to_numpy(dtype=float) - trace[cols].to_numpy(dtype=float))
+    worst = float(np.nanmax(np.abs(d))) if d.size else 0.0
+    if worst != 0.0 or np.isnan(d).any():
+        raise SystemExit("ERROR: the extended series differs from the TRACE series after "
+                         f"2002-08 (max |d| = {worst:.3g}); the blocks come from different runs")
+    pre = ext[ext["date"] < BBW_TRACE_START]
+    lrf = [c for c in cols if c.startswith("lrf_")]
+    if pre[lrf].notna().any().any():
+        raise SystemExit("ERROR: LRF carries pre-2002-08 values; the extension has no LRF leg")
+    if pre.empty:
+        raise SystemExit("ERROR: the extended series has no pre-2002-08 history; the "
+                         "Lehman-ICE backfill did not reach factors_merged")
+    if not BBW_ORIGINAL.exists():
+        raise SystemExit(f"ERROR: {BBW_ORIGINAL} is missing")
+    sha = _sha256(BBW_ORIGINAL)
+    if sha != BBW_ORIGINAL_SHA256:
+        raise SystemExit("ERROR: the original BBW series does not hash as pinned "
+                         f"({sha[:16]} vs {BBW_ORIGINAL_SHA256[:16]}); refusing to ship a "
+                         "changed file as the authors' original")
+
+
+BBW_README = """# The corrected Bai, Bali and Wen (2019) bond factors -- {vintage} vintage
+
+MKTB, DRF, CRF and LRF, the four factors of Bai, Bali and Wen (2019), rebuilt from the OSBAP
+bond panel with the corrections described in Dickerson, Mueller and Robotti (2023), for
+every return definition the panel uses, on two samples. The authors' original series is
+included beside them so the correction can be measured.
+
+## Files
+
+| file | months | what |
+|---|---|---|
+| `bbw_factors_trace_{vintage}.parquet` / `.csv` | {trace_span} ({trace_n}) | built from TRACE alone |
+| `bbw_factors_extended_{vintage}.parquet` / `.csv` | {ext_span} ({ext_n}) | Lehman and ICE quote data before 2002-08, TRACE from 2002-08 |
+| `bbw_factors_original_2004_2021.csv` | 2004-08 to 2021-12 (209) | the authors' original series, unchanged |
+| `PROVENANCE.json` | | which build the series came from, with hashes |
+| `MANIFEST.json` | | every file with its sha256, checked by `verify_release.py` |
+
+Both of our tables have the same 16 columns: `date` (calendar month-end), then each factor
+for each return definition, named `<factor>_<return definition>`. Values are decimal monthly
+returns, 0.01 = 1%.
+
+| column stem | factor |
+|---|---|
+| `mktb` | The bond market factor. The value-weighted return of every bond in the panel, weights the previous month-end market value, over the benchmark named by the suffix. |
+| `drf` | Downside risk. Bonds are sorted 5 x 5 on credit rating and on 5% value-at-risk measured over the previous 36 months (at least 12). The factor is the high-VaR minus low-VaR return, averaged across the rating quintiles. |
+| `crf` | Credit risk. The same 5 x 5 sorts read the other way, the lowest-rated minus the highest-rated return, averaged across the quintiles of the other sort variable and across the three sorts (value-at-risk, illiquidity and short-term reversal). |
+| `lrf` | Liquidity risk. The 5 x 5 sort on rating and on the Bao, Pan and Wang (2011) illiquidity measure, the negative autocovariance of consecutive daily log price changes. The factor is the illiquid minus liquid return, averaged across the rating quintiles. |
+
+| suffix | the return each leg is measured on |
+|---|---|
+| `_exc` | total return minus the one-month Treasury bill |
+| `_dur` | total return minus a duration-matched Treasury return interpolated across CRSP fixed-term indices (Andreani, Palhares and Richardson, 2024) |
+| `_dbns` | total return minus a synthetic Treasury carrying the bond's own cash flows, discounted at the bond's own yield (van Binsbergen, Nozawa and Schwert, 2025) |
+| `_dcls` | the same synthetic Treasury with cash flows weighted on the Treasury zero curve (Cui, Lu and Song, 2026) |
+
+The duration-adjusted columns are not the excess columns with a benchmark subtracted. Every
+sort is re-run on the duration-adjusted return, so the portfolios themselves differ.
+
+## The two samples
+
+**TRACE** starts 2002-08, the first month-end return in the TRACE data. **Extended** carries
+the same series from 1973-02, spliced from the pre-TRACE extension published on
+openbondassetpricing.com (built from the Lehman Brothers Fixed Income Database and the ICE
+index constituents, licensed data whose finished factor series may be distributed). From
+2002-08 the extended file IS the TRACE file, value for value; this bundle refuses to build
+if that ever stops being true.
+
+**LRF has no history before 2002-08** in either file, because the pre-TRACE extension is the
+three-factor variant: the illiquidity measure needs transaction prices, and there are none
+before TRACE. The extended `lrf_*` columns are empty before 2002-08 and complete from it.
+
+## The original series
+
+`bbw_factors_original_2004_2021.csv` is the factor file Bai, Bali and Wen distributed with
+the 2019 Journal of Financial Economics paper, later retracted, obtained from Turan Bali's
+website, which has since been taken down. It is shipped byte for byte, with the authors' own
+column names (`MKTbond, DRF, CRF, LRF`), on the authors' sample of 2004-08 to 2021-12.
+Dickerson, Mueller and Robotti (2023) document why those series cannot be reproduced from
+the underlying data and what the corrected factors look like; the two tables above are the
+corrected factors. Do not use the original series in new work. It is here so that anyone can
+measure the difference.
+
+## Months with data, by column
+
+{last_months}
+
+## Checking a download
+
+Every file is listed in `MANIFEST.json` with its sha256. `verify_release.py`, published on the
+same release page, re-hashes what is in the zip and compares.
+
+## Citation
+
+Dickerson, A., Mueller, P., & Robotti, C. (2023). Priced risk in corporate bonds. *Journal
+of Financial Economics*, 150(2), 103707.
+
+Bai, J., Bali, T. G., & Wen, Q. (2019). Common risk factors in the cross-section of corporate
+bond returns. *Journal of Financial Economics*, 131(3), 619-642. (Retracted.)
+"""
+
+
+def _last_months_table(trace: pd.DataFrame, ext: pd.DataFrame) -> str:
+    rows = ["| column | TRACE | extended |", "|---|---|---|"]
+    for c in trace.columns:
+        if c == "date":
+            continue
+        t = trace.loc[trace[c].notna(), "date"]
+        e = ext.loc[ext[c].notna(), "date"]
+        rows.append(f"| `{c}` | {str(t.min())[:7]} to {str(t.max())[:7]} | "
+                    f"{str(e.min())[:7]} to {str(e.max())[:7]} |")
+    return "\n".join(rows)
+
+
+def release_bbw(mode: str, out_dir: Path, vintage: str) -> int:
+    blocks = cfg.BLOCKS_DIR / mode
+    trace = _bbw_trace(blocks)
+    ext = _bbw_extended(blocks)
+    _gate_bbw(trace, ext)
+
+    stage = out_dir / f"osbap_bbw_factors_{vintage}"
+    if stage.exists():
+        shutil.rmtree(stage)
+    stage.mkdir(parents=True)
+
+    def span(df: pd.DataFrame) -> str:
+        return f"{str(df['date'].min())[:7]} to {str(df['date'].max())[:7]}"
+
+    written = {}
+    for name, df in (("trace", trace), ("extended", ext)):
+        base = stage / f"bbw_factors_{name}_{vintage}"
+        df.to_parquet(base.with_suffix(".parquet"), index=False)
+        csv = df.copy()
+        csv["date"] = csv["date"].dt.strftime("%Y-%m-%d")
+        csv.to_csv(base.with_suffix(".csv"), index=False, float_format="%.10g")
+        written[name] = {"rows": int(len(df)), "span": [str(df["date"].min())[:10],
+                                                          str(df["date"].max())[:10]]}
+    shutil.copyfile(BBW_ORIGINAL, stage / BBW_ORIGINAL.name)
+
+    def block_info(name: str) -> dict:
+        p = blocks / name
+        b = pd.read_parquet(p)
+        if "date" not in b.columns:
+            b = b.reset_index()
+        return {"sha256": _sha256(p), "rows": int(len(b)),
+                "span": [str(pd.to_datetime(b["date"]).min())[:10],
+                         str(pd.to_datetime(b["date"]).max())[:10]]}
+
+    last = {name: {c: str(df.loc[df[c].notna(), "date"].max())[:7]
+                   for c in df.columns if c != "date"}
+            for name, df in (("trace", trace), ("extended", ext))}
+    prov = {
+        "vintage": vintage,
+        "built_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "mode": mode,
+        "trace_start": str(BBW_TRACE_START)[:10],
+        "blocks": {n: block_info(n) for n in ("bbw_factors.parquet", "bbw_factors_bns.parquet",
+                                               "bbw_factors_cls.parquet",
+                                               "factors_merged.parquet")},
+        "extended_backfill": {"url": cfg.BBW_EXTENDED_URL,
+                              "cache": str(cfg.BBW_EXTENDED_CACHE),
+                              "sha256": _sha256(cfg.BBW_EXTENDED_CACHE)
+                              if cfg.BBW_EXTENDED_CACHE.exists() else None},
+        "original": {"file": BBW_ORIGINAL.name, "sha256": BBW_ORIGINAL_SHA256,
+                     "rows": 209, "span": ["2004-08-31", "2021-12-31"], "source": "see README"},
+        "tables": written,
+        "column_last_month": last,
+    }
+    (stage / "PROVENANCE.json").write_text(json.dumps(prov, indent=1), encoding="utf-8")
+    (stage / "README.md").write_text(
+        BBW_README.format(vintage=vintage, trace_span=span(trace), trace_n=len(trace),
+                          ext_span=span(ext), ext_n=len(ext),
+                          last_months=_last_months_table(trace, ext)),
+        encoding="utf-8", newline="\n")
+
+    members = {f.name: {"bytes": f.stat().st_size, "sha256": _sha256(f)}
+               for f in sorted(stage.iterdir()) if f.name != "MANIFEST.json"}
+    manifest = {"archive": f"osbap_bbw_factors_{vintage}.zip", "vintage": vintage,
+                "built_utc": prov["built_utc"],
+                "data_span": {"trace": written["trace"]["span"],
+                              "extended": written["extended"]["span"]},
+                "members": members}
+    (stage / "MANIFEST.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+
+    zip_path = out_dir / f"osbap_bbw_factors_{vintage}.zip"
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
+        for f in sorted(stage.iterdir()):
+            z.write(f, f.name)
+
+    print(f"vintage        : {vintage}")
+    print(f"trace          : {written['trace']['rows']} months, {span(trace)}")
+    print(f"extended       : {written['extended']['rows']} months, {span(ext)}  "
+          f"(== TRACE from {str(BBW_TRACE_START)[:7]}, max |d| = 0)")
+    print(f"original       : {BBW_ORIGINAL.name}, sha256 {BBW_ORIGINAL_SHA256[:16]} (pinned)")
+    print(f"\nBUNDLE  {zip_path}")
+    print(f"        {zip_path.stat().st_size/1e3:.0f} KB, sha256 {_sha256(zip_path)}")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="package a built Stage 2 vintage for publication")
     ap.add_argument("--mode", default="prod_final",
                     help="the build to publish (its blocks/<mode>/ and panel)")
-    ap.add_argument("--what", choices=("all", "panel", "factors"), default="all",
+    ap.add_argument("--what", choices=("all", "panel", "factors", "bbw"), default="all",
                     help="which bundles to build (default all)")
     ap.add_argument("--out-dir", type=Path, default=None,
                     help="where to write the bundles (default stage2/release/)")
@@ -587,6 +886,9 @@ def main() -> int:
     if args.what in ("all", "factors"):
         print("\n" + "=" * 78 + f"\nFACTOR BUNDLE ({vintage})\n" + "=" * 78)
         rc |= release_factors(args.mode, out_dir, vintage)
+    if args.what in ("all", "bbw"):
+        print("\n" + "=" * 78 + f"\nBBW FOUR-FACTOR BUNDLE ({vintage})\n" + "=" * 78)
+        rc |= release_bbw(args.mode, out_dir, vintage)
     return rc
 
 

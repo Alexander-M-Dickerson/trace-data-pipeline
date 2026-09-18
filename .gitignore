@@ -55,6 +55,8 @@ ipython_config.py
 *.csv
 *.csv.gz
 *.csv.gzip
+# the one CSV that is an INPUT we publish, not an output: the original BBW series
+!stage2/reference/*.csv
 *.h5
 *.hdf5
 *.feather
