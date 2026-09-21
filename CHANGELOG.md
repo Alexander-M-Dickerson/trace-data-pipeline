@@ -122,6 +122,21 @@ wrong, grouped.
   - Two cluster headings in the dictionary now match the paper, "Spreads, Yields, Size" and
     "Market Risk".
 
+- **The Stage 2 data report prints the price a return is computed from.** Table 1 showed fewer
+  prices than returns, which looked like a data error and was a label error.
+  - "Price (VW)" was `100/bbtm`, and the main panel's `bbtm` is the price on the SIGNAL date.
+    67,185 returns have none, because the bond had no earlier trade in the same month within
+    10 sessions of its month-end trade. The price the return uses is the month-end one, and
+    all 1,950,002 rows have it.
+  - "Price (VW)" is now that month-end price, read from the `_mmn` sidecar. The signal-date
+    price has its own row, "Price at Signal Date". A row with a return and no month-end price
+    now stops the report.
+  - The report states the 5-session rule and prints the distribution of return windows, so a
+    holding period above 23 is explained where it is printed.
+  - The numbers in its prose are computed from the panel it describes. The signal gap
+    sentence had "approximately 1.68" typed in. A number the builder is not given is refused,
+    not printed blank. `stage2/tests/test_report_facts.py`, 5 tests.
+
 - **Three settings that nothing read are gone** from `stage2/_stage2_settings.py`, `SIGNAL_LAG`,
   `DEFAULT_METHOD` and `INCLUDE_ICE`. Changing them did nothing, which is worse than their
   absence. The three behaviours are fixed in the code.
