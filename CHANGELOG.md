@@ -137,6 +137,26 @@ wrong, grouped.
     sentence had "approximately 1.68" typed in. A number the builder is not given is refused,
     not printed blank. `stage2/tests/test_report_facts.py`, 5 tests.
 
+- ❗**`make_release.py --what daily` writes the public daily panel, and it is the only way one
+  is made.** The file Stage 1 builds has 44 columns, among them the four agency ratings,
+  `permco` and `gvkey`, which are licensed. The public file has 32.
+  - The layout is a WHITELIST, `DAILY_PUBLIC_COLUMNS`. The 12 other columns are listed in
+    `DAILY_WITHHELD` with the reason for each. A column Stage 1 gains later belongs to neither
+    list, and the release refuses to run until someone has decided which.
+  - `assert_daily_publishable` refuses any file that is not exactly the public layout: a
+    licensed column, a name that looks licensed, an extra column, a missing one, a different
+    order, or a different row count from the source.
+  - The file written is compared with the file read by an order-independent hash over every
+    public column of every row. Measured on the 2026-09-10 run: 31,344,732 bond-days, 70,684
+    bonds, 1.89 GB, 13 seconds.
+  - Every `PROVENANCE.json` now records `source` and `source_sha256`, the build file a bundle
+    was cut from, and the panel zips carry their `PROVENANCE.json`. A bundle can now be
+    asked whether it came from the current build. A bundle cut two days before a rebuild was
+    published in 2026-09 because nothing could ask.
+  - Paths in a published file are relative to the repository. The BBW bundle's
+    `PROVENANCE.json` carried an absolute local path.
+  - 14 new tests in `stage2/tests/test_release_redaction.py`.
+
 - **Three settings that nothing read are gone** from `stage2/_stage2_settings.py`, `SIGNAL_LAG`,
   `DEFAULT_METHOD` and `INCLUDE_ICE`. Changing them did nothing, which is worse than their
   absence. The three behaviours are fixed in the code.

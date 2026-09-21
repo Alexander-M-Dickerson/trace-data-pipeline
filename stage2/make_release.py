@@ -14,6 +14,7 @@ published number checkable.
     python3 make_release.py --what panel        # just the panel
     python3 make_release.py --out-dir dist      # somewhere else
     python3 make_release.py --what bbw          # the BBW four-factor bundle
+    python3 make_release.py --what daily        # the Stage 1 daily panel, public layout
     python3 make_release.py --mode <mode>       # a build other than the default stage1
 
 ❗**This script is for REDISTRIBUTION, and only redistribution.**
@@ -69,6 +70,29 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: fh.read(1 << 20), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+def _public_path(path: Path) -> str:
+    """A path as it may appear in a published file: relative to the repository, never absolute.
+
+    PROVENANCE.json is zipped into public bundles. An absolute path puts the builder's user
+    name and disk layout into a download, and the 2026-09 BBW bundle carried one.
+    """
+    path = Path(path)
+    try:
+        return path.resolve().relative_to(Path(cfg.ROOT_PATH).resolve()).as_posix()
+    except ValueError:
+        return path.name
+
+
+def _source(path: Path) -> dict:
+    """What a released file was cut from, so a stale bundle can be told from a fresh one.
+
+    Every gate downstream compared the served bytes with the staged bytes. None asked whether
+    the staged file came from the CURRENT build, and a bundle cut two days before a rebuild was
+    published. `source_sha256` is what that question is asked of.
+    """
+    return {"source": _public_path(path), "source_sha256": _sha256(path)}
 
 
 def collect_provenance(factors: pd.DataFrame) -> dict:
@@ -453,6 +477,7 @@ def release_panel(mode: str, out_dir: Path, vintage: str,
           f"{', '.join(REDACT_RATINGS)} -> 1 (IG) / 11 (NIG)")
 
     written: list[tuple[str, Path]] = []
+    sources: dict[str, dict] = {"main_panel": _source(panel_src)}
     target = stage / f"main_panel_{vintage}.parquet"
     panel.to_parquet(target, index=False, compression="zstd")
     written.append(("main_panel", target))
@@ -469,6 +494,7 @@ def release_panel(mode: str, out_dir: Path, vintage: str,
             print(f"  WARNING: {name} not found under {blocks} -- omitted from the bundle")
             continue
         dst = stage / f"{name}_{vintage}.parquet"
+        sources[name] = _source(src)
         if frontier_cut is None:
             shutil.copy2(src, dst)
         else:
@@ -504,7 +530,8 @@ def release_panel(mode: str, out_dir: Path, vintage: str,
         md = pq.ParquetFile(path).metadata
         prov["files"][path.name] = {
             "artifact": name, "bytes": path.stat().st_size,
-            "rows": md.num_rows, "cols": md.num_columns, "sha256": _sha256(path)}
+            "rows": md.num_rows, "cols": md.num_columns, "sha256": _sha256(path),
+            **sources[name]}
     (stage / "PROVENANCE.json").write_text(json.dumps(prov, indent=1), encoding="utf-8")
 
     bundles = {
@@ -518,6 +545,9 @@ def release_panel(mode: str, out_dir: Path, vintage: str,
         zp = out_dir / zip_name
         with zipfile.ZipFile(zp, "w", zipfile.ZIP_DEFLATED) as z:
             z.write(stage / "README.txt", "README.txt")
+            # The provenance travels WITH the download, so the served bytes can be asked
+            # which build they were cut from.
+            z.write(stage / "PROVENANCE.json", "PROVENANCE.json")
             for m in members:
                 print(f"  packing {m.name} ({m.stat().st_size/1e6:,.0f} MB) ...")
                 z.write(m, m.name)
@@ -549,6 +579,7 @@ def release_factors(mode: str, out_dir: Path, vintage: str) -> int:
     prov = collect_provenance(factors)
     prov["file"] = target.name
     prov["sha256"] = sha
+    prov.update(_source(src))
     (stage / "PROVENANCE.json").write_text(json.dumps(prov, indent=1), encoding="utf-8")
     (stage / "README.md").write_text(build_readme(factors, prov, sha), encoding="utf-8")
 
@@ -810,7 +841,8 @@ def release_bbw(mode: str, out_dir: Path, vintage: str) -> int:
         b = pd.read_parquet(p)
         if "date" not in b.columns:
             b = b.reset_index()
-        return {"sha256": _sha256(p), "rows": int(len(b)),
+        return {"source": _public_path(p), "source_sha256": _sha256(p),
+                "sha256": _sha256(p), "rows": int(len(b)),
                 "span": [str(pd.to_datetime(b["date"]).min())[:10],
                          str(pd.to_datetime(b["date"]).max())[:10]]}
 
@@ -826,7 +858,7 @@ def release_bbw(mode: str, out_dir: Path, vintage: str) -> int:
                                                "bbw_factors_cls.parquet",
                                                "factors_merged.parquet")},
         "extended_backfill": {"url": cfg.BBW_EXTENDED_URL,
-                              "cache": str(cfg.BBW_EXTENDED_CACHE),
+                              "cache": _public_path(cfg.BBW_EXTENDED_CACHE),
                               "sha256": _sha256(cfg.BBW_EXTENDED_CACHE)
                               if cfg.BBW_EXTENDED_CACHE.exists() else None},
         "original": {"file": BBW_ORIGINAL.name, "sha256": BBW_ORIGINAL_SHA256,
@@ -865,13 +897,187 @@ def release_bbw(mode: str, out_dir: Path, vintage: str) -> int:
     return 0
 
 
+# =============================================================================================
+# THE DAILY PANEL
+#
+# Stage 1's bond-day panel, in the layout we publish. The file Stage 1 BUILDS carries the
+# agency ratings and two proprietary identifiers, and is not ours to redistribute. On
+# 2026-09-18 it was uploaded as it stood, because the website copied it with SELECT * and no
+# release step existed for it. This is that step.
+#
+# The public layout is a WHITELIST. A column Stage 1 gains later is withheld until someone
+# decides it is public, and the release refuses to run until they have decided.
+# =============================================================================================
+
+DAILY_PUBLIC_COLUMNS = (
+    "cusip_id", "permno", "trd_exctn_dt",
+    "pr", "prfull", "acclast", "accpmt", "accall",
+    "ytm", "mod_dur", "mac_dur", "convexity", "bond_maturity", "credit_spread",
+    "prc_ew", "prc_vw_par", "prc_first", "prc_last", "prc_hi", "prc_lo",
+    "trade_count", "qvolume", "dvolume",
+    "prc_bid", "bid_last", "prc_ask",
+    "db_type", "ff12num", "ff17num", "ff30num",
+    "bond_age", "bond_amt_outstanding",
+)
+
+# Every other column Stage 1 writes, and why it stays behind.
+DAILY_WITHHELD = {
+    "permco": "proprietary identifier (CRSP)",
+    "gvkey": "proprietary identifier (Compustat)",
+    "sp_rating": "licensed agency rating",
+    "mdy_rating": "licensed agency rating",
+    "spc_rating": "licensed agency rating (composite)",
+    "mdc_rating": "licensed agency rating (composite)",
+    "time_ew": "not in the public layout",
+    "time_last": "not in the public layout",
+    "bid_time_ew": "not in the public layout",
+    "bid_time_last": "not in the public layout",
+    "bid_count": "not in the public layout",
+    "ask_count": "not in the public layout",
+}
+DAILY_LICENSED = tuple(c for c, why in DAILY_WITHHELD.items() if "not in the public" not in why)
+_LICENSED_NAME = ("rating", "permco", "gvkey", "_rat")
+
+
+def assert_daily_publishable(path: Path, source_rows: int | None = None) -> None:
+    """Refuse a daily file that is not exactly the public layout."""
+    pf = pq.ParquetFile(path)
+    names = list(pf.schema.names)
+    problems = []
+    licensed = [c for c in names
+                if c in DAILY_LICENSED or any(k in c.lower() for k in _LICENSED_NAME)]
+    if licensed:
+        problems.append(f"  carries licensed column(s): {licensed}")
+    extra = [c for c in names if c not in DAILY_PUBLIC_COLUMNS and c not in licensed]
+    if extra:
+        problems.append(f"  carries column(s) outside the public layout: {extra}")
+    missing = [c for c in DAILY_PUBLIC_COLUMNS if c not in names]
+    if missing:
+        problems.append(f"  lacks public column(s): {missing}")
+    if not problems and tuple(names) != DAILY_PUBLIC_COLUMNS:
+        problems.append("  has the public columns in a different order")
+    if source_rows is not None and pf.metadata.num_rows != source_rows:
+        problems.append(f"  has {pf.metadata.num_rows:,} rows, the source has {source_rows:,}")
+    if problems:
+        raise AssertionError(
+            f"{Path(path).name} is NOT publishable:\n" + "\n".join(problems)
+            + "\n\n  The public daily layout is make_release.DAILY_PUBLIC_COLUMNS, "
+              f"{len(DAILY_PUBLIC_COLUMNS)} columns, and nothing else.")
+
+
+DAILY_README = """# OSBAP daily bond panel -- {vintage} vintage
+
+`{name}` -- one row per bond per trading day, {rows} bond-days, {span_start} to {span_end}.
+Enhanced TRACE and Rule 144A TRACE combined (`db_type` 1 and 3), with no filter on par or
+dollar volume. Built by Stage 1 of https://github.com/Alexander-M-Dickerson/trace-data-pipeline
+
+{ncols} columns. Definitions are in `stage1/DATA_DICTIONARY.md` in that repository.
+
+## What is not in this file
+
+The panel the pipeline builds has {nsrc} columns. {nheld} are withheld from the download.
+
+| column | why |
+|---|---|
+{withheld}
+
+`permno` is published. Agency ratings, `permco` and `gvkey` are licensed data. Run the
+pipeline with your own WRDS account and you get all {nsrc} columns.
+
+`PROVENANCE.json` records the Stage 1 file this was cut from, with hashes.
+"""
+
+
+def release_daily(out_dir: Path, vintage: str) -> int:
+    """Write Stage 1's daily panel in the public layout. Nothing else may be uploaded."""
+    import duckdb
+
+    src = cfg.daily_input()
+    if not src.exists():
+        print(f"ERROR: no Stage 1 daily panel at {src}.")
+        return 1
+    src_meta = pq.ParquetFile(src)
+    src_cols = list(src_meta.schema.names)
+    src_rows = src_meta.metadata.num_rows
+
+    missing = [c for c in DAILY_PUBLIC_COLUMNS if c not in src_cols]
+    undecided = [c for c in src_cols if c not in DAILY_PUBLIC_COLUMNS and c not in DAILY_WITHHELD]
+    if missing or undecided:
+        print(f"ERROR: {src.name} does not match the layout this release knows.")
+        if missing:
+            print(f"  public columns it lacks      : {missing}")
+        if undecided:
+            print(f"  columns nobody has classified: {undecided}")
+            print("  Add each to DAILY_PUBLIC_COLUMNS or to DAILY_WITHHELD, with the reason.")
+            print("  A column is withheld until someone decides it is public.")
+        return 1
+
+    stage = out_dir / f"osbap_daily_data_{vintage}"
+    if stage.exists():
+        shutil.rmtree(stage)
+    stage.mkdir(parents=True)
+    target = stage / f"stage1_daily_panel_{vintage}.parquet"
+
+    print(f"reading  {src.name}  ({src_rows:,} bond-days, {len(src_cols)} columns)")
+    select = ", ".join(f'"{c}"' for c in DAILY_PUBLIC_COLUMNS)
+    con = duckdb.connect()
+    try:
+        con.execute("SET preserve_insertion_order = true")
+        con.execute(
+            f"COPY (SELECT {select} FROM read_parquet('{src.as_posix()}')) "
+            f"TO '{target.as_posix()}' (FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE 1000000)")
+        assert_daily_publishable(target, source_rows=src_rows)
+
+        # Same rows, same values. An order-independent hash over EVERY public column of every
+        # row, taken on the file read and on the file written. A float sum would not do: a
+        # parallel sum is not the same to the last bit on two files laid out differently.
+        probe = ("count(*), count(permno), count(DISTINCT cusip_id), min(trd_exctn_dt), "
+                 f"max(trd_exctn_dt), bit_xor(hash({select}))")
+        a = con.execute(f"SELECT {probe} FROM read_parquet('{src.as_posix()}')").fetchone()
+        b = con.execute(f"SELECT {probe} FROM read_parquet('{target.as_posix()}')").fetchone()
+    finally:
+        con.close()
+    if a != b:
+        target.unlink()
+        raise AssertionError(f"the public daily file does not reproduce its source:\n  {a}\n  {b}")
+
+    span = (str(b[3])[:10], str(b[4])[:10])
+    withheld = [c for c in src_cols if c in DAILY_WITHHELD]
+    prov = {"vintage": vintage,
+            "built_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "file": target.name, "sha256": _sha256(target),
+            "bytes": target.stat().st_size,
+            "rows": int(b[0]), "bonds": int(b[2]), "span": list(span),
+            "rows_with_permno": int(b[1]),
+            "columns": list(DAILY_PUBLIC_COLUMNS),
+            "withheld": {c: DAILY_WITHHELD[c] for c in withheld},
+            "row_hash": str(b[5]),
+            **_source(src), "source_columns": len(src_cols)}
+    (stage / "PROVENANCE.json").write_text(json.dumps(prov, indent=1), encoding="utf-8")
+    (stage / "README.md").write_text(
+        DAILY_README.format(
+            vintage=vintage, name=target.name, rows=f"{b[0]:,}", span_start=span[0],
+            span_end=span[1], ncols=len(DAILY_PUBLIC_COLUMNS), nsrc=len(src_cols),
+            nheld=len(withheld),
+            withheld="\n".join(f"| `{c}` | {DAILY_WITHHELD[c]} |" for c in withheld)),
+        encoding="utf-8", newline="\n")
+
+    print(f"withheld : {', '.join(withheld)}")
+    print(f"written  : {target.name}  ({len(DAILY_PUBLIC_COLUMNS)} columns, {b[0]:,} bond-days, "
+          f"{b[2]:,} bonds, {span[0]} -> {span[1]}, {target.stat().st_size/1e9:.2f} GB)")
+    print(f"permno   : {b[1]:,} of {b[0]:,} bond-days ({100*b[1]/b[0]:.2f}%)")
+    print(f"sha256   : {prov['sha256']}")
+    print(f"staged in: {stage}")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="package a built Stage 2 vintage for publication")
     ap.add_argument("--mode", default=cfg.INPUT_MODE,
                     help="the build to publish (its blocks/<mode>/ and panel); default "
                          f"{cfg.INPUT_MODE!r}, the mode _run_stage2.py builds")
-    ap.add_argument("--what", choices=("all", "panel", "factors", "bbw"), default="all",
-                    help="which bundles to build (default all)")
+    ap.add_argument("--what", choices=("all", "panel", "factors", "bbw", "daily"), default="all",
+                    help="which bundles to build (default all, which includes daily)")
     ap.add_argument("--out-dir", type=Path, default=None,
                     help="where to write the bundles (default stage2/release/)")
     ap.add_argument("--truncate-frontier", action="store_true",
@@ -893,6 +1099,9 @@ def main() -> int:
     if args.what in ("all", "bbw"):
         print("\n" + "=" * 78 + f"\nBBW FOUR-FACTOR BUNDLE ({vintage})\n" + "=" * 78)
         rc |= release_bbw(args.mode, out_dir, vintage)
+    if args.what in ("all", "daily"):
+        print("\n" + "=" * 78 + f"\nDAILY PANEL, PUBLIC LAYOUT ({vintage})\n" + "=" * 78)
+        rc |= release_daily(out_dir, vintage)
     return rc
 
 

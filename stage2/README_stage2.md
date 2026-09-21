@@ -125,7 +125,7 @@ testing without editing the file.
 | `output/blocks/<mode>/betas_<bm>`, `mom_retx_<bm>` | **Optional.** The 68 beta/momentum columns re-estimated on an alternative Treasury benchmark — only if you run `make_excess_blocks.py`. See below |
 | `data_reports/` | The LaTeX data report, its figures and the PDF |
 | `manifests/` | A JSON run manifest per build: inputs, hashes, config, timings |
-| `release/` | What `make_release.py` packages for publication: the redacted panel, the factor panel, and `osbap_bbw_factors_<vintage>.zip`, the corrected Bai-Bali-Wen four factors for every return definition on the TRACE and extended samples with the authors' original series beside them (`--what bbw`, built from `blocks/<mode>/bbw_factors*.parquet` and `factors_merged.parquet`; the original lives in `reference/`) |
+| `release/` | What `make_release.py` packages for publication: the redacted panel, the factor panel, the Stage 1 daily panel in its 32-column public layout (`--what daily`, which withholds the agency ratings, `permco` and `gvkey` and refuses any column nobody has classified), and `osbap_bbw_factors_<vintage>.zip`, the corrected Bai-Bali-Wen four factors for every return definition on the TRACE and extended samples with the authors' original series beside them (`--what bbw`, built from `blocks/<mode>/bbw_factors*.parquet` and `factors_merged.parquet`; the original lives in `reference/`) |
 
 `<mode>` is the build label (`stage1` by default); released files are renamed to the
 vintage year, e.g. `main_panel_2026.parquet`. `<stamp>` is Stage 1's date stamp.
