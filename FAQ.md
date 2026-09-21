@@ -535,50 +535,48 @@ qstat  # Look for 'hqw' status - this means it's waiting for dependencies
 **Solution**: Ensure all figure files generated before compiling, or set `STAGE0_OUTPUT_FIGURES = False` in `config.py`.
 
 ### The pipeline shows a disk space warning - what should I do?
-Before running the pipeline, it checks your WRDS quota. You'll see one of these:
+Before it starts, `run_pipeline.sh` runs `check_disk_space.sh`. On WRDS the limit that matters is
+your HOME QUOTA, 10 GB on most accounts. The check takes that limit from `quota` and then
+MEASURES what your home directory holds, with `du`, at that moment.
 
-**Sufficient space (>= 4 GB):**
-```bash
+**Enough room (4 GB or more):**
+```
 === DISK SPACE CHECK ===
-[info] WRDS Quota - Home directory: 3.2 GB used / 10 GB limit
-[info] Available space: 6.8 GB
-[ok] Sufficient disk space available (6.8 GB >= 4.0 GB)
+[info] Home quota limit: 10 GB
+[info] Measuring what your home directory holds right now ...
+[info] In use: 2.30 GB, measured now with du
+[info] Available: 7.70 GB (measured now with du)
+[ok] Enough room for a run (7.70 GB available, 4.0 GB needed)
 ```
-✅ **Proceed normally** - you have enough space.
 
-**Insufficient space (< 4 GB):**
+**Not enough:** the check stops, shows the available space, and lists the largest things in
+your home directory so you can see what to delete.
+```
+║  NOT ENOUGH DISK SPACE FOR A RUN                               ║
+║  Available: 1.50 GB                                            ║
+║  Needed:    4.0 GB                                             ║
+
+The largest things in your home directory:
+      1.43 GB  ~/old_run
+      2.86 GB  ~/trace-data-pipeline
+```
+The usual causes are an earlier run's folder and a `trace-data-pipeline.zip` left in `~`. Zip to
+`/scratch` instead, as the download steps in `QUICKSTART.md` show. Delete what you do not need
+and run `./run_pipeline.sh` again. There is nothing to wait for, because the check measures the
+disk each time.
+
+To start anyway: `FORCE_RUN=1 ./run_pipeline.sh`. It reports the same numbers and does not stop.
+A run that fills the disk part-way fails or writes a truncated file, so use this only when you
+know the space is there.
+
+### `quota` says my home directory is nearly full, and I just deleted the old run
+`quota` is not live. WRDS refreshes the USED figure every 30 minutes, and its output says when it
+last did ("Last updated: ..."). For up to half an hour after you delete a folder, `quota` still
+counts it. The pipeline's own check does not read that figure. It measures with `du`, and when
+the two disagree it prints both and says which it used. To see the real number yourself:
 ```bash
-=== DISK SPACE CHECK ===
-[info] WRDS Quota - Home directory: 7.88 GB used / 10 GB limit
-[info] Available space: 2.12 GB
-╔════════════════════════════════════════════════════════════════╗
-║                         ⚠️  WARNING  ⚠️                       ║
-║  INSUFFICIENT DISK SPACE DETECTED                              ║
-║  Available: 2.12 GB                                            ║
-║  Required:  At least 4.0 GB recommended                        ║
-╚════════════════════════════════════════════════════════════════╝
-[error] Exiting due to insufficient disk space.
+du -sh ~
 ```
-⚠️ **Action required:**
-
-**Option 1: Free up space (recommended)**
-```bash
-# Check what's using space
-du -h ~/ | sort -h | tail -20
-
-# Remove old files/logs
-rm -rf ~/old_data/
-rm -f ~/trace-data-pipeline/stage0/logs/*.log  # Old log files
-rm -f ~/trace-data-pipeline/stage1/logs/*.log
-```
-
-**Option 2: Override warning (advanced users only)**
-```bash
-# Only if you're confident the pipeline won't exceed available space
-FORCE_RUN=1 ./run_pipeline.sh
-```
-
-**Why this matters:** The pipeline generates large intermediate files. Running out of disk space mid-processing can corrupt output files or cause job failures.
 
 ### How do I check my WRDS disk quota?
 ```bash

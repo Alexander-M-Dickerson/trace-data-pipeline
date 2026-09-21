@@ -24,82 +24,11 @@ if [[ ! -d "stage0" ]] || [[ ! -d "stage1" ]]; then
     exit 1
 fi
 
-# Check available disk space (use quota on WRDS, fallback to df elsewhere)
-echo ""
-echo "=== DISK SPACE CHECK ==="
-
-# Try WRDS quota command first (more accurate for WRDS users)
-if command -v quota &> /dev/null; then
-    # Parse quota output for Home directory
-    # Expected format: "Home:  7.88GB / 10GB"
-    QUOTA_LINE=$(quota 2>/dev/null | grep -i "Home:" | head -1)
-
-    if [[ -n "$QUOTA_LINE" ]]; then
-        # Extract used and limit from "Home:  7.88GB / 10GB"
-        USED=$(echo "$QUOTA_LINE" | awk '{print $2}' | sed 's/GB//g')
-        LIMIT=$(echo "$QUOTA_LINE" | awk '{print $4}' | sed 's/GB//g')
-
-        if [[ -n "$USED" ]] && [[ -n "$LIMIT" ]]; then
-            # Calculate available space
-            AVAIL_GB=$(awk "BEGIN {printf \"%.2f\", $LIMIT - $USED}")
-            echo "[info] WRDS Quota - Home directory: ${USED} GB used / ${LIMIT} GB limit"
-            echo "[info] Available space: ${AVAIL_GB} GB"
-        else
-            # Quota parsing failed, fall back to df
-            echo "[warn] Could not parse quota output, using df instead"
-            AVAIL_KB=$(df -k . | awk 'NR==2 {print $4}')
-            AVAIL_GB=$(awk "BEGIN {printf \"%.2f\", $AVAIL_KB/1024/1024}")
-            echo "[info] Available disk space (filesystem): ${AVAIL_GB} GB"
-        fi
-    else
-        # quota command exists but no Home line found, fall back to df
-        echo "[info] No quota detected, checking filesystem space"
-        AVAIL_KB=$(df -k . | awk 'NR==2 {print $4}')
-        AVAIL_GB=$(awk "BEGIN {printf \"%.2f\", $AVAIL_KB/1024/1024}")
-        echo "[info] Available disk space: ${AVAIL_GB} GB"
-    fi
-else
-    # quota command not available (non-WRDS system), use df
-    echo "[info] Checking filesystem space (quota not available)"
-    AVAIL_KB=$(df -k . | awk 'NR==2 {print $4}')
-    AVAIL_GB=$(awk "BEGIN {printf \"%.2f\", $AVAIL_KB/1024/1024}")
-    echo "[info] Available disk space: ${AVAIL_GB} GB"
-fi
-
-# Check if less than 4 GB available
-if (( $(awk "BEGIN {print ($AVAIL_GB < 4.0)}") )); then
-    echo ""
-    echo "╔════════════════════════════════════════════════════════════════╗"
-    echo "║                         !   WARNING  !                         ║"
-    echo "╠════════════════════════════════════════════════════════════════╣"
-    echo "║  INSUFFICIENT DISK SPACE DETECTED                              ║"
-    echo "║                                                                ║"
-    echo "║  Available: ${AVAIL_GB} GB                                     ║"
-    echo "║  Required:  At least 4.0 GB recommended                        ║"
-    echo "║                                                                ║"
-    echo "║  The pipeline generates large intermediate files and may fail  ║"
-    echo "║  or corrupt data if disk space runs out during processing.     ║"
-    echo "║                                                                ║"
-    echo "║  RECOMMENDATION: Stop execution and free up disk space         ║"
-    echo "║                                                                ║"
-    echo "║  To continue anyway: Re-run with FORCE_RUN=1                   ║"
-    echo "║  Example: FORCE_RUN=1 ./run_pipeline.sh                        ║"
-    echo "╚════════════════════════════════════════════════════════════════╝"
-    echo ""
-
-    # Allow override with FORCE_RUN environment variable
-    if [[ "${FORCE_RUN:-0}" != "1" ]]; then
-        echo "[error] Exiting due to insufficient disk space."
-        echo "[info] Free up space or set FORCE_RUN=1 to override this check."
-        exit 1
-    else
-        echo "[warn] FORCE_RUN=1 detected - continuing despite low disk space"
-        echo "[warn] Proceed at your own risk!"
-    fi
-else
-    echo "[ok] Sufficient disk space available (${AVAIL_GB} GB >= 4.0 GB)"
-fi
-echo ""
+# Is there room for a run? On WRDS this measures your home directory NOW and compares it with
+# your quota limit. It does not trust the USED figure `quota` prints, which WRDS refreshes only
+# every 30 minutes and which still counts a run folder you have just deleted.
+# FORCE_RUN=1 reports and never refuses.
+bash check_disk_space.sh || exit 1
 
 # Create log directories for all stages
 echo "[setup] Creating log directories..."

@@ -487,6 +487,7 @@ After the pipeline completes:
 trace-data-pipeline/
 ├── config.py                        # Shared configuration (WRDS_USERNAME, TRACE_MEMBERS)
 ├── run_pipeline.sh                  # Main pipeline orchestrator
+├── check_disk_space.sh              # Is there room for a run? Called by run_pipeline.sh
 ├── download_inputs.sh               # Stage 1's external inputs (LOGIN NODE)
 ├── run_smoke_test.sh                # Whole-chain check in minutes
 ├── README.md                        # Detailed documentation

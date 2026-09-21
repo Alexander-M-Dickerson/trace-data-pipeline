@@ -56,6 +56,21 @@ wrong, grouped.
   `GENERATE_REPORTS`, which does not exist. Stage 0's quickstart installed
   `../requirements.txt` from the repo root.
 
+### Fixed -- the disk space check refused a run that had room (2026-09-21)
+
+- **`run_pipeline.sh` measured nothing. It read the USED figure from `quota`, which WRDS refreshes
+  only every 30 minutes.** The usual way to start a run is to delete the last one first, and for
+  the next half hour `quota` still counts the deleted folder. A run with 7.7 GB free was refused
+  with "Available: 2.64 GB".
+  - The check is now `check_disk_space.sh`. It takes the quota LIMIT from `quota` and MEASURES the
+    use with `du` at that moment. When the two disagree it prints both and says which it used.
+  - A refusal now lists the largest things in the home directory and names the two usual causes.
+  - If `du` cannot finish in 120 seconds it falls back to the `quota` figure and says that figure
+    can be 30 minutes old.
+  - A run kept outside the home directory is checked against the filesystem, not the home quota.
+  - `FORCE_RUN=1` is unchanged. `tests/test_disk_check.py`, 7 tests, runs the real script under
+    bash with a fake `quota` and `du`, including the case that happened.
+
 ### Changed
 
 - ❗**Stage 1 now joins the linker's IDENTITY window (`i0`/`i1`), the same one Stage 2 joins.**

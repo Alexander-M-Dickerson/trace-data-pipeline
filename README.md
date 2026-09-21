@@ -351,6 +351,7 @@ trace-data-pipeline/
 ├── requirements.txt                  # Python dependencies (all stages)
 ├── config.py                         # Shared settings (TRACE_MEMBERS, username, ...)
 ├── run_pipeline.sh                   # ✨ One-push button orchestrator (ROOT)
+├── check_disk_space.sh               # Is there room for a run? Measures the disk, called by run_pipeline.sh
 ├── download_inputs.sh                # Fetches stage 1's external inputs (LOGIN NODE)
 ├── run_smoke_test.sh                 # Whole-chain validation in minutes
 ├── .gitignore
