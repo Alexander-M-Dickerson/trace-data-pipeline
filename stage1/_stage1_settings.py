@@ -179,6 +179,15 @@ LIU_WU_URL = "https://docs.google.com/spreadsheets/d/11HsxLl_u2tBNt3FyN5iXGsIKLw
 LINKER_URL = "https://openbondassetpricing.com/wp-content/uploads/2026/09/bond_firm_linker_2026.zip"
 LINKER_ZIPKEY = "bond_firm_linker_2026/fl_linker.parquet"
 
+# Which of the linker's two dated windows this stage joins.
+#   ("i0", "i1")  IDENTITY -- whose bond is this. The default, and what Stage 2 joins too, so the
+#                 daily and monthly panels carry the same firm for the same bond.
+#   ("w0", "w1")  EVIDENCE -- when the mapping is provable (the firm's CRSP listing). Use this
+#                 only if you want ids exactly where equity data exists.
+# The identity window contains the evidence window on every row of the linker, so the
+# identity join never changes an id the evidence join gives. It adds labels outside it.
+LINKER_WINDOW = ("i0", "i1")
+
 # ============================================================================
 # PRE-DOWNLOADED EXTERNAL FILES (DO NOT EDIT)
 # ============================================================================
@@ -503,6 +512,7 @@ def get_config() -> dict:
         # External data
         "linker_url": LINKER_URL,
         "linker_zipkey": LINKER_ZIPKEY,
+        "linker_window": LINKER_WINDOW,
         "external_files": EXTERNAL_FILES,
 
         # Output settings

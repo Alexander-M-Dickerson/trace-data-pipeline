@@ -4,10 +4,12 @@ Comprehensive documentation for the Stage 1 output dataset. Available in zipped 
 [Open Bond Asset Pricing](https://openbondassetpricing.com/data).
 
 **The file you build is not the file you download.** A panel you build yourself carries all 44
-columns with every value populated. The published download has **34 columns**: the four agency
-ratings (†) are removed because they are licensed, six trade-timing and count columns (‡) are
-removed to keep the file small, and `gvkey` is present but **set to NaN** throughout. The
-restriction is on redistribution, not on the pipeline.
+columns with every value populated. The published download has **32 columns**: the four agency
+ratings and the `permco` and `gvkey` identifiers (†) are removed because they are licensed, and
+six trade-timing and count columns (‡) are removed to keep the file small. `permno` stays. The
+restriction is on redistribution, not on the pipeline. The public file is written by
+`stage2/make_release.py --what daily`, which refuses to write a file that still carries any of
+those columns.
 
 ---
 
@@ -35,9 +37,9 @@ in the schema, and the largest drops ~9% of bond-days.
 | **Location** | `stage1/data/stage1_YYYYMMDD.parquet` |
 | **Format** | Apache Parquet (columnar, compressed) |
 | **Structure** | Panel data: one row per (cusip_id, trd_exctn_dt) |
-| **Size** | ~500MB - 2GB (depending on time period) |
+| **Size** | about 2.7 GB for the full sample as built (2026-09-10 run) |
 | **Rows** | ~31 million (full sample 2002-present; 31,344,732 in the 2026 vintage) |
-| **Columns** | 44 as built; **34 in the public download** (see the note above) |
+| **Columns** | 44 as built; **32 in the public download** (see the note above) |
 | **Download** | Available in zipped parquet format on [Open Bond Asset Pricing](https://openbondassetpricing.com/data) |
 
 ---
@@ -74,8 +76,8 @@ Two groups of columns are dropped from the public download:
 |--------|------|-------------|
 | `cusip_id` | category | 9-character CUSIP identifier (unique bond ID) |
 | `permno` | Int32 | CRSP PERMNO equity identifier (links to stock data) |
-| `permco` | Int32 | CRSP PERMCO company identifier |
-| `gvkey` | Int32 | Compustat GVKEY identifier (links to accounting data). **NaN throughout the public download**; populated in a panel you build. |
+| `permco`† | Int32 | CRSP PERMCO company identifier. **Not in the public download**; populated in a panel you build. |
+| `gvkey`† | Int32 | Compustat GVKEY identifier (links to accounting data). **Not in the public download**; populated in a panel you build. |
 | `trd_exctn_dt` | datetime | Trade execution date |
 
 #### How bonds are linked to firms
@@ -83,33 +85,39 @@ Two groups of columns are dropped from the public download:
 The equity identifiers come from the **bond-firm linker** published at
 [openbondassetpricing.com](https://openbondassetpricing.com/), downloaded by
 `run_pipeline.sh`. The mapping is **bond-level and dated**: one row per
-(9-character CUSIP, ownership window `[w0, w1]`), so a bond that changes hands --
+(9-character CUSIP, ownership window), so a bond that changes hands --
 through an acquisition, a spin-off or a rename -- points at the right firm in each
 period rather than at whichever firm owned it last.
 
-❗**The linker ships TWO dated windows, and this panel joins one of them.** `w0`/`w1` is the
-**evidence** window -- *when is this mapping provable* -- the bond's life intersected with the
-firm's CRSP listing. `i0`/`i1` is the **identity** window -- *whose bond is this* -- which stays
-open where no successor or acquisition contradicts it. Use evidence when you are joining
-**equity-side data** (CRSP returns, market cap), because outside it there is no listed firm to
-join to; use identity when the firm id is a **label** you group by.
-`bond_firm_linker_2026/SCHEMA.md`, shipped inside the bundle, is the authority.
+❗**The linker ships TWO dated windows.** `w0`/`w1` is the **evidence** window -- *when is this
+mapping provable* -- the bond's life intersected with the firm's CRSP listing. `i0`/`i1` is the
+**identity** window -- *whose bond is this* -- which stays open where no successor or acquisition
+contradicts it. Use evidence when you are joining **equity-side data** (CRSP returns, market
+cap), because outside it there is no listed firm to join to. Use identity when the firm id is a
+**label** you group by. `bond_firm_linker_2026/SCHEMA.md`, shipped inside the bundle, is the
+authority.
 
-**This daily panel joins the EVIDENCE window**, which is right for an evidence-side artifact.
+**This daily panel joins the IDENTITY window, and so does the Stage 2 monthly panel**
+(`_stage1_settings.LINKER_WINDOW`, `stage2/_stage2_settings.LINKER_WINDOW`, and a test that
+fails if the two ever differ). A bond does not stop being a firm's bond because the firm's
+CRSP listing ended. On every row of the linker the evidence window lies inside the identity
+window with the same firm, so the identity join never changes an id the evidence join would
+give. It adds labels outside it.
 
-❗**KNOWN, DATED GAP (2026-09-16).** The Stage 2 monthly panel joins the **identity** window,
-because a bond-month panel labels issuers. Until Stage 1 is next rebuilt from WRDS, **the daily
-and monthly panels carry different `permno` on roughly 2% of bond-months** -- the monthly panel
-covers 88.8% of bond-months, against 86.6% had it joined the evidence window, and this daily
-panel covers 87.8% of bond-days (2026 vintage). If you join the two, reconcile on `cusip_id` and
-date, not on `permno`. This
-is deliberate and written down: the two windows drifted apart in the first place precisely
-because nobody had written down which one anything used.
+> Before 2026-09-21 this stage joined the evidence window while Stage 2 joined identity, and
+> the two panels named a different firm on about 2% of bond-months. Measured on the 2026-09-10
+> run when the join moved: 644,754 bond-days gained an id, none lost one and none changed, and
+> `permno` coverage went from 87.8% to 89.8% of bond-days. If you need ids only where equity
+> data exists, set `LINKER_WINDOW = ("w0", "w1")`, or re-join the linker yourself.
 
-A consequence worth stating plainly: **`permno` is NULL for about 12% of bond-days**,
-and that is deliberate. It is NULL when the bond is outside every window we can
-support -- most often when the bond still trades after the firm's equity stopped
-being listed. A missing identifier is an answer; a stale one is a silent error. If
+The daily and monthly ids can still differ on a handful of bond-months (about 140 of 1.95
+million), because the monthly panel takes the id at the calendar month-end and a window can
+start or end between a bond's last trade and that date.
+
+A consequence worth stating plainly: **`permno` is NULL for about 10% of bond-days**,
+and that is deliberate. About three quarters of those are bonds the linker does not carry at all,
+because no listed firm can be evidenced behind them. The rest are dates outside every window
+of a bond the linker does carry. A missing identifier is an answer; a stale one is a silent error. If
 you need to know *why* a particular bond has no link, the published release ships
 `fl_verdicts.parquet`, which records every refusal and its reason, and
 `firm_names.parquet`, which maps `permno` to a dated firm name.

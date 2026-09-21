@@ -51,7 +51,7 @@ tqdm.pandas()
 # - STAGE0_DATE_STAMP, TRACE_MEMBERS
 # - N_CORES, N_CHUNKS, DATE_CUT_OFF
 # - ULTRA_DISTRESSED_CONFIG, FINAL_FILTER_CONFIG
-# - yld_type, liu_wu_url, LINKER_URL, LINKER_ZIPKEY
+# - yld_type, liu_wu_url, LINKER_URL, LINKER_ZIPKEY, LINKER_WINDOW
 # ============================================================================
 
 # ============================================================================
@@ -1208,112 +1208,32 @@ def step7_merge_linker():
         dfl = pd.read_parquet(local_path).copy()
         logger.info(f"Successfully loaded the bond-firm linker from {local_file}")
 
-    dfl.columns = dfl.columns.str.lower()
+    # window-choice: IDENTITY (i0/i1) -- "whose bond is this". The linker also ships an EVIDENCE
+    # window (w0/w1, "when is this mapping provable"), which is the one to use when joining
+    # equity-side data. A bond panel LABELS the issuer, so this stage and Stage 2
+    # (stage2/lib/linker.py) both join the identity window and carry the same firm for the
+    # same bond. The window is named once, in _stage1_settings.LINKER_WINDOW, and the join
+    # lives in _linker_join.py so it can be tested without WRDS.
+    import _linker_join
 
-    # The linker is BOND-level and DATED: one row per (bond, ownership window).
-    # cusip9 -> permno/permco/gvkey, valid over [w0, w1].
-    dfl = dfl.rename(columns={"cusip9": "cusip_id"})
-    missing = {"cusip_id", "w0", "w1", "permno"} - set(dfl.columns)
-    if missing:
-        raise ValueError(
-            f"Linker file is missing required column(s): {sorted(missing)}. "
-            f"Expected the bond-firm linker schema (cusip9, w0, w1, permno, permco, "
-            f"gvkey). Got: {sorted(dfl.columns)}"
-        )
-
-    # confidence / window_src / rung describe HOW each link was earned. They are in
-    # the published file (and in fl_verdicts alongside it) for anyone auditing a
-    # link, but they are not carried into the daily panel.
-    dfl = dfl.drop(columns=["confidence", "window_src", "rung"], errors="ignore")
-
-    for c in ("w0", "w1"):
-        dfl[c] = pd.to_datetime(dfl[c], errors="coerce")
-    dfl["permno"] = pd.to_numeric(dfl["permno"], errors="coerce").astype("Int64")
-
-    if "permco" in dfl.columns:
-        dfl["permco"] = pd.to_numeric(dfl["permco"], errors="coerce").astype("Int64")
-        logger.info("permco column found and processed")
-    else:
-        logger.warning("permco column not found in linker file - will be NaN in output")
-
-    if "gvkey" in dfl.columns:
-        # GVKEY ships as a zero-padded string ('013557'). Kept numeric here for schema
-        # continuity with previous releases -- re-pad to 6 characters before joining to
-        # Compustat.
-        dfl["gvkey"] = pd.to_numeric(dfl["gvkey"], errors="coerce").astype("Int32")
-        logger.info("gvkey column found and processed")
-    else:
-        logger.warning("gvkey column not found in linker file - will be NaN in output")
-
-    dfl = dfl.dropna(subset=["cusip_id", "w0"])
+    dfl = _linker_join.prepare_linker(dfl, LINKER_WINDOW)
     logger.info("Linker: %d rows over %d distinct bonds",
                 len(dfl), dfl["cusip_id"].nunique())
-
-    # Prep keys. cusip_id is a category at this point; merge_asof matches `by` keys by
-    # value, and a category against a str silently matches NOTHING -- cast first.
-    final_df["cusip_id"] = final_df["cusip_id"].astype(str)
-    final_df["trd_exctn_dt"] = pd.to_datetime(final_df["trd_exctn_dt"], errors="coerce")
-
-    # A bond with two owners over its life has two rows in the linker. A plain merge on
-    # cusip_id would fan every trade day of such a bond out to two rows before the
-    # window could be applied -- millions of transient rows on a 24 GB node. merge_asof
-    # takes the latest window that OPENED at or before the trade date and cannot fan
-    # out; the closed-window rows are then nulled below.
-    # window-choice: EVIDENCE (w0/w1) -- "when is this mapping provable". The linker also ships an
-    # IDENTITY window (i0/i1, "whose bond is this"), which is the right one when the firm id is a
-    # LABEL rather than a key into equity data. The daily panel here is the evidence-side artifact,
-    # so it stays on w0/w1.
-    #
-    # KNOWN, DATED GAP (2026-09-16): stage 2 now attaches its ids from the IDENTITY window, because
-    # a bond-month panel labels firms. Until this stage is next rebuilt from WRDS the daily and
-    # monthly panels will therefore carry DIFFERENT permno on ~2% of bond-months. That is deliberate
-    # and recorded rather than silent -- silence is how the two diverged unnoticed in the first
-    # place. See stage2/lib/linker.py and the linker bundle's SCHEMA.md.
-    logger.info("Merging linker on cusip_id within [w0, w1] (window-choice: evidence)...")
+    logger.info("Merging linker on cusip_id within [%s, %s] (window-choice: identity)...",
+                *LINKER_WINDOW)
     before = len(final_df)
-    # merge_asof requires the two `on` keys to have the SAME datetime resolution and
-    # raises MergeError otherwise. The panel's dates come back from parquet as
-    # datetime64[us] while the linker's windows are datetime64[ns], so align the
-    # linker to whatever the panel is using rather than assuming either.
-    ts_dtype = final_df["trd_exctn_dt"].dtype
-    for c in ("w0", "w1"):
-        dfl[c] = dfl[c].astype(ts_dtype)
-
-    dfl = dfl.sort_values("w0").reset_index(drop=True)
-    final_df = final_df.sort_values(["trd_exctn_dt"]).reset_index(drop=True)
-    final_df = pd.merge_asof(
-        final_df,
-        dfl,
-        left_on="trd_exctn_dt",
-        right_on="w0",
-        by="cusip_id",
-        direction="backward",
-    )
+    final_df, n_past = _linker_join.attach_firm_ids(final_df, dfl, LINKER_WINDOW)
     after = len(final_df)
     logger.info("Linker merge: %d -> %d rows", before, after)
-
-    # merge_asof only enforces the window's LEFT edge. Drop the identifiers where the
-    # trade falls after the window closed -- typically the bond outliving the firm's
-    # listing. A missing link is the intended answer there; a stale one is not.
-    id_cols = [c for c in ("permno", "permco", "gvkey") if c in final_df.columns]
-    past_window = final_df["w1"].notna() & (final_df["trd_exctn_dt"] > final_df["w1"])
-    n_past = int(past_window.sum())
     if n_past:
-        final_df.loc[past_window, id_cols] = pd.NA
         logger.info("Cleared equity IDs on %d rows dated after the linker window closed",
                     n_past)
-    final_df = final_df.drop(columns=["w0", "w1"], errors="ignore")
+    for c in ("permco", "gvkey"):
+        if c not in final_df.columns:
+            logger.warning("%s column not found in linker file - will be NaN in output", c)
 
-    # The linker is one row per (bond, window) and the windows do not overlap, so the
-    # merge must be row-preserving. Assert it rather than trusting it.
-    if after != before:
-        raise RuntimeError(
-            f"Linker merge changed the row count ({before} -> {after}). The linker "
-            "should have at most one open window per bond per date; a duplicate "
-            "(cusip_id, w0) would fan rows out."
-        )
-    # A DIFFERENT property from the row-count check above, and it is not about the
-    # linker: this is simply the first place the panel's uniqueness is re-checked after
+    # A DIFFERENT property from the row-count check inside the linker join, and it is not
+    # about the linker: this is simply the first place the panel's uniqueness is re-checked after
     # step 2's dedup. A duplicate here was created by an earlier many-to-one merge whose
     # right frame had a duplicate key -- on the 2026-09-09 run, one CUSIP with two FISD
     # issue records. Say so, and name the keys, so the next reader does not begin by

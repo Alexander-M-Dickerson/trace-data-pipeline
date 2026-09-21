@@ -104,6 +104,7 @@ def run_stage1(config: dict):
     # External Data URLs
     pipeline_module.LINKER_URL = config["linker_url"]
     pipeline_module.LINKER_ZIPKEY = config["linker_zipkey"]
+    pipeline_module.LINKER_WINDOW = tuple(config["linker_window"])
 
     # DATE_CUT_OFF may be an "auto:-Nmo" spec; step 2 resolves it once the data's
     # last trade date is known.

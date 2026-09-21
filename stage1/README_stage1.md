@@ -307,7 +307,7 @@ tail -f stage1/logs/stage1.err  # Check for errors
 
 ### Step 7: Merge the bond-firm linker
 - Reads `bond_firm_linker_2026/fl_linker.parquet`, which `download_inputs.sh` fetched on the login node (a run with internet access downloads it itself)
-- Adds equity identifiers: PERMNO, PERMCO and GVKEY, joined on the linker's dated evidence window `[w0, w1]`
+- Adds equity identifiers: PERMNO, PERMCO and GVKEY, joined on the linker's dated identity window `[i0, i1]`, the same window Stage 2 joins (`LINKER_WINDOW` in `_stage1_settings.py`)
 - Enables cross-referencing with other datasets
 
 ### Step 8: Ultra-Distressed Bond Filters

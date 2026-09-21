@@ -58,6 +58,23 @@ wrong, grouped.
 
 ### Changed
 
+- ❗**Stage 1 now joins the linker's IDENTITY window (`i0`/`i1`), the same one Stage 2 joins.**
+  Daily `permno` / `permco` / `gvkey` coverage rises from 87.8% to 89.8% of bond-days.
+  - Measured on the 2026-09-10 run by re-joining all 31,344,732 bond-days with the new code:
+    **644,754 gained a firm id, 0 lost one, 0 changed.** On every row of the linker the
+    evidence window lies inside the identity window with the same firm, so an id the old join
+    gave is never altered.
+  - Before this, Stage 1 joined the evidence window and Stage 2 the identity window, and the
+    daily and monthly panels named a different firm on about 2% of bond-months. They now agree
+    except on about 140 bond-months where a window starts or ends between a bond's last
+    trade of the month and the calendar month-end.
+  - The window is named once, `LINKER_WINDOW` in `stage1/_stage1_settings.py`. The join moved
+    to `stage1/_linker_join.py`, pure pandas, so `tests/test_linker_window.py` (12 tests) runs
+    without WRDS. One test fails if Stage 1 and Stage 2 ever declare different windows.
+  - A linker without `i0`/`i1` is now REFUSED rather than joined on `w0`/`w1`. The July 2026
+    bundle is such a file. Run `bash download_inputs.sh` for the current one.
+  - Set `LINKER_WINDOW = ("w0", "w1")` for ids only where equity data exists.
+
 - **`make_release.py` now packages the `stage1` build by default.** The default `--mode` was
   `prod_final`, a development build from before the 2026 vintage, so running the script with
   no arguments could package a stale panel on a machine that still held one. It now uses
@@ -199,10 +216,9 @@ the same PDF had been computed to 2025-11 and printed a 2025 row.
     MEMBERSHIP changes**, not just a value, and more so than the 2.2 points suggest: a common
     `min_bonds_per_firm = 2` screen turns each recovered link into a whole newly-eligible
     firm. Sorts that never touch `permno` are unaffected.
-  - **Stage 1 still joins the evidence window** and converges at the next annual rebuild, so
-    the daily and monthly panels disagree about `permno` until then. Recorded in
-    `stage1/DATA_DICTIONARY.md` rather than left silent -- that silence is what let the two
-    windows drift apart in the first place.
+  - Stage 1 was left on the evidence window at the time, with a note that it would converge
+    at the next rebuild. That note was wrong, since a rebuild with unchanged code joins the same
+    window. Stage 1 moved to the identity window on 2026-09-21, see below.
 
 ### Fixed
 

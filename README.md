@@ -360,6 +360,7 @@ trace-data-pipeline/
 │   ├── test_chunk_plan.py            # Chunk-partition properties
 │   ├── test_chunk_scheduler.py       # Ordering + failure handling
 │   ├── test_merge_keys.py            # Lookups must be one row per key
+│   ├── test_linker_window.py         # Stage 1 joins the linker's identity window, as Stage 2 does
 │   ├── test_cut_off_basis.py         # The auto:complete sample-end rule
 │   ├── test_public_boundary.py       # No private path or name in committed files
 │   ├── test_docs.py                  # Docs vs the code they describe
@@ -402,6 +403,7 @@ trace-data-pipeline/
 │   ├── _stage1_settings.py           # Configuration file
 │   ├── create_daily_stage1.py        # Driver
 │   ├── stage1_pipeline.py            # Main processing module
+│   ├── _linker_join.py               # The bond-firm linker join (identity window)
 │   ├── helper_functions.py           # Utility functions
 │   ├── _distressed_plot_helpers.py
 │   ├── _run_stage1.py                # Runner script
@@ -538,7 +540,7 @@ Stage 0 produces daily panels in dataset-specific subfolders with the following 
 | `cusip_id` | category | 9-character CUSIP identifier |
 | `issuer_cusip`* | category | 6-character issuer CUSIP |
 | `permno` | Int32 | CRSP PERMNO equity identifier |
-| `permco` | Int32 | CRSP PERMCO company identifier |
+| `permco`† | Int32 | CRSP PERMCO company identifier |
 | `gvkey`† | Int32 | Compustat GVKEY identifier |
 | `trd_exctn_dt` | datetime | Trade execution date |
 
