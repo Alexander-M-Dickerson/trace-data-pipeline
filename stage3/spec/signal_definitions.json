@@ -1394,11 +1394,13 @@
       "group": "Cluster IX: Macro & Other Betas",
       "name": "Credit Spread Level Beta",
       "description": "Beta on BAA-AAA credit spread level.",
-      "citation": "\\citet{dickerson2023priced}",
+      "citation": "\\citet{dickerson-bayesian}",
       "citation_keys": [
-        "dickerson2023priced"
+        "dickerson-bayesian"
       ],
-      "citation_text": "Dickerson, Mueller and Robotti (2023)"
+      "paper_prints_citation": "\\citet{dickerson2023priced}",
+      "why_corrected": "The printed row cites Dickerson, Mueller and Robotti (2023), Priced risk in corporate bonds. Corrected by the author on 2026-09-21: the credit spread level beta comes from Dickerson, Julliard and Mueller (2026), The co-pricing factor zoo, Journal of Financial Economics 182, 104295. The Stage 2 data report already cited that paper for this row.",
+      "citation_text": "Dickerson, Julliard and Mueller (2026)"
     },
     {
       "mnemonic": "b_cptlt",

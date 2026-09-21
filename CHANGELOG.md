@@ -101,9 +101,9 @@ wrong, grouped.
   - The report's copy had drifted. It still printed five old names, among them "Trade Policy
     Uncertainty Beta" for `b_eput`, which is TAX policy, and four old descriptions, among them
     a ±2 month band for `dcs6`, which is ±1.
-  - Five more spec rows now depart from the printed paper, twelve in all, each with what the
-    paper prints and why: `hprd`, `hprd_bgn`, `lib`, `igap_bgn` and `val_hz`.
-    `stage3/RECONCILIATION_ia08.md` sections 5, 9 and 10.
+  - Six more spec rows now depart from the printed paper, thirteen in all, each with what
+    the paper prints and why: `hprd`, `hprd_bgn`, `lib`, `igap_bgn`, `val_hz` and
+    `b_credit`. `stage3/RECONCILIATION_ia08.md` sections 5, 9, 10 and 11.
   - `lib` and `igap_bgn` point in opposite directions on the same row, and the text now says
     so. `lib` on the row for month t is the price move from that month-end to the first trade
     of month t+1. `igap_bgn` on the same row counts sessions from the last session of month
@@ -114,7 +114,11 @@ wrong, grouped.
   - The report still cites with `\citet`, now using the spec's keys, so its BibTeX keys were
     renamed to the paper's (16 of them, each pair checked to be the same work) and
     `gebhardt2005stock` was added. The four momentum rows cite that paper, as the paper's
-    table should. `b_credit` follows the paper and cites Dickerson, Mueller and Robotti (2023).
+    table should.
+  - `b_credit` cites Dickerson, Julliard and Mueller (2026), The co-pricing factor zoo, JFE
+    182, 104295. The report always did. The paper's row cites Dickerson, Mueller and Robotti
+    (2023), so the spec now departs from it, and the report's entry carries the published
+    volume and article number in place of "forthcoming".
   - Two cluster headings in the dictionary now match the paper, "Spreads, Yields, Size" and
     "Market Risk".
 

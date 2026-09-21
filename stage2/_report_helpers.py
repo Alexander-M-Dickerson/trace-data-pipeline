@@ -76,9 +76,14 @@ def build_latex_document(
     fig_filenames: list = None,
     author: str = None,
     vintage: str = None,
+    facts: dict = None,
 ) -> str:
     """
     Build complete LaTeX document for Stage 2 monthly panel report.
+
+    `facts` fills the @@NAME@@ tokens in the prose with numbers computed from the panel the
+    report describes (_build_data_report.window_facts). They used to be typed in, and a typed
+    number outlives the data it came from. A token left unfilled is refused.
 
     Parameters
     ----------
@@ -184,7 +189,13 @@ r_{i,t+1}^{x} = r_{i,t+1} - r_{i,t+1}^{\text{Tsy}},
 \end{equation}
 where $r_{i,t+1}^{\text{Tsy}}$ is the return on a duration-matched Treasury portfolio. This adjustment isolates credit-specific performance from parallel shifts in the yield curve.
 
-Figure~\ref{fig:return_timeline} illustrates the timing of price observations for month-end and month-begin returns. In the data, the month-end return is stored in \texttt{ret\_vw}, with trade dates \texttt{dt\_s} (month $t$) and \texttt{dt\_e} (month $t{+}1$), and holding period \texttt{hprd}. The month-begin return is stored in \texttt{ret\_vw\_bgn}, with trade dates \texttt{dt\_s\_bgn} and \texttt{dt\_e\_bgn} within month $t{+}1$, and holding period \texttt{hprd\_bgn}. The matched Treasury return $r_{i,t+1}^{\text{Tsy}}$ is stored in \texttt{tret}; duration-adjusted returns can be computed by subtracting \texttt{tret} from \texttt{ret\_vw} or \texttt{ret\_vw\_bgn}.
+Figure~\ref{fig:return_timeline} illustrates the timing of price observations for month-end and month-begin returns. In the data, the month-end return is stored in \texttt{ret\_vw}, with trade dates \texttt{dt\_s} (month $t$) and \texttt{dt\_e} (month $t{+}1$), and holding period \texttt{hprd}. The month-begin return is stored in \texttt{ret\_vw\_bgn}, with trade dates \texttt{dt\_s\_bgn} and \texttt{dt\_e\_bgn} within month $t{+}1$, and holding period \texttt{hprd\_bgn}. Both holding periods count NYSE trading sessions between the two trades. The matched Treasury return $r_{i,t+1}^{\text{Tsy}}$ is stored in \texttt{tret}; duration-adjusted returns can be computed by subtracting \texttt{tret} from \texttt{ret\_vw} or \texttt{ret\_vw\_bgn}.
+
+\paragraph{The 5-session rule and the length of a month-end return.} A month-end return needs a trade in the last 5 NYSE sessions of month $t$ and another in the last 5 sessions of month $t{+}1$. A bond that misses either window has no return for that month. Each trade may fall on any of its 5 sessions, so the window between them, \texttt{hprd}, runs from @@HPRD_MIN@@ to @@HPRD_MAX@@ sessions, with a mean of @@HPRD_MEAN@@. A month has at most 23 sessions. A window longer than that is a return whose start trade fell before the last session of its month and whose end trade fell late, which the rule allows. @@HPRD_GT23@@\% of returns are of that kind. The distribution across all @@N_RET@@ month-end returns is below.
+
+@@WINDOW_TABLE@@
+
+\paragraph{Two prices.} The tables report two prices. \textit{Price (VW)} is the volume-weighted month-end price that the return is computed from, and every return has one. \textit{Price at Signal Date} is the price on the signal date described in Section~\ref{sec:signal_gap}, which the price-based signals in the main panel use. @@N_RET_NO_SIGNAL_PRICE@@ returns have no signal-date price, because the bond had no earlier trade in the same month within @@ADJ_WINDOW@@ sessions of its month-end trade.
 
 \begin{figure}[htbp]
 \centering
@@ -355,7 +366,7 @@ which represents the clean price return between signal observation and trade exe
 \subsubsection{Signal Gap for Price-Based Signals}
 \label{sec:signal_gap}
 
-All price-based signals---those involving bond price, yield, spread, or prior 1-month return---are adjusted such that they are observed with at least a 1-business day gap (using the NYSE trading calendar) before the $P^{\text{end}}_{i,t}$ used for month-end return computation. We allow a maximum of 10 business days gap. This adjustment removes the mechanical bid-ask bias that can inflate factor performance when sorting on a price-based signal that is also used in the return computation. Panel B: Adjusted Signal in Figure~\ref{fig:return_timeline} graphically illustrates this adjustment. In our sample, the average (median) signal gap is approximately 1.68 (1.00) business days.
+All price-based signals---those involving bond price, yield, spread, or prior 1-month return---are adjusted such that they are observed with at least a 1-business day gap (using the NYSE trading calendar) before the $P^{\text{end}}_{i,t}$ used for month-end return computation. We allow a maximum gap of @@ADJ_WINDOW@@ business days, within the same month. This adjustment removes the mechanical bid-ask bias that can inflate factor performance when sorting on a price-based signal that is also used in the return computation. Panel B: Adjusted Signal in Figure~\ref{fig:return_timeline} graphically illustrates this adjustment. In our sample, the average (median) signal gap is @@SIGGAP_MEAN@@ (@@SIGGAP_MEDIAN@@) business days and the largest is @@SIGGAP_MAX@@.
 
 \subsection{Rule 144a Bonds}
 
@@ -431,6 +442,15 @@ and reproducible methods for corporate bond research.
     # the DFPS constants (trace_alternate_2025_12_2024) or anything else.
     if vintage and vintage != _VINTAGE_IN_SOURCE:
         doc = doc.replace(rf"\_{_VINTAGE_IN_SOURCE}.parquet", rf"\_{vintage}.parquet")
+
+    for name, value in (facts or {}).items():
+        doc = doc.replace(f"@@{name}@@", str(value))
+    import re as _re
+    unfilled = sorted(set(_re.findall(r"@@([A-Z0-9_]+)@@", doc)))
+    if unfilled:
+        raise KeyError(
+            f"the report's prose asks for {unfilled} and build_latex_document was not given "
+            "them. Pass facts=_build_data_report.window_facts(panel).")
 
     return doc
 
@@ -792,10 +812,12 @@ def get_references_bib() -> str:
   publisher={Elsevier}
 }
 
-@article{dickerson2023corporate,
-  title={The Co-Pricing Factor Zoo},
+@article{dickerson-bayesian,
+  title={The co-pricing factor zoo},
   author={Dickerson, Alexander and Julliard, Christian and Mueller, Philippe},
-  journal={Journal of Financial Economics, forthcoming},
+  journal={Journal of Financial Economics},
+  volume={182},
+  pages={104295},
   year={2026}
 }
 

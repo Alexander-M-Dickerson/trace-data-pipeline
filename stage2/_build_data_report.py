@@ -84,6 +84,72 @@ def require_columns(df: pd.DataFrame, requested: list[tuple[str, str]],
     )
 
 
+def attach_prices(df: pd.DataFrame, mode: str) -> pd.DataFrame:
+    """Add `pr`, the month-end price the RETURN uses, and `pr_sig`, the signal-date price.
+
+    The panel's `bbtm` is measured on the SIGNAL date, 1 to 10 sessions before the month-end
+    trade, so that a price-based signal never shares a price with the return it predicts. A
+    month with no earlier trade has no signal-date price. The report used to print 100/bbtm
+    under the label "Price (VW)", and so showed fewer prices than returns, which cannot
+    happen to the price a return is computed from.
+
+    That price is the month-end one. The `_mmn` sidecar carries it as `bbtm_mmn`.
+    """
+    sidecars = sorted((cfg.BLOCKS_DIR / mode).glob("mmn_price_based_signals_*.parquet"))
+    if not sidecars:
+        raise FileNotFoundError(
+            f"no mmn_price_based_signals_*.parquet under {cfg.BLOCKS_DIR / mode}.\n"
+            "    The month-end price is read from it. Step 7 of the build writes it.")
+    mmn = pd.read_parquet(sidecars[-1], columns=["cusip", "date", "bbtm_mmn"])
+    price = pd.Series(
+        mmn["bbtm_mmn"].to_numpy(),
+        index=pd.MultiIndex.from_arrays(
+            [mmn["cusip"].astype(str), mmn["date"].astype("datetime64[ns]")]))
+    if not price.index.is_unique:
+        raise AssertionError(f"{sidecars[-1].name} has duplicate (cusip, date) keys")
+    keys = pd.MultiIndex.from_arrays(
+        [df["cusip"].astype(str), df["date"].astype("datetime64[ns]")])
+    df = df.copy()
+    df["pr"] = 100 / price.reindex(keys).to_numpy()
+    df["pr_sig"] = 100 / df["bbtm"]
+
+    orphans = int((df["ret_vw"].notna() & df["pr"].isna()).sum())
+    if orphans:
+        raise AssertionError(
+            f"{orphans:,} row(s) carry a month-end return and no month-end price.\n"
+            "    A return is computed from that price, so this cannot happen in a sound build.\n"
+            f"    Check that {sidecars[-1].name} belongs to main_panel_{mode}.parquet.")
+    return df
+
+
+def window_facts(df: pd.DataFrame) -> dict:
+    """The numbers the report's prose states, computed from the panel it describes."""
+    has_ret = df["ret_vw"].notna()
+    w = df.loc[has_ret, "hprd"].dropna()
+    g = df["sig_gap"].dropna()
+    if w.empty or g.empty:
+        raise AssertionError("no holding periods or no signal gaps to describe")
+    n = len(w)
+    rows = "\n".join(
+        f"{int(k)} & {int(v):,} & {100 * v / n:.2f} \\\\"
+        for k, v in w.value_counts().sort_index().items())
+    table = (
+        "\\begin{center}\n\\begin{tabular}{rrr}\n\\toprule\n"
+        "Sessions & Returns & \\% \\\\\n\\midrule\n" + rows +
+        "\n\\bottomrule\n\\end{tabular}\n\\end{center}")
+    return {
+        "HPRD_MIN": str(int(w.min())), "HPRD_MAX": str(int(w.max())),
+        "HPRD_MEAN": f"{w.mean():.2f}",
+        "HPRD_GT23": f"{100 * (w > 23).mean():.1f}",
+        "WINDOW_TABLE": table,
+        "SIGGAP_MEAN": f"{g.mean():.2f}", "SIGGAP_MEDIAN": f"{g.median():.2f}",
+        "SIGGAP_MAX": str(int(g.max())),
+        "ADJ_WINDOW": str(int(cfg.ADJ_WINDOW)),
+        "N_RET": f"{int(has_ret.sum()):,}",
+        "N_RET_NO_SIGNAL_PRICE": f"{int((has_ret & df['pr_sig'].isna()).sum()):,}",
+    }
+
+
 def build_report(mode: str, report_dir: Path, external: bool, make_pdf: bool,
                  wrds_username: str) -> Path:
     t0 = time.time()
@@ -104,6 +170,12 @@ def build_report(mode: str, report_dir: Path, external: bool, make_pdf: bool,
     max_date = df["date"].max().strftime("%Y-%m-%d")
     _say(f"    {min_date} -> {max_date}")
 
+    # --- Prices, and the numbers the prose states ----------------------------
+    df = attach_prices(df, mode)
+    facts = window_facts(df)
+    _say(f"    return window {facts['HPRD_MIN']} to {facts['HPRD_MAX']} sessions, "
+         f"{facts['HPRD_GT23']}% above 23; signal gap up to {facts['SIGGAP_MAX']}")
+
     # --- Contiguous month-end panel (for the availability table) ------------
     _say("  resampling to a contiguous monthly panel ...")
     df_resampled = rpt.build_month_end_panel(df, id_col="cusip", date_col="date")
@@ -111,13 +183,12 @@ def build_report(mode: str, report_dir: Path, external: bool, make_pdf: bool,
 
     # --- Table 1: data availability -----------------------------------------
     _say("  table 1: data availability")
-    # `bbtm` is book-to-market, not a price: step1_returns.py:251 builds it as 100/pr,
-    # so the price is 100/bbtm. The reference multiplied instead of dividing, which
-    # inverts the tails (bbtm p99 = 1.67 is a price of 60, not 167). The availability
-    # table only counts non-nulls, so its numbers are unaffected either way.
-    df_resampled["pr"] = 100 / df_resampled["bbtm"]
+    # `pr` and `pr_sig` come from attach_prices() above: the month-end price the return
+    # uses, and the signal-date price. `bbtm` is book-to-market, 100/price, so a price is
+    # 100/bbtm. The reference multiplied, which inverts the tails.
     avail_vars = [
         ("pr", "Price (VW)"),
+        ("pr_sig", "Price at Signal Date"),
         ("ret_vw", "Month-End Return"),
         ("ret_vw_bgn", "Month-Begin Return"),
         ("ytm", "YTM"),
@@ -136,7 +207,6 @@ def build_report(mode: str, report_dir: Path, external: bool, make_pdf: bool,
     if "tret" in df.columns:
         df["ret_vwx"] = df["ret_vw"] - df["tret"]
         df["ret_vwx_bgn"] = df["ret_vw_bgn"] - df["tret"]
-    df["pr"] = 100 / df["bbtm"]          # the reference never built this on the stats frame
 
     stat_vars = [
         ("ret_vw", "Total End Return (%)"),
@@ -149,6 +219,7 @@ def build_report(mode: str, report_dir: Path, external: bool, make_pdf: bool,
         ("igap_bgn", "Implementation Gap"),
         ("sig_gap", "Signal Gap"),
         ("pr", "Price (VW)"),
+        ("pr_sig", "Price at Signal Date"),
         ("ytm", "YTM (%)"),
         ("cs", "Spread (%)"),
         ("md_dur", "Duration (Modified)"),
@@ -363,7 +434,8 @@ We compare our OSBAP monthly panel with the \href{""" + WRDS_URL + r"""}{WRDS Bo
     # --- Assemble ------------------------------------------------------------
     _say("\n  building the LaTeX document ...")
     doc = rpt.build_latex_document(tables=tables, fig_filenames=fig_filenames,
-                                   author=cfg.AUTHOR, vintage=cfg.release_vintage())
+                                   author=cfg.AUTHOR, vintage=cfg.release_vintage(),
+                                   facts=facts)
     tex_path = report_dir / f"stage2_data_report_{cfg.DATE_STAMP}.tex"
     tex_path.write_text(doc, encoding="utf-8")
     _say(f"    wrote {tex_path.name}")

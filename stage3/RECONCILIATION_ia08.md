@@ -10,7 +10,7 @@ does not describe what the code does is wrong however carefully it was written, 
 only way to find out is to open the function.
 
 Stage 3 now generates the table from `spec/signal_definitions.json`
-(`s4_zoo/t_ia08.py`). Twelve rows there differ from the printed table; each carries
+(`s4_zoo/t_ia08.py`). Thirteen rows there differ from the printed table; each carries
 `paper_prints` and `why_corrected`, is marked `†` in the rendered table, and is listed
 below. `python s4_zoo/t_ia08.py --diffs` prints them.
 
@@ -114,7 +114,7 @@ contradicts itself within two lines; 21/22 is the scale the data uses.
 **Fixed here.**
 
 ❗**Both rows also mislabel rating 21 as CCC−** (corrected 2026-09-21, which makes
-`spc_rat` the seventh corrected row; sections 5, 9 and 10 add five more). On the numeric scale Stage 1 builds
+`spc_rat` the seventh corrected row; sections 5, 9, 10 and 11 add six more). On the numeric scale Stage 1 builds
 (`stage1/helper_functions.convert_sp_to_numeric`), CCC− is 19, CC is 20, C is 21 and
 D is 22; on Moody's side Caa3 is 19, Ca is 20 and C is 21. The range was right and
 only the label on its last non-default grade was wrong. Stage 2's dictionary and report
@@ -256,15 +256,34 @@ decided here.
 
 ---
 
+## 11. `b_credit` cites the wrong paper by the same first author
+
+The paper's row cites Dickerson, Mueller and Robotti (2023), *Priced risk in corporate
+bonds*. The credit spread level beta comes from Dickerson, Julliard and Mueller (2026),
+*The co-pricing factor zoo*, Journal of Financial Economics 182, 104295. Corrected by the
+author on 2026-09-21.
+
+The Stage 2 data report cited the right paper all along. It was found when the report was
+moved onto this spec and its citation cells were diffed against the old ones: of 78 cited
+rows, this was the only one where the two documents named different work, apart from the
+four momentum rows of section 4.
+
+`dickerson-bayesian` was already in the paper's `references.bib`, as a 2024 working paper,
+and cited nowhere.
+
+**Fixed here**, and the manuscript row and its bibliography entry are corrected with it.
+
+---
+
 ## How to re-run this
 
 ```bash
 cd stage3
-python s4_zoo/t_ia08.py --diffs     # the twelve corrected rows and what settled each
+python s4_zoo/t_ia08.py --diffs     # the thirteen corrected rows and what settled each
 python s4_zoo/t_ia08.py             # -> reports/tables/table_ia08.tex
 python -m pytest tests/ -k ia08 -q  # every sorted signal has a definition
 ```
 
-The spec is `spec/signal_definitions.json`. It is the paper's text with twelve rows
+The spec is `spec/signal_definitions.json`. It is the paper's text with thirteen rows
 corrected, each recording what was printed and why it changed — so the printed table can
 always be reconstructed from it, and no correction is silent.
