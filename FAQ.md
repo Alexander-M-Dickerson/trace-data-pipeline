@@ -24,7 +24,7 @@ This is a **two-machine pipeline**, and the hand-off is a file you copy yourself
 | | Where | Why |
 |---|---|---|
 | Stages 0 and 1 | **WRDS Cloud** | they read the raw TRACE tape, which is a WRDS database |
-| the hand-off | you | zip on WRDS, `scp` down (~6 GB) |
+| the hand-off | you | zip on WRDS, `scp` down (~5 GB) |
 | Stage 2 | **your own computer** | it reads only Stage 1's output file; no WRDS connection needed |
 | Stage 3 | **your own computer** | it reads only Stage 2's panel; optional, and no WRDS connection needed |
 
@@ -52,9 +52,10 @@ Using `./run_pipeline.sh` (complete automated pipeline):
   Stage 1 -- the two run side by side. It was ~50 minutes before that release.
 - **Stage 1 (Bond analytics)**: **~2.5-3 hours**
 
-**End to end: about 4.5-5 hours.** The 2026-09-09 production run took 4.63 h.
+**End to end: about 4.5-5 hours.** The 2026-09-09 run took 4.63 h and the 2026-09-10 run
+4.7 h.
 
-Then, on your own machine: **Stage 2 about 8 minutes**, and **Stage 3 about 14 minutes**
+Then, on your own machine: **Stage 2 about 8-13 minutes**, and **Stage 3 about 15 minutes**
 on 24 cores with a PyBondLab build carrying the fast kernels. Without those kernels Stage
 3 still runs, and the two uncertainty grids become the long part; see
 [stage3/README_stage3.md](stage3/README_stage3.md).
@@ -220,7 +221,7 @@ pd.read_parquet("stage1/data/stage1_YYYYMMDD.parquet").to_csv("stage1.csv.gz", i
 ```
 
 ### How do I control Stage 0 error plot generation?
-Stage 0 error plots are **very slow** to generate (30+ minutes for Enhanced TRACE). Control this in `config.py`:
+Stage 0 error plots take about 5 minutes for Enhanced TRACE (measured 2026-09-09), and the report job runs beside Stage 1, so they no longer delay anything. Control them in `config.py`:
 ```python
 STAGE0_OUTPUT_FIGURES = False  # Skip error plots (tables only - faster)
 STAGE0_OUTPUT_FIGURES = True   # Generate error plots (slow but comprehensive)
@@ -253,19 +254,20 @@ Using Python/pandas:
 ```python
 import pandas as pd
 
-# Read a single dataset
-df = pd.read_parquet('enhanced/enhanced_20250120.parquet')
+# Read a single dataset (use your own date stamp)
+df = pd.read_parquet('stage0/enhanced/trace_enhanced_20260910.parquet')
 
-# Read multiple files
+# Read every member's daily panel -- the pattern skips the FISD, audit and CUSIP-list files
 import glob
-files = glob.glob('enhanced/*.parquet')
+files = glob.glob('stage0/*/trace_*_[0-9]*.parquet')
+files = [f for f in files if 'fisd' not in f]
 df = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
 ```
 
 Using R:
 ```r
 library(arrow)
-df <- read_parquet('enhanced/enhanced_20250120.parquet')
+df <- read_parquet('stage0/enhanced/trace_enhanced_20260910.parquet')
 ```
 
 ### What columns are in the output files?
@@ -321,23 +323,26 @@ These help you understand how many transactions were removed at each cleaning st
 These files identify bonds that were corrected:
 - `decimal_shift_cusips_*.parquet`: CUSIPs with decimal-shift corrections
 - `bounce_back_cusips_*.parquet`: CUSIPs with bounce-back flags
+- `init_price_cusips_*.parquet`: CUSIPs with a removed initial-price error
 
 Useful for understanding which bonds had price errors.
 
 ### What is the ultra_distressed_cusips CSV file? (Stage 1)
-Stage 1 exports `stage1/data/ultra_distressed_cusips_{date}.csv` which contains all bonds flagged by the ultra-distressed filter. Each row shows:
+Stage 1 exports `stage1/data/ultra_distressed_cusips_{date}.csv`, one row for **every** CUSIP
+in the panel, flagged or not. Filter on `flagged_observations > 0` for the flagged bonds. In
+the 2026-09-10 run the file has 76,592 rows, of which 1,045 CUSIPs carry 10,185 flagged
+bond-days (0.03% of all bond-days).
 
 **Columns**:
 - `cusip_id`: Bond identifier
-- `total_observations`: Total trades for this CUSIP
-- `flagged_observations`: Number of flagged trades
+- `total_observations`: Bond-days for this CUSIP
+- `flagged_observations`: Bond-days the filter flagged
 - `pct_flagged`: Percentage flagged (%)
-- `flag_anomalous_price`: Count of anomalous price flags
-- `flag_upward_spike`: Count of upward spike flags
-- `flag_plateau_sequence`: Count of plateau sequence flags
-- `flag_intraday_inconsistent`: Count of intraday inconsistent flags
 - `first_trade_date`: Earliest trade date
 - `last_trade_date`: Latest trade date
+
+The file does not break the count down by filter. The per-filter flags are dropped before
+export to save memory.
 
 **Use cases**:
 - Identify problematic bonds for manual review
@@ -355,7 +360,7 @@ You can compile the LaTeX to PDF or view the figures directly.
 
 ### How do I download files from WRDS Cloud?
 
-The pipeline generates a large folder (~6 GB) with hundreds of files. **Zip the folder first** for faster, more reliable downloads.
+The pipeline generates a large folder (~5 GB) with hundreds of files. **Zip the folder first** for faster, more reliable downloads.
 
 **Step 1: Create zip file on WRDS (via SSH)**
 
@@ -448,7 +453,7 @@ qstat -j <job_id>  # View specific job details
 **Check**:
 1. Verify date ranges in `_trace_settings.py`
 2. Confirm WRDS entitlements (Enhanced/Standard/144A)
-3. Review logs for SQL errors: `cat logs/01_enhanced.err`
+3. Review logs for SQL errors: `cat stage0/logs/01_enhanced.err`
 4. Ensure FISD filters aren't too restrictive
 
 ### Empty output files
@@ -497,9 +502,9 @@ PY
 ```
 
 A healthy full run is tens of millions of rows spanning 2002-07 to your data frontier.
-For reference, the 2026-09-10 production run produced 31,344,732 rows over 70,684 CUSIPs
-covering 2002-07-01 to 2025-11-28, and its `stage1.err` held 683 lines that were *all*
-this one harmless pattern.
+For reference, the 2026-09-10 production run wrote 31,412,833 rows from 2002-07-01 to
+2025-12-31, and its `stage1.err` held 689 lines that were *all* this one harmless pattern
+(683 on the 2026-09-09 run).
 
 **What WOULD indicate a real failure:** a non-zero exit status from the job, a `stage1.out`
 that stops mid-step, or a missing/short `stage1_YYYYMMDD.parquet`. Stage 0's `.err` files
@@ -563,8 +568,8 @@ du -h ~/ | sort -h | tail -20
 
 # Remove old files/logs
 rm -rf ~/old_data/
-rm -f ~/stage0/logs/*.log  # Old log files
-rm -f ~/stage1/logs/*.log
+rm -f ~/trace-data-pipeline/stage0/logs/*.log  # Old log files
+rm -f ~/trace-data-pipeline/stage1/logs/*.log
 ```
 
 **Option 2: Override warning (advanced users only)**
@@ -616,7 +621,9 @@ DIRECTORY  USED / LIMIT
    - Efficient parquet compression
 
 ### Can I run multiple datasets simultaneously?
-Yes! That's exactly what `./run_pipeline.sh` does. It submits Enhanced, Standard, and 144A as parallel jobs.
+Yes. `./run_pipeline.sh` submits Enhanced and 144A as parallel jobs by default. Standard is
+opt-in (`TRACE_MEMBERS`), and when requested it is held until the other two finish so it can
+use the whole WRDS connection budget.
 
 ---
 
@@ -637,8 +644,6 @@ Create a GitHub issue with:
 - Your environment (Python version, WRDS setup)
 - Relevant log files
 - Expected vs actual behavior
-
-Use the bug report template when creating the issue.
 
 ### I have an idea for a new feature
 Great! Create a feature request issue explaining:
@@ -663,9 +668,10 @@ See the Citation section in [README.md](README.md). Use both references:
 
 **Primary**:
 ```
-Dickerson, A., Robotti, C., & Rossetti, G. (2025). 
-Common pitfalls in the evaluation of corporate bond strategies.
-Working Paper.
+Dickerson, A., Robotti, C., & Rossetti, G. (2026).
+The Corporate Bond Factor Replication Crisis.
+Working Paper. (Earlier versions circulated as "Common pitfalls in the
+evaluation of corporate bond strategies.")
 ```
 
 **Secondary**:
@@ -688,8 +694,8 @@ Yes! Contributors are acknowledged in:
 This pipeline produces clean TRACE data. [PyBondLab](https://github.com/GiulioRossetti94/PyBondLab) is the companion repository for constructing corporate bond asset pricing factors from this data.
 
 Workflow:
-1. **trace-data-pipeline** (this repo): Clean raw TRACE → daily panels
-2. **PyBondLab**: Daily panels → bond characteristics → factor portfolios
+1. **trace-data-pipeline** (this repo): raw TRACE → daily panel (Stages 0-1) → monthly panel with 108 signals (Stage 2)
+2. **PyBondLab**: monthly panel → sorted portfolios and factors (Stage 3 calls it for the paper's exhibits)
 
 ### Is this part of a larger project?
 Yes! This is part of the [Open Bond Asset Pricing](https://openbondassetpricing.com/) project, which aims to provide open-source tools for corporate bond research.
@@ -704,6 +710,9 @@ Yes! This is part of the [Open Bond Asset Pricing](https://openbondassetpricing.
 - **Documentation**: 
   - [Main README](README.md)
   - [Stage 0 README](stage0/README_stage0.md)
+  - [Stage 1 README](stage1/README_stage1.md)
+  - [Stage 2 README](stage2/README_stage2.md)
+  - [Stage 3 README](stage3/README_stage3.md)
   - [Contributing Guide](CONTRIBUTING.md)
 
 ### How quickly will I get a response?
@@ -736,7 +745,7 @@ qsub stage1/run_stage1.sh
 ```
 
 ### What about Stage 2?
-Stage 2 builds the monthly asset-pricing panel from your Stage 1 output: **140 columns**
+Stage 2 builds the monthly asset-pricing panel from your Stage 1 output: **145 columns**
 per bond-month, covering
 
 - spreads, yields and size; value; momentum and reversal
@@ -758,7 +767,7 @@ panel, and the panel is useful on its own.
 It turns the Stage-2 monthly panel into portfolio sorts, two uncertainty grids, and
 **33 table files and 11 figures** reproducing *The Corporate Bond Factor Replication
 Crisis* -- main text, appendix and Internet Appendix -- ending in a single compiled
-`stage3/reports/exhibits.pdf`. Twenty-eight of the tables are the paper's; the other four
+`stage3/reports/exhibits.pdf`. Twenty-nine of the tables are the paper's; the other four
 are Stage 3's own.
 
 ```bash
@@ -767,8 +776,8 @@ python tools/check_inputs.py     # are the five inputs there and the right shape
 bash run_stage3.sh               # everything, ending in reports/exhibits.pdf
 ```
 
-Like Stage 2, it runs on your own machine and opens no WRDS connection. 833 s -- just
-under 14 minutes -- on 24 cores, measured on a cold run. See [stage3/QUICKSTART_stage3.md](stage3/QUICKSTART_stage3.md).
+Like Stage 2, it runs on your own machine and opens no WRDS connection. 906 s -- about
+15 minutes -- on 24 cores, measured on a cold run on 2026-09-12. See [stage3/QUICKSTART_stage3.md](stage3/QUICKSTART_stage3.md).
 
 ### Are Stage 3's numbers the paper's printed numbers?
 **No, and nothing in Stage 3 compares them to the paper's.** It produces exhibits from

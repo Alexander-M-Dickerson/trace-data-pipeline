@@ -63,24 +63,15 @@ The result is a research-ready dataset of 44 columns per bond-day observation.
 - Completed Stage 0 processing (Enhanced, Standard, and/or 144A TRACE)
 - Stage 0 outputs in `stage0/{enhanced,standard,144a}/trace_*_YYYYMMDD.parquet`
 
-**Python version:** 3.10 or higher (tested with Python 3.12.11)
+**Python version:** 3.10 or higher
 
-**Required packages:**
+**Required packages:** everything in the repository's `requirements.txt`, which states minimum
+versions (`QuantLib>=1.36`, `joblib>=1.4`, `pandas>=2.2.3`, `numpy>=2.0`, `pyarrow>=20.0.0`,
+`wrds>=3.3.0`, plus `tqdm`, `openpyxl`, `requests` and `matplotlib` for the reports).
 
-- `pandas == 2.2.3` (tested version)
-- `numpy == 2.2.5` (tested version)
-- `wrds >= 3.3.0` (for FISD, ratings data)
-- `pyarrow >= 20.0.0`
-- `tqdm`
-- **`QuantLib == 1.37` (REQUIRED - must have this exact version)**
-- **`joblib == 1.5.1` (REQUIRED - must have this exact version)**
-- `openpyxl` (for reading Excel/Google Sheets)
-- `requests` (for downloading external data)
-
-**Optional (for report generation):**
-- `matplotlib >= 3.8.0`
-
-**IMPORTANT:** QuantLib 1.37 and joblib 1.5.1 are **required** for correct operation. The code was tested and validated with these specific versions on Python 3.12.11. The log files will print your Python version and package versions for reproducibility.
+The 2026-09-10 production run, which the 2026 data vintage was built from, used Python 3.14.5,
+pandas 2.2.3, NumPy 2.4.6, QuantLib 1.37 and joblib 1.5.1 on the WRDS Cloud. The log files print
+your Python and package versions, so a run can always be matched to the environment that made it.
 
 **WRDS Access Required:**
 - TRACE (already used in Stage 0)
@@ -215,22 +206,24 @@ mkdir -p data
 wget -O data/liu_wu_yields.xlsx "https://docs.google.com/spreadsheets/d/11HsxLl_u2tBNt3FyN5iXGsIKLwxvVz7t/export?format=xlsx&id=11HsxLl_u2tBNt3FyN5iXGsIKLwxvVz7t"
 
 # Download the bond-firm linker (for equity identifiers)
-wget -O data/linker_file_2025.zip "https://openbondassetpricing.com/wp-content/uploads/2025/11/linker_file_2025.zip"
+wget -O data/bond_firm_linker_2026.zip "https://openbondassetpricing.com/wp-content/uploads/2026/09/bond_firm_linker_2026.zip"
 
 # Unzip the linker file
-unzip data/linker_file_2025.zip -d data/
+unzip data/bond_firm_linker_2026.zip -d data/
 
 # Verify downloads
 ls -lh data/liu_wu_yields.xlsx
 ls -lh data/bond_firm_linker_2026/fl_linker.parquet
 
 # Clean up zip file (optional)
-rm data/linker_file_2025.zip
+rm data/bond_firm_linker_2026.zip
 ```
 
 **Note:** If you're running locally (Mac/Windows) with internet access, the pipeline will automatically download these files, so you can skip this step.
 
-### 4. Make script executable (run once)
+### 4. Make script executable (older clones only)
+
+The script ships executable, so a fresh clone needs nothing here. An older clone may need:
 
 ```bash
 chmod +x run_stage1.sh
@@ -261,12 +254,12 @@ bash run_stage1.sh
 # Check job status (WRDS only)
 qstat
 
-# Follow output logs
-tail -f logs/stage1.out
-tail -f logs/stage1.err  # Check for errors
+# Follow output logs (from the repo root)
+tail -f stage1/logs/stage1.out
+tail -f stage1/logs/stage1.err  # Check for errors
 ```
 
-**Expected runtime:** ~3 hours on WRDS Cloud (2 cores with 4 threads).
+**Expected runtime:** about 2.5 hours on the WRDS Cloud, on the 4 slots and 40 GB `run_pipeline.sh` requests (2.4 h on the 2026-09-10 run, 2.6 h on 2026-09-09).
 
 ---
 
@@ -313,8 +306,8 @@ tail -f logs/stage1.err  # Check for errors
 - Creates composite rating variables
 
 ### Step 7: Merge the bond-firm linker
-- Downloads OSBAP (Open-Source Bond Asset Pricing) linker file
-- Adds equity identifiers: PERMNO, PERMCO and GVKEY
+- Reads `bond_firm_linker_2026/fl_linker.parquet`, which `download_inputs.sh` fetched on the login node (a run with internet access downloads it itself)
+- Adds equity identifiers: PERMNO, PERMCO and GVKEY, joined on the linker's dated evidence window `[w0, w1]`
 - Enables cross-referencing with other datasets
 
 ### Step 8: Ultra-Distressed Bond Filters
@@ -1022,9 +1015,10 @@ If you use this stage in your research, please cite:
 
 **Primary Reference:**
 ```
-Dickerson, A., Robotti, C., & Rossetti, G. (2025).
-Common pitfalls in the evaluation of corporate bond strategies.
-Working Paper.
+Dickerson, A., Robotti, C., & Rossetti, G. (2026).
+The Corporate Bond Factor Replication Crisis.
+Working Paper. (Earlier versions circulated as "Common pitfalls in the
+evaluation of corporate bond strategies.")
 ```
 
 **Secondary Reference:**
@@ -1046,13 +1040,9 @@ For questions, issues, or contributions:
 
 ## Version History
 
-- **v1.0** (2025-11-17): Initial release
-  - Bond characteristics from FISD
-  - QuantLib-based analytics (duration, convexity, spreads)
-  - Credit ratings (S&P, Moody's)
-  - Equity identifiers (PERMNO, PERMCO, GVKEY)
-  - Ultra-distressed filters
-  - Comprehensive reporting
+Every release, with what it changed, is in [CHANGELOG.md](../CHANGELOG.md). Stage 1 first shipped
+in 2.0.0 (2025-12-11) with FISD characteristics, QuantLib analytics, S&P and Moody's ratings,
+equity identifiers, the ultra-distressed filters and the data report.
 
 ---
 

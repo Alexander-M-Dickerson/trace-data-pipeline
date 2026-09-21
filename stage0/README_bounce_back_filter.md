@@ -605,7 +605,8 @@ n_flagged = df_flagged["filtered_error"].sum()
 affected_cusips = df_flagged.loc[df_flagged["filtered_error"] == 1, "cusip_id"].nunique()
 
 print(f"Flagged {n_flagged:,} transactions across {affected_cusips:,} bonds")
-# Output: Flagged 8,423 transactions across 892 bonds
+# On the full Enhanced sample (2026-09-10 run) this came to 8,877 transactions across
+# 2,901 bonds, summed over the run's 485 chunks.
 ```
 
 ---
@@ -651,7 +652,7 @@ After flagging a par block, the baseline may be shifted by the flagged rows. Coo
 
 ## References
 
-**Dickerson, A., Robotti, C., & Rossetti, G. (2025)**. "Common pitfalls in the evaluation of corporate bond strategies." Working Paper.
+**Dickerson, A., Robotti, C., & Rossetti, G. (2026)**. "The Corporate Bond Factor Replication Crisis." Working Paper. Earlier versions circulated as "Common pitfalls in the evaluation of corporate bond strategies."
 
 ---
 

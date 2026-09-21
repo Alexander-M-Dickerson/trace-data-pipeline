@@ -10,10 +10,11 @@ Released artifacts carry the vintage YEAR -- ``factors_2026.parquet`` -- which i
 users cite. This script does that rename and assembles the provenance that makes a
 published number checkable.
 
-    python3 make_release.py --mode prod_final                 # panel + factor bundles
-    python3 make_release.py --mode prod_final --what panel    # just the panel
-    python3 make_release.py --mode prod_final --out-dir dist  # somewhere else
-    python3 make_release.py --mode prod_final --what bbw      # the BBW four-factor bundle
+    python3 make_release.py                     # panel, factor and BBW bundles
+    python3 make_release.py --what panel        # just the panel
+    python3 make_release.py --out-dir dist      # somewhere else
+    python3 make_release.py --what bbw          # the BBW four-factor bundle
+    python3 make_release.py --mode <mode>       # a build other than the default stage1
 
 ❗**This script is for REDISTRIBUTION, and only redistribution.**
 
@@ -159,8 +160,9 @@ Expected: `{sha}`
 
 ## Citation
 
-Dickerson, A., Robotti, C., & Rossetti, G. (2025). *Common pitfalls in the evaluation of
-corporate bond strategies.* Working Paper.
+Dickerson, A., Robotti, C., & Rossetti, G. (2026). *The Corporate Bond Factor Replication
+Crisis.* Working Paper. Earlier versions circulated as "Common pitfalls in the evaluation of
+corporate bond strategies."
 """
 
 COLUMN_GROUPS = [
@@ -381,8 +383,9 @@ repository, which also documents the factor models behind each beta.
                               CITATION
 ================================================================================
 
-Dickerson, A., Robotti, C., & Rossetti, G. (2025). Common pitfalls in the
-evaluation of corporate bond strategies. Working Paper.
+Dickerson, A., Robotti, C., & Rossetti, G. (2026). The Corporate Bond Factor
+Replication Crisis. Working Paper. Earlier versions circulated as "Common
+pitfalls in the evaluation of corporate bond strategies."
 
 Built with the public TRACE Data Pipeline:
 https://github.com/Alexander-M-Dickerson/trace-data-pipeline
@@ -864,8 +867,9 @@ def release_bbw(mode: str, out_dir: Path, vintage: str) -> int:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="package a built Stage 2 vintage for publication")
-    ap.add_argument("--mode", default="prod_final",
-                    help="the build to publish (its blocks/<mode>/ and panel)")
+    ap.add_argument("--mode", default=cfg.INPUT_MODE,
+                    help="the build to publish (its blocks/<mode>/ and panel); default "
+                         f"{cfg.INPUT_MODE!r}, the mode _run_stage2.py builds")
     ap.add_argument("--what", choices=("all", "panel", "factors", "bbw"), default="all",
                     help="which bundles to build (default all)")
     ap.add_argument("--out-dir", type=Path, default=None,

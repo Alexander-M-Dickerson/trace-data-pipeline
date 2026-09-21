@@ -10,13 +10,13 @@ sorted portfolios (e.g., deciles) or as characteristics in cross-sectional asset
 >
 > | column | model | overlay |
 > |---|---|---|
-> | `val_hz` | Houweling-Zhang | none |
-> | `val_hz_dts` | Houweling-Zhang | duration-times-spread |
+> | `val_hz` | Houweling-van Zundert | none |
+> | `val_hz_dts` | Houweling-van Zundert | duration-times-spread |
 > | `val_ipr` | Israel-Palhares-Richardson | none |
 > | `val_ipr_dts` | Israel-Palhares-Richardson | duration-times-spread |
 >
-> The **firm overlay** (`_fl`) described below is a capability of the function; it is not
-> built into the published panel. See `DATA_DICTIONARY.md` for the panel's definitions.
+> The **firm overlay** (`_wi`) described below is computed by the function but not kept in
+> the published panel. See `DATA_DICTIONARY.md` for the panel's definitions.
 
 ## What `compute_value()` does
 
@@ -26,9 +26,9 @@ Given a bond-level panel with identifiers `i` (CUSIP) and months `t`, `compute_v
 2. Uses the fitted values to form a **value signal** (either a scaled deviation from “fair” spread, or the residual).
 3. Optionally applies two overlays (activated when `dur_col` is supplied):
    - **DtS overlay (`_dts`)**: demean within month × quintile of duration-times-spread.
-   - **Firm overlay (`_fl`)**: demean within month × issuing firm (single-issue firms are left unchanged).
+   - **Firm overlay (`_wi`)**: demean within month × issuing firm (single-issue firms are left unchanged).
 
-The output columns are named by `model_type`, e.g. `val_hz`, `val_hz_dts`, `val_hz_fl`.
+The output columns are named by `model_type`, e.g. `val_hz`, `val_hz_dts`, `val_hz_wi`.
 
 ---
 
@@ -37,10 +37,9 @@ The output columns are named by `model_type`, e.g. `val_hz`, `val_hz_dts`, `val_
 For bond `i` in month `t`:
 
 - `cs_{i,t}`: credit spread (column `cs_col`).
-- `rating_{i,t}`: rating measure (column `rating_col`).
-- `tmat_{i,t}`: time to maturity (column `maturity_col`).
-- `dcs3_{i,t}`: 3-month change in spread (column `dcs3_col`).
-- `z_{i,t}`: optional additional controls (columns in `other_x_cols`, e.g., `call`, `vol12_x`).
+- `rating_{i,t}`: rating measure (column `rating_col`, default `spc_rat`).
+- `z_{i,t}`: every other regressor, passed as the list `x_cols` (at least one is required),
+  e.g. `dcs3` (3-month change in spread), `call`, `log_md_dur`, `vol12_x`.
 - `ind_{i,t}`: industry group (column `industry_col`, e.g., FF17 industry code).
 - `dur_{i,t}`: modified duration (column `dur_col`, used only for overlays).
 
@@ -64,8 +63,8 @@ The regressor vector `x_{i,t}` is composed of:
   - **dummies** (`rating_mode="dummies"`): one-hot indicators for each rating (one base category omitted), or
   - **numeric** (`rating_mode="numeric"`): a single numeric rating regressor.
 - Optional **industry dummies** (e.g., FF17) when `industry_col` is provided.
-- Continuous controls: `tmat_{i,t}` and `dcs3_{i,t}`.
-- Optional additional controls `z_{i,t}` from `other_x_cols`.
+- The regressors `z_{i,t}` listed in `x_cols`. Nothing else enters, so a maturity control
+  is present only if `x_cols` names one.
 
 We run OLS each month (separately for each cross-section). The fitted “fair” spread is:
 
@@ -182,7 +181,7 @@ Output column name: `val_{model_type}_dts` by default.
 
 ---
 
-## Step 4: Firm overlay (`_fl`)
+## Step 4: Firm overlay (`_wi`)
 
 When `dur_col` is provided, the function also computes a **within-firm demeaned** signal.
 Let `f(i,t)` denote the issuing firm for bond `i` in month `t`.
@@ -203,18 +202,18 @@ Within each (month, firm), compute the mean:
 Define the firm-level adjusted signal as:
 
 \[
-val^{fl}_{i,t} =
+val^{wi}_{i,t} =
 \begin{cases}
 val_{i,t} - \bar{val}_{f,t}, & N_{f,t}\ge 2\\
 val_{i,t}, & N_{f,t}=1
 \end{cases}
 \]
 
-So **single-issue firms are left unchanged**, as requested.
+So **single-issue firms are left unchanged**.
 
 **Intuition:** isolates within-issuer relative value (bond-to-bond cheapness) by removing issuer-level common components.
 
-Output column name: `val_{model_type}_fl` by default.
+Output column name: `val_{model_type}_wi` by default (`suffix_firm`).
 
 ---
 
@@ -224,12 +223,17 @@ Output column name: `val_{model_type}_fl` by default.
 
 **Reference:** Houweling and van Zundert (2017), “Factor Investing in the Corporate Bond Market,” *Financial Analysts Journal*, 73(2).
 
-We implement the monthly log-spread specification and augment it with:
+The production call regresses log spreads on:
+- rating dummies (`rating_col` left at its default, `spc_rat`),
 - FF17 industry dummies (`industry_col="ff17num"`),
-- a call dummy (`other_x_cols=["call"]`) because spreads are **unadjusted** for embedded options,
-- log transformation of spreads (`y_transform="log"`) with lognormal retransformation (`retransform="lognormal"`).
+- the 3-month spread change and a call dummy (`x_cols=["dcs3", "call"]`), the call dummy
+  because spreads are **unadjusted** for embedded options,
 
-Example usage:
+with lognormal retransformation (`y_transform="log"`, `retransform="lognormal"`). There is
+no maturity control.
+
+The call as `lib/value.py` makes it (the month-end version; the adjusted version passes
+`cs_adj`, `dcs3_adj` and `md_dur_adj`):
 
 ```python
 val_end = compute_value(
@@ -238,18 +242,14 @@ val_end = compute_value(
     date_col="date",
     model_type="hz",
     cs_col="cs",
-    rating_col="sp_rat",
-    maturity_col="tmat",
-    dcs3_col="dcs3",
     industry_col="ff17num",
-    other_x_cols=["call"],
-    min_obs=200,
+    x_cols=["dcs3", "call"],
     dur_col="md_dur",
     firm_col="issuer_cusip",
     y_transform="log",
     retransform="lognormal",
 )
-# columns: cusip, date, val_hz, val_hz_dts, val_hz_fl
+# columns: cusip, date, val_hz, val_hz_dts, val_hz_wi
 ```
 
 ### 2) Israel, Palhares & Richardson (2018) value signal (`model_type="ipr"`)
@@ -259,12 +259,11 @@ val_end = compute_value(
 This variant uses:
 - numeric rating control (`rating_mode="numeric"`),
 - FF17 industry dummies (`industry_col="ff17num"`),
-- call dummy and bond excess-return volatility (`other_x_cols=["call","vol12_x"]`),
+- call dummy, log duration and bond excess-return volatility (`x_cols=["call", "log_md_dur", "vol12_x"]`),
 - log spreads (`y_transform="log"`, `retransform="lognormal"`),
-- and defines value as the **log-spread residual** (`denom="resid"`),
-- with log duration passed in via `maturity_col="log_md_dur"`.
+- and defines value as the **log-spread residual** (`denom="resid"`).
 
-Example usage:
+The call as `lib/value.py` makes it:
 
 ```python
 end["log_md_dur"] = np.log(end["md_dur"])
@@ -275,19 +274,16 @@ val_end1 = compute_value(
     date_col="date",
     model_type="ipr",
     cs_col="cs",
-    rating_col="sp_rat",
     rating_mode="numeric",
     industry_col="ff17num",
-    other_x_cols=["call", "vol12_x"],
-    min_obs=200,
+    x_cols=["call", "log_md_dur", "vol12_x"],
     dur_col="md_dur",
     firm_col="issuer_cusip",
     denom="resid",
-    maturity_col="log_md_dur",
     y_transform="log",
     retransform="lognormal",
 )
-# columns: cusip, date, val_ipr, val_ipr_dts, val_ipr_fl
+# columns: cusip, date, val_ipr, val_ipr_dts, val_ipr_wi
 ```
 
 ---
@@ -300,12 +296,12 @@ If `dur_col` is **not** provided, output is:
 
 If `dur_col` **is** provided, output is:
 
-- `id_col`, `date_col`, `val_{model_type}`, `val_{model_type}_dts`, `val_{model_type}_fl`
+- `id_col`, `date_col`, `val_{model_type}`, `val_{model_type}_dts`, `val_{model_type}_wi`
 
 If `return_overlay_details=True`, additional diagnostic columns are included from the DtS overlay:
 - `dts`: duration-times-spread
 - `Q_dts`: DtS quintile (1–5)
-- `{val}_{model_type}_m_dtsQ`: mean signal within (date, Q_dts)
+- `val_{model_type}_m_dtsQ`: mean signal within (date, Q_dts)
 
 ---
 
@@ -323,5 +319,5 @@ If `return_overlay_details=True`, additional diagnostic columns are included fro
 ## References
 
 - Duan, N. (1983). “Smearing estimate: A nonparametric retransformation method.” *Journal of the American Statistical Association*.
-- Houweling, P., and J. van Zundert (2017). “Factor Investing in the Corporate Bond Market.” *Financial Analysts Journal*, 73(2).
-- Israel, R., D. Palhares, and S. Richardson (2018). “Common factors in corporate bond returns.” *Journal of Investment Management*, 16(2).
+- Houweling, P., and J. van Zundert (2017). “Factor Investing in the Corporate Bond Market.” *Financial Analysts Journal*, 73(2), 100-115.
+- Israel, R., D. Palhares, and S. Richardson (2018). “Common factors in corporate bond returns.” *Journal of Investment Management*, 16(2), 17-46.

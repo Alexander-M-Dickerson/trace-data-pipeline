@@ -103,7 +103,7 @@ build it resolved, and records it in every manifest:
 
 ```bash
 python _run_stage3.py --dry-run     # resolve and print the configuration, compute nothing
-python _run_stage3.py --list        # the 40 steps, and which outputs already exist
+python _run_stage3.py --list        # the 41 steps, and which outputs already exist
 ```
 
 Then one cheap section end to end, which exercises the whole shape — a producer, a
@@ -124,7 +124,7 @@ bash run_stage3.sh
 ```
 
 **906 s — about 15 minutes** on 24 cores with the fast kernels, measured on a cold
-run (`data/` and `reports/` wiped first) on 2026-09-12, all 40 steps. The two
+run (`data/` and `reports/` wiped first) on 2026-09-12, all 41 steps. The two
 uncertainty grids are 55% of it. See **What it costs** in
 [README_stage3.md](README_stage3.md) for the per-section split, the disk and memory
 figures, and what to lower first on a smaller machine.

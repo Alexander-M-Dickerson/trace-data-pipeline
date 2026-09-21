@@ -24,9 +24,9 @@ Getting this straight first will save you an afternoon.
 | | Where | What happens | How long |
 |---|---|---|---|
 | **1** | **WRDS Cloud** | Stages 0 and 1 build the daily bond panel from the raw TRACE tape | ~5 hours, mostly waiting |
-| **2** | **In between** | You zip the output on WRDS and copy it down to your own computer | ~15 min for ~6 GB |
-| **3** | **Your own computer** | Stage 2 turns that daily panel into the monthly asset-pricing panel | ~8 minutes |
-| **4** | **Your own computer** | Stage 3 turns the monthly panel into sorted portfolios and the paper's exhibits | ~14 minutes |
+| **2** | **In between** | You zip the output on WRDS and copy it down to your own computer | ~15 min for ~5 GB |
+| **3** | **Your own computer** | Stage 2 turns that daily panel into the monthly asset-pricing panel | ~8-13 minutes |
+| **4** | **Your own computer** | Stage 3 turns the monthly panel into sorted portfolios and the paper's exhibits | ~15 minutes |
 
 **Why the split?** Stages 0 and 1 read the raw TRACE transaction tape, which is a WRDS
 database — so they have to run where the data is, submitted to the WRDS job grid. Stage 2
@@ -44,7 +44,7 @@ faster on your own machine and needs no WRDS connection at all.
    Stage 1 starts automatically when they finish.
 5. Wait. Check on it with `qstat`.
 
-**Moving the results** — you end up with roughly 6 GB across hundreds of files:
+**Moving the results** — you end up with roughly 5 GB across hundreds of files:
 
 6. On WRDS, zip it: `cd ~ && zip -r /scratch/{institution}/trace-data-pipeline.zip trace-data-pipeline/`
 7. From your own computer, copy it down with `scp`, then unzip.
@@ -57,7 +57,7 @@ faster on your own machine and needs no WRDS connection at all.
 8. Install the same requirements (`pip install -r requirements.txt`) in a Python 3.10+
    environment. You do **not** need a WRDS connection from here.
 9. `cd stage2 && python _run_stage2.py`
-10. You now have `stage2/output/panel/main_panel_<mode>.parquet` — 140 columns per bond-month.
+10. You now have `stage2/output/panel/main_panel_<mode>.parquet` — 145 columns per bond-month.
 
 **Still on your own computer, if you want the research output too:**
 
@@ -83,7 +83,7 @@ Full detail: [QUICKSTART.md](QUICKSTART.md) for stages 0-1,
 
 ## Overview
 
-This is a **three-stage pipeline** for building *clean, reliable and reproducible* TRACE corporate bond datasets. 
+This is a **four-stage pipeline** for building *clean, reliable and reproducible* TRACE corporate bond datasets. Stages 0 and 1 run on WRDS, Stages 2 and 3 on your own computer.
 
 ### Stage 0: Intraday to Daily Processing  **PUBLIC BETA**
 Processes raw intraday TRACE transaction data to clean daily panels. Handles three types of TRACE data:
@@ -112,7 +112,7 @@ Enriches Stage 0 daily panels with comprehensive bond analytics and characterist
 
 ### Stage 2: Monthly Panel with Factor Signals
 Produces a clean, error-corrected monthly panel with dozens of corporate bond signals for asset pricing research:
-- 108 bond characteristic signals across 140 panel columns
+- 108 bond characteristic signals across 145 panel columns
 - Credit risk factors
 - Liquidity measures
 - Momentum and reversal signals
@@ -123,13 +123,20 @@ Produces a clean, error-corrected monthly panel with dozens of corporate bond si
 **Release:** Published vintages at [openbondassetpricing.com](https://openbondassetpricing.com)
 **Execution:** Your own machine, NOT the WRDS grid (a WRDS subscription is still required)
 
+### Stage 3: Sorts and the Paper's Exhibits
+Turns the Stage 2 panel into portfolio sorts, two uncertainty grids, and the 33 tables and
+11 figures of *The Corporate Bond Factor Replication Crisis*, compiled into one PDF. Optional.
+
+**Execution:** Your own machine, and it opens no WRDS connection
+**Documentation:** See [stage3/README_stage3.md](stage3/README_stage3.md) and [stage3/INDEX.md](stage3/INDEX.md)
+
 ---
 
 ## Project Status & Timeline
 
 - **Stage 0**: ✅ **Now available** - Public beta, ready for testing
 - **Stage 1**: ✅ **Now available** - Public beta, ready for testing
-- **Stage 2**: 🔨 **Code available** - Builds the monthly panel from your Stage 1 output; the first published data vintage is still to come
+- **Stage 2**: ✅ **Released** - Builds the monthly panel from your Stage 1 output; published vintages are on [openbondassetpricing.com](https://openbondassetpricing.com)
 - **Stage 3**: 🔨 **Code available** - Turns that monthly panel into portfolio sorts, uncertainty grids and the paper's 33 tables and 11 figures
 
 **This project is under active development and any feedback is greatly appreciated.**
@@ -142,7 +149,7 @@ Please reach out to `alexander.dickerson1@unsw.edu.au` if you would like to coll
 ### Stage 0: Robust Error Correction
 - **Decimal-shift corrector**: Automatically detects and fixes multiplicative price errors (10x, 0.1x, 100x, 0.01x)
 - **Bounce-back filter**: Identifies and removes erroneous price spikes that revert quickly
-- Algorithms designed by Dickerson, Robotti & Rossetti (2025) account for TRACE idiosyncrasies
+- Algorithms designed by Dickerson, Robotti & Rossetti (2026) account for TRACE idiosyncrasies
 - **Full documentation**: See [README_decimal_shift_corrector.md](stage0/README_decimal_shift_corrector.md) and [README_bounce_back_filter.md](stage0/README_bounce_back_filter.md)
 
 
@@ -173,7 +180,7 @@ Please reach out to `alexander.dickerson1@unsw.edu.au` if you would like to coll
 - **External identifiers** 
 - **Ultra-distressed bond filters** to flag potentially erroneous prices
 - **Fama-French industry classifications** (12, 17 and 30 industry groups)
-- Produces a daily bond-level dataset of 44 columns (Stage 2 is the 50+ signal product)
+- Produces a daily bond-level dataset of 44 columns (Stage 2 turns it into the 108-signal monthly panel)
 - Ultra-distressed filter catches suspicious "rounded" price numbers at very low prices often associated with issues trading under default. See [README_distressed_filter.md](stage1/README_distressed_filter.md)
 
 ---
@@ -182,7 +189,7 @@ Please reach out to `alexander.dickerson1@unsw.edu.au` if you would like to coll
 
 ### Prerequisites
 - WRDS subscription with access to TRACE, FISD, and ratings data
-- Python 3.10 or higher (tested on Python 3.12.11)
+- Python 3.10 or higher (the 2026-09-10 production run used Python 3.14.5 on the WRDS Cloud)
 - SSH access to WRDS Cloud (or local Python environment)
 - `.pgpass` configured for passwordless WRDS authentication
 
@@ -223,7 +230,6 @@ python -m pip install --user -r requirements.txt
 
 3. **Check the chain works, before spending hours on it (recommended):**
 ```bash
-chmod +x *.sh stage0/*.sh stage1/*.sh
 bash download_inputs.sh     # LOGIN NODE ONLY -- compute nodes have no internet
 qsub run_smoke_test.sh      # ~10 min; output lands in smoke_test.out
 ```
@@ -279,6 +285,13 @@ This runs the real Stage 0 → Stage 1 code on a handful of CUSIP chunks and ass
 - **[Configuration Guide](stage1/README_stage1.md#configuration-choices-you-can-edit)**: All configurable parameters
 - **[Troubleshooting](stage1/README_stage1.md#troubleshooting)**: Common issues and solutions
 
+**Stage 2 - Monthly Panel:**
+- **[Stage 2 README](stage2/README_stage2.md)**: What it builds and how to run it
+- **[Quick Start](stage2/QUICKSTART_stage2.md)**: The shortest path from Stage 1 output to a panel
+- **[Data Dictionary](stage2/DATA_DICTIONARY.md)**: All 145 columns, the factor models, and the `_mmn` sidecar
+- **[Defaulted-bond returns](stage2/README_Default.md)**: How returns are computed when a bond enters or trades in default
+- **[Value signals](stage2/README_Value.md)**: The value-signal family and its duration-times-spread variants
+
 **Stage 3 - Sorts and Exhibits:**
 - **[Stage 3 README](stage3/README_stage3.md)**: What it produces, the five inputs, and the conventions that decide what a number means
 - **[Stage 3 Quickstart](stage3/QUICKSTART_stage3.md)**: A minimal run, and what to do when a step complains
@@ -287,18 +300,11 @@ This runs the real Stage 0 → Stage 1 code on a handful of CUSIP chunks and ass
   mapped to the file that produces it, its LaTeX label and the sample it states.
   Generated, and gated so it cannot go stale
 
-**Stage 2 - Monthly Panel:**
-- **[Stage 2 README](stage2/README_stage2.md)**: What it builds and how to run it
-- **[Quick Start](stage2/QUICKSTART_stage2.md)**: The shortest path from Stage 1 output to a panel
-- **[Data Dictionary](stage2/DATA_DICTIONARY.md)**: All 140 columns, the factor models, and the `_mmn` sidecar
-- **[Default-risk signals](stage2/README_Default.md)**: How the default-risk signals are built
-- **[Value signals](stage2/README_Value.md)**: The value-signal family and its duration-times-spread variants
-
 ---
 
 ## Downloading Results to Your Local Machine
 
-The pipeline generates a large folder (~6 GB) with hundreds of files. **Zip the folder first**, then download a single file for reliability and speed.
+The pipeline generates a large folder (~5 GB) with hundreds of files. **Zip the folder first**, then download a single file for reliability and speed.
 
 ### Quick Overview
 
@@ -354,6 +360,8 @@ trace-data-pipeline/
 │   ├── test_chunk_plan.py            # Chunk-partition properties
 │   ├── test_chunk_scheduler.py       # Ordering + failure handling
 │   ├── test_merge_keys.py            # Lookups must be one row per key
+│   ├── test_cut_off_basis.py         # The auto:complete sample-end rule
+│   ├── test_public_boundary.py       # No private path or name in committed files
 │   ├── test_docs.py                  # Docs vs the code they describe
 │   └── probe_wrds_connections.py     # Measures your account's connection ceiling
 │
@@ -418,16 +426,18 @@ trace-data-pipeline/
 │   ├── _stage2_settings.py           # Settings + fail-loud input contract
 │   ├── _build_data_report.py         # LaTeX/PDF data report
 │   ├── make_release.py               # Packages a vintage for publication
+│   ├── make_excess_blocks.py         # Optional: betas and momentum on another Treasury benchmark
 │   ├── lib/                          # Engine: returns, illiquidity, betas, value, ...
-│   │   └── contract.py               # The panel's frozen 140-column contract
+│   │   └── contract.py               # The panel's frozen 145-column contract
 │   ├── steps/                        # step1..step7 + the factor build
+│   ├── reference/                    # The original BBW factors, shipped in the BBW bundle
 │   ├── tests/                        # Contract, parity and boundary gates
 │   ├── DATA_DICTIONARY.md            # Every column, every factor model
 │   ├── data/  output/  data_reports/ # Gitignored build artifacts
 │   └── logs/
 │
 └── stage3/                           # Sorts and the paper's exhibits (runs on YOUR machine)
-    ├── _run_stage3.py                # Entry point: 40 steps, producers then exhibits
+    ├── _run_stage3.py                # Entry point: 41 steps, producers, exhibits, then the PDF
     ├── run_stage3.sh                 # Input contract, then the above
     ├── _stage3_settings.py           # Every path and constant
     ├── paths.py                      # Paths derived from the settings
@@ -442,7 +452,7 @@ trace-data-pipeline/
     ├── s3_nse/                       # The paper's Section 5 - non-standard errors
     ├── s4_zoo/                       # The factor zoo
     ├── spec/inputs.json              # The five-file input contract
-    ├── spec/signal_definitions.json  # What each of the 140 panel columns MEANS
+    ├── spec/signal_definitions.json  # What each of the 145 panel columns MEANS
     ├── tools/check_inputs.py         # Enforces the input contract
     ├── tools/build_index.py          # Generates INDEX.md; --check gates it
     ├── tests/                        # Contract, purge, provenance and index gates
@@ -484,20 +494,25 @@ Stage 0 produces daily panels in dataset-specific subfolders with the following 
 | `prc_vw_par` | Volume-weighted price (par) |
 | `prc_first` | First trade price of day |
 | `prc_last` | Last trade price of day |
+| `prc_hi` | High price of the day |
+| `prc_lo` | Low price of the day |
 | `trade_count` | Number of trades |
+| `time_ew` | Equal-weighted mean trade time (seconds after midnight) |
+| `time_last` | Time of the last trade (seconds after midnight) |
 | `qvolume` | Par volume (millions) |
 | `dvolume` | Dollar volume (millions) |
 | `prc_bid` | Dealer bid (value-weighted) |
+| `bid_last` | Last dealer bid price of the day |
+| `bid_time_ew` | Equal-weighted mean time of dealer bids |
+| `bid_time_last` | Time of the last dealer bid |
 | `prc_ask` | Dealer ask (value-weighted) |
-| `prc_lo` | Low price of the day |
-| `prc_hi` | High price of the day |
 | `bid_count` | Number of dealer buys (= customer sells) |
-| `ask_count` | Number of sells |
+| `ask_count` | Number of dealer sells (= customer buys) |
 
-**Expected output size:**
-- Enhanced TRACE (2002-present): ~30 million rows
-- Standard TRACE (2024-present): ~2-3 million rows
-- Rule 144A (2002-present): ~5-8 million rows
+**Expected output size** (the 2026-09-10 run):
+- Enhanced TRACE (2002-07 to the data frontier): ~31 million rows, about 2.2 GB
+- Standard TRACE (from 2024-10): opt-in, not part of the default run
+- Rule 144A (first trade 2003-10): ~3.8 million rows, about 250 MB
 
 **Additional outputs:**
 - Audit files documenting filter effects (in dataset subfolders)
@@ -510,7 +525,7 @@ Stage 0 produces daily panels in dataset-specific subfolders with the following 
 
 **Structure:** Panel data with one row per (cusip_id, trd_exctn_dt) combination
 
-**Output size:** ~500MB-2GB (depending on time period and datasets included)
+**Output size:** about 2.7 GB for the full sample with Enhanced and 144A (the 2026-09-10 run)
 
 **Data download:** Available in zipped parquet format on [Open Bond Asset Pricing](https://openbondassetpricing.com/data)
 
@@ -543,7 +558,7 @@ All prices are in **percentage of par** (e.g., 99 = 99% of par = $990 for a $1,0
 | `mac_dur` | float32 | Macaulay duration (years) |
 | `convexity` | float32 | Bond convexity |
 | `bond_maturity` | float32 | Time to maturity (years) |
-| `credit_spread` | float64 | Credit spread over duration-matched Treasury yield |
+| `credit_spread` | float64 | Credit spread over the Treasury yield at the bond's maturity (Liu-Wu curve) |
 
 #### TRACE Pricing (from Stage 0)
 
@@ -623,8 +638,9 @@ All prices are in **percentage of par**.
 - All `prc_*` prices are in percentage of par (99 = 99% of $1,000 = $990)
 
 ### Stage 2 Output
-Monthly panel of 140 columns carrying 108 corporate bond signals, ready for asset pricing
-research, plus the unadjusted `_mmn` twins and the factor time series.
+Monthly panel of 145 columns carrying 108 corporate bond signals, ready for asset pricing
+research, plus the unadjusted `_mmn` twins and the factor time series. Every column is
+defined in [stage2/DATA_DICTIONARY.md](stage2/DATA_DICTIONARY.md).
 
 ---
 
@@ -644,10 +660,12 @@ Using `./run_pipeline.sh` (complete automated pipeline from ROOT):
   member submitted, and runs ALONGSIDE Stage 1 rather than before it
 - **Stage 1 - Bond analytics**: **~2.5-3 hours** (waits for the Stage 0 DATA jobs)
 
-**End to end: about 4.5-5 hours.** The 2026-09-10 production run took 4.6 h wall clock and
-produced a 31,344,732-row Stage 1 panel over 70,684 CUSIPs, covering 2002-07-01 to
-2025-11-28 -- the sample end being set by `DATE_CUT_OFF = "auto:complete"`, the last month
-every source covers through its final trading session.
+**End to end: about 4.5-5 hours.** The 2026-09-10 production run took 4.7 h wall clock
+(07:33 to 12:16) and wrote a Stage 1 panel of 31,412,833 rows ending 2025-12-31. That run
+predates `DATE_CUT_OFF = "auto:complete"`, which ends the sample at the last month every
+source covers through its final trading session. Cut there, the panel is 31,344,732 rows over
+70,684 CUSIPs, 2002-07-01 to 2025-11-28, and that is the file the 2026 vintage was built from.
+A run with the current code writes that cut directly.
 
 **How it works:**
 The script uses SGE's `-hold_jid` to create automatic dependency chains:
@@ -682,11 +700,11 @@ PER SLOT, so the total is `slots x mem` and must stay within the WRDS caps of 8 
 If you use this pipeline in your research, please cite:
 
 ```bibtex
-@unpublished{dickerson2025pitfalls,
+@unpublished{dickerson2026replication,
   author = {Dickerson, Alexander and Robotti, Cesare and Rossetti, Giulio},
-  title = {Common pitfalls in the evaluation of corporate bond strategies},
-  year = {2025},
-  note = {Working Paper}
+  title = {The Corporate Bond Factor Replication Crisis},
+  year = {2026},
+  note = {Working Paper. Earlier versions circulated as "Common pitfalls in the evaluation of corporate bond strategies"}
 }
 
 @unpublished{dickerson2025constructing,

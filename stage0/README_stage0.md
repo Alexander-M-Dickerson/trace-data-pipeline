@@ -2,7 +2,7 @@
 
 This stage fetches and cleans TRACE data (Enhanced, Standard, and Rule 144A) on the WRDS Cloud and aggregates to daily panels. Jobs are submitted to Sun Grid Engine (SGE) from a PuTTY session (Windows users); files can be moved to/from WRDS with [WinSCP](https://winscp.net/eng/download.php) (Windows users). Mac users can simply use their terminal once connected to the WRDS Cloud. Mac users might find [ForkLift](https://binarynights.com/) useful -- a GUI file manager that allows uploads, edits, and the ability to manage WRDS Cloud files through a UI. 
 
-Besides generating daily bond pricing panels, the code also generates highly detailed TRACE data reports which document the effect of the filters at the transaction level. It produces (potentially) hundreds of time-series plots of every bond `cusip_id` that is impacted by the decimal shift and bounce-back correctors of Dickerson, Rossetti and Robotti (2025). 
+Besides generating daily bond pricing panels, the code also generates highly detailed TRACE data reports which document the effect of the filters at the transaction level. It produces (potentially) hundreds of time-series plots of every bond `cusip_id` that is impacted by the decimal shift and bounce-back correctors of Dickerson, Robotti and Rossetti (2026). 
 
 If you want to get things going quickly see **Quick start**. 
 Please also see **Generating the TRACE Data Reports** for instructions on how to generate the reports.
@@ -259,7 +259,7 @@ Replace:
 
 ## Requirements
 
-**Python version:** 3.10 or higher (tested with Python 3.13.3)
+**Python version:** 3.10 or higher (the 2026-09-10 production run used Python 3.14.5, the WRDS Cloud default)
 
 **Required packages:**
 
@@ -329,9 +329,12 @@ That looks exactly like the connection limit and is not.
 
 The WRDS password should be handled by the `.pgpass` file which you should have set up following the WRDS documentation.
 
-Review the default filter settings in `_trace_settings.py`. All filters are enabled by default with recommended values from Dickerson, Rossetti and Robotti (2025). See the [Configuration](#configuration-choices-you-can-edit) section for more details.
+Review the default filter settings in `_trace_settings.py`. All filters are enabled by default with recommended values from Dickerson, Robotti and Rossetti (2026). See the [Configuration](#configuration-choices-you-can-edit) section for more details.
 
-### 3. Make scripts executable (run once)
+### 3. Make scripts executable (older clones only)
+
+The scripts ship executable, so a fresh clone needs nothing here. A clone made before the
+executable bits were committed may need:
 
 ```bash
 chmod +x run_pipeline.sh download_inputs.sh run_smoke_test.sh stage0/run_*.sh stage1/run_stage1.sh
@@ -913,11 +916,11 @@ Or use your favorite LaTeX editor (TeXShop, TeXstudio, Overleaf, etc.).
     pulls 5 chunks at once. How much less depends on how fetch and clean divide up on the
     day — measured 4.5x on the chunk loop itself.
   - Standard TRACE (from 2024): 30-60 minutes, and opt-in
-  - Rule 144A (full sample): 30-60 minutes
+  - Rule 144A (full sample): 30-60 minutes (39 minutes on the 2026-09-10 run)
   - Data reports (with figures): was ~50 minutes for Enhanced; since v2.2.2 its
     re-clean pulls 5 chunks at once (~9 min), and the job no longer blocks stage 1
 
-- **Disk space**: Enhanced TRACE generates ~30M rows. Parquet files are compressed and typically 500MB-1GB per dataset. CSV files are much larger.
+- **Disk space**: Enhanced TRACE generates ~31M rows. On the 2026-09-10 run the Enhanced panel was about 2.2 GB and the 144A panel about 250 MB, and the whole `stage0/` folder about 2.7 GB.
 
 ---
 
@@ -1188,9 +1191,10 @@ If you use or extend this stage, please cite:
 
 **Primary Reference:**
 ```
-Dickerson, A., Robotti, C., & Rossetti, G. (2025). 
-Common pitfalls in the evaluation of corporate bond strategies.
-Working Paper.
+Dickerson, A., Robotti, C., & Rossetti, G. (2026).
+The Corporate Bond Factor Replication Crisis.
+Working Paper. (Earlier versions circulated as "Common pitfalls in the
+evaluation of corporate bond strategies.")
 ```
 
 **Secondary Reference:**
@@ -1219,11 +1223,9 @@ For questions, issues, or contributions:
 
 ## Version History
 
-- **v1.0** (2025-01-20): Initial release
-  - Enhanced, Standard, and 144A TRACE processing
-  - Decimal-shift and bounce-back error correction
-  - Comprehensive audit logging
-  - LaTeX report generation
+Every release, with what it changed, is in [CHANGELOG.md](../CHANGELOG.md). Stage 0 first shipped
+in 1.0.0 (2025-11-01) with Enhanced, Standard and 144A processing, the decimal-shift and
+bounce-back correctors, audit logging and the LaTeX reports.
 
 ---
 

@@ -1,9 +1,9 @@
 # Stage 2 — Monthly Asset-Pricing Panel
 
 Stage 2 turns Stage 1's daily bond-day panel into the **monthly asset-pricing panel**:
-returns, bond characteristics, ~100 signals, factor time series, and rolling factor betas.
+returns, bond characteristics, 108 signals, factor time series, and rolling factor betas.
 
-> **Status:** complete. Seven steps, a frozen 140-column contract asserted at the end of
+> **Status:** complete. Seven steps, a frozen 145-column contract asserted at the end of
 > every build, and a release packager that refuses to publish an unredacted panel.
 > `python _run_stage2.py --dry-run` resolves and validates the configuration without
 > building anything.
@@ -36,8 +36,8 @@ must **never** be submitted with `qsub`. Two reasons:
 `run_pipeline.sh` therefore does not submit it. When your WRDS run finishes, download
 `stage0/` and `stage1/` to your own machine and run Stage 2 there.
 
-A full build is roughly **7 minutes on 24 cores / 128 GB**. It is comfortable on a
-modern desktop and unhappy on a laptop with 16 GB.
+A full build takes **8 to 13 minutes on 24 cores / 128 GB** (the last two full builds, 2026-09-14
+and 2026-09-16). It is comfortable on a modern desktop and unhappy on a laptop with 16 GB.
 
 ---
 
@@ -78,7 +78,7 @@ cd stage2
 
 `--dry-run` prints the resolved configuration and validates every input, reporting all
 problems at once. Run it first — it is fast and it catches a wrong tree before you spend
-seven minutes discovering it.
+ten minutes discovering it.
 
 Useful flags (passed straight through to `_run_stage2.py`):
 
@@ -130,7 +130,7 @@ testing without editing the file.
 `<mode>` is the build label (`stage1` by default); released files are renamed to the
 vintage year, e.g. `main_panel_2026.parquet`. `<stamp>` is Stage 1's date stamp.
 
-**The column contract.** The panel's 140 names **and their order** are frozen in
+**The column contract.** The panel's 145 names **and their order** are frozen in
 [`lib/contract.py`](lib/contract.py) and asserted at the end of step 7. Adding, removing or
 moving a column is a public API change and a CHANGELOG entry — the build fails rather than
 shipping a silently permuted file. This caught a real reordering: the DEF/TERM fix swapped
@@ -214,10 +214,13 @@ Stage 2 downloads and caches a few published inputs into `stage2/data/` on first
 |---|---|
 | Pre-2002 quote returns | Lets rolling signals reach a common 2002-08 start. Carries the five `tret_*` benchmarks as well as `tret`, so the duration-adjusted blocks have the same pre-history whichever benchmark they use |
 | Extended BBW factor series | Backfills factor history before 2002-08 |
+| Bond-firm linker (`bond_firm_linker_2026`) | `permno` / `permco` / `gvkey`, joined on the linker's identity window |
+| Federal Reserve GSW yield curve | The zero-coupon Treasury returns behind `tret_bns`, `tret_cfm`, `tret_gprs` and `tret_cls` |
 | Fama-French, FRED, He-Kelly-Manela, Ludvigson, Policy Uncertainty | The monthly factor matrix |
 
-It also fetches Treasury returns, Fama-French factors and VIX from WRDS **once** and
-caches them, so only the first run needs your credentials.
+It also fetches Treasury returns, Fama-French factors, VIX and the FISD coupon terms the
+`tret_*` benchmarks need (`fisd_cashflow_terms.parquet`) from WRDS **once** and caches them,
+so only the first run needs your credentials.
 
 ---
 

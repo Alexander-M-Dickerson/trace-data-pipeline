@@ -24,11 +24,11 @@ every table and figure is still written, you just do not get the assembled PDF.
 ```bash
 cd stage3
 python tools/check_inputs.py     # are the five inputs there and the right shape?
-python _run_stage3.py --list     # the 40 steps, and what is already built
+python _run_stage3.py --list     # the 41 steps, and what is already built
 bash run_stage3.sh               # everything, ending in reports/exhibits.pdf
 ```
 
-The last step compiles every exhibit into **`reports/exhibits.pdf`** — 49 pages. That
+The last step compiles every exhibit into **`reports/exhibits.pdf`** — 58 pages. That
 is deliberately part of the run and not an afterthought: the exhibits are LaTeX
 fragments, and a fragment that will not compile looks perfectly fine sitting on disk.
 Compiling is what catches it.
@@ -44,7 +44,7 @@ Compiling is what catches it.
 | `data/<section>/` | the tidy statistics frames the exhibits format, plus a manifest per result |
 | `reports/tables/` | the paper's tables, as LaTeX fragments |
 | `reports/figures/` | the paper's figures, as PDF |
-| **`reports/exhibits.pdf`** | **all 43 of them compiled into one document**, in the paper's order and under the paper's exhibit numbers, with a provenance page |
+| **`reports/exhibits.pdf`** | **all 44 of them compiled into one document**, in the paper's order and under the paper's exhibit numbers, with a provenance page |
 | `reports/timings.jsonl` | one line per run: phases, wall clock, and the run's own check |
 
 Nothing downstream of a statistics frame recomputes a regression. Each section computes
@@ -159,12 +159,12 @@ return timeline, a look-ahead illustration. They have no data behind them, so St
 does not produce them, and the document says so rather than leaving a gap.
 
 Table IA.VIII is different: it is the paper's **signal dictionary**, defining each of
-the 140 panel fields. There is no computation behind it, so Stage 3 renders it from a
+the 145 panel fields. There is no computation behind it, so Stage 3 renders it from a
 spec -- `spec/signal_definitions.json`, one entry per field -- rather than from data.
 That spec was reconciled against Stage 2's `DATA_DICTIONARY.md` and against the code
-that computes each signal; six rows differ from the printed table and each records what
+that computes each signal; seven rows differ from the printed table and each records what
 was printed and why it changed. `RECONCILIATION_ia08.md` has the full account, and
-`python s4_zoo/t_ia08.py --diffs` prints the six.
+`python s4_zoo/t_ia08.py --diffs` prints the seven.
 
 Those timings are with the fast kernels, on 24 cores. Without them a sort takes roughly
 fourteen times as long (43.8 s against 3.2 s, measured on one), which is what turns the
@@ -228,7 +228,7 @@ drops that row so Table 3 prints 15 and the two tables agree.
 
 ## What it costs
 
-Measured on a **cold run** — `data/` and `reports/` wiped first — on 24 cores / 128 GB, Windows, with a PyBondLab build carrying the fast kernels, 2026-09-12. All 40 steps ran; none was skipped.
+Measured on a **cold run** — `data/` and `reports/` wiped first — on 24 cores / 128 GB, Windows, with a PyBondLab build carrying the fast kernels, 2026-09-12. All 41 steps ran; none was skipped.
 
 **906 s = 15.1 minutes** end to end, `tools/check_inputs.py` through `reports/exhibits.pdf`.
 
@@ -240,7 +240,7 @@ Measured on a **cold run** — `data/` and `reports/` wiped first — on 24 core
 | data appendix | `data` | 60 s | 7% |
 | Section 4 -- look-ahead bias | `lab` | 21 s | 2% |
 
-Those are the benched steps (856 s of the 906 s); the rest is process start-up, the 40 subprocess launches and the LaTeX compile. `reports/timings.jsonl` carries one line per step, and the run prints its own five slowest at the end.
+Those are the benched steps (856 s of the 906 s); the rest is process start-up across the 41 steps and the LaTeX compile. `reports/timings.jsonl` carries one line per step, and the run prints its own five slowest at the end.
 
 The run **exits non-zero**, and should: `s3_nse/t06_mua_nse.py`'s twin-invariance check is red while the sort engine's unstable empty cell is open. Every other step passed, and the PDF was produced -- a failed exhibit does not abandon the run.
 
@@ -365,7 +365,7 @@ own 16-versus-15 gap. It is emitted and marked, with `--quantified-only` to drop
 ```
 stage3/
   _stage3_settings.py     every path and constant; nothing hard-coded
-  _run_stage3.py          the entry point: 40 steps, producers then exhibits then the report
+  _run_stage3.py          the entry point: 41 steps, producers then exhibits then the report
   run_stage3.sh           contract check, then the above
   paths.py                paths derived from the settings
   pblenv.py               which PyBondLab, asserted and fingerprinted

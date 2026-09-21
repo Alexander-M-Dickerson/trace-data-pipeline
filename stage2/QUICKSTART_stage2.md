@@ -1,12 +1,11 @@
 # Quick Start (Stage 2) — Monthly Asset-Pricing Panel
 
-The shortest path from a Stage 1 daily panel to a 140-column monthly bond panel.
+The shortest path from a Stage 1 daily panel to a 145-column monthly bond panel.
 
 Stage 2 runs on **your own machine**, not the WRDS grid. It reads Stage 1's output rather
-than the TRACE tape, so there is no job to submit and no queue to wait in. Measured on 24
-cores and the full 2002-2025 sample, the seven steps take 125 s, 111 s, 31 s, 68 s, 53 s,
-13 s and 61 s — under eight minutes in total, and less than that in practice because the
-orchestrator overlaps two of the chains.
+than the TRACE tape, so there is no job to submit and no queue to wait in. On 24 cores and
+the full 2002-2025 sample, the last two full builds took 8.3 minutes (2026-09-14) and 13.0
+minutes (2026-09-16), start to finish.
 
 ---
 
@@ -27,8 +26,9 @@ All three are found automatically — newest date stamp wins.
 > least one rating. Fed the download, it would produce an **empty panel with no error**.
 > Stage 2 checks for this and refuses to start. Run Stage 0 and Stage 1 yourself.
 
-**2. A WRDS account.** Stage 2 pulls Treasury returns, the Fama-French factors and VIX.
-These are fetched once and cached under `stage2/data/`.
+**2. A WRDS account.** Stage 2 pulls Treasury returns, the Fama-French factors, VIX and the
+FISD coupon terms the `tret_*` benchmarks need. These are fetched once and cached under
+`stage2/data/`.
 
 **3. Python packages.**
 
@@ -117,7 +117,7 @@ it you still get the `.tex`.
 ## What you end up with
 
 ```
-stage2/output/panel/main_panel_<mode>.parquet     the 140-column panel
+stage2/output/panel/main_panel_<mode>.parquet     the 145-column panel
 stage2/output/blocks/<mode>/                      intermediate blocks, incl.
                                                     betas_x, mom_retx, returns_alt,
                                                     factors, and the _mmn sidecar
@@ -139,6 +139,6 @@ so a panel that builds is a panel you can read positionally.
 | `FileNotFoundError` on a factor | first run with no cache and no internet; the fetchers need one online run |
 | WRDS asks for a password on every step | no `.pgpass`; create one, or run `wrds.Connection()` once interactively |
 | the build asserts on the column contract | something changed the panel's columns; the message names them — see `lib/contract.py` |
-| step 2 is much slower than 25 s | you are running steps in one process; use `_run_stage2.py`, which forks per step |
+| step 2 takes several times its usual ~2 minutes | you are running steps in one process; use `_run_stage2.py`, which forks per step |
 
 More detail in [`README_stage2.md`](README_stage2.md).

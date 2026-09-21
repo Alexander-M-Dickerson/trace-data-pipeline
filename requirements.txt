@@ -1,6 +1,7 @@
 # TRACE Data Pipeline - Python Requirements
 # Stage 0-2: TRACE Processing
-# Tested on Python 3.12.11 and 3.14.2 (WRDS cloud)
+# Stages 0-1: the 2026-09-10 production run used Python 3.14.5 on the WRDS Cloud.
+# Stages 2-3: built and tested on Python 3.13 on a local machine.
 # Install with: python -m pip install -r requirements.txt
 
 # Core data processing

@@ -5,7 +5,7 @@
 - ✅ **Stage 0 completed** with outputs in `stage0/{enhanced,standard,144a}/`
 - ✅ **SSH access to WRDS Cloud** (or local Python environment)
 - ✅ **WRDS account** with FISD and ratings data access
-- ✅ **Python ≥ 3.10** (tested with Python 3.12.11)
+- ✅ **Python ≥ 3.10** (the 2026-09-10 production run used 3.14.5 on the WRDS Cloud)
 - ✅ **`.pgpass`** configured for passwordless WRDS authentication
 
 ---
@@ -23,7 +23,7 @@ Stage 1 enriches your cleaned TRACE data from Stage 0 with:
 
 **Output:** A research-ready dataset of 44 columns per bond-day.
 
-**Runtime:** ~3-4 hours with 2 cores (4 cores with threading) on WRDS cloud. Potentially quicker on your home machine.
+**Runtime:** about 2.5 hours on the WRDS Cloud with the 4 slots `run_pipeline.sh` requests (2.4 h on the 2026-09-10 run).
 
 ---
 
@@ -35,7 +35,7 @@ Stage 1 enriches your cleaned TRACE data from Stage 0 with:
 
 ```bash
 ssh <your_wrds_id>@wrds-cloud.wharton.upenn.edu
-cd ~/proj  # Navigate to your project root
+cd ~/trace-data-pipeline  # the repo root
 ```
 
 **Install packages** (recommended method):
@@ -75,7 +75,7 @@ pyarrow 24.0.0 on Python 3.14) — pinning downgrades a working environment. Use
 
 **Navigate to your root directory:**
 ```bash
-cd ~/proj  # Navigate to your project root directory
+cd ~/trace-data-pipeline  # the repo root directory
 ```
 
 **Edit root config file (if needed):**
@@ -123,7 +123,7 @@ N_CORES = None  # Auto-detects available cores
 
 ```bash
 # From your root directory
-cd ~/proj  # Navigate to your project root
+cd ~/trace-data-pipeline  # the repo root
 
 # Run the complete pipeline (downloads data + runs Stage 0 + Stage 1)
 ./run_pipeline.sh
@@ -131,7 +131,7 @@ cd ~/proj  # Navigate to your project root
 
 **This automatically:**
 1. Downloads required data files (Liu-Wu yields, bond-firm linker, FF industries)
-2. Submits Stage 0 jobs (Enhanced, Standard, 144A TRACE extraction)
+2. Submits Stage 0 jobs (Enhanced and 144A by default; Standard is opt-in)
 3. Submits Stage 1 job (waits for Stage 0 to complete)
 
 **Manual Stage 1 execution (if you already ran Stage 0):**
@@ -209,12 +209,14 @@ ls -lh data/stage1_*.parquet
 
 **Expected output:**
 ```
-data/
-├── stage1_YYYYMMDD.parquet       # Main enriched dataset (~500MB-2GB)
-└── reports/                      # Data quality reports (if enabled)
-    ├── stage1_data_report.tex
+stage1/
+├── data/
+│   ├── stage1_YYYYMMDD.parquet   # Main enriched dataset (~2.7 GB for the full sample)
+│   └── data_reports/             # The ultra-distressed filter's figure pages
+└── data_reports/                 # The Stage 1 data report
+    ├── stage1_data_report_YYYYMMDD.tex
     ├── references.bib
-    └── figures/
+    └── stage1_*.pdf              # its figures
 ```
 
 **Verify data:**
@@ -324,14 +326,14 @@ For detailed explanations of the accrued interest variables (`acclast`, `accpmt`
 
 **Windows users (WinSCP):**
 - Connect to WRDS Cloud via WinSCP
-- Navigate to `~/proj/stage1/data/`
+- Navigate to `~/trace-data-pipeline/stage1/data/`
 - Download `stage1_YYYYMMDD.parquet` to your local machine
 
 **Mac/Linux users (scp):**
 
 ```bash
 # From your LOCAL machine, run:
-scp -r <wrds_id>@wrds-cloud.wharton.upenn.edu:~/proj/stage1/data ./local_destination/
+scp -r <wrds_id>@wrds-cloud.wharton.upenn.edu:~/trace-data-pipeline/stage1/data ./local_destination/
 ```
 
 ---
@@ -458,23 +460,19 @@ wrds-pgdata.wharton.upenn.edu:9737:wrds:your_username:your_password
 
 **Solutions:**
 
-1. **Disable reports:**
-   ```python
-   # In _stage1_settings.py
-   GENERATE_REPORTS = False
-   ```
-
-2. **Process fewer datasets:**
+1. **Process fewer datasets** (in the root `config.py`, or `TRACE_MEMBERS="enhanced"` in the environment):
    ```python
    TRACE_MEMBERS = ["enhanced"]  # Only Enhanced, not Standard/144A
    ```
 
-3. **Use more CPU cores:**
+   There is no switch for Stage 1's reports; they always run.
+
+2. **Use more CPU cores:**
    ```python
    N_CORES = 20  # If available on your machine
    ```
 
-4. **Check you're not in the middle of a WRDS outage:**
+3. **Check you're not in the middle of a WRDS outage:**
    ```bash
    # Test WRDS connection
    python -c "import wrds; db = wrds.Connection(); print('Connected OK')"
@@ -488,7 +486,7 @@ wrds-pgdata.wharton.upenn.edu:9737:wrds:your_username:your_password
 # Configure settings (from root directory)
 nano stage1/_stage1_settings.py
 
-# Make executable
+# Make executable (older clones only; the script ships executable)
 chmod +x stage1/run_stage1.sh
 
 # Submit job (WRDS)
@@ -506,7 +504,7 @@ tail -f stage1/logs/stage1.err
 ls -lh stage1/data/stage1_*.parquet
 
 # Download from WRDS (Mac/Linux, run from LOCAL machine)
-scp -r <wrds_id>@wrds-cloud.wharton.upenn.edu:~/proj/stage1/data ./local_destination/
+scp -r <wrds_id>@wrds-cloud.wharton.upenn.edu:~/trace-data-pipeline/stage1/data ./local_destination/
 ```
 
 ---
@@ -515,6 +513,6 @@ scp -r <wrds_id>@wrds-cloud.wharton.upenn.edu:~/proj/stage1/data ./local_destina
 
 Having trouble? Check:
 1. **Detailed README:** See [README_stage1.md](README_stage1.md)
-2. **Log files:** Check `logs/stage1.err` for error messages
+2. **Log files:** Check `stage1/logs/stage1.err` for error messages
 3. **Email:** alexander.dickerson1@unsw.edu.au
 4. **GitHub Issues:** [trace-data-pipeline/issues](https://github.com/Alexander-M-Dickerson/trace-data-pipeline/issues)

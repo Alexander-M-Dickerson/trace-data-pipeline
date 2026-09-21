@@ -470,9 +470,9 @@ def default_references_bib() -> str:
 
 @unpublished{DickersonRobottiRossetti_2024,
   author = {Alexander Dickerson and Cesare Robotti and Giulio Rossetti},
-  note = {Working Paper},
-  title={Common pitfalls in the evaluation of corporate bond strategies},
-  year = {2024}
+  note = {Working Paper. Earlier versions circulated as ``Common pitfalls in the evaluation of corporate bond strategies''},
+  title={The Corporate Bond Factor Replication Crisis},
+  year = {2026}
 }
 
 @article{dick2009liquidity,

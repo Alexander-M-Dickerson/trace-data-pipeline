@@ -284,20 +284,22 @@
       "mnemonic": "spc_rat",
       "group": "Bond Characteristics",
       "name": "S&P Composite Rating",
-      "description": "Composite credit rating: S&P rating if available, otherwise Moody's rating. Scale: 1 (AAA) to 21 (CCC-), 22 = Default.",
+      "description": "Composite credit rating: S&P rating if available, otherwise Moody's rating. Scale: 1 (AAA) to 21 (C), 22 = Default.",
       "citation": "--",
       "citation_keys": [],
+      "paper_prints": "Composite credit rating: S&P rating if available, otherwise Moody's rating. Scale: 1 (AAA) to 21 (CCC-), 22 = Default.",
+      "why_corrected": "The printed row labels rating 21 as CCC-. On the numeric scale Stage 1 builds (stage1/helper_functions.convert_sp_to_numeric), CCC- is 19, CC is 20, C is 21 and D is 22. The scale's range is right; only the label on its last non-default grade is wrong.",
       "citation_text": "--"
     },
     {
       "mnemonic": "mdc_rat",
       "group": "Bond Characteristics",
       "name": "Moody's Composite Rating",
-      "description": "Composite credit rating: Moody's rating if available, otherwise S&P rating. Scale: 1 (AAA) to 21 (CCC-), 22 = Default.",
+      "description": "Composite credit rating: Moody's rating if available, otherwise S&P rating. Scale: 1 (Aaa) to 21 (C), 22 = Default.",
       "citation": "--",
       "citation_keys": [],
       "paper_prints": "Composite credit rating: Moody's rating if available, otherwise S&P rating. Scale: 1 (AAA) to 20 (CCC-), 21 = Default.",
-      "why_corrected": "The printed row says 1--20 with 21 = Default. Its own `spc_rat` row, one line above, says 1--21 with 22 = Default for the identical scale, and so does Stage 2's data dictionary. The paper contradicts itself; the 21/22 scale is the one the data uses.",
+      "why_corrected": "The printed row says 1--20 with 21 = Default. Its own `spc_rat` row, one line above, says 1--21 with 22 = Default for the identical scale, and so does Stage 2's data dictionary. The paper contradicts itself; the 21/22 scale is the one the data uses. Rating 21 is C, not CCC- (CCC- and Caa3 are 19; see stage1/helper_functions.convert_sp_to_numeric and convert_moodys_to_numeric).",
       "citation_text": "--"
     },
     {

@@ -718,8 +718,8 @@ Note: Individual filter flags and metadata are dropped to conserve memory.
 **Algorithm Execution (Filter 2)**:
 
 1. **Row 2 (Candidate)**:
-   - $|P_2 - 100.0| < 0.0001$ ✓ (round number)
-   - $P_2 = 100.0 > 0.50$ ✓ (qualifies for spike round check)
+   - $P_2 = 100.0 > \tau_{\text{high}} = 5.0$ ✓ (a high price)
+   - 100.0 is not in the round-number set $\mathcal{R}$, so the round test plays no part here
    - **Candidate opened**
 
 2. **Pre-Spike Prices**:
@@ -734,7 +734,10 @@ Note: Individual filter flags and metadata are dropped to conserve memory.
    - Row 3: $P_3 = 12.2 \leq 24.30$ ✓
    - **Recovery found**
 
-5. **Decision**: **Flag as spike** (type: `round_spike`)
+5. **Decision**: **Flag as spike** (type: `high_spike`)
+
+Verified by running `ultra_distressed_filter` on this input with the default configuration:
+row 2 is the only row flagged, with `spike_type = high_spike`.
 
 **Output**:
 
@@ -779,9 +782,13 @@ Note: Individual filter flags and metadata are dropped to conserve memory.
 
 | Row | Price | `flag_refined_any` | Notes |
 |-----|-------|--------------------|-------|
-| 2 | 0.01 | **1** | Plateau (ID=0) |
-| 3 | 0.01 | **1** | Plateau (ID=0) |
-| 4 | 0.01 | **1** | Plateau (ID=0) |
+| 2 | 0.01 | **1** | Plateau (ID=0), also anomalous (`ultra_low_round`) |
+| 3 | 0.01 | **1** | Plateau (ID=0), also anomalous (`ultra_low_round`) |
+| 4 | 0.01 | **1** | Plateau (ID=0), also anomalous (`ultra_low_round`) |
+
+Run on this input, the anomaly filter (Filter 1) flags the same three rows on its own, because
+each 0.01 is ultra-low, round, and far below the prices around it. Either filter is enough to
+remove them.
 
 ---
 
@@ -804,10 +811,12 @@ Note: Individual filter flags and metadata are dropped to conserve memory.
 - None are round numbers from R = {0.001, 0.01, 0.05, 0.10, 0.25, 0.50, 1.00}
 - **No candidates opened** → Filter 1 passes all rows
 
-**Filter 2 (Spike)**: No candidates
-- No price > τ_high = 5.0 AND no round numbers > 0.50
-- (65.0 is not a round number)
-- **No spike candidates**
+**Filter 2 (Spike)**: candidates, but no flag
+- Every price is above τ_high = 5.0, so every row is a spike candidate
+- Row 0 (65.0) has no earlier prices to compare against
+- Rows 1, 2 and 4 have no earlier price below their own, so no pre-spike median exists
+- Row 3 (8.2) has one lower earlier price, 7.8, and 8.2 / 7.8 ≈ 1.05 is below the 3.0 ratio
+- **No spike flagged**
 
 **Filter 3 (Plateau)**: No candidates
 - No price < τ_plateau = 0.15 AND no round numbers
@@ -815,7 +824,8 @@ Note: Individual filter flags and metadata are dropped to conserve memory.
 
 **Filter 4 (Intraday)**: Not applicable (would need intraday data)
 
-**Output**: All rows have `flag_refined_any = 0` (genuine distressed trading preserved)
+**Output**: All rows have `flag_refined_any = 0` (genuine distressed trading preserved).
+Verified by running `ultra_distressed_filter` on this input with the default configuration.
 
 **Key Insight**: The filter correctly ignores genuine distressed bonds because:
 1. Even $75-85 prices are well above the ultra-low thresholds ($1-$1.50)
@@ -853,7 +863,7 @@ Note: Individual filter flags and metadata are dropped to conserve memory.
 |-----|--------------------|-------|
 | 0 | **1** | Intraday inconsistency |
 
-**Note**: This example shows an erroneous low print of $1 on a day where the high was $890—an implausible 89× intraday swing indicating data error.
+**Note**: This example shows an erroneous low print of $1 on a day where the high was $890—an implausible 890× intraday swing indicating data error. Verified by running `ultra_distressed_filter` on this input: the row is flagged `flag_intraday_inconsistent = 1`.
 
 ---
 
@@ -936,8 +946,9 @@ affected_cusips = df_flagged.loc[df_flagged["flag_refined_any"] == 1, "cusip_id"
 
 print(f"Flagged {n_flagged:,} / {n_total:,} observations ({100*n_flagged/n_total:.2f}%)")
 print(f"Affected CUSIPs: {affected_cusips:,}")
-# Output: Flagged 12,847 / 3,245,892 observations (0.40%)
-# Output: Affected CUSIPs: 2,153
+# The 2026-09-10 production run printed the equivalent of:
+#   Flagged 10,185 observations (0.03%)
+#   Affected CUSIPs: 1,045
 ```
 
 ---
@@ -999,7 +1010,7 @@ Core detection functions (`_detect_anomalies_ultra`, `_detect_spikes_ultra`, `_d
 - `fastmath=True`: Aggressive floating-point optimizations
 - `nogil=True`: Release Python GIL for potential parallelism
 
-**Typical Performance**: Processes ~500,000 bond-days in ~15 seconds (single-threaded).
+**Typical Performance**: the whole Step 8 (the filter plus its chunking and bookkeeping) took about 10 minutes over the full sample on the 2026-09-10 run.
 
 ### Memory Optimization
 
@@ -1030,11 +1041,11 @@ At function exit, individual flag columns are **dropped** to conserve RAM:
 ## References
 
 ```bibtex
-@unpublished{dickerson2025pitfalls,
+@unpublished{dickerson2026replication,
   author = {Dickerson, Alexander and Robotti, Cesare and Rossetti, Giulio},
-  title = {Common pitfalls in the evaluation of corporate bond strategies},
-  year = {2025},
-  note = {Working Paper}
+  title = {The Corporate Bond Factor Replication Crisis},
+  year = {2026},
+  note = {Working Paper. Earlier versions circulated as "Common pitfalls in the evaluation of corporate bond strategies"}
 }
 
 @unpublished{dickerson2025constructing,

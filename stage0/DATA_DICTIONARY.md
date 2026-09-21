@@ -87,7 +87,9 @@ surviving customer trades.
 
 ## The FISD attribute file
 
-`enhanced/trace_enhanced_fisd_YYYYMMDD.parquet` — **23 columns**, one row per bond. Not a
+`enhanced/trace_enhanced_fisd_YYYYMMDD.parquet` — **23 columns**, one row per bond. 144A writes
+the same file as `144a/trace_fisd_144a_YYYYMMDD.parquet`; Stage 1 and Stage 2 read the Enhanced
+one. Not a
 panel: it carries the static issue attributes used to build the traded universe, and it is an
 **input to both Stage 1 and Stage 2** (Stage 2 reads `rule_144a`, `country_domicile`,
 `sic_code` and `offering_amt` from it).
@@ -95,9 +97,9 @@ panel: it carries the static issue attributes used to build the traded universe,
 | Column | Type | Definition |
 |---|---|---|
 | `complete_cusip` | string | 9-character bond CUSIP. Key. |
-| `issue_id` | int | FISD issue identifier. |
+| `issue_id` | float | FISD issue identifier (whole numbers, stored as float). |
 | `issue_name` | string | Issue description. |
-| `issuer_id` | int | FISD issuer identifier. |
+| `issuer_id` | float | FISD issuer identifier (whole numbers, stored as float). |
 | `foreign_currency` | string | `Y` if the bond is denominated in a foreign currency. |
 | `coupon_type` | string | FISD coupon type (`F` fixed, `V` variable, `Z` zero). |
 | `coupon` | float | Annual coupon rate, percent. |
@@ -114,7 +116,7 @@ panel: it carries the static issue attributes used to build the traded universe,
 | `principal_amt` | float | Principal amount per bond. |
 | `offering_amt` | float | Amount offered, **$1,000 units** — multiply by 1,000 for dollars. |
 | `country_domicile` | string | Issuer country of domicile. Source of the panel's `country`. |
-| `sic_code` | string | SIC industry code. Feeds the FF17/FF30 industry assignments. |
+| `sic_code` | string | SIC industry code. Feeds the FF12/FF17/FF30 industry assignments. |
 | `tenor` | float | Years from offering to maturity. |
 | `index` | int | Row index carried from the FISD pull. |
 

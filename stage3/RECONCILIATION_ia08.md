@@ -1,7 +1,7 @@
 # Table IA.VIII reconciled — the paper, Stage 2's dictionary, and the code
 
 Table IA.VIII (*Signal Definitions and Citations*) defines every column of the
-140-column Stage-2 panel. Three documents describe those columns: the paper's printed
+145-column Stage-2 panel. Three documents describe those columns: the paper's printed
 table, `stage2/DATA_DICTIONARY.md`, and the code that computes each one. This is what
 happens when you check all three against each other.
 
@@ -10,7 +10,7 @@ does not describe what the code does is wrong however carefully it was written, 
 only way to find out is to open the function.
 
 Stage 3 now generates the table from `spec/signal_definitions.json`
-(`s4_zoo/t_ia08.py`). Six rows there differ from the printed table; each carries
+(`s4_zoo/t_ia08.py`). Seven rows there differ from the printed table; each carries
 `paper_prints` and `why_corrected`, is marked `†` in the rendered table, and is listed
 below. `python s4_zoo/t_ia08.py --diffs` prints them.
 
@@ -20,17 +20,20 @@ below. `python s4_zoo/t_ia08.py --diffs` prints them.
 
 | check | result |
 |---|---|
-| mnemonics in IA.VIII | **140** |
-| columns in `stage2/lib/contract.PANEL_COLUMNS` | **140** |
+| mnemonics in IA.VIII | **145** |
+| columns in `stage2/lib/contract.PANEL_COLUMNS` | **145** |
 | in IA.VIII but not in the contract | **none** |
 | in the contract but not in IA.VIII | **none** |
 | Stage 3's 108 sorted signals missing a definition | **none** |
-| of the 140, undocumented in `stage2/DATA_DICTIONARY.md` | **none** |
-| citation keys in IA.VIII not resolvable in `references.bib` | **none** |
+| of the 145, undocumented in `stage2/DATA_DICTIONARY.md` | **none** |
+| citation keys in IA.VIII not resolvable in the paper's `references.bib` | **none** |
 | cluster memberships, paper vs `zoo_engine.CLUSTERS` vs `s3_nse/clusters.py` | **identical** |
 
-140 = 108 sorted signals + 32 identifiers, returns and characteristics. Every signal
-Stage 3 sorts has a definition, and a test asserts it.
+145 = 108 sorted signals + 37 identifiers, returns and characteristics. Every signal
+Stage 3 sorts has a definition, and a test asserts it. The count was 140 when this
+reconciliation was first run (2026-09-12); the five alternative Treasury benchmarks
+(`tret_bns`, `tret_cfm`, `tret_gprs`, `tret_cls`, `tret_mat`) joined the panel on 2026-09-14
+and carry no citation.
 
 **The discrepancies are all in prose, definitions and citations.** None is a missing or
 extra variable, and none changes which signals are sorted.
@@ -79,7 +82,7 @@ This is the one that matters. `dcs6` is an FDR survivor.
 | source | says |
 |---|---|
 | the paper | "±2 month band, with **+** favored over **−**" |
-| `stage2/DATA_DICTIONARY.md:184` | "searches with **±1** month bandwidth" (no tie-break stated) |
+| `stage2/DATA_DICTIONARY.md`, Cluster I table | "searches with **±1** month bandwidth" (no tie-break stated, as first read) |
 | **the code** | `DSPREAD_BANDWIDTH = 1`; `offsets = [0, -1, +1]` |
 
 `_stage2_settings.py:132` sets the bandwidth to 1. `lib/value.py:779-781` builds the
@@ -90,8 +93,9 @@ available it takes the **earlier** month — the longer lag — not the later on
 The paper is wrong in the width *and* backwards in the direction. Stage 2's dictionary
 has the width right and is silent on the tie-break.
 
-**Fixed here**: the spec states ±1, earlier month first. **Also fix**: Stage 2's
-dictionary should state the tie-break, since a reader who needs the band needs the order.
+**Fixed here**: the spec states ±1, earlier month first. Stage 2's dictionary now states
+the tie-break too ("taking the EARLIER month first"), since a reader who needs the band
+needs the order.
 
 ---
 
@@ -101,13 +105,20 @@ dictionary should state the tie-break, since a reader who needs the band needs t
 |---|---|
 | the paper's `mdc_rat` row | 1 (AAA) to **20** (CCC−), **21** = Default |
 | the paper's `spc_rat` row, one line above | 1 (AAA) to **21** (CCC−), **22** = Default |
-| `stage2/DATA_DICTIONARY.md:164-165` | 1 to 21, 22 = Default, for **both** |
+| `stage2/DATA_DICTIONARY.md`, Bond Characteristics table | 1 to 21, 22 = Default, for **both** |
 
 `spc_rat` and `mdc_rat` are the same scale reached by two different priority orders
 (S&P first, or Moody's first). They cannot have different lengths. The paper
 contradicts itself within two lines; 21/22 is the scale the data uses.
 
 **Fixed here.**
+
+❗**Both rows also mislabel rating 21 as CCC−** (corrected 2026-09-21, which makes
+`spc_rat` the seventh corrected row). On the numeric scale Stage 1 builds
+(`stage1/helper_functions.convert_sp_to_numeric`), CCC− is 19, CC is 20, C is 21 and
+D is 22; on Moody's side Caa3 is 19, Ca is 20 and C is 21. The range was right and
+only the label on its last non-default grade was wrong. Stage 2's dictionary and report
+carried the same label and are corrected with it.
 
 ---
 
@@ -147,15 +158,15 @@ convention a given file uses.
 
 ---
 
-## 6. Stage 2 documents all 140 — including `144a`
+## 6. Stage 2 documents all 145 — including `144a`
 
-Every one of the 140 mnemonics has an entry in `stage2/DATA_DICTIONARY.md`, and every
+Every one of the 145 mnemonics has an entry in `stage2/DATA_DICTIONARY.md`, and every
 column of `contract.PANEL_COLUMNS` does too. No gaps either way.
 
 Worth recording how nearly this was reported as a gap: the first pass matched dictionary
 rows with `` `([A-Za-z_][A-Za-z_0-9]*)` ``, which cannot match `` `144a` `` because the
 mnemonic starts with a digit. The checker reported one missing row and the row was
-there all along, at `DATA_DICTIONARY.md:168`. A coverage check that is wrong about its
+there all along, in the Bond Characteristics table. A coverage check that is wrong about its
 own alphabet reports a clean bill of health for 139 names and invents a defect in the
 140th.
 
@@ -163,11 +174,12 @@ own alphabet reports a clean bill of health for 139 names and invents a defect i
 
 ## 7. Stage 2's dictionary has no citation column
 
-78 of the 140 rows in IA.VIII carry a citation, drawing on 35 distinct works.
+78 of the 145 rows in IA.VIII carry a citation, drawing on 36 distinct works (35 when
+first counted; the momentum correction in section 4 brought in `gebhardt2005stock`).
 `stage2/DATA_DICTIONARY.md` carries none, so a reader there cannot find where a signal
 comes from without opening the paper.
 
-Not fixed — adding 35 references to a data dictionary is a judgement call about what
+Not fixed — adding 36 references to a data dictionary is a judgement call about what
 that document is for. Noted so the choice is deliberate.
 
 ---
@@ -193,11 +205,11 @@ cannot drift between them unnoticed.
 
 ```bash
 cd stage3
-python s4_zoo/t_ia08.py --diffs     # the six corrected rows and what settled each
+python s4_zoo/t_ia08.py --diffs     # the seven corrected rows and what settled each
 python s4_zoo/t_ia08.py             # -> reports/tables/table_ia08.tex
 python -m pytest tests/ -k ia08 -q  # every sorted signal has a definition
 ```
 
-The spec is `spec/signal_definitions.json`. It is the paper's text with six rows
+The spec is `spec/signal_definitions.json`. It is the paper's text with seven rows
 corrected, each recording what was printed and why it changed — so the printed table can
 always be reconstructed from it, and no correction is silent.

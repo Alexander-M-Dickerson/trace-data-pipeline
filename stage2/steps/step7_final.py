@@ -1,5 +1,5 @@
 """step7_final.py -- upstream step 7 (step_final_wrangle): the final left-join merge chain that
-produces the 140-column monthly panel.
+produces the 145-column monthly panel.
 
 Ground truth: the reference implementation's final wrangle line-for-line -- wrangle_returns (+ OSBAP
 linker), wrangle_signals, build_main_panel, str = ret_vw, runner column drops, str1_adj -> str_adj,

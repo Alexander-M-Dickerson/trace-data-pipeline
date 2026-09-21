@@ -8,7 +8,7 @@
 #
 #     bash stage2/run_build_data_reports.sh
 #     bash stage2/run_build_data_reports.sh --no-external      # no network needed
-#     bash stage2/run_build_data_reports.sh --mode prod_final  # a specific build
+#     bash stage2/run_build_data_reports.sh --mode stage1      # a specific build
 #
 # Any arguments are passed straight through to _build_data_report.py.
 #

@@ -1,6 +1,7 @@
 # TRACE Data Pipeline — Quick Start Guide
 
-Processes TRACE data from intraday to monthly with one execution script.
+Processes TRACE data from intraday trades to a monthly bond panel. One script runs Stages 0
+and 1 on WRDS, and Stage 2 then runs on your own computer.
 
 ---
 
@@ -36,9 +37,9 @@ Before you start, know where you will be:
 | | Where | What |
 |---|---|---|
 | Stages 0 and 1 | **WRDS Cloud** | build the daily bond panel from the raw TRACE tape (~5 h) |
-| The hand-off | you | zip it on WRDS, `scp` it to your own computer (~6 GB) |
-| Stage 2 | **your own computer** | build the monthly panel from that file (~8 min) |
-| Stage 3 | **your own computer** | sorts, uncertainty grids and the paper's exhibits (~14 min, optional) |
+| The hand-off | you | zip it on WRDS, `scp` it to your own computer (~5 GB) |
+| Stage 2 | **your own computer** | build the monthly panel from that file (~8-13 min) |
+| Stage 3 | **your own computer** | sorts, uncertainty grids and the paper's exhibits (~15 min, optional) |
 
 Steps 1-3 below are all **on WRDS**. The switch to your own computer happens at
 [Download Results](#download-results-to-your-local-machine), and Stage 2 follows it.
@@ -81,7 +82,7 @@ nano config.py
 
 Change the default values:
 ```python
-WRDS_USERNAME = os.getenv("WRDS_USERNAME", "your_username")  # Change to your WRDS ID
+WRDS_USERNAME = os.getenv("WRDS_USERNAME", "your_wrds_username")  # Change to your WRDS ID
 AUTHOR = "Your Name"  # Change from default "Open Source Bond Asset Pricing"
 ```
 
@@ -126,10 +127,9 @@ pyarrow 24.0.0 on Python 3.14) — pinning downgrades a working environment. Use
 
 ### Step 3: Run the Pipeline
 
-```bash
-# Make the scripts executable (once per clone)
-chmod +x *.sh stage0/*.sh stage1/*.sh
+The scripts ship executable, so a fresh clone needs no `chmod`.
 
+```bash
 # OPTIONAL BUT RECOMMENDED: prove the chain works first, in ~10 minutes
 bash download_inputs.sh     # LOGIN NODE only -- compute nodes have no internet
 qsub run_smoke_test.sh      # result in smoke_test.out
@@ -147,8 +147,8 @@ qsub run_smoke_test.sh      # result in smoke_test.out
 
 2. **Stage 0** (TRACE data extraction) -- submits exactly the members in
    `TRACE_MEMBERS`, which defaults to Enhanced + 144A:
-   - Enhanced TRACE (2002-present), pulling 5 CUSIP chunks at a time
-   - 144A TRACE (2002-present), running alongside it
+   - Enhanced TRACE (2002-07 onward), pulling 5 CUSIP chunks at a time
+   - 144A TRACE (first trade 2003-10), running alongside it
    - Standard TRACE (2024-present) -- OPT-IN; when requested it runs after the other
      two so it can use the whole WRDS connection budget
    - Data quality reports
@@ -161,7 +161,7 @@ qsub run_smoke_test.sh      # result in smoke_test.out
    - Apply quality filters
    - Generate final dataset
 
-**Runtime:** about 4.5-5 hours total on the WRDS Cloud with default settings (measured 4.63 h on 2026-09-09)
+**Runtime:** about 4.5-5 hours total on the WRDS Cloud with default settings (measured 4.63 h on 2026-09-09 and 4.7 h on 2026-09-10)
 
 ---
 
@@ -210,7 +210,7 @@ ls stage1/data_reports/
 trace-data-pipeline/
 ├── stage0/
 │   ├── enhanced/                                    # nine files per member
-│   │   ├── trace_enhanced_YYYYMMDD.parquet          # the cleaned tape, ~500MB-2GB
+│   │   ├── trace_enhanced_YYYYMMDD.parquet          # the daily panel, ~2.2 GB
 │   │   ├── trace_enhanced_fisd_YYYYMMDD.parquet     # the FISD universe used
 │   │   ├── fisd_filters_enhanced_YYYYMMDD.parquet
 │   │   ├── dick_nielsen_filters_audit_enhanced_YYYYMMDD.parquet
@@ -251,7 +251,7 @@ trace-data-pipeline/
 
 ## Download Results to Your Local Machine
 
-The pipeline generates a large folder (~6 GB) with hundreds of files. **The recommended approach is to zip the folder first**, then download a single file.
+The pipeline generates a large folder (~5 GB) with hundreds of files. **The recommended approach is to zip the folder first**, then download a single file.
 
 ### Step 1: Zip the Folder on WRDS (via SSH)
 
@@ -365,21 +365,21 @@ Then build the panel:
 ```bash
 cd stage2
 python _run_stage2.py --dry-run     # resolve and validate the config, build nothing
-python _run_stage2.py               # the full build, ~8 minutes on 24 cores
+python _run_stage2.py               # the full build, ~8-13 minutes on 24 cores
 ```
 
-It writes `output/panel/main_panel_<mode>.parquet` -- 140 columns per bond-month -- plus the
+It writes `output/panel/main_panel_<mode>.parquet` -- 145 columns per bond-month -- plus the
 unadjusted `_mmn` twins, the factor series, and the beta and momentum blocks. Every column is
 defined in [stage2/DATA_DICTIONARY.md](stage2/DATA_DICTIONARY.md).
 
-The build asserts its own column contract at the end: the 140 names **and their order** are
+The build asserts its own column contract at the end: the 145 names **and their order** are
 frozen in `stage2/lib/contract.py`, so a change to the model list cannot silently permute the
 published file.
 
 To package a vintage for distribution:
 
 ```bash
-python make_release.py --mode <mode>
+python make_release.py              # the stage1 build; --mode <mode> for another
 ```
 
 which redacts the proprietary identifiers and licensed ratings, and refuses to write a bundle
@@ -460,7 +460,8 @@ qstat -f  # Check cluster load
 
 ### Memory errors ("Killed")
 
-**Fix:** Reduce parallel processing (24GB is the hard cap on WRDS):
+**Fix:** Reduce parallel processing. A WRDS job may hold at most 48 GB, and Stage 1 asks for
+40 GB (4 slots of 10 GB):
 ```python
 # In stage1/_stage1_settings.py
 N_CORES = 1  # Use fewer cores on WRDS
@@ -498,6 +499,8 @@ trace-data-pipeline/
 │   ├── test_chunk_plan.py           # No WRDS needed
 │   ├── test_chunk_scheduler.py      # No WRDS needed
 │   ├── test_merge_keys.py           # No WRDS needed by default
+│   ├── test_cut_off_basis.py        # No WRDS needed
+│   ├── test_public_boundary.py      # No WRDS needed
 │   ├── test_docs.py                 # No WRDS needed
 │   └── probe_wrds_connections.py    # Measures your connection ceiling
 │
@@ -533,13 +536,18 @@ trace-data-pipeline/
 │       ├── Siccodes17.txt           # FF17 industries (auto-downloaded)
 │       └── Siccodes30.txt           # FF30 industries (auto-downloaded)
 │
-└── stage2/                          # Monthly panel -- YOUR machine, not the grid
-    ├── _run_stage2.py               # Main entry point
-    ├── _stage2_settings.py          # Stage 2 configuration
-    ├── make_release.py              # Packages a vintage (and redacts it)
-    ├── DATA_DICTIONARY.md           # Every one of the 140 columns
-    ├── lib/  steps/  tests/         # Engine, the seven steps, 14 test files
-    └── output/panel/                # main_panel_<mode>.parquet
+├── stage2/                          # Monthly panel -- YOUR machine, not the grid
+│   ├── _run_stage2.py               # Main entry point
+│   ├── _stage2_settings.py          # Stage 2 configuration
+│   ├── make_release.py              # Packages a vintage (and redacts it)
+│   ├── DATA_DICTIONARY.md           # Every one of the 145 columns
+│   ├── lib/  steps/  tests/         # Engine, the seven steps, 17 test files
+│   └── output/panel/                # main_panel_<mode>.parquet
+│
+└── stage3/                          # Sorts and the paper's exhibits -- YOUR machine, optional
+    ├── run_stage3.sh                # Input check, then the 41 steps
+    ├── README_stage3.md  QUICKSTART_stage3.md  INDEX.md
+    └── reports/exhibits.pdf         # Every table and figure, compiled
 ```
 
 ---
@@ -565,7 +573,6 @@ nano config.py  # Set WRDS_USERNAME
 python -m pip install --user -r requirements.txt
 
 # Fetch stage 1's external inputs (login node) and check the chain end to end
-chmod +x *.sh stage0/*.sh stage1/*.sh
 bash download_inputs.sh
 qsub run_smoke_test.sh             # ~10 min -> smoke_test.out
 

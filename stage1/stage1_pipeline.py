@@ -2458,7 +2458,7 @@ def step10_generate_reports():
         max_date=max_date_str,
         table_number=6,
         title="Non-Investment Grade Corporate Bonds",
-        rating_range_text="Ratings 11-21 (BB+ to CCC-)"
+        rating_range_text="Ratings 11-21 (BB+ to C)"
     )
     
     # ========================================================================

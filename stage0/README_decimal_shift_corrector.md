@@ -439,7 +439,8 @@ df_clean, n_corrected, affected_cusips = decimal_shift_corrector(
 )
 
 print(f"Corrected {n_corrected:,} transactions across {len(affected_cusips):,} bonds")
-# Output: Corrected 12,847 transactions across 1,203 bonds
+# On the full Enhanced sample (2026-09-10 run) this came to 2,223 transactions across
+# 1,149 bonds, summed over the run's 485 chunks.
 ```
 
 ---
@@ -465,7 +466,7 @@ The algorithm distinguishes errors from genuine moves by requiring:
 
 ## References
 
-**Dickerson, A., Robotti, C., & Rossetti, G. (2025)**. "Common pitfalls in the evaluation of corporate bond strategies." Working Paper.
+**Dickerson, A., Robotti, C., & Rossetti, G. (2026)**. "The Corporate Bond Factor Replication Crisis." Working Paper. Earlier versions circulated as "Common pitfalls in the evaluation of corporate bond strategies."
 
 ---
 

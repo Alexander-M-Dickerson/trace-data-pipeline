@@ -1,6 +1,6 @@
 r"""t_ia08.py -- Table IA.VIII, Signal Definitions and Citations.
 
-One row per column of the 140-column Stage-2 panel: the 108 sorted signals plus 32
+One row per column of the 145-column Stage-2 panel: the 108 sorted signals plus 37
 identifiers, returns and characteristics, each with its definition and its citation.
 
 This is the only exhibit in Stage 3 whose content is a SPEC rather than a computation.
@@ -12,7 +12,7 @@ dictionary and against the code by anyone, in a file that is not LaTeX.
     python s4_zoo/t_ia08.py --diffs         # print only the rows the paper prints
                                             #   differently, and why
 
-Six rows differ from the printed table. Each carries `why_corrected` in the spec and is
+Seven rows differ from the printed table. Each carries `why_corrected` in the spec and is
 listed in `RECONCILIATION_ia08.md`; each was settled by the code or by the paper
 contradicting itself, never by preference. The table footnotes them, so a reader of the
 PDF is told rather than left to diff two documents.

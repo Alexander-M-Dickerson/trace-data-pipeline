@@ -70,14 +70,15 @@ The repo ships a test suite. Run it before submitting a pull request.
 pytest:
 
 ```bash
-python -m pytest stage2/tests tests -q      # ~110 tests, no WRDS, no network
+python -m pytest stage2/tests tests -q      # 154 tests, no WRDS, no network
+python -m pytest stage3/tests -q            # 77 tests for the exhibit package
 ```
 
-That covers the frozen 140-column contract and its order, the `_mmn` twin rule, the release
+That covers the frozen 145-column contract and its order, the `_mmn` twin rule, the release
 redaction gate, the frontier guard, the `auto:complete` cut-off rule, the golden-diff engine,
 the NYSE calendar, month boundaries, the factor fetchers and the published extended series.
 
-❗**Some of it skips on a fresh clone, and a skip is not a pass.** Five of the six
+❗**Some of it skips on a fresh clone, and a skip is not a pass.** Six of the seven
 `stage2/tests/test_column_contract.py` tests need a built panel under `stage2/output/panel/`, so the
 panel = report = dictionary gate passes *vacuously* until you have run a build. The parity
 tests skip unless `STAGE2_REFERENCE_OUTPUT` / `STAGE2_REFERENCE_ROOT` point at a reference

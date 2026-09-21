@@ -31,7 +31,7 @@ and `stage1/` are both directly beneath the working directory.
 python3 -m venv ~/wrds_env
 source ~/wrds_env/bin/activate
 python -m pip install -U pip
-python -m pip install -r ../requirements.txt   # do NOT add --user
+python -m pip install -r requirements.txt      # do NOT add --user
 ```
 
 ### Option B — conda (if installed)
@@ -39,13 +39,13 @@ python -m pip install -r ../requirements.txt   # do NOT add --user
 ```bash
 conda create -n wrds_env python=3.13 -y
 conda activate wrds_env
-python -m pip install -r ../requirements.txt   # do NOT add --user
+python -m pip install -r requirements.txt      # do NOT add --user
 ```
 
 > Use `--user` only if you are **not** in any virtual/conda environment (system Python):
 >
 > ```bash
-> python -m pip install --user -r ../requirements.txt
+> python -m pip install --user -r requirements.txt
 > ```
 
 
@@ -108,14 +108,14 @@ What this does:
   the reports rather than after them (v2.2.2).
 * Jobs run on the WRDS cluster via `qsub`, so disconnecting SSH is safe
 
-Outputs:
+Outputs, under `stage0/`:
 
 ```
-enhanced/
-standard/
-144a/
-data_reports/
-logs/
+stage0/enhanced/
+stage0/144a/
+stage0/standard/        # only if you opt Standard in
+stage0/data_reports/
+stage0/logs/
 ```
 
 ---
@@ -144,8 +144,8 @@ qstat -j <jobID>
 Live logs:
 
 ```bash
-tail -f logs/01_enhanced.out
-tail -f logs/01_enhanced.err
+tail -f stage0/logs/01_enhanced.out
+tail -f stage0/logs/01_enhanced.err
 ```
 
 Stop tail: `Ctrl + C`

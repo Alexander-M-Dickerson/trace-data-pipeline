@@ -365,7 +365,7 @@ In the TRACE data available from WRDS (as opposed to academic TRACE), comprehens
 
 \subsection{Defaulted Bonds}
 
-We include bonds that have entered default in our sample. Recent evidence suggests that defaulted bonds remain actively traded in secondary markets and exhibit distinct pricing dynamics. \citet{baumann2025life} document how dealer intermediation affects recovery rates for defaulted bonds, while \citet{baumann2025defaulted} show that defaulted bonds represent a hybrid asset class with characteristics of both fixed income and equity securities. Figure~\ref{fig:figure_2} shows the time-series evolution of defaulted bond coverage. A bond is classified as defaulted if the S\&P rating (\texttt{sp\_rat}) equals 22 or the Moody's rating (\texttt{mdy\_rat}) equals 21 (corresponding to a D rating).
+We include bonds that have entered default in our sample. Recent evidence suggests that defaulted bonds remain actively traded in secondary markets and exhibit distinct pricing dynamics. \citet{baumann2025life} document how dealer intermediation affects recovery rates for defaulted bonds, while \citet{baumann2025defaulted} show that defaulted bonds represent a hybrid asset class with characteristics of both fixed income and equity securities. Figure~\ref{fig:figure_2} shows the time-series evolution of defaulted bond coverage. A bond is classified as defaulted if the S\&P rating (\texttt{sp\_rat}) equals 22 or the Moody's rating (\texttt{mdy\_rat}) equals 21 (S\&P's D and Moody's C, the lowest grade on each scale).
 
 \subsubsection{Return Calculation for Defaulted Bonds}
 
@@ -391,7 +391,7 @@ We impose the constraint that the trading-under-default return cannot exceed the
 
 \subsection{Sample Overview}
 
-Table~\ref{tab:monthly_data_availability} reports the overall data availability across our sample period. Tables~\ref{tab:desc_stats_all}--\ref{tab:desc_stats_def} present descriptive statistics for all bonds, investment grade bonds (S\&P ratings AAA to BBB-), non-investment grade bonds (BB+ to CCC-), and defaulted bonds, respectively. Table~\ref{tab:desc_stats_144a} presents descriptive statistics for Rule 144a bonds, which comprise approximately 25\% of all bond-month observations at sample end. Figure~\ref{fig:figure_1} compares market-level returns computed using month-end versus month-begin pricing conventions, illustrating the economic magnitude of the implementation gap for price-based strategies. Figure~\ref{fig:figure_2} shows the time-series evolution of defaulted bond coverage, and Figure~\ref{fig:figure_3} documents the dynamics of 144a bond coverage.
+Table~\ref{tab:monthly_data_availability} reports the overall data availability across our sample period. Tables~\ref{tab:desc_stats_all}--\ref{tab:desc_stats_def} present descriptive statistics for all bonds, investment grade bonds (S\&P ratings AAA to BBB-), non-investment grade bonds (BB+ to C), and defaulted bonds, respectively. Table~\ref{tab:desc_stats_144a} presents descriptive statistics for Rule 144a bonds, which make up about a fifth of all bond-month observations at sample end. Figure~\ref{fig:figure_1} compares market-level returns computed using month-end versus month-begin pricing conventions, illustrating the economic magnitude of the implementation gap for price-based strategies. Figure~\ref{fig:figure_2} shows the time-series evolution of defaulted bond coverage, and Figure~\ref{fig:figure_3} documents the dynamics of 144a bond coverage.
 """
 
     doc = r"""\documentclass[11pt]{article}
@@ -442,14 +442,17 @@ def get_references_bib() -> str:
   title={Computing Corporate Bond Returns: A Word (or Two) of Caution},
   author={Andreani, Martina and Palhares, Diogo and Richardson, Scott},
   journal={Review of Accounting Studies},
-  year={2023}
+  volume={29},
+  number={4},
+  pages={3887--3906},
+  year={2024}
 }
 
 @unpublished{DickersonRobottiRossetti_2024,
   author = {Alexander Dickerson and Cesare Robotti and Giulio Rossetti},
-  note = {Working Paper, Warwick Business School},
-  title = {Common Pitfalls in the Evaluation of Corporate Bond Strategies},
-  year = {2024}
+  note = {Working Paper. Earlier versions circulated as ``Common Pitfalls in the Evaluation of Corporate Bond Strategies''},
+  title = {The Corporate Bond Factor Replication Crisis},
+  year = {2026}
 }
 
 @article{dick2009liquidity,
@@ -519,12 +522,12 @@ def get_references_bib() -> str:
 }
 
 @article{danyliv2014convenient,
-  title={A convenient liquidity measure},
+  title={A practical approach to liquidity calculation},
   author={Danyliv, Oleh and Bland, Bruce and Nicholass, Daniel},
   journal={The Journal of Trading},
   volume={9},
-  number={4},
-  pages={38--49},
+  number={3},
+  doi={10.3905/jot.2014.9.3.057},
   year={2014},
   publisher={Pageant Media}
 }
@@ -572,7 +575,7 @@ def get_references_bib() -> str:
 @article{baumann2025life,
   title={Life after default: How dealer intermediation improves default recovery},
   author={Baumann, Friedrich and Kakhbod, Ali and Livdan, Dmitry and Nazemi, Abdolreza and Sch{\"u}rhoff, Norman},
-  journal={Available at SSRN 5134832},
+  journal={Available at SSRN 4579966},
   year={2025}
 }
 
@@ -758,14 +761,14 @@ def get_references_bib() -> str:
 }
 
 @article{bollerslev2020,
-  title={Realized semicovariances},
+  title={Good volatility, bad volatility, and the cross section of stock returns},
   author={Bollerslev, Tim and Li, Sophia Zhengzi and Zhao, Bingzhi},
-  journal={Econometrica},
-  volume={88},
-  number={4},
-  pages={1515--1551},
+  journal={Journal of Financial and Quantitative Analysis},
+  volume={55},
+  number={3},
+  pages={751--781},
   year={2020},
-  publisher={Wiley}
+  publisher={Cambridge University Press}
 }
 
 @article{dickerson2023priced,
@@ -774,7 +777,7 @@ def get_references_bib() -> str:
   journal={Journal of Financial Economics},
   volume={150},
   number={2},
-  pages={1--28},
+  pages={103707},
   year={2023},
   publisher={Elsevier}
 }
@@ -860,11 +863,11 @@ def get_references_bib() -> str:
 }
 
 @article{koijen2017,
-  title={The cross-section of managerial ability, incentives, and risk preferences},
+  title={The cross-section and time series of stock and bond returns},
   author={Koijen, Ralph SJ and Lustig, Hanno and {Van Nieuwerburgh}, Stijn},
   journal={Journal of Monetary Economics},
-  volume={91},
-  pages={1--17},
+  volume={88},
+  pages={50--69},
   year={2017},
   publisher={Elsevier}
 }
@@ -1097,13 +1100,13 @@ def get_signal_definitions() -> list:
                 {
                     'mnemonic': 'spc_rat',
                     'name': 'S\\&P Composite Rating',
-                    'description': 'Composite credit rating: S\\&P rating if available, otherwise Moody\'s rating. Scale: 1 (AAA) to 21 (CCC-), 22 = Default.',
+                    'description': 'Composite credit rating: S\\&P rating if available, otherwise Moody\'s rating. Scale: 1 (AAA) to 21 (C), 22 = Default.',
                     'citation': '--',
                 },
                 {
                     'mnemonic': 'mdc_rat',
                     'name': "Moody's Composite Rating",
-                    'description': 'Composite credit rating: Moody\'s rating if available, otherwise S\\&P rating. Scale: 1 (AAA) to 20 (CCC-), 21 = Default.',
+                    'description': 'Composite credit rating: Moody\'s rating if available, otherwise S\\&P rating. Scale: 1 (Aaa) to 21 (C), 22 = Default.',
                     'citation': '--',
                 },
                 {

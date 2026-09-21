@@ -99,8 +99,10 @@ join to; use identity when the firm id is a **label** you group by.
 
 ❗**KNOWN, DATED GAP (2026-09-16).** The Stage 2 monthly panel joins the **identity** window,
 because a bond-month panel labels issuers. Until Stage 1 is next rebuilt from WRDS, **the daily
-and monthly panels carry different `permno` on roughly 2% of bond-months** -- monthly coverage is
-88.8%, daily 86.5%. If you join the two, reconcile on `cusip_id` and date, not on `permno`. This
+and monthly panels carry different `permno` on roughly 2% of bond-months** -- the monthly panel
+covers 88.8% of bond-months, against 86.6% had it joined the evidence window, and this daily
+panel covers 87.8% of bond-days (2026 vintage). If you join the two, reconcile on `cusip_id` and
+date, not on `permno`. This
 is deliberate and written down: the two windows drifted apart in the first place precisely
 because nobody had written down which one anything used.
 

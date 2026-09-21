@@ -61,13 +61,13 @@ This document describes the variables computed in the Stage 2 bond data pipeline
 
 All data in the panel is sampled at the end of month $t$; no variables have a lead or a lag.
 
-**Sample start dates:** Most signals have a sample start date of 2002-08, including those that require a rolling estimation period. Signals requiring rolling data use ICE/BofA data to generate observations prior to 2002-08, enabling a consistent start date of 2002-08 for the main panel. Rolling signals that require TRACE-based illiquidity data (e.g., Amihud and Pastor-Stambaugh liquidity betas) start 2003-08.
+**Sample start dates:** Most signals have a sample start date of 2002-08, including those that require a rolling estimation period. Signals requiring rolling data use ICE/BofA data to generate observations prior to 2002-08, enabling a consistent start date of 2002-08 for the main panel. Rolling signals that require TRACE-based illiquidity data (e.g., Amihud and Pastor-Stambaugh liquidity betas) start 2003-07.
 
 Several datasets are available on the [Open Bond Asset Pricing](https://openbondassetpricing.com/) website.
 
 ### Market Microstructure Adjusted Signals and Returns
 
-The main panel includes several identifiers, additional variables, and signals. As standard, we provide market microstructure-adjusted (MMN) price-based signals, which includes all variables related to bond price, yield, spread, value, illiquidity, within-month risk, and daily betas. The signals employ a minimum 1-business day gap before the month-end price used for returns. The average (median) day gap is 1.68 (1) day. The maximum allowed gap is capped at 10 business days, although this is extremely rare (P99 of the signal gap is 5 days). The methodology is outlined in the [Signal Gap](#signal-gap-for-price-based-signals) section below.
+The main panel includes several identifiers, additional variables, and signals. As standard, we provide market microstructure-adjusted (MMN) price-based signals, which includes all variables related to bond price, yield, spread, value, illiquidity, within-month risk, and daily betas. The signals employ a minimum 1-business day gap before the month-end price used for returns. In the 2026 vintage the average (median) gap is 1.66 (1) business days. The maximum allowed gap is capped at 10 business days, and long gaps are rare (the 95th percentile is 5 days and the 99th is 7). The methodology is outlined in the [Signal Gap](#signal-gap-for-price-based-signals) section below.
 
 **Main panel usage:** Use month-end returns (`ret_vw`) with the MMN-adjusted signals provided in the main panel.
 
@@ -103,13 +103,9 @@ column differs from `ret_vw` only in which price is used at each month end:
 | `ret_lst` | float32 | Return computed from the **last** available trade price on day $d$. |
 | `ret_bid` | float32 | Return computed from the volume-weighted average **bid** price on day $d$. |
 | `tret` | float32 | Duration-matched Treasury return, as in the main panel. |
-| `tret_bns` | float32 | Treasury Return, Duration-Weighted Cash Flows; see the main panel. |
-| `tret_cfm` | float32 | Treasury Return, Cash-Flow-Weighted; see the main panel. |
-| `tret_gprs` | float32 | Treasury Return, Exact Duration Match; see the main panel. |
-| `tret_cls` | float32 | Treasury Return, Cash-Flow-Matched; see the main panel. |
-| `tret_mat` | float32 | Treasury Return, Maturity-Matched; see the main panel. |
 
-where day $d$ is in the last 5 business days of months $t$ and $t+1$.
+where day $d$ is in the last 5 business days of months $t$ and $t+1$. The five alternative
+Treasury benchmarks (`tret_bns` and the rest) are in the main panel only, not in this file.
 
 All five return measures use the same total-return construction as `ret_vw` -- the coupon is
 carried through accrued interest, not inferred from a dirty-price ratio -- so they differ from
@@ -153,9 +149,6 @@ For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month r
 | `tret_gprs` | Treasury Return, Exact Duration Match | As `tret_bns`, refined so the Treasury portfolio's duration equals the bond's exactly. The present-value weights are duration-matched only when the term structure is flat; this solves for the Treasury yield that restores the match and reweights accordingly. |
 | `tret_cls` | Treasury Return, Cash-Flow-Matched | As `tret_bns`, but discounting the same cash flows on the Treasury zero curve instead of at the bond's own yield to maturity. This replicates the bond's cash flows rather than its duration, so it removes slope and curvature effects as well as parallel shifts. The difference from `tret_bns` is the authors' higher-order component. |
 | `tret_mat` | Treasury Return, Maturity-Matched | The twin of `tret`: the same key-rate Treasury index returns, the same interpolation nodes and rounding, but interpolated at the bond's remaining MATURITY rather than its modified duration. Included as the maturity-matched comparator; duration matching is the more precise of the two. |
-
-**The five `tret_*` benchmarks before 1986.** The Treasury curve's long end is held flat beyond the longest tenor the Gurkaynak-Sack-Wright curve actually fitted, because no Treasury that long existed to price. This is the convention of Gurkaynak, Sack and Wright (2007) and of Ghaderi, Plante, Roussanov and Seo (2026), whose Appendix A states it in as many words -- "we conservatively apply flat extrapolation when necessary". It is what makes a 1973 start possible at all: without it no bond outliving the fitted curve could be priced, and the early sample would simply be absent. Measured cost: RMSE 15.8 bps, bias -0.3 bps, and exactly zero for any bond whose cash flows end inside the fitted range. The benchmarks diverge from one another most in this early period, for the same reason -- the curve is least anchored there.
-
 | `ret_vw` | Total Return (End) | Month-end to month-end total return. |
 | `ret_vw_bgn` | Total Return (Begin) | Month-begin to month-end total return within the same month. |
 | `dt_s` | Date Start | Trade date for month-end price in month $t-1$ (last 5 BD). |
@@ -166,7 +159,9 @@ For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month r
 | `igap_bgn` | Implementation Gap | Business days between month-end price ($t$) and month-begin price ($t+1$); capped at 5 BD. |
 | `sig_dt` | Signal Date | Date when price-based signal was observed (minimum 1 BD before month-end price). |
 | `sig_gap` | Signal Gap | Business days between signal observation and month-end price; ranges 1–10 BD. |
-| `rfret` | Risk-Free Rate | Monthly risk-free rate from Fama-French. Used for excess returns: $r^x = r - r^f$. |
+| `rfret` | Risk-Free Rate | Monthly risk-free rate from Fama-French. Used for excess returns, $r - r^f$. |
+
+**The five `tret_*` benchmarks before 1986.** The Treasury curve's long end is held flat beyond the longest tenor the Gurkaynak-Sack-Wright curve actually fitted, because no Treasury that long existed to price. This is the convention of Gurkaynak, Sack and Wright (2007) and of Ghaderi, Plante, Roussanov and Seo (2026), whose Appendix A states it in as many words -- "we conservatively apply flat extrapolation when necessary". It is what makes a 1973 start possible at all: without it no bond outliving the fitted curve could be priced, and the early sample would simply be absent. Measured cost: RMSE 15.8 bps, bias -0.3 bps, and exactly zero for any bond whose cash flows end inside the fitted range. The benchmarks diverge from one another most in this early period, for the same reason -- the curve is least anchored there.
 
 ---
 
@@ -174,8 +169,8 @@ For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month r
 
 | Mnemonic | Name | Description |
 |----------|------|-------------|
-| `spc_rat` | S&P Composite Rating | Composite credit rating: S&P rating if available, otherwise Moody's rating. Scale: 1 (AAA) to 21 (CCC-), 22 = Default. **Collapsed to {1, 11} in the published file** -- see *Redaction* below. |
-| `mdc_rat` | Moody's Composite Rating | Composite credit rating: Moody's rating if available, otherwise S&P rating. Scale: 1 (AAA) to 21 (CCC-), 22 = Default. **Collapsed to {1, 11} in the published file** -- see *Redaction* below. |
+| `spc_rat` | S&P Composite Rating | Composite credit rating: S&P rating if available, otherwise Moody's rating. Scale: 1 (AAA) to 21 (C), 22 = Default. **Collapsed to {1, 11} in the published file** -- see *Redaction* below. |
+| `mdc_rat` | Moody's Composite Rating | Composite credit rating: Moody's rating if available, otherwise S&P rating. Scale: 1 (Aaa) to 21 (C), 22 = Default. **Collapsed to {1, 11} in the published file** -- see *Redaction* below. |
 | `call` | Callable Indicator | Indicator for embedded call option (1 = callable, 0 = non-callable). |
 | `fce_val` | Face Value | Bond amount outstanding (face value); units of the bond outstanding. |
 | `144a` | Rule 144A Indicator | Dummy variable: 1 if bond is Rule 144A, 0 otherwise. |
@@ -204,7 +199,7 @@ For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month r
 | Mnemonic | Name | Description |
 |----------|------|-------------|
 | `bbtm` | Bond Book-to-Market | Par price divided by market price of the bond. |
-| `val_hz` | Value (HZ) | Percentage deviation of observed credit spread from fitted "fair" spread: $(cs - \widehat{cs}) / \widehat{cs}$. Controls: rating, industry, maturity, spread change, callable. |
+| `val_hz` | Value (HZ) | Percentage deviation of observed credit spread from fitted "fair" spread: $(cs - \widehat{cs}) / \widehat{cs}$. Controls: rating, industry, 3-month spread change, callable. |
 | `val_hz_dts` | Value (HZ, DtS-adjusted) | HZ value signal demeaned within duration-times-spread quintiles to control for systematic spread-duration risk. |
 | `val_ipr` | Value (IPR) | Log-spread residual from fair-value regression: $\log(cs) - X'\hat{\beta}$. Controls: rating, industry, log duration, volatility, callable. |
 | `val_ipr_dts` | Value (IPR, DtS-adjusted) | IPR value signal demeaned within duration-times-spread quintiles. |
@@ -1363,7 +1358,7 @@ For each month $t$, estimate:
 
 $$\log(cs_{i,t}) = x_{i,t}^\top \beta_t + \varepsilon_{i,t}$$
 
-where $x_{i,t}$ includes rating controls, industry dummies, time-to-maturity, spread changes, and other characteristics. The fitted "fair" spread uses a lognormal retransformation:
+where $x_{i,t}$ includes rating controls, industry dummies and the model's own characteristics, listed under each model below. The fitted "fair" spread uses a lognormal retransformation:
 
 $$\widehat{cs}_{i,t} = \exp\left(x_{i,t}^\top \widehat{\beta}_t + \tfrac{1}{2}\widehat{\sigma}_t^2\right)$$
 
@@ -1373,7 +1368,7 @@ Percentage deviation from fitted spread:
 
 $$\text{val-hz}_{i,t} = \frac{cs_{i,t} - \widehat{cs}_{i,t}}{\widehat{cs}_{i,t}}$$
 
-**Controls:** Rating dummies, FF17 industry dummies, maturity, 3-month spread change, call indicator.
+**Controls:** Rating dummies (`spc_rat`), FF17 industry dummies, 3-month spread change, call indicator. The regression carries no maturity control (`lib/value.py`, `x_cols=['dcs3', 'call']`).
 
 | Variable | Description |
 |----------|-------------|
@@ -1570,34 +1565,34 @@ Based on squared returns (no mean adjustment).
 
 ### Collinearity Notes
 
-None of the 140 columns duplicates another: across all 7,626 numeric pairs, **no two are
+None of the 145 columns duplicates another: across all 9,045 numeric pairs, **no two are
 bit-identical**, and the test suite asserts that. But several are near-substitutes, and
 anyone forming clusters, running a horse race or building a factor zoo should know which.
-Measured on the production panel (1.8 M bond-months):
+Measured on the 2026 panel (1.95 M bond-months):
 
 | pair | \|corr\| | why they are close |
 |---|---|---|
 | `mcap_e` / `sze` | 0.9998 | both are market value; `sze` is the panel's size variable and `mcap_e` the end-of-month market cap |
-| `mcap_s` / `sze` | 0.9980 | as above, `mcap_s` measured at the signal date |
-| `mcap_s` / `mcap_e` | 0.9978 | the same quantity a few business days apart |
-| `fce_val` / `mcap_e` | 0.9809 | face value against market value; they differ only through the price |
-| `dvol` / `dvol_idio` | 0.9797 | total daily volatility is mostly idiosyncratic for corporate bonds |
-| `b_mktbx_dcapm` / `b_defb` | **0.9744** | see below |
-| `ivol_mkt` / `ivol_bbw` | 0.9705 | residual volatility from two nested market models |
+| `mcap_s` / `sze` | 0.9981 | as above, `mcap_s` measured at the signal date |
+| `mcap_s` / `mcap_e` | 0.9979 | the same quantity a few business days apart |
+| `fce_val` / `mcap_e` | 0.9817 | face value against market value; they differ only through the price |
+| `dvol` / `dvol_idio` | 0.9817 | total daily volatility is mostly idiosyncratic for corporate bonds |
+| `b_mktbx_dcapm` / `b_defb` | **0.9750** | see below |
+| `ivol_mkt` / `ivol_bbw` | 0.9708 | residual volatility from two nested market models |
 
 ❗**`b_defb` and `b_mktbx_dcapm`.** These correlate 0.97, which is high enough to matter if you
 put both in the same regression or treat them as separate cluster members. This is economically
 sensible — bonds with high market betas are bonds with high default betas. For reference,
-`b_defb` correlates 0.94 with `b_mktb`.
+`b_defb` correlates 0.87 with `b_mktb`.
 
 Within the Credit and Default Betas cluster the loadings are related but distinct:
 
 | | `b_drf` | `b_crf` | `b_lrf` | `b_defb` | `b_termb` |
 |---|---|---|---|---|---|
-| `b_drf` | 1.00 | 0.30 | 0.75 | 0.87 | 0.67 |
-| `b_crf` | | 1.00 | 0.31 | 0.48 | −0.13 |
-| `b_lrf` | | | 1.00 | 0.70 | 0.59 |
-| `b_defb` | | | | 1.00 | 0.63 |
+| `b_drf` | 1.00 | 0.37 | 0.79 | 0.88 | 0.67 |
+| `b_crf` | | 1.00 | 0.39 | 0.53 | −0.04 |
+| `b_lrf` | | | 1.00 | 0.73 | 0.54 |
+| `b_defb` | | | | 1.00 | 0.64 |
 | `b_termb` | | | | | 1.00 |
 
 ---
@@ -1686,7 +1681,7 @@ stamp instead; the release step renames them.
 
 | File | Description |
 |------|-------------|
-| `main_panel_<YYYY>.parquet` | Main panel with MMN-adjusted price-based signals — the 140 columns defined in this document |
+| `main_panel_<YYYY>.parquet` | Main panel with MMN-adjusted price-based signals — the 145 columns defined in this document |
 | `mmn_price_based_signals_<YYYY>.parquet` | Unadjusted twins of the price-based signals, suffix `_mmn` (see below) |
 | `betas_x_<YYYY>.parquet` | Betas from duration-adjusted returns ($r^x = r - r^{Tsy}$) |
 | `mom_retx_<YYYY>.parquet` | Momentum/LTR signals from duration-adjusted returns |
@@ -1724,9 +1719,9 @@ entry, never a silent edit.
 **Risk Premia:**
 - Bali, T. G., Subrahmanyam, A., & Wen, Q. (2021). The macroeconomic uncertainty premium in the corporate bond market. *Journal of Financial and Quantitative Analysis*, 56(5), 1653-1678.
 - Ceballos, L. (2021). Inflation volatility risk and the cross-section of corporate bond returns. Working paper.
-- Dickerson, A., Mueller, P., & Robotti, C. (2023). Priced risk in corporate bonds. *Journal of Financial Economics*, 150(2), 1-28.
+- Dickerson, A., Mueller, P., & Robotti, C. (2023). Priced risk in corporate bonds. *Journal of Financial Economics*, 150(2), 103707.
 - Gebhardt, W. R., Hvidkjaer, S., & Swaminathan, B. (2005). The cross-section of expected corporate bond returns: Betas or characteristics? *Journal of Financial Economics*, 75(1), 85-114.
-- Koijen, R. S., Lustig, H., & Van Nieuwerburgh, S. (2017). The cross-section of managerial ability, incentives, and risk preferences. *Journal of Monetary Economics*, 91, 1-17.
+- Koijen, R. S., Lustig, H., & Van Nieuwerburgh, S. (2017). The cross-section and time series of stock and bond returns. *Journal of Monetary Economics*, 88, 50-69.
 - Ang, A., Chen, J., & Xing, Y. (2006). Downside risk. *Review of Financial Studies*, 19(4), 1191-1239.
 - Baker, S. R., Bloom, N., & Davis, S. J. (2016). Measuring economic policy uncertainty. *Quarterly Journal of Economics*, 131(4), 1593-1636.
 
@@ -1754,5 +1749,12 @@ entry, never a silent edit.
 - Israel, R., Palhares, D., & Richardson, S. (2018). Common factors in corporate bond returns. *Journal of Investment Management*, 16(2), 17-46.
 - Gilchrist, S., & Zakrajšek, E. (2012). Credit spreads and business cycle fluctuations. *American Economic Review*, 102(4), 1692-1720.
 
-**Duration-Adjusted Bond Returns:**
-- Andreani, M., Palhares, D., & Richardson, S. (2024). Computing corporate bond returns: A word (or two) of caution. *Review of Accounting Studies*.
+**Duration-Adjusted Bond Returns and Treasury Benchmarks:**
+- Andreani, M., Palhares, D., & Richardson, S. (2024). Computing corporate bond returns: A word (or two) of caution. *Review of Accounting Studies*, 29(4), 3887-3906.
+- Bessembinder, H., Kahle, K. M., Maxwell, W. F., & Xu, D. (2009). Measuring abnormal bond performance. *Review of Financial Studies*, 22(10), 4219-4258.
+- Cui, L., Lu, X., & Song, Z. (2026). Understanding corporate bond excess returns. Working paper.
+- Ghaderi, M., Plante, S., Roussanov, N., & Seo, S. B. (2026). Reconstructing a century of U.S. corporate bonds: Credit risk in historical perspective. Working paper.
+- Gürkaynak, R. S., Sack, B., & Wright, J. H. (2007). The U.S. Treasury yield curve: 1961 to the present. *Journal of Monetary Economics*, 54(8), 2291-2304.
+
+**Equity Factors:**
+- Fama, E. F., & French, K. R. (1993). Common risk factors in the returns on stocks and bonds. *Journal of Financial Economics*, 33(1), 3-56.

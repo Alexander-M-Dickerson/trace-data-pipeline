@@ -81,7 +81,7 @@ Consider Bond ABC with the following data:
 - This is a **Default Event** (`ret_type = 'default_evnt'`)
 
 **Return Calculation:**
-$$r_{t+1}^{\text{default}} = \frac{P_{t+1}^{\text{end}}}{P_{t}^{\text{end}} + AI_{t}^{\text{end}}} - 1 = \frac{45.00}{100.25} - 1 = -0.5512 = -55.12\%$$
+$$r_{t+1}^{\text{default}} = \frac{P_{t+1}^{\text{end}}}{P_{t}^{\text{end}} + AI_{t}^{\text{end}}} - 1 = \frac{45.00}{100.25} - 1 = -0.5511 = -55.11\%$$
 
 ---
 

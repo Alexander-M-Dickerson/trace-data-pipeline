@@ -676,7 +676,7 @@ def test_the_signal_spec_matches_the_stage2_contract():
 def test_corrected_definition_rows_say_what_was_printed_and_why():
     """A correction that does not record what it replaced is not reproducible.
 
-    Six rows differ from the printed Table IA.VIII. Each must carry the paper's own
+    Seven rows differ from the printed Table IA.VIII. Each must carry the paper's own
     text and the reason, so the printed table can be reconstructed from the spec and
     no change is silent.
     """

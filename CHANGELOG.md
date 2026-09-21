@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed -- documentation and citations, checked against the data (2026-09-21)
+
+Every doc was read against the 2026 build, the 2026-09-10 WRDS run and the code. What was
+wrong, grouped.
+
+- **Citations.**
+  - The Koijen, Lustig and Van Nieuwerburgh (2017) reference carried the title of a
+    different paper. It is *The cross-section and time series of stock and bond returns*,
+    *Journal of Monetary Economics* 88, 50-69.
+  - The Bollerslev, Li and Zhao (2020) entry in the Stage 2 report carried the title and
+    journal of *Realized semicovariances*, a different paper by a different author team. It
+    is *Good volatility, bad volatility, and the cross section of stock returns*, *JFQA*
+    55(3), 751-781.
+  - Danyliv, Bland and Nicholass (2014) is *A practical approach to liquidity calculation*,
+    *Journal of Trading* 9(3).
+  - Dickerson, Mueller and Robotti (2023) is article 103707, not pages 1-28.
+  - Baumann et al.'s *Life after default* is SSRN 4579966. The report gave another paper's id.
+  - The pipeline's own paper is cited under its current title, *The Corporate Bond Factor
+    Replication Crisis* (2026), with the earlier title noted, everywhere it was cited as
+    *Common pitfalls*. Two places had the authors in the wrong order.
+  - `README_Value.md` called `val_hz` "Houweling-Zhang". It is Houweling and van Zundert.
+  - The Data Dictionary gained the five works it cites but did not list.
+- **Column counts.** The panel is 145 columns. The README, both Stage 2 guides, the
+  QUICKSTART, the FAQ, CONTRIBUTING and Stage 3's signal-spec comments still said 140.
+- **Definitions that did not match the code.**
+  - `val_hz` has no maturity control (`x_cols=['dcs3', 'call']`). The dictionary said it had.
+  - `README_Value.md`'s examples called `compute_value()` with arguments it does not take, and
+    named the firm overlay `_fl` where the code writes `_wi`. They now show the real calls.
+  - `returns_alt` carries `tret` only, not the five `tret_*` benchmarks the dictionary listed.
+  - Rating 21 is C, not CCC- (CCC- is 19), on both composite scales. This makes `spc_rat` a
+    seventh corrected row in Table IA.VIII, with the printed text kept in the spec.
+  - Stage 1's `credit_spread` is measured against the Treasury yield at the bond's maturity,
+    not its duration.
+- **Measured numbers.** The 2026-09-10 run took 4.7 h and wrote 31,412,833 Stage 1 rows to
+  2025-12-31. The 31,344,732-row, 2025-11 panel is that file cut where `auto:complete` now
+  cuts. Rule 144A is about 3.8 million bond-days starting 2003-10, not 5-8 million. The run
+  folder is about 5 GB, Stage 3 about 15 minutes over 41 steps, and the collinearity table,
+  signal-gap statistics and `permno` coverage figures were re-measured on the current panel.
+- **Worked examples run, not reasoned.** `README_distressed_filter.md` Example 2 is flagged as
+  `high_spike`, not `round_spike`, Example 4's spike reasoning was wrong though its verdict
+  was right, and Example 5's swing is 890x, not 89x. Its sample output now quotes the real run
+  (10,185 bond-days, 1,045 CUSIPs). The decimal-shift and bounce-back READMEs printed sample
+  outputs no run had produced. They now quote the 2026-09-10 Enhanced run (2,223 corrections
+  across 1,149 bonds, and 8,877 removals across 2,901 bonds).
+- **Instructions that could not work.** Stage 1's manual linker download named a 2025 file
+  and then checked for the 2026 one. Stage 1's quickstart told users to set
+  `GENERATE_REPORTS`, which does not exist. Stage 0's quickstart installed
+  `../requirements.txt` from the repo root.
+
+### Changed
+
+- **`make_release.py` now packages the `stage1` build by default.** The default `--mode` was
+  `prod_final`, a development build from before the 2026 vintage, so running the script with
+  no arguments could package a stale panel on a machine that still held one. It now uses
+  `_stage2_settings.INPUT_MODE`, the mode `_run_stage2.py` builds.
+
 ### Added
 
 - **The 68 beta and momentum columns can now be rebuilt on any Treasury benchmark**, as an
