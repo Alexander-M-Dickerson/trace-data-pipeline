@@ -7,28 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed -- documentation and citations, checked against the data (2026-09-21)
+### Fixed -- documentation, checked against the data (2026-09-21)
 
 Every doc was read against the 2026 build, the 2026-09-10 WRDS run and the code. What was
 wrong, grouped.
 
-- **Citations.**
-  - The Koijen, Lustig and Van Nieuwerburgh (2017) reference carried the title of a
-    different paper. It is *The cross-section and time series of stock and bond returns*,
-    *Journal of Monetary Economics* 88, 50-69.
-  - The Bollerslev, Li and Zhao (2020) entry in the Stage 2 report carried the title and
-    journal of *Realized semicovariances*, a different paper by a different author team. It
-    is *Good volatility, bad volatility, and the cross section of stock returns*, *JFQA*
-    55(3), 751-781.
-  - Danyliv, Bland and Nicholass (2014) is *A practical approach to liquidity calculation*,
-    *Journal of Trading* 9(3).
-  - Dickerson, Mueller and Robotti (2023) is article 103707, not pages 1-28.
-  - Baumann et al.'s *Life after default* is SSRN 4579966. The report gave another paper's id.
-  - The pipeline's own paper is cited under its current title, *The Corporate Bond Factor
-    Replication Crisis* (2026), with the earlier title noted, everywhere it was cited as
-    *Common pitfalls*. Two places had the authors in the wrong order.
-  - `README_Value.md` called `val_hz` "Houweling-Zhang". It is Houweling and van Zundert.
-  - The Data Dictionary gained the five works it cites but did not list.
 - **Column counts.** The panel is 145 columns. The README, both Stage 2 guides, the
   QUICKSTART, the FAQ, CONTRIBUTING and Stage 3's signal-spec comments still said 140.
 - **Definitions that did not match the code.**
@@ -117,8 +100,7 @@ wrong, grouped.
     Uncertainty Beta" for `b_eput`, which is TAX policy, and four old descriptions, among them
     a ±2 month band for `dcs6`, which is ±1.
   - Six more spec rows now depart from the printed paper, thirteen in all, each with what
-    the paper prints and why: `hprd`, `hprd_bgn`, `lib`, `igap_bgn`, `val_hz` and
-    `b_credit`. `stage3/RECONCILIATION_ia08.md` sections 5, 9, 10 and 11.
+    the paper prints and why. `stage3/RECONCILIATION_ia08.md` sections 5, 9, 10 and 11.
   - `lib` and `igap_bgn` point in opposite directions on the same row, and the text now says
     so. `lib` on the row for month t is the price move from that month-end to the first trade
     of month t+1. `igap_bgn` on the same row counts sessions from the last session of month
@@ -126,14 +108,8 @@ wrong, grouped.
     carries a lead or a lag, which was wrong for `lib` and `libd`.
   - `val_hz` lists the controls the code uses. The paper's row includes maturity, and the
     regression has no maturity control.
-  - The report still cites with `\citet`, now using the spec's keys, so its BibTeX keys were
-    renamed to the paper's (16 of them, each pair checked to be the same work) and
-    `gebhardt2005stock` was added. The four momentum rows cite that paper, as the paper's
-    table should.
-  - `b_credit` cites Dickerson, Julliard and Mueller (2026), The co-pricing factor zoo, JFE
-    182, 104295. The report always did. The paper's row cites Dickerson, Mueller and Robotti
-    (2023), so the spec now departs from it, and the report's entry carries the published
-    volume and article number in place of "forthcoming".
+  - The report's table cites with the spec's keys, so the report's BibTeX uses the same keys
+    and a key it lacks stops the build.
   - Two cluster headings in the dictionary now match the paper, "Spreads, Yields, Size" and
     "Market Risk".
 
