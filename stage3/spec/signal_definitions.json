@@ -59,18 +59,22 @@
       "mnemonic": "hprd",
       "group": "Bond Identifiers and Return Metrics",
       "name": "Holding Period",
-      "description": "Month-end holding period in calendar days (see Fig. \\ref{fig:return_timeline}).",
+      "description": "NYSE trading sessions from the start trade (dt_s) to the end trade (dt_e) of the month-end return (see Fig. \\ref{fig:return_timeline}). Runs 15 to 27, because each trade may fall anywhere in the last 5 sessions of its month.",
       "citation": "--",
       "citation_keys": [],
+      "paper_prints": "Month-end holding period in calendar days (see Fig. \\ref{fig:return_timeline}).",
+      "why_corrected": "The printed row says calendar days. It was never calendar days. Until 2026-09-21 stage2/steps/step1_returns.py counted NYSE sessions from dt_s to the CALENDAR month-end, a date the return does not use; it now counts to dt_e, the end trade, so the column is the window of the return printed beside it. contract.assert_holding_period_is_the_window checks it on every row of every build.",
       "citation_text": "--"
     },
     {
       "mnemonic": "lib",
       "group": "Bond Identifiers and Return Metrics",
       "name": "Latent Implementation Bias",
-      "description": "Clean price return from month-end to month-begin: $\\text{LIB} = P_t^{\\text{bgn}} / P_{t-1}^{\\text{end}} - 1$ (see Fig. \\ref{fig:return_timeline}).",
+      "description": "Clean price return from month-end to the next month-begin. On the row for month $t$: $\\text{LIB}_t = P_{t+1}^{\\text{bgn}} / P_t^{\\text{end}} - 1$, the gap that FOLLOWS that month's end price (see Fig. \\ref{fig:return_timeline}).",
       "citation": "--",
       "citation_keys": [],
+      "paper_prints": "Clean price return from month-end to month-begin: $\\text{LIB} = P_t^{\\text{bgn}} / P_{t-1}^{\\text{end}} - 1$ (see Fig. \\ref{fig:return_timeline}).",
+      "why_corrected": "The printed row writes $P_t^{bgn} / P_{t-1}^{end} - 1$, stamping the gap with the month its begin price falls in. The panel stamps it with the month-end price it follows: step1_returns.py re-dates the gap to t-1 before merging it onto the end frame. Recomputed from the daily prices on all 1,650,561 rows that carry lib, the forward form matches every row and the printed form matches 2,192. Same object, and the row it sits on is what a user joining on date needs to know.",
       "citation_text": "--"
     },
     {
@@ -239,18 +243,22 @@
       "mnemonic": "hprd_bgn",
       "group": "Bond Identifiers and Return Metrics",
       "name": "Holding Period (Begin)",
-      "description": "Month-begin holding period in calendar days.",
+      "description": "NYSE trading sessions from the month-begin trade (dt_s_bgn) to the month-end trade (dt_e_bgn) of the same month.",
       "citation": "--",
       "citation_keys": [],
+      "paper_prints": "Month-begin holding period in calendar days.",
+      "why_corrected": "The printed row says calendar days. stage2/steps/step1_returns.py counts NYSE sessions between the two trades of the month-begin return (cal_lut cum_before at dt minus at date_start), and always has. Observed range 10 to 22.",
       "citation_text": "--"
     },
     {
       "mnemonic": "igap_bgn",
       "group": "Bond Identifiers and Return Metrics",
       "name": "Implementation Gap",
-      "description": "Business days between month-end price ($t{-}1$) and month-begin price ($t$); capped at 5 BD. Refer to Panel D of Fig. \\ref{fig:return_timeline}.",
+      "description": "NYSE trading sessions from the last session of month $t{-}1$ to the month-begin trade of month $t$ (dt_s_bgn); 1 to 5. Refer to Panel D of Fig. \\ref{fig:return_timeline}.",
       "citation": "--",
       "citation_keys": [],
+      "paper_prints": "Business days between month-end price ($t{-}1$) and month-begin price ($t$); capped at 5 BD. Refer to Panel D of Fig. \\ref{fig:return_timeline}.",
+      "why_corrected": "The printed row measures from the month-end PRICE of t-1. The code measures from the last NYSE SESSION of t-1 (date_end_bus_lag), whether or not the bond traded that day: that form matches all 1,801,790 rows, and measuring from the month-end trade matches 1,215,816 of 1,584,054.",
       "citation_text": "--"
     },
     {
@@ -450,11 +458,13 @@
       "mnemonic": "val_hz",
       "group": "Cluster II: Value",
       "name": "Value (HZ)",
-      "description": "Percentage deviation of observed credit spread from fitted ``fair'' spread: $(cs - \\widehat{cs}) / \\widehat{cs}$. Controls: rating, industry, maturity, spread change, callable. Fitted spread is estimated each month via cross-sectional regression; because cs is used, this signal is also exposed to microstructure noise.",
+      "description": "Percentage deviation of observed credit spread from fitted ``fair'' spread: $(cs - \\widehat{cs}) / \\widehat{cs}$. Controls: rating, industry, 3-month spread change, callable. Fitted spread is estimated each month via cross-sectional regression; because cs is used, this signal is also exposed to microstructure noise.",
       "citation": "\\citet{houweling2017factor}",
       "citation_keys": [
         "houweling2017factor"
       ],
+      "paper_prints": "Percentage deviation of observed credit spread from fitted ``fair'' spread: $(cs - \\widehat{cs}) / \\widehat{cs}$. Controls: rating, industry, maturity, spread change, callable. Fitted spread is estimated each month via cross-sectional regression; because cs is used, this signal is also exposed to microstructure noise.",
+      "why_corrected": "The printed row lists maturity among the controls. The regression has no maturity control: stage2/lib/value.py calls compute_value(model_type='hz', x_cols=['dcs3', 'call']) with rating and FF17 industry dummies, and nothing else enters.",
       "citation_text": "Houweling and Van Zundert (2017)"
     },
     {

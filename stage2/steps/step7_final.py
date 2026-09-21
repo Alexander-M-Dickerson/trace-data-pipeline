@@ -157,6 +157,13 @@ def build(con=None, mode: str | None = None, limit_cusips: int | None = None) ->
     # Fail here rather than shipping a silently permuted file (lib/contract.py).
     contract.assert_panel_contract(main_panel, what=f"main_panel_{mode}")
 
+    # `hprd` is the return's real window, dt_s -> dt_e in NYSE sessions. Checked against the two
+    # dates printed beside it, because for years it was measured to the calendar month-end while
+    # every definition called it calendar days, and nothing compared them.
+    from lib import nyse_calendar as _cal
+    contract.assert_holding_period_is_the_window(
+        main_panel, _cal.cal_lut_frame(), what=f"main panel ({mode})")
+
     # ❗The frontier guard, HERE rather than only at packaging. A month carried by one
     # source alone is not a cross-section -- the usual cause is Stage 1's cut-off landing
     # where Enhanced has a few days and 144A has the whole month -- and until 2026-09-16

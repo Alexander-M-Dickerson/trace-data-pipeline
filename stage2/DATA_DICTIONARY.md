@@ -14,12 +14,12 @@ This document describes the variables computed in the Stage 2 bond data pipeline
 2. [Signal Definitions](#signal-definitions)
    - [Bond Identifiers and Return Metrics](#bond-identifiers-and-return-metrics)
    - [Bond Characteristics](#bond-characteristics)
-   - [Cluster I: Spreads, Yields, and Size](#cluster-i-spreads-yields-and-size)
+   - [Cluster I: Spreads, Yields, Size](#cluster-i-spreads-yields-size)
    - [Cluster II: Value](#cluster-ii-value)
    - [Cluster III: Momentum & Reversal](#cluster-iii-momentum--reversal)
    - [Cluster IV: Illiquidity](#cluster-iv-illiquidity)
    - [Cluster V: Volatility & Risk](#cluster-v-volatility--risk)
-   - [Cluster VI: Market Betas](#cluster-vi-market-betas)
+   - [Cluster VI: Market Risk](#cluster-vi-market-risk)
    - [Cluster VII: Credit & Default Betas](#cluster-vii-credit--default-betas)
    - [Cluster VIII: Volatility & Liquidity Betas](#cluster-viii-volatility--liquidity-betas)
    - [Cluster IX: Macro & Other Betas](#cluster-ix-macro--other-betas)
@@ -59,7 +59,7 @@ This document describes the variables computed in the Stage 2 bond data pipeline
 
 ## How to Use the Monthly Data
 
-All data in the panel is sampled at the end of month $t$; no variables have a lead or a lag.
+All data in the panel is sampled at the end of month $t$, with one exception. `lib` and `libd` sit on the row for month $t$ and measure the price move from that month-end to the first trade of month $t+1$, so they look one month ahead. They describe a cost, and are not signals to sort on. See [Latent Implementation Bias](#latent-implementation-bias-lib).
 
 **Sample start dates:** Most signals have a sample start date of 2002-08, including those that require a rolling estimation period. Signals requiring rolling data use ICE/BofA data to generate observations prior to 2002-08, enabling a consistent start date of 2002-08 for the main panel. Rolling signals that require TRACE-based illiquidity data (e.g., Amihud and Pastor-Stambaugh liquidity betas) start 2003-07.
 
@@ -135,8 +135,8 @@ For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month r
 | `permno` | CRSP PERMNO | CRSP permanent security identifier. |
 | `permco` | CRSP PERMCO | CRSP permanent company identifier. **Null in the published file** -- see *Redaction* below. |
 | `gvkey` | Compustat GVKEY | Compustat global company key. **Null in the published file** -- see *Redaction* below. |
-| `hprd` | Holding Period | Month-end holding period in calendar days. |
-| `lib` | Latent Implementation Bias | Clean price return from month-end to month-begin: $\text{LIB} = P_{t+1}^{bgn} / P_t^{end} - 1$. |
+| `hprd` | Holding Period | NYSE trading sessions from the start trade (dt_s) to the end trade (dt_e) of the month-end return. Runs 15 to 27, because each trade may fall anywhere in the last 5 sessions of its month. |
+| `lib` | Latent Implementation Bias | Clean price return from month-end to the next month-begin. On the row for month $t$: $\text{LIB}_t = P_{t+1}^{\text{bgn}} / P_t^{\text{end}} - 1$, the gap that FOLLOWS that month's end price. |
 | `libd` | LIB (Dirty) | LIB computed using dirty prices (includes accrued interest and coupon). |
 | `ret_type` | Return Type | Return classification: `standard`, `trad_in_def`, or `default_evnt`. |
 | `ff17num` | FF17 Industry | Fama-French 17-industry classification. |
@@ -155,12 +155,11 @@ For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month r
 | `dt_e` | Date End | Trade date for month-end price in month $t$ (last 5 BD). |
 | `dt_s_bgn` | Date Start (Begin) | Trade date for month-begin price in month $t$ (first 5 BD). |
 | `dt_e_bgn` | Date End (Begin) | Trade date for month-end price in month $t$ (last 5 BD) for begin returns. |
-| `hprd_bgn` | Holding Period (Begin) | Month-begin holding period in calendar days. |
-| `igap_bgn` | Implementation Gap | Business days between month-end price ($t$) and month-begin price ($t+1$); capped at 5 BD. |
+| `hprd_bgn` | Holding Period (Begin) | NYSE trading sessions from the month-begin trade (dt_s_bgn) to the month-end trade (dt_e_bgn) of the same month. |
+| `igap_bgn` | Implementation Gap | NYSE trading sessions from the last session of month $t-1$ to the month-begin trade of month $t$ (dt_s_bgn); 1 to 5. |
 | `sig_dt` | Signal Date | Date when price-based signal was observed (minimum 1 BD before month-end price). |
 | `sig_gap` | Signal Gap | Business days between signal observation and month-end price; ranges 1–10 BD. |
-| `rfret` | Risk-Free Rate | Monthly risk-free rate from Fama-French. Used for excess returns, $r - r^f$. |
-
+| `rfret` | Risk-Free Rate | Monthly risk-free rate from Fama-French. Used for excess returns: $r^x = r - r^f$. |
 **The five `tret_*` benchmarks before 1986.** The Treasury curve's long end is held flat beyond the longest tenor the Gurkaynak-Sack-Wright curve actually fitted, because no Treasury that long existed to price. This is the convention of Gurkaynak, Sack and Wright (2007) and of Ghaderi, Plante, Roussanov and Seo (2026), whose Appendix A states it in as many words -- "we conservatively apply flat extrapolation when necessary". It is what makes a 1973 start possible at all: without it no bond outliving the fitted curve could be priced, and the early sample would simply be absent. Measured cost: RMSE 15.8 bps, bias -0.3 bps, and exactly zero for any bond whose cash flows end inside the fitted range. The benchmarks diverge from one another most in this early period, for the same reason -- the curve is least anchored there.
 
 ---
@@ -178,18 +177,18 @@ For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month r
 
 ---
 
-### Cluster I: Spreads, Yields, and Size
+### Cluster I: Spreads, Yields, Size
 
 | Mnemonic | Name | Description |
 |----------|------|-------------|
 | `tmat` | Time to Maturity | Years remaining until bond maturity. |
 | `age` | Bond Age | Years since bond issuance. |
-| `ytm` | Yield to Maturity | Annualized yield to maturity. |
+| `ytm` | Yield to Maturity | Annualized yield to maturity. Computed with QuantLib. |
 | `cs` | Credit Spread | Annualized credit spread: yield minus maturity-matched U.S. Treasury yield. |
-| `md_dur` | Modified Duration | Modified duration measuring price sensitivity to yield changes. |
-| `convx` | Convexity | Second-order price sensitivity to yield changes. |
+| `md_dur` | Modified Duration | Modified duration measuring price sensitivity to yield changes. Computed with QuantLib. |
+| `convx` | Convexity | Second-order price sensitivity to yield changes. Computed with QuantLib. |
 | `sze` | Bond Size | Bond market capitalization: dirty price times amount outstanding ($ millions). |
-| `dcs6` | 6-Month Spread Narrowing (log) | Log change in credit spread over prior 6 months: $\log(cs_{t-6}) - \log(cs_t)$. If spread is missing exactly 6 months ago, searches ±1 month, taking the EARLIER month first (`_stage2_settings.DSPREAD_BANDWIDTH = 1`; `lib/value.py` builds `offsets = [0, -1, +1]` and takes the first hit). |
+| `dcs6` | 6-Month Spread Narrowing (log) | Log change in credit spread over prior 6 months: $\log(cs_{t-6}) - \log(cs_t)$. If the spread is missing exactly 6 months ago, the nearest adjacent month is used within a ±1 month band, the EARLIER month first. |
 | `cs_mu12_1` | 12-Month Average Spread | Rolling 12-month average credit spread, skipping the prior month. Requires minimum 6 observations. |
 
 ---
@@ -198,10 +197,10 @@ For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month r
 
 | Mnemonic | Name | Description |
 |----------|------|-------------|
-| `bbtm` | Bond Book-to-Market | Par price divided by market price of the bond. |
-| `val_hz` | Value (HZ) | Percentage deviation of observed credit spread from fitted "fair" spread: $(cs - \widehat{cs}) / \widehat{cs}$. Controls: rating, industry, 3-month spread change, callable. |
+| `bbtm` | Bond Book-to-Market | Par price divided by market price of the bond. All bonds have a par value of \$1,000 (100%). |
+| `val_hz` | Value (HZ) | Percentage deviation of observed credit spread from fitted "fair" spread: $(cs - \widehat{cs}) / \widehat{cs}$. Controls: rating, industry, 3-month spread change, callable. Fitted spread is estimated each month via cross-sectional regression; because cs is used, this signal is also exposed to microstructure noise. |
 | `val_hz_dts` | Value (HZ, DtS-adjusted) | HZ value signal demeaned within duration-times-spread quintiles to control for systematic spread-duration risk. |
-| `val_ipr` | Value (IPR) | Log-spread residual from fair-value regression: $\log(cs) - X'\hat{\beta}$. Controls: rating, industry, log duration, volatility, callable. |
+| `val_ipr` | Value (IPR) | Log-spread residual from fair-value regression: $\log(cs) - X'\hat{\beta}$. Controls: rating, industry, log duration, volatility, callable. Fitted spread is estimated each month via cross-sectional regression; because cs is used, this signal is also exposed to microstructure noise. |
 | `val_ipr_dts` | Value (IPR, DtS-adjusted) | IPR value signal demeaned within duration-times-spread quintiles. |
 
 ---
@@ -247,7 +246,7 @@ For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month r
 | `spd_abs` | Absolute Bid-Ask Spread | Volume-weighted $(P^{ask} - P^{bid})$ in dollars. Requires a minimum of 5 prices. |
 | `cs_sprd` | Corwin-Schultz Spread | High-low spread estimator using two-day price ranges. Requires a minimum of 5 prices. |
 | `ar_sprd` | Abdi-Ranaldo Spread | Closing price spread estimator. Requires a minimum of 5 prices. |
-| `p_zro` | No-Trade Day Proportion | Fraction of business days with no valid price. ❗Returns are never inspected, so the old name "Zero-Return" contradicted this very description. |
+| `p_zro` | No-Trade Day Proportion | Fraction of business days with no valid price. Returns are never inspected, so the old name "Zero-Return Proportion" contradicted this description. |
 | `p_fht` | FHT Spread | Spread derived from zero-return proportion: $2\sigma\Phi^{-1}((1+p_{zro})/2)$. Requires a minimum of 5 daily returns. |
 | `vov` | Volatility-over-Volume | Liquidity proxy: $2.5 \times \sigma^{0.6} / \bar{V}^{0.25}$, where $\sigma$ is the volatility of daily RETURNS and $\bar{V}$ mean volume. Requires a minimum of 5 daily returns. ❗Not the volatility OF volume. |
 | `lix` | Negative LIX (Illiquidity) | $-\log_{10}[(V \times P_{close}) / (P_{high} - P_{low})]$. Requires a minimum of 5 prices. ❗Stored NEGATED (`lib/illiq_pandas.py`), so it rises with ILLIQUIDITY -- 99.29% of non-null values are negative, median -2.181. |
@@ -277,7 +276,7 @@ For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month r
 
 ---
 
-### Cluster VI: Market Betas
+### Cluster VI: Market Risk
 
 | Mnemonic | Name | Description |
 |----------|------|-------------|
@@ -328,12 +327,12 @@ For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month r
 
 | Mnemonic | Name | Description |
 |----------|------|-------------|
-| `b_dunc` | Macro Uncertainty Beta | Beta on changes in JLN macro uncertainty index. |
-| `b_duncr` | Real Uncertainty Beta | Beta on changes in JLN real uncertainty component. |
-| `b_duncf` | Financial Uncertainty Beta | Beta on changes in JLN financial uncertainty component. |
-| `b_unc` | Uncertainty Level Beta | Beta on JLN macro uncertainty level. |
-| `b_dunc3` | 3-Month Uncertainty Change Beta | Beta on 3-month change in JLN macro uncertainty. |
-| `b_dunc6` | 6-Month Uncertainty Change Beta | Beta on 6-month change in JLN macro uncertainty. |
+| `b_dunc` | Macro Uncertainty Beta | Beta on changes in Jurado, Ludvigson, and Ng (2015) macro uncertainty index. |
+| `b_duncr` | Real Uncertainty Beta | Beta on changes in Jurado, Ludvigson, and Ng (2015) real uncertainty component. |
+| `b_duncf` | Financial Uncertainty Beta | Beta on changes in Jurado, Ludvigson, and Ng (2015) financial uncertainty component. |
+| `b_unc` | Uncertainty Level Beta | Beta on Jurado, Ludvigson, and Ng (2015) macro uncertainty level. |
+| `b_dunc3` | 3-Month Uncertainty Change Beta | Beta on 3-month change in Jurado, Ludvigson, and Ng (2015) macro uncertainty. |
+| `b_dunc6` | 6-Month Uncertainty Change Beta | Beta on 6-month change in Jurado, Ludvigson, and Ng (2015) macro uncertainty. |
 | `b_dcpi` | Inflation Beta | Beta on monthly CPI changes. |
 | `b_cpi_vol6` | Inflation Volatility Beta | Beta on 6-month rolling CPI volatility. |
 | `b_dcredit` | Credit Spread Change Beta | Beta on monthly changes in BAA-AAA spread. |
@@ -345,8 +344,7 @@ For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month r
 | `b_ysp` | Yield Spread Beta | Beta on yield spread factor. |
 | `b_epu` | Economic Policy Uncertainty Beta | Beta on EPU index level. |
 | `b_epum` | Monetary Policy Uncertainty Beta | Beta on monetary policy uncertainty index level. |
-| `b_eput` | Tax Policy Uncertainty Beta | Beta on the tax policy uncertainty index level (Baker-Bloom-Davis categorical EPU, column "3. Taxes"). ❗NOT trade policy: that is a separate category in the same workbook and is never read (`lib/factor_fetch.py`). |
-
+| `b_eput` | Tax Policy Uncertainty Beta | Beta on the tax policy uncertainty index level (Baker-Bloom-Davis categorical EPU, column "3. Taxes"). NOT trade policy -- a separate category in the same workbook, never read. |
 ---
 
 
@@ -418,7 +416,7 @@ where:
 | `ret_vw` | Month-end total return $r_{i,t+1}^{End}$ |
 | `dt_s` | Trade date used for month $t$ price |
 | `dt_e` | Trade date used for month $t+1$ price |
-| `hprd` | Holding period in business days between `dt_s` and `dt_e` |
+| `hprd` | NYSE trading sessions from `dt_s` to `dt_e`. Runs 15 to 27, because each trade may fall anywhere in the last 5 sessions of its month |
 
 ---
 
@@ -464,38 +462,40 @@ where:
 | `ret_vw_bgn` | Month-begin total return $r_{i,t+1}^{Bgn}$ |
 | `dt_s_bgn` | Trade date used for month-begin price |
 | `dt_e_bgn` | Trade date used for month-end price |
-| `hprd_bgn` | Holding period in business days between `dt_s_bgn` and `dt_e_bgn` |
+| `hprd_bgn` | NYSE trading sessions from `dt_s_bgn` to `dt_e_bgn` |
 
 ---
 
 ### Implementation Gap (`igap_bgn`)
 
-The implementation gap measures the time between observing a signal and executing a trade:
+The implementation gap measures how long a trader waits, once the month has turned, for the first trade. On the row for month $t$, `igap_bgn` counts the NYSE sessions from the last session of month $t-1$ to the month-begin trade of month $t$ (`dt_s_bgn`). It runs 1 to 5, because the month-begin trade must fall in the first 5 sessions of the month.
+
+It is measured from the last SESSION of month $t-1$, whether or not the bond traded that day. It is not measured from the bond's own month-end trade, which can sit up to 4 sessions earlier.
 
 ```
                         IMPLEMENTATION GAP TIMELINE
    ═══════════════════════════════════════════════════════════════════
 
-        Month t                                Month t+1
+        Month t-1                              Month t
    ┌───────────────────┐               ┌──────────────────────────────┐
-   │           ┌─────┐ │               │ ┌─────┐                      │
-   │           │5 BD │ │               │ │5 BD │                      │
-   │           └──┬──┘ │               │ └──┬──┘                      │
-   └──────────────┼────┘               └────┼─────────────────────────┘
-                  ▼                         ▼
-   ───────────────●─────────────────────────●─────────────────────────▶
-                dt_e                     dt_s_bgn
-                  │                         │
-                  │◄────── igap_bgn ───────►│
-                  │    (capped at 5 BD)     │
-                  │                         │
-            Signal observed            Trade executed
-           (month-end t)              (month-begin t+1)
+   │                   │               │ ┌─────┐                      │
+   │                   │               │ │5 BD │                      │
+   │                   │               │ └──┬──┘                      │
+   └───────────────────┤               └────┼─────────────────────────┘
+                       ▼                    ▼
+   ────────────────────●────────────────────●─────────────────────────▶
+               last NYSE session         dt_s_bgn
+                of month t-1                │
+                       │◄─── igap_bgn ─────►│
+                       │      (1 to 5)      │
+                       │                    │
+                 Month turns           Trade executed
+                                      (month-begin t)
 ```
 
 | Variable | Description |
 |----------|-------------|
-| `igap_bgn` | Business days between month-end price ($t$) and month-begin price ($t+1$), capped at 5 |
+| `igap_bgn` | NYSE sessions from the last session of month $t-1$ to the month-begin trade of month $t$ (`dt_s_bgn`), 1 to 5 |
 
 ---
 
@@ -512,6 +512,8 @@ $$\text{LIB}_{i,t+1} = \frac{P_{i,t+1}^{bgn}}{P_{i,t}} - 1$$
 where:
 - $P_{i,t}$ = month-end clean price at $t$ (signal observation price, denominator of $r^{End}$)
 - $P_{i,t+1}^{bgn}$ = month-begin clean price at $t+1$ (execution price, denominator of $r^{Bgn}$)
+
+**Which row it sits on.** In the panel the value is stored on the row for month $t$, the month of the end price it follows. So `lib` on a row dated month $t$ is the gap that comes AFTER that row's `ret_vw`, and it lines up with the NEXT row's `ret_vw_bgn`. `igap_bgn` runs the other way: on the row for month $t$ it looks back to the last session of month $t-1$.
 
 ```
              LATENT IMPLEMENTATION BIAS: SIGNAL TO EXECUTION
@@ -551,8 +553,8 @@ where:
 
 | Variable | Description |
 |----------|-------------|
-| `lib` | Latent Implementation Bias: $(P_{i,t+1}^{bgn} / P_{i,t}) - 1$ (clean price return) |
-| `libd` | Latent Implementation Bias Dirty: uses dirty prices (includes accrued interest) |
+| `lib` | Latent Implementation Bias: $(P_{i,t+1}^{bgn} / P_{i,t}) - 1$ (clean price return), stored on the row for month $t$ |
+| `libd` | Latent Implementation Bias Dirty: uses dirty prices (includes accrued interest), stored on the row for month $t$ |
 
 ---
 

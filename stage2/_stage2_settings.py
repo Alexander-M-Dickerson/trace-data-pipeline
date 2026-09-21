@@ -97,13 +97,18 @@ DUCKDB_MEMORY_LIMIT = os.environ.get("STAGE2_DUCKDB_MEMORY_LIMIT", "")
 
 IMP_GAP = 1                # business days between signal observation and portfolio formation
 BUSINESS_DAY_GAP = 5       # max NYSE-session gap for contiguous returns
-SIGNAL_LAG = 1             # min day gap between signal observation and month-end (adj signals)
 ADJ_WINDOW = 10            # max days back within the month for the adjusted month-end signal
 CALENDAR_NAME = "NYSE"     # market calendar for business-day math
-DEFAULT_METHOD = "event_based"   # default-return adjustment method
 SWAP_ADJ_SIGNALS = True    # replace month-end signals with adjusted versions in the final panel
 START_DATE = "2002-07-31"  # first month-end of the panel
 SIGNALS = ("ytm", "mod_dur", "convexity", "credit_spread")   # step-1 signals (lagged by IMP_GAP)
+
+# Three things that are NOT settings, so nobody edits a constant and expects an effect:
+#   - The adjusted signal is read at least ONE session before the month-end trade. That is the
+#     strict `<` in step 1 (`p.dt < t.dt_e`), and ADJ_WINDOW above is its only knob.
+#   - Defaulted-bond returns always use the event-based method (README_Default.md).
+#   - The published extended-BBW series always backfills the factor columns before 2002-08-31.
+# SIGNAL_LAG, DEFAULT_METHOD and INCLUDE_ICE used to sit here. Nothing read them.
 
 # step 2 illiquidity
 ILLIQ_MIN_OBS = 5          # min valid obs per bond-month for estimated measures
@@ -111,7 +116,6 @@ ILLIQ_MIN_OBS = 5          # min valid obs per bond-month for estimated measures
 # step 3 BBW factor sorts
 N_PORTF_1 = 5              # single-sort quintiles
 N_PORTF_2 = 5              # double-sort 5x5
-INCLUDE_ICE = True         # published extended-BBW backfill for factor columns before 2002-08-31
 
 # step 4 rolling betas / systematic momentum
 BETA_WINDOW = 36           # rolling window (months)
@@ -423,17 +427,14 @@ def get_config() -> dict:
         # Processing parameters
         "imp_gap": IMP_GAP,
         "business_day_gap": BUSINESS_DAY_GAP,
-        "signal_lag": SIGNAL_LAG,
         "adj_window": ADJ_WINDOW,
         "calendar_name": CALENDAR_NAME,
-        "default_method": DEFAULT_METHOD,
         "swap_adj_signals": SWAP_ADJ_SIGNALS,
         "start_date": START_DATE,
         "signals": SIGNALS,
         "illiq_min_obs": ILLIQ_MIN_OBS,
         "n_portf_1": N_PORTF_1,
         "n_portf_2": N_PORTF_2,
-        "include_ice": INCLUDE_ICE,
         "beta_window": BETA_WINDOW,
         "beta_min_obs": BETA_MIN_OBS,
         "def_corp_min_maturity": DEF_CORP_MIN_MATURITY,

@@ -10,7 +10,7 @@ does not describe what the code does is wrong however carefully it was written, 
 only way to find out is to open the function.
 
 Stage 3 now generates the table from `spec/signal_definitions.json`
-(`s4_zoo/t_ia08.py`). Seven rows there differ from the printed table; each carries
+(`s4_zoo/t_ia08.py`). Twelve rows there differ from the printed table; each carries
 `paper_prints` and `why_corrected`, is marked `†` in the rendered table, and is listed
 below. `python s4_zoo/t_ia08.py --diffs` prints them.
 
@@ -114,7 +114,7 @@ contradicts itself within two lines; 21/22 is the scale the data uses.
 **Fixed here.**
 
 ❗**Both rows also mislabel rating 21 as CCC−** (corrected 2026-09-21, which makes
-`spc_rat` the seventh corrected row). On the numeric scale Stage 1 builds
+`spc_rat` the seventh corrected row; sections 5, 9 and 10 add five more). On the numeric scale Stage 1 builds
 (`stage1/helper_functions.convert_sp_to_numeric`), CCC− is 19, CC is 20, C is 21 and
 D is 22; on Moody's side Caa3 is 19, Ca is 20 and C is 21. The range was right and
 only the label on its last non-default grade was wrong. Stage 2's dictionary and report
@@ -140,21 +140,30 @@ betas and characteristics.
 
 ---
 
-## 5. `lib` and `igap_bgn` are defined one month-index apart
+## 5. `lib` looks forward and `igap_bgn` looks back, on the same row
 
-| | the paper | Stage 2 |
-|---|---|---|
-| `lib` | $P_t^{\mathrm{bgn}} / P_{t-1}^{\mathrm{end}} - 1$ | $P_{t+1}^{\mathrm{bgn}} / P_t^{\mathrm{end}} - 1$ |
-| `igap_bgn` | business days between month-end ($t{-}1$) and month-begin ($t$) | between month-end ($t$) and month-begin ($t{+}1$) |
+Read on 2026-09-12 as one object under two indexing conventions, and left alone. Checked
+against the data on 2026-09-21, that reading was wrong about `igap_bgn`, and the two rows
+now say exactly what each column holds.
 
-The same object under two indexing conventions — the paper stamps the observation with
-the month-begin price's month, Stage 2 with the month-end price's. Both are internally
-consistent and neither is wrong.
+| | the paper prints | what the panel holds on the row for month $t$ | rows that match |
+|---|---|---|---|
+| `lib` | $P_t^{\mathrm{bgn}} / P_{t-1}^{\mathrm{end}} - 1$ | $P_{t+1}^{\mathrm{bgn}} / P_t^{\mathrm{end}} - 1$, the gap AFTER that month's end price | forward form 1,650,561 of 1,650,561. Printed form 2,192 |
+| `igap_bgn` | business days between the month-end PRICE ($t{-}1$) and the month-begin price ($t$) | NYSE sessions from the last SESSION of $t{-}1$ to the month-begin trade of $t$, 1 to 5 | last-session form 1,801,790 of 1,801,790. From the month-end trade 1,215,816 of 1,584,054 |
 
-**Not changed**, because changing it would make the spec disagree with the printed table
-for no gain. Recorded here because a reader comparing the two documents will otherwise
-suspect an off-by-one, and because anyone joining on the date needs to know which
-convention a given file uses.
+`lib` is re-dated to $t-1$ in `stage2/steps/step1_returns.py` before it is merged onto the
+month-end frame, so it sits beside the end price it follows. `igap_bgn` is not re-dated. It
+is measured from `date_end_bus_lag`, the last NYSE session of the previous month, whether
+or not the bond traded that day.
+
+So the two columns point in opposite directions on the same row. That is the intended
+behaviour and the data is unchanged. What changed is the text. The printed `lib` row
+stamps the gap with the other month, and the printed `igap_bgn` row names a starting
+point the code does not use. Stage 2's dictionary had `igap_bgn` wrong in a third way,
+between month-end $t$ and month-begin $t+1$, and also said no column carries a lead or a
+lag. Both are corrected.
+
+**Fixed here**: both rows state the direction and the row they sit on.
 
 ---
 
@@ -201,15 +210,61 @@ cannot drift between them unnoticed.
 
 ---
 
+## 9. `hprd` and `hprd_bgn` were never calendar days ❗
+
+| source | says |
+|---|---|
+| the paper, both rows | holding period "in calendar days" |
+| `stage2/DATA_DICTIONARY.md`, the table rows | the same |
+| `stage2/DATA_DICTIONARY.md`, the Bond Returns section | business days between `dt_s` and `dt_e` |
+| **the code, until 2026-09-21** | NYSE sessions from `dt_s` to the CALENDAR month-end |
+| **the code, now** | NYSE sessions from `dt_s` to `dt_e` |
+
+Two defects in one row. The unit was wrong everywhere it was written down: the column is
+a count of NYSE sessions, taken from the calendar lookup. And the end point was wrong in
+the code: `hprd` counted to the last calendar day of the month, a date the return does not
+use, so it overstated the window of every return whose end trade fell before the last
+session. The data report printed holding periods of 25 and 26 for a monthly return, which
+is how it was found.
+
+`stage2/steps/step1_returns.py` now counts to `dt_e`, the end trade. The column is the
+window of the return printed beside it, and
+`contract.assert_holding_period_is_the_window` checks that on every row of every build.
+It runs 15 to 27. A month has at most 23 sessions, and the start trade may sit up to 4
+sessions before the last session of the month before, so 27 is the ceiling and not an
+error. No return changes. The filter `hprd > 0` keeps the same rows, because the end
+trade follows the start trade on every one.
+
+`hprd_bgn` always counted sessions between its two trades (`dt_s_bgn` to `dt_e_bgn`),
+observed 10 to 22. Only its text was wrong.
+
+**Fixed here**, in the code, the dictionary and the spec. The paper's Table IA.II reports
+`hprd`, so that row is recomputed with the manuscript.
+
+---
+
+## 10. `val_hz` has no maturity control
+
+The paper lists the controls as rating, industry, **maturity**, 3-month spread change and
+callable. `stage2/lib/value.py` calls `compute_value(model_type='hz', x_cols=['dcs3',
+'call'])` with rating and FF17 industry dummies. Nothing else enters the regression, so
+maturity is not a control.
+
+**Fixed here**: the spec and the dictionary list the four controls the code uses. Whether
+the regression SHOULD carry maturity is a separate question for the authors and is not
+decided here.
+
+---
+
 ## How to re-run this
 
 ```bash
 cd stage3
-python s4_zoo/t_ia08.py --diffs     # the seven corrected rows and what settled each
+python s4_zoo/t_ia08.py --diffs     # the twelve corrected rows and what settled each
 python s4_zoo/t_ia08.py             # -> reports/tables/table_ia08.tex
 python -m pytest tests/ -k ia08 -q  # every sorted signal has a definition
 ```
 
-The spec is `spec/signal_definitions.json`. It is the paper's text with seven rows
+The spec is `spec/signal_definitions.json`. It is the paper's text with twelve rows
 corrected, each recording what was printed and why it changed — so the printed table can
 always be reconstructed from it, and no correction is silent.

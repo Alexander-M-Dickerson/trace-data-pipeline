@@ -75,6 +75,53 @@ wrong, grouped.
     bundle is such a file. Run `bash download_inputs.sh` for the current one.
   - Set `LINKER_WINDOW = ("w0", "w1")` for ids only where equity data exists.
 
+- ❗**`hprd` now counts to the end trade. A public column changes; no return does.**
+  - `hprd` is the number of NYSE sessions in the month-end return's window. It used to count
+    from the start trade (`dt_s`) to the CALENDAR month-end, a date the return does not use. It
+    now counts from `dt_s` to the end trade (`dt_e`), so it is the window of the `ret_vw` on
+    the same row. One join in `stage2/steps/step1_returns.py`.
+  - Measured by rebuilding the 2026-09-16 panel with the new code and comparing all 1,950,002
+    bond-months on (cusip, date). `hprd` changes on 963,777 rows, by at most 5 sessions, and
+    its mean falls from 21.82 to 20.95. Every other column is identical, apart from six
+    liquidity columns that move by 1e-13 or less on 121 to 203 rows each (float noise).
+  - It runs 15 to 27. A value above 23 is not an error. A month has at most 23 sessions, and
+    the start trade may fall up to 4 sessions before the last session of the month before,
+    which is inside the 5-session rule. 5.4% of rows are above 23.
+  - Every text called it "calendar days", which it never was. The dictionary, the report and
+    the definitions spec now say sessions, for `hprd_bgn` too.
+  - `contract.assert_holding_period_is_the_window` checks every row of every build, and refuses
+    the old definition by name. `stage2/tests/test_holding_period.py`, 7 tests.
+  - The `hprd > 0` filter keeps the same rows, because the end trade follows the start trade
+    on every one.
+
+- **The column definitions now have one source.** `stage3/spec/signal_definitions.json` was
+  already what Table IA.VIII is rendered from. The Stage 2 data report's Table 7 now reads
+  it too, in place of a 950-line copy of its own, and `stage2/DATA_DICTIONARY.md` is held to
+  it by `stage2/tests/test_signal_definitions.py` on all 145 names and descriptions.
+  - The report's copy had drifted. It still printed five old names, among them "Trade Policy
+    Uncertainty Beta" for `b_eput`, which is TAX policy, and four old descriptions, among them
+    a ±2 month band for `dcs6`, which is ±1.
+  - Five more spec rows now depart from the printed paper, twelve in all, each with what the
+    paper prints and why: `hprd`, `hprd_bgn`, `lib`, `igap_bgn` and `val_hz`.
+    `stage3/RECONCILIATION_ia08.md` sections 5, 9 and 10.
+  - `lib` and `igap_bgn` point in opposite directions on the same row, and the text now says
+    so. `lib` on the row for month t is the price move from that month-end to the first trade
+    of month t+1. `igap_bgn` on the same row counts sessions from the last session of month
+    t-1 to the first trade of month t. The data is unchanged. The dictionary said no column
+    carries a lead or a lag, which was wrong for `lib` and `libd`.
+  - `val_hz` lists the controls the code uses. The paper's row includes maturity, and the
+    regression has no maturity control.
+  - The report still cites with `\citet`, now using the spec's keys, so its BibTeX keys were
+    renamed to the paper's (16 of them, each pair checked to be the same work) and
+    `gebhardt2005stock` was added. The four momentum rows cite that paper, as the paper's
+    table should. `b_credit` follows the paper and cites Dickerson, Mueller and Robotti (2023).
+  - Two cluster headings in the dictionary now match the paper, "Spreads, Yields, Size" and
+    "Market Risk".
+
+- **Three settings that nothing read are gone** from `stage2/_stage2_settings.py`, `SIGNAL_LAG`,
+  `DEFAULT_METHOD` and `INCLUDE_ICE`. Changing them did nothing, which is worse than their
+  absence. The three behaviours are fixed in the code.
+
 - **`make_release.py` now packages the `stage1` build by default.** The default `--mode` was
   `prod_final`, a development build from before the 2026 vintage, so running the script with
   no arguments could package a stale panel on a machine that still held one. It now uses

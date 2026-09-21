@@ -191,14 +191,22 @@ FROM (
 """)
 
     # ============ upstream steps 12-13: hprd / igap via the session LUT ===========================
-    # end hprd: sessions in [prev month-end TRADE, calendar month-end); bgn hprd: [first, last trade);
-    # igap: [previous business month-end, first trade)
+    # end hprd: sessions in [prev month-end TRADE, this month-end TRADE); bgn hprd: [first, last
+    # trade); igap: [previous business month-end, first trade)
+    #
+    # ! `hprd` is the return's REAL window: NYSE sessions from the start trade (dt_s) to the end
+    #   trade (dt, published as dt_e). The reference implementation measured to the CALENDAR
+    #   month-end instead, which is not a date the return uses -- it overstated the window (mean
+    #   21.8 against a true 21.0) and disagreed with `hprd_bgn`, which has always run trade to
+    #   trade. Changed 2026-09-21. The `hprd > 0` filter below is unaffected: the end trade is in a
+    #   later month than the start trade on every row, so both definitions are positive together
+    #   and NULL together (no start trade).
     con.execute("""
 CREATE OR REPLACE TEMP TABLE t_end_ret2 AS
 SELECT e.*, (ce.cum_before - cs.cum_before) AS hprd
 FROM t_end_ret e
 LEFT JOIN cal_lut cs ON cs.cday = e.dt_s
-LEFT JOIN cal_lut ce ON ce.cday = e.date_end_ref
+LEFT JOIN cal_lut ce ON ce.cday = e.dt
 """)
     con.execute("""
 CREATE OR REPLACE TEMP TABLE t_bgn_ret2 AS

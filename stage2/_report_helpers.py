@@ -466,7 +466,7 @@ def get_references_bib() -> str:
   publisher={Pageant Media}
 }
 
-@article{amihud2002illiquidity,
+@article{AM2002,
   title={Illiquidity and stock returns: cross-section and time-series effects},
   author={Amihud, Yakov},
   journal={Journal of Financial Markets},
@@ -532,7 +532,7 @@ def get_references_bib() -> str:
   publisher={Pageant Media}
 }
 
-@article{pastor2003liquidity,
+@article{PS2003,
   title={Liquidity risk and expected stock returns},
   author={P{\'a}stor, L'ubos and Stambaugh, Robert F},
   journal={Journal of Political Economy},
@@ -586,7 +586,7 @@ def get_references_bib() -> str:
   year={2025}
 }
 
-@article{bartram2025book,
+@article{Bartram-Grinblatt-Nozawa-2021,
   title={Book-to-market, mispricing, and the cross section of corporate bond returns},
   author={Bartram, S{\"o}hnke M and Grinblatt, Mark and Nozawa, Yoshio},
   journal={Journal of Financial and Quantitative Analysis},
@@ -608,7 +608,7 @@ def get_references_bib() -> str:
   publisher={Taylor \& Francis}
 }
 
-@article{kelly2023modeling,
+@article{KPP2023,
   title={Modeling corporate bond returns},
   author={Kelly, Bryan and Palhares, Diogo and Pruitt, Seth},
   journal={The Journal of Finance},
@@ -619,7 +619,7 @@ def get_references_bib() -> str:
   publisher={Wiley Online Library}
 }
 
-@article{elkamhi2024one,
+@article{elkamhi2022one,
   title={A one-factor model of corporate bond premia},
   author={Elkamhi, Redouane and Jo, Chanik and Nozawa, Yoshio},
   journal={Management Science},
@@ -630,7 +630,7 @@ def get_references_bib() -> str:
   publisher={INFORMS}
 }
 
-@article{israel2018common,
+@article{IPR2018,
   title={Common factors in corporate bond returns},
   author={Israel, Ronen and Palhares, Diogo and Richardson, Scott},
   journal={Journal of Investment Management},
@@ -651,7 +651,17 @@ def get_references_bib() -> str:
   publisher={Elsevier}
 }
 
-@article{novymarx2012,
+@article{gebhardt2005stock,
+  title={Stock and bond market interaction: {D}oes momentum spill over?},
+  author={Gebhardt, William R. and Hvidkjaer, Soeren and Swaminathan, Bhaskaran},
+  journal={Journal of Financial Economics},
+  volume={75},
+  pages={651--690},
+  year={2005},
+  publisher={Elsevier}
+}
+
+@article{novy2012momentum,
   title={Is momentum really momentum?},
   author={Novy-Marx, Robert},
   journal={Journal of Financial Economics},
@@ -680,7 +690,7 @@ def get_references_bib() -> str:
   year={2024}
 }
 
-@article{bali2021ltr,
+@article{bali2021long,
   title={Long-term reversals in the corporate bond market},
   author={Bali, Turan G and Subrahmanyam, Avanidhar and Wen, Quan},
   journal={Journal of Financial Economics},
@@ -691,14 +701,14 @@ def get_references_bib() -> str:
   publisher={Elsevier}
 }
 
-@unpublished{subrahmanyam2023,
+@unpublished{subrahmanyam2023corporatebonddata,
   title={Corporate bond data projects: Some clarifications},
   author={Subrahmanyam, Avanidhar},
   note={Working Paper},
   year={2023}
 }
 
-@article{bai2019common,
+@article{BaiBaliWen_2019,
   title={Common risk factors in the cross-section of corporate bond returns},
   author={Bai, Jennie and Bali, Turan G and Wen, Quan},
   journal={Journal of Financial Economics},
@@ -720,7 +730,7 @@ def get_references_bib() -> str:
   publisher={Taylor \& Francis}
 }
 
-@article{corwin2012,
+@article{corwin2012simple,
   title={A simple way to estimate bid-ask spreads from daily high and low prices},
   author={Corwin, Shane A and Schultz, Paul},
   journal={The Journal of Finance},
@@ -731,7 +741,7 @@ def get_references_bib() -> str:
   publisher={Wiley}
 }
 
-@article{abdi2017,
+@article{abdi2017simple,
   title={A simple estimation of bid-ask spreads from daily close, high, and low prices},
   author={Abdi, Farshid and Ranaldo, Angelo},
   journal={The Review of Financial Studies},
@@ -789,7 +799,7 @@ def get_references_bib() -> str:
   year={2026}
 }
 
-@article{vanbinsbergen2025,
+@article{Binsbergen-Schwert-Nozawa-2023,
   title={Duration-based valuation of corporate bonds},
   author={{van Binsbergen}, Jules H and Nozawa, Yoshio and Schwert, Michael},
   journal={Review of Financial Studies},
@@ -811,7 +821,7 @@ def get_references_bib() -> str:
   publisher={Oxford University Press}
 }
 
-@article{chung2019volatility,
+@article{ChungWangWu_2019,
   title={Volatility and the cross-section of corporate bond returns},
   author={Chung, Kee H and Wang, Junbo and Wu, Chunchi},
   journal={Journal of Financial Economics},
@@ -822,7 +832,7 @@ def get_references_bib() -> str:
   publisher={Elsevier}
 }
 
-@article{lin2011liquidity,
+@article{LinWangWu_2011,
   title={Liquidity risk and expected corporate bond returns},
   author={Lin, Hai and Wang, Junbo and Wu, Chunchi},
   journal={Journal of Financial Economics},
@@ -844,7 +854,7 @@ def get_references_bib() -> str:
   publisher={Wiley}
 }
 
-@article{bali2021uncertainty,
+@article{bali2021macroeconomic,
   title={The macroeconomic uncertainty premium in the corporate bond market},
   author={Bali, Turan G and Subrahmanyam, Avanidhar and Wen, Quan},
   journal={Journal of Financial and Quantitative Analysis},
@@ -889,955 +899,120 @@ def get_references_bib() -> str:
 # SIGNAL DEFINITIONS TABLE
 # ============================================================================
 
-def get_signal_definitions() -> list:
-    """
-    Return signal definitions organized by panel.
+SIGNAL_SPEC = Path(__file__).resolve().parent.parent / "stage3" / "spec" / "signal_definitions.json"
 
-    Returns
-    -------
-    list of dict
-        Each dict has keys: 'panel', 'panel_name', 'signals'
-        where 'signals' is a list of dicts with keys:
-        'mnemonic', 'name', 'description', 'citation'
+# The spec cross-references the paper's timeline figure. This report prints the same figure
+# under the same label, so the reference resolves here too.
+_MACRO_ESCAPES = {"_": r"\_", "&": r"\&", "%": r"\%"}
+
+
+def _tex_escape(x: str) -> str:
+    """Escape _ & % in plain text and leave LaTeX alone (macros, their braced arguments, math).
+
+    The same rule stage3/s4_zoo/t_ia08.py applies to the same spec, so Table IA.VIII and this
+    table print identical text. tests/test_signal_definitions.py holds the two in step.
     """
-    panels = [
-        {
-            'panel': '',
-            'panel_name': 'Bond Identifiers and Return Metrics',
-            'signals': [
-                {
-                    'mnemonic': 'cusip',
-                    'name': 'Bond Identifier',
-                    'description': '9-digit CUSIP bond identifier.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'date',
-                    'name': 'Date',
-                    'description': 'True month-end date (YYYY-MM-DD).',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'issuer_cusip',
-                    'name': 'Issuer CUSIP',
-                    'description': '6-digit firm identifier (first 6 digits of CUSIP).',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'permno',
-                    'name': 'CRSP PERMNO',
-                    'description': 'CRSP permanent security identifier.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'permco',
-                    'name': 'CRSP PERMCO',
-                    'description': 'CRSP permanent company identifier.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'gvkey',
-                    'name': 'Compustat GVKEY',
-                    'description': 'Compustat global company key.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'hprd',
-                    'name': 'Holding Period',
-                    'description': 'Month-end holding period in calendar days (see Figure~\\ref{fig:return_timeline}).',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'lib',
-                    'name': 'Latent Implementation Bias',
-                    'description': 'Clean price return from month-end to month-begin: $\\text{LIB} = P_t^{\\text{bgn}} / P_{t-1}^{\\text{end}} - 1$ (see Figure~\\ref{fig:return_timeline}).',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'libd',
-                    'name': 'LIB (Dirty)',
-                    'description': 'LIB computed using dirty prices (includes accrued interest and coupon).',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'ret_type',
-                    'name': 'Return Type',
-                    'description': 'Return classification: \\texttt{standard}, \\texttt{trad\\_in\\_def}, or \\texttt{default\\_evnt}.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'ff17num',
-                    'name': 'FF17 Industry',
-                    'description': 'Fama-French 17-industry classification.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'ff30num',
-                    'name': 'FF30 Industry',
-                    'description': 'Fama-French 30-industry classification.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'mcap_s',
-                    'name': 'Market Cap (Start)',
-                    'description': 'Bond market capitalization at end of month $t{-}1$.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'mcap_e',
-                    'name': 'Market Cap (End)',
-                    'description': 'Bond market capitalization at end of month $t$.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'tret',
-                    'name': 'Treasury Return',
-                    'description': 'Duration-matched U.S. Treasury portfolio return. Used to compute duration-adjusted returns: $r^x = r - \\texttt{tret}$.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'tret_bns',
-                    'name': 'Treasury Return, Duration-Weighted Cash Flows',
-                    'description': "Treasury benchmark built from the cash flows of the bond itself, weighted by their present-value shares (Macaulay duration weights) and applied to zero-coupon Treasury returns from the Gurkaynak-Sack-Wright curve. Subtract from `ret_vw` for a duration-adjusted return.",
-                    'citation': 'van Binsbergen, Nozawa, and Schwert (2025)',
-                },
-                {
-                    'mnemonic': 'tret_cfm',
-                    'name': 'Treasury Return, Cash-Flow-Weighted',
-                    'description': "As `tret_bns`, but weighting the same cash flows by future value rather than present value. Places more weight on long-dated cash flows and so overstates interest rate risk; reported as the robustness alternative given by the same authors.",
-                    'citation': 'van Binsbergen, Nozawa, and Schwert (2025), Internet Appendix A1',
-                },
-                {
-                    'mnemonic': 'tret_gprs',
-                    'name': 'Treasury Return, Exact Duration Match',
-                    'description': "As `tret_bns`, refined so the duration of the Treasury portfolio equals that of the bond exactly. The present-value weights are duration-matched only when the term structure is flat; this solves for the Treasury yield that restores the match and reweights accordingly.",
-                    'citation': 'Ghaderi, Plante, Roussanov, and Seo (2026), Appendix B.2',
-                },
-                {
-                    'mnemonic': 'tret_cls',
-                    'name': 'Treasury Return, Cash-Flow-Matched',
-                    'description': "As `tret_bns`, but discounting the same cash flows on the Treasury zero curve instead of at the bond's own yield to maturity. This replicates the bond's cash flows rather than its duration, so it removes slope and curvature effects as well as parallel shifts. The difference from `tret_bns` is the authors' higher-order component.",
-                    'citation': 'Cui, Lu, and Song (2026)',
-                },
-                {
-                    'mnemonic': 'tret_mat',
-                    'name': 'Treasury Return, Maturity-Matched',
-                    'description': "The twin of `tret`: the same key-rate Treasury index returns, the same interpolation nodes and rounding, but interpolated at remaining MATURITY rather than modified duration. Included as the maturity-matched comparator; duration matching is the more precise of the two.",
-                    'citation': 'Bessembinder, Kahle, Maxwell, and Xu (2009)',
-                },
-                {
-                    'mnemonic': 'ret_vw',
-                    'name': 'Total Return (End)',
-                    'description': 'Month-end to month-end total return (see Figure~\\ref{fig:return_timeline}).',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'ret_vw_bgn',
-                    'name': 'Total Return (Begin)',
-                    'description': 'Month-begin to month-end total return within the same month (see Figure~\\ref{fig:return_timeline}).',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'dt_s',
-                    'name': 'Date Start',
-                    'description': 'Trade date for month-end price in month $t{-}1$ (last 5 BD); refer to Panel A of Figure~\\ref{fig:return_timeline}.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'dt_e',
-                    'name': 'Date End',
-                    'description': 'Trade date for month-end price in month $t$ (last 5 BD); refer to Panel A of Figure~\\ref{fig:return_timeline}.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'dt_s_bgn',
-                    'name': 'Date Start (Begin)',
-                    'description': 'Trade date for month-begin price in month $t$ (first 5 BD); refer to Panel C of Figure~\\ref{fig:return_timeline}.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'dt_e_bgn',
-                    'name': 'Date End (Begin)',
-                    'description': 'Trade date for month-end price in month $t$ (last 5 BD) for begin returns; refer to Panel C of Figure~\\ref{fig:return_timeline}.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'hprd_bgn',
-                    'name': 'Holding Period (Begin)',
-                    'description': 'Month-begin holding period in calendar days.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'igap_bgn',
-                    'name': 'Implementation Gap',
-                    'description': 'Business days between month-end price ($t{-}1$) and month-begin price ($t$); capped at 5 BD. Refer to Panel D of Figure~\\ref{fig:return_timeline}.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'sig_dt',
-                    'name': 'Signal Date',
-                    'description': 'Date when price-based signal was observed (minimum 1 BD before month-end price). Refer to Panel B of Figure~\\ref{fig:return_timeline}.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'sig_gap',
-                    'name': 'Signal Gap',
-                    'description': 'Business days between signal observation and month-end price; ranges 1--10 BD. Refer to Panel B of Figure~\\ref{fig:return_timeline}.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'rfret',
-                    'name': 'Risk-Free Rate',
-                    'description': 'Monthly risk-free rate from Fama-French. Used for excess returns: $r^x = r - r^f$.',
-                    'citation': '--',
-                },
-            ],
-        },
-        {
-            'panel': '',
-            'panel_name': 'Bond Characteristics',
-            'signals': [
-                {
-                    'mnemonic': 'spc_rat',
-                    'name': 'S\\&P Composite Rating',
-                    'description': 'Composite credit rating: S\\&P rating if available, otherwise Moody\'s rating. Scale: 1 (AAA) to 21 (C), 22 = Default.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'mdc_rat',
-                    'name': "Moody's Composite Rating",
-                    'description': 'Composite credit rating: Moody\'s rating if available, otherwise S\\&P rating. Scale: 1 (Aaa) to 21 (C), 22 = Default.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'call',
-                    'name': 'Callable Indicator',
-                    'description': 'Indicator for embedded call option (1 = callable, 0 = non-callable).',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'fce_val',
-                    'name': 'Face Value',
-                    'description': 'Bond amount outstanding (face value); units of the bond outstanding.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': '144a',
-                    'name': 'Rule 144A Indicator',
-                    'description': 'Dummy variable: 1 if bond is Rule 144A, 0 otherwise.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'country',
-                    'name': 'Country',
-                    'description': 'Country of issuance (e.g., \\texttt{USA} for U.S. bonds).',
-                    'citation': '--',
-                },
-            ],
-        },
-        {
-            'panel': 'I',
-            'panel_name': 'Spreads, Yields, and Size',
-            'signals': [
-                {
-                    'mnemonic': 'tmat',
-                    'name': 'Time to Maturity',
-                    'description': 'Years remaining until bond maturity.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'age',
-                    'name': 'Bond Age',
-                    'description': 'Years since bond issuance.',
-                    'citation': '\\citet{kelly2023modeling}',
-                },
-                {
-                    'mnemonic': 'ytm',
-                    'name': 'Yield to Maturity',
-                    'description': 'Annualized yield to maturity. Computed with \\texttt{QuantLib}.',
-                    'citation': '\\citet{gebhardt2005cross}',
-                },
-                {
-                    'mnemonic': 'cs',
-                    'name': 'Credit Spread',
-                    'description': 'Annualized credit spread: yield minus maturity-matched U.S. Treasury yield.',
-                    'citation': '\\citet{kelly2023modeling}',
-                },
-                {
-                    'mnemonic': 'md_dur',
-                    'name': 'Modified Duration',
-                    'description': 'Modified duration measuring price sensitivity to yield changes. Computed with \\texttt{QuantLib}.',
-                    'citation': '\\citet{kelly2023modeling}',
-                },
-                {
-                    'mnemonic': 'convx',
-                    'name': 'Convexity',
-                    'description': 'Second-order price sensitivity to yield changes. Computed with \\texttt{QuantLib}.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'sze',
-                    'name': 'Bond Size',
-                    'description': 'Bond market capitalization: dirty price times amount outstanding (\\$ millions).',
-                    'citation': '\\citet{houweling2017factor}',
-                },
-                {
-                    'mnemonic': 'dcs6',
-                    'name': '6-Month Spread Change',
-                    'description': 'Log change in credit spread over prior 6 months: $\\log(cs_{t-6}) - \\log(cs_t)$. If spread is missing exactly 6 months ago, the nearest adjacent spread is used within a $\\pm$2 month band, with $+$ favored over $-$.',
-                    'citation': '\\citet{kelly2023modeling}',
-                },
-                {
-                    'mnemonic': 'cs_mu12_1',
-                    'name': '12-Month Average Spread',
-                    'description': 'Rolling 12-month average credit spread, skipping the prior month. Requires minimum 6 observations.',
-                    'citation': '\\citet{elkamhi2024one}',
-                },
-            ],
-        },
-        {
-            'panel': 'II',
-            'panel_name': 'Value',
-            'signals': [
-                {
-                    'mnemonic': 'bbtm',
-                    'name': 'Bond Book-to-Market',
-                    'description': 'Par price divided by market price of the bond. All bonds have a par value of \\$1,000 (100\\%).',
-                    'citation': '\\citet{bartram2025book}',
-                },
-                {
-                    'mnemonic': 'val_hz',
-                    'name': 'Value (HZ)',
-                    'description': 'Percentage deviation of observed credit spread from fitted ``fair\'\' spread: $(cs - \\widehat{cs}) / \\widehat{cs}$. Controls: rating, industry, maturity, spread change, callable. Fitted spread is estimated each month via cross-sectional regression; because \\texttt{cs} is used, this signal is also exposed to microstructure noise.',
-                    'citation': '\\citet{houweling2017factor}',
-                },
-                {
-                    'mnemonic': 'val_hz_dts',
-                    'name': 'Value (HZ, DtS-adjusted)',
-                    'description': 'HZ value signal demeaned within duration-times-spread quintiles to control for systematic spread-duration risk.',
-                    'citation': '\\citet{houweling2017factor}',
-                },
-                {
-                    'mnemonic': 'val_ipr',
-                    'name': 'Value (IPR)',
-                    'description': 'Log-spread residual from fair-value regression: $\\log(cs) - X\'\\hat{\\beta}$. Controls: rating, industry, log duration, volatility, callable. Fitted spread is estimated each month via cross-sectional regression; because \\texttt{cs} is used, this signal is also exposed to microstructure noise.',
-                    'citation': '\\citet{israel2018common}',
-                },
-                {
-                    'mnemonic': 'val_ipr_dts',
-                    'name': 'Value (IPR, DtS-adjusted)',
-                    'description': 'IPR value signal demeaned within duration-times-spread quintiles.',
-                    'citation': '\\citet{israel2018common}',
-                },
-            ],
-        },
-        {
-            'panel': 'III',
-            'panel_name': 'Momentum \\& Reversal',
-            'signals': [
-                {
-                    'mnemonic': 'mom3_1',
-                    'name': '3-Month Momentum',
-                    'description': 'Cumulative return months $t{-}2$ to $t{-}1$, skipping prior month.',
-                    'citation': '\\citet{gebhardt2005cross}',
-                },
-                {
-                    'mnemonic': 'mom6_1',
-                    'name': '6-Month Momentum',
-                    'description': 'Cumulative return months $t{-}5$ to $t{-}1$.',
-                    'citation': '\\citet{gebhardt2005cross}',
-                },
-                {
-                    'mnemonic': 'mom12_1',
-                    'name': '12-Month Momentum',
-                    'description': 'Cumulative return months $t{-}11$ to $t{-}1$.',
-                    'citation': '\\citet{gebhardt2005cross}',
-                },
-                {
-                    'mnemonic': 'mom12_7',
-                    'name': 'Intermediate Momentum',
-                    'description': 'Cumulative return months $t{-}11$ to $t{-}7$, excluding recent returns.',
-                    'citation': '\\citet{novymarx2012}',
-                },
-                {
-                    'mnemonic': 'sysmom6_1',
-                    'name': 'Systematic Momentum (6-1)',
-                    'description': 'Sum of fitted values over months $t{-}5$ to $t{-}1$ from a 36(12) rolling CAPMB regression (bond market factor).',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'idimom6_1',
-                    'name': 'Idiosyncratic Momentum (6-1)',
-                    'description': 'Sum of residuals over months $t{-}5$ to $t{-}1$ from a 36(12) rolling CAPMB regression (bond market factor).',
-                    'citation': '\\citet{blitz2011residual}',
-                },
-                {
-                    'mnemonic': 'imom12_1',
-                    'name': 'Industry Momentum (12-1)',
-                    'description': 'Equal-weighted average 12-1 momentum of other bonds in the same FF17 industry.',
-                    'citation': '\\citet{wang2024industry}',
-                },
-                {
-                    'mnemonic': 'ltr48_12',
-                    'name': 'Long-Term Reversal (48-12)',
-                    'description': 'Cumulative return months $t{-}47$ to $t{-}12$. Uses expanding window starting at 12-3, ramping to 48-12.',
-                    'citation': '\\citet{bali2021ltr}',
-                },
-                {
-                    'mnemonic': 'ltr30_6',
-                    'name': 'Long-Term Reversal (30-6)',
-                    'description': 'Cumulative return months $t{-}29$ to $t{-}6$. Uses expanding window starting at 12-3, ramping to 30-6.',
-                    'citation': '\\citet{subrahmanyam2023}',
-                },
-                {
-                    'mnemonic': 'iltr48_12',
-                    'name': 'Industry LTR (48-12)',
-                    'description': 'Equal-weighted average 48-12 LTR of other bonds in the same FF17 industry.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'str',
-                    'name': 'Short-Term Reversal',
-                    'description': 'Prior month return $r_{t-1}$.',
-                    'citation': '\\citet{bai2019common}',
-                },
-                {
-                    'mnemonic': 'mom9_1',
-                    'name': '9-Month Momentum',
-                    'description': 'Cumulative return months $t{-}8$ to $t{-}1$.',
-                    'citation': '\\citet{gebhardt2005cross}',
-                },
-                {
-                    'mnemonic': 'sysmom3_1',
-                    'name': 'Systematic Momentum (3-1)',
-                    'description': 'Sum of fitted values over months $t{-}2$ to $t{-}1$ from a 36(12) rolling CAPMB regression.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'sysmom12_1',
-                    'name': 'Systematic Momentum (12-1)',
-                    'description': 'Sum of fitted values over months $t{-}11$ to $t{-}1$ from a 36(12) rolling CAPMB regression.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'idimom3_1',
-                    'name': 'Idiosyncratic Momentum (3-1)',
-                    'description': 'Sum of residuals over months $t{-}2$ to $t{-}1$ from a 36(12) rolling CAPMB regression.',
-                    'citation': '\\citet{blitz2011residual}',
-                },
-                {
-                    'mnemonic': 'idimom12_1',
-                    'name': 'Idiosyncratic Momentum (12-1)',
-                    'description': 'Sum of residuals over months $t{-}11$ to $t{-}1$ from a 36(12) rolling CAPMB regression.',
-                    'citation': '\\citet{blitz2011residual}',
-                },
-                {
-                    'mnemonic': 'imom1',
-                    'name': 'Industry Momentum (1)',
-                    'description': 'Equal-weighted average prior-month return of other bonds in the same FF17 industry.',
-                    'citation': '\\citet{wang2024industry}',
-                },
-                {
-                    'mnemonic': 'imom3_1',
-                    'name': 'Industry Momentum (3-1)',
-                    'description': 'Equal-weighted average 3-1 momentum of other bonds in the same FF17 industry.',
-                    'citation': '\\citet{wang2024industry}',
-                },
-                {
-                    'mnemonic': 'ltr24_3',
-                    'name': 'Long-Term Reversal (24-3)',
-                    'description': 'Cumulative return months $t{-}23$ to $t{-}3$. Uses expanding window starting at 12-3.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'iltr30_6',
-                    'name': 'Industry LTR (30-6)',
-                    'description': 'Equal-weighted average 30-6 LTR of other bonds in the same FF17 industry.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'iltr24_3',
-                    'name': 'Industry LTR (24-3)',
-                    'description': 'Equal-weighted average 24-3 LTR of other bonds in the same FF17 industry.',
-                    'citation': '--',
-                },
-            ],
-        },
-        {
-            'panel': 'IV',
-            'panel_name': 'Illiquidity',
-            'signals': [
-                {
-                    'mnemonic': 'pi',
-                    'name': 'Price Impact',
-                    'description': 'Pastor-Stambaugh liquidity: negated coefficient from return reversal regression on signed volume. Requires a minimum of 5 daily returns.',
-                    'citation': '\\citet{pastor2003liquidity}',
-                },
-                {
-                    'mnemonic': 'ami',
-                    'name': 'Amihud Illiquidity',
-                    'description': 'Within-month mean of daily $|r_t|/\\text{dvol}_t$. Requires a minimum of 5 daily returns.',
-                    'citation': '\\citet{amihud2002illiquidity}',
-                },
-                {
-                    'mnemonic': 'ami_v',
-                    'name': 'Amihud Volatility',
-                    'description': 'Monthly standard deviation of daily Amihud ratios. Requires a minimum of 5 daily returns.',
-                    'citation': '\\citet{dick2012corporate}',
-                },
-                {
-                    'mnemonic': 'roll',
-                    'name': 'Roll Spread',
-                    'description': 'Implicit bid-ask spread: $2\\sqrt{\\max(-\\text{Cov}(r_t, r_{t-1}), 0)}$. Requires a minimum of 5 daily returns.',
-                    'citation': '\\citet{roll1984simple}',
-                },
-                {
-                    'mnemonic': 'ilq',
-                    'name': 'Roll Autocovariance',
-                    'description': 'Negative autocovariance of log returns $\\times 100$. Requires a minimum of 5 daily returns.',
-                    'citation': '\\citet{bao2011illiquidity}',
-                },
-                {
-                    'mnemonic': 'spd_rel',
-                    'name': 'Relative Bid-Ask Spread',
-                    'description': 'Volume-weighted $(P^{ask} - P^{bid})/\\text{mid}$. Requires a minimum of 5 prices.',
-                    'citation': '\\citet{hong2000empirical}',
-                },
-                {
-                    'mnemonic': 'cs_sprd',
-                    'name': 'Corwin-Schultz Spread',
-                    'description': 'High-low spread estimator using two-day price ranges. Requires a minimum of 5 prices.',
-                    'citation': '\\citet{corwin2012}',
-                },
-                {
-                    'mnemonic': 'ar_sprd',
-                    'name': 'Abdi-Ranaldo Spread',
-                    'description': 'Closing price spread estimator. Requires a minimum of 5 prices.',
-                    'citation': '\\citet{abdi2017}',
-                },
-                {
-                    'mnemonic': 'p_zro',
-                    'name': 'Zero-Return Proportion',
-                    'description': 'Fraction of business days with no valid price.',
-                    'citation': '\\citet{fong2017}',
-                },
-                {
-                    'mnemonic': 'p_fht',
-                    'name': 'FHT Spread',
-                    'description': 'Spread derived from zero-return proportion: $2\\sigma\\Phi^{-1}((1+p_{zro})/2)$. Requires a minimum of 5 daily returns.',
-                    'citation': '\\citet{fong2017}',
-                },
-                {
-                    'mnemonic': 'vov',
-                    'name': 'Volatility of Volume',
-                    'description': 'Liquidity proxy: $2.5 \\times \\sigma^{0.6} / \\bar{V}^{0.25}$. Requires a minimum of 5 daily returns.',
-                    'citation': '\\citet{tobek2016}',
-                },
-                {
-                    'mnemonic': 'lix',
-                    'name': 'LIX Liquidity',
-                    'description': '$\\log_{10}[(V \\times P_{\\text{close}}) / (P_{\\text{high}} - P_{\\text{low}})]$. Requires a minimum of 5 prices.',
-                    'citation': '\\citet{danyliv2014convenient}',
-                },
-                {
-                    'mnemonic': 'spd_abs',
-                    'name': 'Absolute Bid-Ask Spread',
-                    'description': 'Volume-weighted $(P^{ask} - P^{bid})$ in dollars. Requires a minimum of 5 prices.',
-                    'citation': '--',
-                },
-            ],
-        },
-        {
-            'panel': 'V',
-            'panel_name': 'Volatility \\& Risk',
-            'signals': [
-                {
-                    'mnemonic': 'dvol',
-                    'name': 'Daily Volatility',
-                    'description': 'Standard deviation of daily returns within the month.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'dskew',
-                    'name': 'Daily Skewness',
-                    'description': 'Central skewness of daily returns within the month.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'dkurt',
-                    'name': 'Daily Kurtosis',
-                    'description': 'Excess kurtosis of daily returns within the month.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'rvol',
-                    'name': 'Realized Volatility',
-                    'description': 'Within-month square root of sum of squared daily returns: $\\sqrt{\\sum r_t^2}$. Requires a minimum of 5 daily returns.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'rsj',
-                    'name': 'Realized Signed Jump',
-                    'description': 'Within-month asymmetry in positive vs.\\ negative squared returns: $(RV^+ - RV^-)/RV$. Requires a minimum of 5 daily returns.',
-                    'citation': '\\citet{bollerslev2020}',
-                },
-                {
-                    'mnemonic': 'rsk',
-                    'name': 'Realized Skewness',
-                    'description': 'Within-month third moment of daily returns scaled by realized volatility. Requires a minimum of 5 daily returns.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'rkt',
-                    'name': 'Realized Kurtosis',
-                    'description': 'Within-month fourth moment of daily returns scaled by realized volatility. Requires a minimum of 5 daily returns.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'var_95',
-                    'name': '95\\% Value-at-Risk',
-                    'description': '5th percentile loss from empirical daily return distribution over a 36(12) rolling window.',
-                    'citation': '\\citet{bai2019common}',
-                },
-                {
-                    'mnemonic': 'es_90',
-                    'name': '90\\% Expected Shortfall',
-                    'description': 'Mean of worst 10\\% of daily returns over a 36(12) rolling window.',
-                    'citation': '\\citet{bai2019common}',
-                },
-                {
-                    'mnemonic': 'var_90',
-                    'name': '90\\% Value-at-Risk',
-                    'description': '10th percentile loss from empirical daily return distribution over a 36(12) rolling window.',
-                    'citation': '\\citet{bai2019common}',
-                },
-                {
-                    'mnemonic': 'dvol_sys',
-                    'name': 'Systematic Volatility',
-                    'description': 'Standard deviation of systematic returns (CAPMB fitted values) within the month. Requires a minimum of 5 daily returns.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'dvol_idio',
-                    'name': 'Idiosyncratic Volatility',
-                    'description': 'Standard deviation of idiosyncratic returns (CAPMB residuals) within the month. Requires a minimum of 5 daily returns.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'ivol_mkt',
-                    'name': 'Idiosyncratic Volatility (MKT)',
-                    'description': 'Residual volatility from joint MKTRF+MKTB regression.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'ivol_bbw',
-                    'name': 'Idiosyncratic Volatility (BBW)',
-                    'description': 'Residual volatility from BBW 4-factor regression.',
-                    'citation': '\\citet{bai2019common}',
-                },
-                {
-                    'mnemonic': 'ivol_vp',
-                    'name': 'Idiosyncratic Volatility (VP)',
-                    'description': 'Residual volatility from VOLPSB regression.',
-                    'citation': '\\citet{chung2019volatility}',
-                },
-                {
-                    'mnemonic': 'iskew',
-                    'name': 'Idiosyncratic Skewness',
-                    'description': 'Skewness of residuals from coskewness regression.',
-                    'citation': '\\citet{harvey2000conditional}',
-                },
-            ],
-        },
-        {
-            'panel': 'VI',
-            'panel_name': 'Market Betas',
-            'signals': [
-                {
-                    'mnemonic': 'b_mktrf_mkt',
-                    'name': 'Equity Market Beta',
-                    'description': 'Beta on MKTRF from joint regression with MKTB (36-month rolling).',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'b_mktb_mkt',
-                    'name': 'Bond Market Beta',
-                    'description': 'Beta on MKTB from joint regression with MKTRF (36-month rolling).',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'b_mktb',
-                    'name': 'Bond Market Beta (Univariate)',
-                    'description': 'Beta from univariate regression on MKTB.',
-                    'citation': '\\citet{dickerson2023priced}',
-                },
-                {
-                    'mnemonic': 'b_mktbx_dcapm',
-                    'name': 'Duration-Adj Market Beta',
-                    'description': 'Beta on MKTBX from duration-adjusted CAPM.',
-                    'citation': '\\citet{vanbinsbergen2025}',
-                },
-                {
-                    'mnemonic': 'b_term_dcapm',
-                    'name': 'Term Premium Beta',
-                    'description': 'Beta on TERM $=$ MKTB $-$ MKTBX from duration-adjusted CAPM.',
-                    'citation': '\\citet{vanbinsbergen2025}',
-                },
-                {
-                    'mnemonic': 'b_mktb_dn',
-                    'name': 'Downside Market Beta',
-                    'description': 'Beta on $\\min(\\text{MKTB}, 0)$ from asymmetric market model.',
-                    'citation': '\\citet{ang2006downside}',
-                },
-                {
-                    'mnemonic': 'b_mktb_up',
-                    'name': 'Upside Market Beta',
-                    'description': 'Beta on $\\max(\\text{MKTB}, 0)$ from asymmetric market model.',
-                    'citation': '\\citet{ang2006downside}',
-                },
-                {
-                    'mnemonic': 'b_termb',
-                    'name': 'Term Beta',
-                    'description': 'Beta on TERMB from market regression.',
-                    'citation': '\\citet{gebhardt2005cross}',
-                },
-                {
-                    'mnemonic': 'db_mkt',
-                    'name': 'Daily Market Beta',
-                    'description': 'Beta from within-month daily regression on cross-sectional mean return.',
-                    'citation': '--',
-                },
-            ],
-        },
-        {
-            'panel': 'VII',
-            'panel_name': 'Credit \\& Default Betas',
-            'signals': [
-                {
-                    'mnemonic': 'b_drf',
-                    'name': 'Downside Risk Beta (Univariate)',
-                    'description': 'Beta from univariate regression on DRF.',
-                    'citation': '\\citet{dickerson2023priced}',
-                },
-                {
-                    'mnemonic': 'b_crf',
-                    'name': 'Credit Risk Beta (Univariate)',
-                    'description': 'Beta from univariate regression on CRF.',
-                    'citation': '\\citet{dickerson2023priced}',
-                },
-                {
-                    'mnemonic': 'b_lrf',
-                    'name': 'Liquidity Risk Beta (Univariate)',
-                    'description': 'Beta from univariate regression on LRF.',
-                    'citation': '\\citet{dickerson2023priced}',
-                },
-                {
-                    'mnemonic': 'b_defb',
-                    'name': 'Default Beta',
-                    'description': 'Beta on DEFB from duration-adjusted market regression.',
-                    'citation': '\\citet{gebhardt2005cross}',
-                },
-            ],
-        },
-        {
-            'panel': 'VIII',
-            'panel_name': 'Volatility \\& Liquidity Betas',
-            'signals': [
-                {
-                    'mnemonic': 'b_dvix',
-                    'name': 'VIX Innovation Beta',
-                    'description': 'Sum of contemporaneous and lagged $\\Delta$VIX betas from MKTB+MKTRF regression.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'b_dvix_va',
-                    'name': 'VIX Beta (Amihud)',
-                    'description': '$\\Delta$VIX beta from FF3+VIX+Amihud specification.',
-                    'citation': '\\citet{chung2019volatility}',
-                },
-                {
-                    'mnemonic': 'b_dvix_vp',
-                    'name': 'VIX Beta (PSB)',
-                    'description': '$\\Delta$VIX beta from FF3+VIX+PSB specification.',
-                    'citation': '\\citet{chung2019volatility}',
-                },
-                {
-                    'mnemonic': 'b_dvix_dn',
-                    'name': 'Downside VIX Beta',
-                    'description': 'Beta on $\\min(\\Delta\\text{VIX}, 0)$ from asymmetric VIX model.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'b_dvix_up',
-                    'name': 'Upside VIX Beta',
-                    'description': 'Beta on $\\max(\\Delta\\text{VIX}, 0)$ from asymmetric VIX model.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'b_psb',
-                    'name': 'Pastor-Stambaugh Beta',
-                    'description': 'Beta on bond market liquidity factor PSB.',
-                    'citation': '\\citet{lin2011liquidity}',
-                },
-                {
-                    'mnemonic': 'b_psb_m',
-                    'name': 'PSB Beta (Multi-Factor)',
-                    'description': 'PSB beta controlling for FF3+MKTBX+TERM.',
-                    'citation': '\\citet{lin2011liquidity}',
-                },
-                {
-                    'mnemonic': 'b_amd_m',
-                    'name': 'Amihud Beta (Multi-Factor)',
-                    'description': 'Amihud beta controlling for FF3+MKTBX+TERM.',
-                    'citation': '\\citet{lin2011liquidity}',
-                },
-                {
-                    'mnemonic': 'b_amd',
-                    'name': 'Amihud Beta',
-                    'description': 'Beta on aggregate Amihud illiquidity factor.',
-                    'citation': '\\citet{lin2011liquidity}',
-                },
-                {
-                    'mnemonic': 'b_coskew',
-                    'name': 'Coskewness Beta',
-                    'description': 'Beta on $\\text{MKTB}^2$ from coskewness regression.',
-                    'citation': '\\citet{harvey2000conditional}',
-                },
-                {
-                    'mnemonic': 'b_vix',
-                    'name': 'VIX Level Beta',
-                    'description': 'Beta on VIX level from monthly regression.',
-                    'citation': '\\citet{chung2019volatility}',
-                },
-                {
-                    'mnemonic': 'b_dvixd',
-                    'name': 'Daily VIX Innovation Beta',
-                    'description': 'Beta on daily $\\Delta$VIX within the month. Requires a minimum of 5 daily returns.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'b_illiq',
-                    'name': 'Illiquidity Beta',
-                    'description': 'Beta on aggregate bond market illiquidity factor.',
-                    'citation': '--',
-                },
-            ],
-        },
-        {
-            'panel': 'IX',
-            'panel_name': 'Macro \\& Other Betas',
-            'signals': [
-                {
-                    'mnemonic': 'b_dunc',
-                    'name': 'Macro Uncertainty Beta',
-                    'description': 'Beta on changes in Jurado, Ludvigson, and Ng (2015) macro uncertainty index.',
-                    'citation': '\\citet{bali2021uncertainty}',
-                },
-                {
-                    'mnemonic': 'b_duncr',
-                    'name': 'Real Uncertainty Beta',
-                    'description': 'Beta on changes in Jurado, Ludvigson, and Ng (2015) real uncertainty component.',
-                    'citation': '\\citet{bali2021uncertainty}',
-                },
-                {
-                    'mnemonic': 'b_duncf',
-                    'name': 'Financial Uncertainty Beta',
-                    'description': 'Beta on changes in Jurado, Ludvigson, and Ng (2015) financial uncertainty component.',
-                    'citation': '\\citet{bali2021uncertainty}',
-                },
-                {
-                    'mnemonic': 'b_unc',
-                    'name': 'Uncertainty Level Beta',
-                    'description': 'Beta on Jurado, Ludvigson, and Ng (2015) macro uncertainty level.',
-                    'citation': '\\citet{bali2021uncertainty}',
-                },
-                {
-                    'mnemonic': 'b_dunc3',
-                    'name': '3-Month Uncertainty Change Beta',
-                    'description': 'Beta on 3-month change in Jurado, Ludvigson, and Ng (2015) macro uncertainty.',
-                    'citation': '\\citet{bali2021uncertainty}',
-                },
-                {
-                    'mnemonic': 'b_dunc6',
-                    'name': '6-Month Uncertainty Change Beta',
-                    'description': 'Beta on 6-month change in Jurado, Ludvigson, and Ng (2015) macro uncertainty.',
-                    'citation': '\\citet{bali2021uncertainty}',
-                },
-                {
-                    'mnemonic': 'b_dcpi',
-                    'name': 'Inflation Beta',
-                    'description': 'Beta on monthly CPI changes.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'b_cpi_vol6',
-                    'name': 'Inflation Volatility Beta',
-                    'description': 'Beta on 6-month rolling CPI volatility.',
-                    'citation': '\\citet{ceballos2021inflation}',
-                },
-                {
-                    'mnemonic': 'b_dcredit',
-                    'name': 'Credit Spread Change Beta',
-                    'description': 'Beta on monthly changes in BAA-AAA spread.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'b_credit',
-                    'name': 'Credit Spread Level Beta',
-                    'description': 'Beta on BAA-AAA credit spread level.',
-                    'citation': '\\citet{dickerson2023corporate}',
-                },
-                {
-                    'mnemonic': 'b_cptlt',
-                    'name': 'Intermediary Capital Beta',
-                    'description': 'Beta on traded intermediary capital ratio.',
-                    'citation': '\\citet{he2017intermediary}',
-                },
-                {
-                    'mnemonic': 'b_rvol',
-                    'name': 'Realized Volatility Beta',
-                    'description': 'Beta on aggregate realized volatility factor.',
-                    'citation': '--',
-                },
-                {
-                    'mnemonic': 'b_rsj',
-                    'name': 'Realized Jump Beta',
-                    'description': 'Beta on aggregate realized signed jump factor.',
-                    'citation': '\\citet{bollerslev2020}',
-                },
-                {
-                    'mnemonic': 'b_lvl',
-                    'name': 'Level Factor Beta',
-                    'description': 'Beta on the average over key-rate U.S. Treasury yields.',
-                    'citation': '\\citet{koijen2017}',
-                },
-                {
-                    'mnemonic': 'b_ysp',
-                    'name': 'Yield Spread Beta',
-                    'description': 'Beta on yield spread factor.',
-                    'citation': '\\citet{koijen2017}',
-                },
-                {
-                    'mnemonic': 'b_epu',
-                    'name': 'Economic Policy Uncertainty Beta',
-                    'description': 'Beta on EPU index level.',
-                    'citation': '\\citet{baker2016measuring}',
-                },
-                {
-                    'mnemonic': 'b_epum',
-                    'name': 'Monetary Policy Uncertainty Beta',
-                    'description': 'Beta on monetary policy uncertainty index level.',
-                    'citation': '\\citet{baker2016measuring}',
-                },
-                {
-                    'mnemonic': 'b_eput',
-                    'name': 'Trade Policy Uncertainty Beta',
-                    'description': 'Beta on trade policy uncertainty index level.',
-                    'citation': '\\citet{baker2016measuring}',
-                },
-            ],
-        },
-    ]
+    out, i, in_math = [], 0, False
+    while i < len(x):
+        c = x[i]
+        if c == "$":
+            in_math = not in_math
+            out.append(c)
+            i += 1
+        elif c == "\\":
+            j = i + 1
+            while j < len(x) and x[j].isalpha():
+                j += 1
+            if j == i + 1 and j < len(x):          # an escaped character, e.g. \% \& \_
+                j += 1
+            while j < len(x) and x[j] == "{":      # ...and every braced argument
+                depth = 0
+                while j < len(x):
+                    if x[j] == "{":
+                        depth += 1
+                    elif x[j] == "}":
+                        depth -= 1
+                        if depth == 0:
+                            j += 1
+                            break
+                    j += 1
+            out.append(x[i:j])
+            i = j
+        elif in_math:
+            out.append(c)
+            i += 1
+        else:
+            out.append(_MACRO_ESCAPES.get(c, c))
+            i += 1
+    return "".join(out)
+
+
+def _backticks_to_texttt(x: str) -> str:
+    """The spec marks a few column names with backticks. LaTeX wants a texttt macro."""
+    import re
+    return re.sub(r"`([^`]+)`", lambda m: r"\texttt{" + m.group(1).replace("_", r"\_") + "}", x)
+
+
+def _cite(row: dict, known: set) -> str:
+    """\\citet{...} for a spec row. Refuses a key this report's bibliography lacks.
+
+    A row with words and no key (the five tret_* benchmarks cite an appendix or a working
+    paper) prints its words. A row with neither prints '--'.
+    """
+    keys = row.get("citation_keys") or []
+    if not keys:
+        return _tex_escape(row.get("citation_text") or "--")
+    missing = [k for k in keys if k not in known]
+    if missing:
+        raise KeyError(
+            f"{row['mnemonic']}: the spec cites {missing}, which get_references_bib() does not "
+            "define. LaTeX would print a question mark and carry on. Add the entry, copied from "
+            "the paper's references.bib, under the same key.")
+    return r"\citet{" + ",".join(keys) + "}"
+
+
+def get_signal_definitions() -> list:
+    """The panel's column definitions, grouped for the appendix table.
+
+    ONE source. This used to be a 950-line literal, a third hand-kept copy beside
+    DATA_DICTIONARY.md and stage3/spec/signal_definitions.json. It drifted: when five names
+    were corrected elsewhere (b_eput is TAX policy, lix is negated, ...) this copy kept the old
+    ones, and the published report printed them. It now reads the spec Table IA.VIII is built
+    from, so the two tables cannot disagree, and tests/test_signal_definitions.py holds the
+    dictionary to the same text.
+
+    Returns a list of {'panel', 'panel_name', 'signals'}; each signal is
+    {'mnemonic', 'name', 'description', 'citation'}, LaTeX-ready. `citation` is a citet of the
+    spec's own keys, so every cited work reaches this report's reference list. The keys are the
+    paper's, and get_references_bib() uses the same ones; a key it lacks is refused here rather
+    than printed as a question mark.
+    """
+    import json
+    import re
+
+    if not SIGNAL_SPEC.exists():
+        raise FileNotFoundError(
+            f"the signal definitions are read from {SIGNAL_SPEC}, which is missing.\n"
+            "    It ships in this repository under stage3/spec/. Restore it rather than "
+            "typing definitions here: a second copy is how the report came to print stale names.")
+    rows = json.loads(SIGNAL_SPEC.read_text(encoding="utf-8"))["rows"]
+    known = set(re.findall(r"@\w+\{([^,\s]+),", get_references_bib()))
+
+    panels: list[dict] = []
+    for r in rows:
+        m = re.match(r"Cluster ([IVX]+): (.*)", r["group"])
+        label, name = (m.group(1), m.group(2)) if m else ("", r["group"])
+        if not panels or panels[-1]["_group"] != r["group"]:
+            panels.append({"panel": label, "panel_name": _tex_escape(name),
+                           "_group": r["group"], "signals": []})
+        panels[-1]["signals"].append({
+            "mnemonic": r["mnemonic"],
+            "name": _tex_escape(r["name"]),
+            "description": _tex_escape(_backticks_to_texttt(r["description"])),
+            "citation": _cite(r, known),
+        })
+    for p in panels:
+        del p["_group"]
     return panels
 
 

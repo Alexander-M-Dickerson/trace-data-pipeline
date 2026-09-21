@@ -218,6 +218,44 @@ def assert_main_panel_is_adjusted(panel, sidecar, *, what: str = "main panel") -
     )
 
 
+def assert_holding_period_is_the_window(panel, cal_lut, *, what: str = "main panel") -> None:
+    """`hprd` must be the return's real window: NYSE sessions from `dt_s` to `dt_e`.
+
+    Until 2026-09-21 `hprd` ran from the start trade to the CALENDAR month-end, a date the
+    return does not use, while every definition called it "calendar days". Nothing failed,
+    because nothing compared the column with the two dates printed beside it. This does.
+
+    `cal_lut` is `nyse_calendar.cal_lut_frame()`: one row per calendar day with `cum_before`,
+    the number of sessions strictly before it. Sessions in [dt_s, dt_e) is the difference.
+    """
+    import pandas as pd
+
+    need = {"dt_s", "dt_e", "hprd"}
+    if not need <= set(panel.columns):
+        raise AssertionError(f"{what}: need {sorted(need)} to check the holding period")
+    rows = panel.loc[panel["hprd"].notna(), ["dt_s", "dt_e", "hprd"]]
+    if rows.empty:
+        raise AssertionError(f"{what}: no row carries hprd -- nothing was compared. "
+                             "A check over an empty population is not a pass.")
+    lut = pd.Series(cal_lut["cum_before"].to_numpy(),
+                    index=pd.to_datetime(cal_lut["cday"]).dt.normalize())
+    s = pd.to_datetime(rows["dt_s"]).dt.normalize().map(lut)
+    e = pd.to_datetime(rows["dt_e"]).dt.normalize().map(lut)
+    if s.isna().any() or e.isna().any():
+        raise AssertionError(f"{what}: {int(s.isna().sum() + e.isna().sum()):,} trade date(s) "
+                             "fall outside the NYSE calendar table")
+    want = (e - s).to_numpy()
+    got = rows["hprd"].to_numpy(dtype="float64")
+    bad = int((want != got).sum())
+    if bad:
+        raise AssertionError(
+            f"{what}: hprd differs from the dt_s -> dt_e session count on {bad:,} of "
+            f"{len(rows):,} rows (mean hprd {got.mean():.3f}, mean window {want.mean():.3f}).\n"
+            "  hprd is the number of NYSE sessions between the return's two trades. If it is\n"
+            "  measured to anything else -- the calendar month-end, calendar days -- it no\n"
+            "  longer describes the return printed beside it.")
+
+
 def assert_panel_contract(df, *, what: str = "main panel") -> None:
     """Raise unless `df` carries exactly PANEL_COLUMNS, in exactly that order."""
     actual = list(df.columns)

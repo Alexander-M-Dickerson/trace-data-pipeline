@@ -12,7 +12,7 @@ dictionary and against the code by anyone, in a file that is not LaTeX.
     python s4_zoo/t_ia08.py --diffs         # print only the rows the paper prints
                                             #   differently, and why
 
-Seven rows differ from the printed table. Each carries `why_corrected` in the spec and is
+Some rows differ from the printed table. Each carries `why_corrected` in the spec and is
 listed in `RECONCILIATION_ia08.md`; each was settled by the code or by the paper
 contradicting itself, never by preference. The table footnotes them, so a reader of the
 PDF is told rather than left to diff two documents.

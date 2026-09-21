@@ -162,9 +162,9 @@ Table IA.VIII is different: it is the paper's **signal dictionary**, defining ea
 the 145 panel fields. There is no computation behind it, so Stage 3 renders it from a
 spec -- `spec/signal_definitions.json`, one entry per field -- rather than from data.
 That spec was reconciled against Stage 2's `DATA_DICTIONARY.md` and against the code
-that computes each signal; seven rows differ from the printed table and each records what
+that computes each signal. The rows that differ from the printed table each record what
 was printed and why it changed. `RECONCILIATION_ia08.md` has the full account, and
-`python s4_zoo/t_ia08.py --diffs` prints the seven.
+`python s4_zoo/t_ia08.py --diffs` prints them.
 
 Those timings are with the fast kernels, on 24 cores. Without them a sort takes roughly
 fourteen times as long (43.8 s against 3.2 s, measured on one), which is what turns the
