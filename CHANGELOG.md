@@ -21,6 +21,11 @@ factor panel is unchanged. Stage 3 reproduces every exhibit with only the known 
 The public daily download is now 32 columns, cut by `make_release.py --what daily`, and every
 bundle records the build file it was cut from.
 
+**Released 2026-09-23.** The downloads on openbondassetpricing.com now serve this run: both
+monthly zips, the factor and BBW bundles, the four factor archives, the reports, and the daily
+panel in two parts (2002-2016 and 2017-2025, 31,344,732 rows). Every served file was
+downloaded back and checked against the build.
+
 ### Fixed -- documentation, checked against the data (2026-09-21)
 
 Every doc was read against the 2026 build, the 2026-09-10 WRDS run and the code. What was
