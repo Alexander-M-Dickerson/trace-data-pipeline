@@ -269,10 +269,11 @@ ssh {wrds_username}@wrds-cloud.wharton.upenn.edu
 **Create the zip file in scratch space:**
 ```bash
 cd ~
-zip -r /scratch/{institution}/trace-data-pipeline.zip trace-data-pipeline/
+zip -r "/scratch/$(basename "$(dirname "$HOME")")/trace-data-pipeline.zip" trace-data-pipeline/
 ```
 
 This compresses the folder and stores it in scratch space, avoiding home directory quota issues.
+`$(basename "$(dirname "$HOME")")` is your institution code, the folder between `/home` and your username. Type the line as written; nothing in it is a placeholder. For the `scp` line below, `{institution}` IS a placeholder: replace it, braces included, with that code (`echo $HOME` on WRDS shows it).
 
 > ❗`zip` stores whatever path you hand it. Given the absolute `~/trace-data-pipeline/`,
 > it strips the leading `/` and stores `home/{institution}/{wrds_username}/trace-data-pipeline/...`,
@@ -593,7 +594,7 @@ ls -lh stage1/data/stage1_*.parquet
 # Download (from local machine) - see "Download Results" section above
 # Step 1: SSH to WRDS and zip to scratch
 ssh {wrds_username}@wrds-cloud.wharton.upenn.edu
-cd ~ && zip -r /scratch/{institution}/trace-data-pipeline.zip trace-data-pipeline/
+cd ~ && zip -r "/scratch/$(basename "$(dirname "$HOME")")/trace-data-pipeline.zip" trace-data-pipeline/
 
 # Step 2: Download zip (from LOCAL machine)
 scp {wrds_username}@wrds-cloud.wharton.upenn.edu:/scratch/{institution}/trace-data-pipeline.zip ./

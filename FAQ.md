@@ -372,8 +372,9 @@ ssh {wrds_username}@wrds-cloud.wharton.upenn.edu
 # Run from ~ on a RELATIVE path: zip stores the path you give it, so an absolute
 # ~/trace-data-pipeline/ makes the archive extract four directories deep.
 cd ~
-zip -r /scratch/{institution}/trace-data-pipeline.zip trace-data-pipeline/
+zip -r "/scratch/$(basename "$(dirname "$HOME")")/trace-data-pipeline.zip" trace-data-pipeline/
 ```
+`$(basename "$(dirname "$HOME")")` is your institution code, the folder between `/home` and your username. Type the line as written; nothing in it is a placeholder. For the `scp` line below, `{institution}` IS a placeholder: replace it, braces included, with that code (`echo $HOME` on WRDS shows it).
 
 **Step 2: Download the zip file (from your LOCAL machine)**
 

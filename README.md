@@ -46,11 +46,12 @@ faster on your own machine and needs no WRDS connection at all.
 
 **Moving the results** — you end up with roughly 5 GB across hundreds of files:
 
-6. On WRDS, zip it: `cd ~ && zip -r /scratch/{institution}/trace-data-pipeline.zip trace-data-pipeline/`
+6. On WRDS, zip it: `cd ~ && zip -r "/scratch/$(basename "$(dirname "$HOME")")/trace-data-pipeline.zip" trace-data-pipeline/`
 7. From your own computer, copy it down with `scp`, then unzip.
 
 > ❗Zip from `~` using a **relative** path, exactly as written. `zip -r out.zip ~/trace-data-pipeline/`
 > stores the absolute path and you get an archive nested four directories deep.
+> `$(basename "$(dirname "$HOME")")` is your institution code, the folder between `/home` and your username. Type the line as written; nothing in it is a placeholder. For the `scp` line below, `{institution}` IS a placeholder: replace it, braces included, with that code (`echo $HOME` on WRDS shows it).
 
 **On your own computer:**
 
@@ -312,8 +313,10 @@ The pipeline generates a large folder (~5 GB) with hundreds of files. **Zip the 
    ```bash
    ssh {wrds_username}@wrds-cloud.wharton.upenn.edu
    cd ~
-   zip -r /scratch/{institution}/trace-data-pipeline.zip trace-data-pipeline/
+   zip -r "/scratch/$(basename "$(dirname "$HOME")")/trace-data-pipeline.zip" trace-data-pipeline/
    ```
+   `$(basename "$(dirname "$HOME")")` is your institution code, the folder between `/home` and your username. Type the line as written; nothing in it is a placeholder. For the `scp` line below, `{institution}` IS a placeholder: replace it, braces included, with that code (`echo $HOME` on WRDS shows it).
+
    ❗Zip from `~` on a **relative** path. `zip` stores the path you hand it, so an absolute
    `~/trace-data-pipeline/` strips the leading `/` and makes the archive extract as
    `home/{institution}/{wrds_username}/trace-data-pipeline/...`, four directories deep.
