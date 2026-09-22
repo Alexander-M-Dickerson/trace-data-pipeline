@@ -761,4 +761,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Last Updated:** September 2026
-**Version:** 3.2.0 — see [CHANGELOG.md](CHANGELOG.md) for what each release changed.
+**Version:** 3.3.0 — see [CHANGELOG.md](CHANGELOG.md) for what each release changed.

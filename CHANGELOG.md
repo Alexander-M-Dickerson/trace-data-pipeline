@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.3.0] - 2026-09-22
+
+**The 2026 vintage, rebuilt on the linker's identity window.** Stages 0 and 1 were re-run on
+WRDS on 2026-09-21 from commit `1866122`, and everything downstream was rebuilt on that run.
+Measured, against the 2026-09-10 run on all 31,344,732 shared bond-days: prices, volumes and
+trade counts identical; 644,754 bond-days gained a firm id, 0 lost one, 0 changed; `permno`
+coverage 87.77% to 89.83%. Nothing else moved, because the WRDS frontier and every input were
+the same. Stage 2 on it: 1,950,002 bond-months, 55,422 bonds, 2002-08 to 2025-11, 145 columns.
+Against the 2026-09-16 build, `hprd` moves on 963,777 rows by design (below) and six liquidity
+columns by 1e-13 or less; every return, every other signal and `permno` are identical, and the
+factor panel is unchanged. Stage 3 reproduces every exhibit with only the known `t06` red.
+The public daily download is now 32 columns, cut by `make_release.py --what daily`, and every
+bundle records the build file it was cut from.
+
 ### Fixed -- documentation, checked against the data (2026-09-21)
 
 Every doc was read against the 2026 build, the 2026-09-10 WRDS run and the code. What was
