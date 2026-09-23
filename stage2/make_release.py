@@ -617,9 +617,17 @@ BBW_FACTORS = ("MKTB", "DRF", "CRF", "LRF")
 BBW_RETURN_TYPES = (("", "exc"), ("x", "dur"), ("_bns", "dbns"), ("_cls", "dcls"))
 
 # The authors' original series, committed under reference/ and shipped unchanged. Pinned: a
-# file that hashes differently is a different claim, and the bundle refuses it.
+# file whose CONTENT hashes differently is a different claim, and the bundle refuses it.
+# The pin is over the content with line endings normalized to LF. Until 2026-09-23 it was the
+# sha256 of a Windows checkout's CRLF bytes, so on Linux and macOS -- and on WRDS -- the
+# unchanged file failed the check and the BBW bundle refused to build.
 BBW_ORIGINAL = cfg.STAGE2_DIR / "reference" / "bbw_factors_original_2004_2021.csv"
-BBW_ORIGINAL_SHA256 = "4588e8ee406eb14510c05b2dd47e332c98b630abacd101acea009907987dbbb4"
+BBW_ORIGINAL_SHA256 = "d20016bd922127c7d0a5d07a4ff3a4c11b329923b15455f8d5aa2c01f62bfca5"
+
+
+def _content_sha256(path: Path) -> str:
+    """sha256 of a text file's content with CRLF normalized to LF: the same on every checkout."""
+    return hashlib.sha256(Path(path).read_bytes().replace(b"\r\n", b"\n")).hexdigest()
 
 # Where the TRACE-built factors take over from the Lehman-ICE backfill -- step4_betas.ICE_CUTOFF.
 BBW_TRACE_START = pd.Timestamp("2002-08-31")
@@ -711,7 +719,7 @@ def _gate_bbw(trace: pd.DataFrame, ext: pd.DataFrame) -> None:
                          "Lehman-ICE backfill did not reach factors_merged")
     if not BBW_ORIGINAL.exists():
         raise SystemExit(f"ERROR: {BBW_ORIGINAL} is missing")
-    sha = _sha256(BBW_ORIGINAL)
+    sha = _content_sha256(BBW_ORIGINAL)
     if sha != BBW_ORIGINAL_SHA256:
         raise SystemExit("ERROR: the original BBW series does not hash as pinned "
                          f"({sha[:16]} vs {BBW_ORIGINAL_SHA256[:16]}); refusing to ship a "

@@ -126,11 +126,16 @@ def test_blocks_on_different_axes_are_refused(tmp_path):
         mr._bbw_trace(blocks)
 
 
-def test_the_original_series_is_pinned_and_present():
+def test_the_original_series_is_pinned_and_present(tmp_path):
     """The file shipped as the authors' original must hash as pinned, and the pin must be
     the sha256 of a real file with the authors' columns and their 209 months."""
     assert mr.BBW_ORIGINAL.exists(), mr.BBW_ORIGINAL
-    assert hashlib.sha256(mr.BBW_ORIGINAL.read_bytes()).hexdigest() == mr.BBW_ORIGINAL_SHA256
+    assert mr._content_sha256(mr.BBW_ORIGINAL) == mr.BBW_ORIGINAL_SHA256
+    # the pin does not depend on the checkout's line endings
+    crlf = tmp_path / 'crlf.csv'
+    lf = mr.BBW_ORIGINAL.read_bytes().replace(b"\r\n", b"\n")
+    crlf.write_bytes(lf.replace(b"\n", b"\r\n"))
+    assert mr._content_sha256(crlf) == mr.BBW_ORIGINAL_SHA256
     o = pd.read_csv(mr.BBW_ORIGINAL, parse_dates=["date"])
     assert list(o.columns) == ["date", "MKTbond", "DRF", "CRF", "LRF"]
     assert len(o) == 209 and str(o["date"].min())[:10] == "2004-08-31"
