@@ -164,6 +164,17 @@ def main() -> int:
     if unknown:
         raise SystemExit(f"unknown benchmark(s) {unknown}; known: {list(BENCHMARKS)}")
 
+    # Each benchmark's BBW factor twins, rebuilt from THIS build's blocks before any beta. Until
+    # 2026-09-23 this runner never built them: on a fresh build every benchmark raised for missing
+    # twins, and where an older bbw_factors_<bm>.parquet sat in the folder it was reused silently,
+    # pairing one build's twins with another build's returns. Always rebuilt, never reused.
+    import step3_bbw
+    for bm in todo:
+        print(f"\nBBW factor twins for {bm} (step 3, benchmark={bm}) ...")
+        step3_bbw.build(mode=mode, benchmark=bm)
+    factors = step4_betas.build_factor_matrix(blocks)
+    print(f"  factor matrix with the twins: {factors.shape[0]} months x {factors.shape[1]} columns")
+
     report = {"mode": mode, "benchmarks": {}}
     for bm in todo:
         print(f"\n=== {bm} ===")
