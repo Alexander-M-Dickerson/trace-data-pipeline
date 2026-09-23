@@ -36,8 +36,9 @@ must **never** be submitted with `qsub`. Two reasons:
 `run_pipeline.sh` therefore does not submit it. When your WRDS run finishes, download
 `stage0/` and `stage1/` to your own machine and run Stage 2 there.
 
-A full build takes **8 to 13 minutes on 24 cores / 128 GB** (the last two full builds, 2026-09-14
-and 2026-09-16). It is comfortable on a modern desktop and unhappy on a laptop with 16 GB.
+A full build takes **8 to 18 minutes on 24 cores / 128 GB** (four full builds, 2026-09-14 to
+2026-09-23; the slowest was the first in a fresh checkout, which also downloads the external
+series). It is comfortable on a modern desktop and unhappy on a laptop with 16 GB.
 
 ---
 
@@ -87,7 +88,7 @@ Useful flags (passed straight through to `_run_stage2.py`):
 | `--dry-run` | Validate the configuration and exit |
 | `--limit-cusips 200` | Build on the first 200 CUSIPs — a fast development loop |
 | `--from-step N --to-step M` | Run part of the pipeline (steps 1-7) |
-| `--factor-source pinned` | Use a pre-built factor file instead of fetching public sources |
+| `--factor-source pinned` | Use the factor file published with your vintage (downloaded once) instead of rebuilding it from public sources. Needed to reproduce a published panel exactly |
 | `--validate` | Run the validation sweep after building |
 
 ---

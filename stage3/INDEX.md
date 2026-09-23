@@ -33,7 +33,7 @@ Shared code sits at the top level: `drrlib.py` (statistics, sample provenance, r
 | Table 3 | `tab:lab_affected_factors` | `s2_lab/t03_affected.py` | -- | `table03` |
 | Table 4 | `tab:lab_ls_1` | `s2_lab/t04_table4.py` | 2002-08 to 2025-11, T 268-279 by series | `table04` |
 | Table 5 | `tab:nse_by_cluster` | `s3_nse/t05_dua_nse.py` | 2002-09 to 2025-11; 69,984 filter paths | `table05 (x2)` |
-| Table 6 | `tab:mu_nse_by_cluster` | `s3_nse/t06_mua_nse.py` | 2002-09 to 2025-11; 18,026 construction paths | `table06 (x2)` |
+| Table 6 | `tab:mu_nse_by_cluster` | `s3_nse/t06_mua_nse.py` | 2002-09 to 2025-11; 18,064 construction paths | `table06 (x2)` |
 | Figure 3 | -- | `s1_lib/f_lib_figures.py` | 2002-09 to 2025-11 | `fig03_cumret` |
 | Figure 4 | -- | `s1_lib/f_lib_figures.py` | 2002-09 to 2025-11 | `fig04_bias` |
 | Figure 6 | -- | `s2_lab/f06_dua.py` | 2002-09 to 2025-11, T=279 | `fig06_momentum_trim` |
@@ -103,8 +103,8 @@ Shared code sits at the top level: `drrlib.py` (statistics, sample provenance, r
 | Table IA.XV | `tab:lab_full_mean_8` | `s2_lab/t15_decomp.py` | 2002-08 to 2025-11, T 268-279 by series | `table15` |
 | Table IA.XVI | `tab:lab_full_alpha_9` | `s2_lab/t15_decomp.py` | 2002-08 to 2025-11, T 268-279 by series | `table16` |
 | Table IA.XVII | `tab:filter_paths` | `s3_nse/t17_filter_paths.py` | 2002-09 to 2025-11; 69,984 filter paths | `table_ia17 (x2)` |
-| Table IA.XVIII | `tab:mua_portfolio_size` | `s3_nse/t18_portfolio_size.py` | 2002-09 to 2025-11; 18,026 strategies | `table_ia18 (x2)` |
-| Table IA.XIX | `tab:mua_improvement` | `s3_nse/t19_mua_improvement.py` | 2002-09 to 2025-11; 18,026 construction paths | `table_ia19 (x2)` |
+| Table IA.XVIII | `tab:mua_portfolio_size` | `s3_nse/t18_portfolio_size.py` | 2002-09 to 2025-11; 18,064 strategies | `table_ia18 (x2)` |
+| Table IA.XIX | `tab:mua_improvement` | `s3_nse/t19_mua_improvement.py` | 2002-09 to 2025-11; 18,064 construction paths | `table_ia19 (x2)` |
 | Inline counts (alpha) | -- | `s4_zoo/t_inline.py` | 2002-08 to 2025-11 | `inline_counts_alpha` |
 | Inline counts (premium) | -- | `s4_zoo/t_inline.py` | 2002-08 to 2025-11 | `inline_counts_premium` |
 | Figure IA.1 | -- | `s1_lib/f_lib_figures.py` | 2002-09 to 2025-11 | `figIA1_bias_by_rating` |

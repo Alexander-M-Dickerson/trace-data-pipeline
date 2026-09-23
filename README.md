@@ -25,8 +25,8 @@ Getting this straight first will save you an afternoon.
 |---|---|---|---|
 | **1** | **WRDS Cloud** | Stages 0 and 1 build the daily bond panel from the raw TRACE tape | ~5 hours, mostly waiting |
 | **2** | **In between** | You zip the output on WRDS and copy it down to your own computer | ~15 min for ~5 GB |
-| **3** | **Your own computer** | Stage 2 turns that daily panel into the monthly asset-pricing panel | ~8-13 minutes |
-| **4** | **Your own computer** | Stage 3 turns the monthly panel into sorted portfolios and the paper's exhibits | ~15 minutes |
+| **3** | **Your own computer** | Stage 2 turns that daily panel into the monthly asset-pricing panel | ~8-18 minutes |
+| **4** | **Your own computer** | Stage 3 turns the monthly panel into sorted portfolios and the paper's exhibits | ~15-20 minutes |
 
 **Why the split?** Stages 0 and 1 read the raw TRACE transaction tape, which is a WRDS
 database — so they have to run where the data is, submitted to the WRDS job grid. Stage 2
@@ -73,6 +73,10 @@ It is optional — the panel is useful on its own.
 Full detail: [QUICKSTART.md](QUICKSTART.md) for stages 0-1,
 [stage2/QUICKSTART_stage2.md](stage2/QUICKSTART_stage2.md) for stage 2,
 [stage3/QUICKSTART_stage3.md](stage3/QUICKSTART_stage3.md) for stage 3.
+
+Running stages 2 and 3 with Claude Code or Codex? The repository carries instructions they
+read by themselves: [AGENTS.md](AGENTS.md) here and in `stage2/` and `stage3/` (Codex), and a
+`CLAUDE.md` beside each that points to it (Claude Code).
 
 > ❗**You cannot skip stages 0 and 1 by downloading the published Stage 1 file.** The public
 > download has its rating columns removed, because agency ratings are licensed. Stage 2 keeps

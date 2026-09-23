@@ -144,8 +144,11 @@ unchanged.
 
 ### Resuming, forcing, and what a failure does
 
-A producer whose output already exists is **skipped**, so if a run stops you can simply
-run it again and it resumes. `--force` recomputes from scratch.
+A producer is **skipped** when its output already exists AND was built from the Stage 2
+files present now, so if a run stops you can simply run it again and it resumes. Each
+producer records what it read under `data/_inputs/`; after a new Stage 2 build the
+producers that read it run again by themselves, and the run says so with a `[rebuild]`
+line. `--force` recomputes everything regardless.
 
 A failed **exhibit** does not abandon the run: the remaining steps still run and the PDF
 is still produced, and the run exits non-zero so the failure is not lost. A failed
@@ -168,10 +171,12 @@ run's own audit and they are collected in `reports/timings.jsonl`; `make_report.
 prints any that failed on the PDF's title page, so a red check cannot leave the document
 silently.
 
-❗One check is **red by design** on this build: `s3_nse/t06_mua_nse.py`'s twin-invariance check
-fails whenever the sort engine's unstable empty cell bites (see *What is not
-reproducible* in README_stage3.md). The run continues, the PDF is produced, and the exit
-code is non-zero. That is the intended behaviour, not a broken install.
+❗One check can go red without anything being wrong with your install:
+`s3_nse/t06_mua_nse.py`'s twin-invariance check fails whenever the sort engine's unstable
+empty cell bites (see *What is not reproducible* in README_stage3.md). It does not bite
+every run: the 2026-09-12 run had 54 such cells and `t06` failed; the 2026-09-23 run had
+none and every step passed. When it bites, the run continues, the PDF is produced, and the
+exit code is non-zero. The grid step prints how many such cells it found.
 
 ---
 
@@ -197,7 +202,7 @@ so on a normal machine the grids are bounded by cores, not by memory.
 
 ```bash
 cd stage3
-python -m pytest tests/ -q          # the contract suite: 68 checks, about 1 s
+python -m pytest tests/ -q          # the contract suite, about 2 s
 python tools/check_inputs.py        # the five inputs, before a long run
 python _run_stage3.py --dry-run     # what would run, what would be skipped
 ```

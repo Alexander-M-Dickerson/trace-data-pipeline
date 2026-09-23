@@ -4,8 +4,9 @@ The shortest path from a Stage 1 daily panel to a 145-column monthly bond panel.
 
 Stage 2 runs on **your own machine**, not the WRDS grid. It reads Stage 1's output rather
 than the TRACE tape, so there is no job to submit and no queue to wait in. On 24 cores and
-the full 2002-2025 sample, the last two full builds took 8.3 minutes (2026-09-14) and 13.0
-minutes (2026-09-16), start to finish.
+the full 2002-2025 sample, full builds took 8.3 minutes (2026-09-14) and 13.0 minutes
+(2026-09-16), start to finish. The first build in a fresh checkout, which also downloads
+the external series, took 18.2 minutes, and the next one there 11.6 (2026-09-23).
 
 ---
 

@@ -134,7 +134,9 @@ CPI, and the Ludvigson uncertainty series is re-estimated on each release. A pan
 next month therefore will not reproduce a panel published today. Shipping the exact factor
 panel a release consumed is what lets anyone reproduce -- or check -- a published number.
 
-To use it, point Stage 2 at this file:
+To use it, run Stage 2 with `python _run_stage2.py --factor-source pinned`. On a Stage 1
+file from {vintage} it downloads this file on the first run and caches it in `stage2/data/`.
+To use a copy you already have, set in `stage2/_stage2_settings.py`:
 
 ```
 FACTOR_SOURCE = "pinned"

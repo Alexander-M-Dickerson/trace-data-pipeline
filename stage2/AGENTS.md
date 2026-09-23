@@ -24,7 +24,7 @@ Run from `stage2/`. Set `WRDS_USERNAME` first if the cache under `stage2/data/` 
 
 ```bash
 python _run_stage2.py --dry-run [--factor-source pinned]   # 1. resolve and print every input
-python _run_stage2.py [--factor-source pinned]             # 2. the build, about 10-20 min
+python _run_stage2.py [--factor-source pinned]             # 2. the build, about 8-18 min
 python validate_coverage.py                                # 3. every column reaches the panel's end
 python -m pytest tests -q                                  # 4. the stage's own tests
 python make_excess_blocks.py --mode stage1 --verify       # 5. optional: other Treasury benchmarks

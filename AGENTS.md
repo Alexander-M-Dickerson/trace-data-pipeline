@@ -14,7 +14,7 @@ on two machines:
 |---|---|---|---|
 | 0 and 1 | **WRDS Cloud** (SGE grid) | clean the raw tape, build the daily bond panel | about 5 h |
 | hand-off | the user | zip the folder on WRDS, copy it to their own computer | -- |
-| 2 | **the user's computer** | build the monthly panel (145 columns per bond-month) | about 10-20 min (first run includes downloads) |
+| 2 | **the user's computer** | build the monthly panel (145 columns per bond-month) | about 8-18 min (the first run also downloads its inputs) |
 | 3 | **the user's computer** | portfolio sorts and the paper's exhibits (tex tables, figures) | about 15-20 min |
 
 Stages 2 and 3 are what most users run locally with an assistant. Each has its own instructions:

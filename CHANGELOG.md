@@ -37,6 +37,16 @@ exactly as a user would. Each fix carries a test.
 - The INDEX.md test failed after a full run on any data but ours; it now checks the code's map,
   not the sample each exhibit states.
 
+### Fixed -- documentation
+- Stage 3's guides said the `t06` check is always red. It goes red only on a run where the sort
+  engine leaves some cells empty (54 on 2026-09-12, none on 2026-09-23, when every step passed).
+- Stage 3's guides described the old rule for skipping a producer; they now describe the input
+  records and the `[rebuild]` line.
+- Build times now include the first build in a fresh checkout: Stage 2 takes 8-18 minutes, Stage 3
+  15-20.
+- `stage3/INDEX.md` states the path counts of the released 2026 data (18,064, not 18,026).
+- The factor bundle's README says `--factor-source pinned` downloads the file itself.
+
 ### Added
 - `AGENTS.md` (read by Codex) and `CLAUDE.md` (read by Claude Code) at the root and in `stage2/`
   and `stage3/`: how to run the local stages with an AI assistant -- the commands in order, the

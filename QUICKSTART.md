@@ -38,8 +38,8 @@ Before you start, know where you will be:
 |---|---|---|
 | Stages 0 and 1 | **WRDS Cloud** | build the daily bond panel from the raw TRACE tape (~5 h) |
 | The hand-off | you | zip it on WRDS, `scp` it to your own computer (~5 GB) |
-| Stage 2 | **your own computer** | build the monthly panel from that file (~8-13 min) |
-| Stage 3 | **your own computer** | sorts, uncertainty grids and the paper's exhibits (~15 min, optional) |
+| Stage 2 | **your own computer** | build the monthly panel from that file (~8-18 min) |
+| Stage 3 | **your own computer** | sorts, uncertainty grids and the paper's exhibits (~15-20 min, optional) |
 
 Steps 1-3 below are all **on WRDS**. The switch to your own computer happens at
 [Download Results](#download-results-to-your-local-machine), and Stage 2 follows it.
@@ -366,7 +366,7 @@ Then build the panel:
 ```bash
 cd stage2
 python _run_stage2.py --dry-run     # resolve and validate the config, build nothing
-python _run_stage2.py               # the full build, ~8-13 minutes on 24 cores
+python _run_stage2.py               # the full build, ~8-18 minutes on 24 cores
 ```
 
 It writes `output/panel/main_panel_<mode>.parquet` -- 145 columns per bond-month -- plus the

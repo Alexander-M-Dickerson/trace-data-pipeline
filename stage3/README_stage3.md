@@ -131,8 +131,10 @@ implementation bias the paper is about.
 `python _run_stage3.py --list` prints them. Two kinds, costing very different amounts:
 
 **Producers** run sorts through PyBondLab and save return series. A producer is
-**skipped when its output already exists**, so re-running after a crash resumes rather
-than restarting; `--force` recomputes.
+**skipped when its output already exists and was built from the Stage 2 files present
+now** (each run records what it read under `data/_inputs/`), so re-running after a crash
+resumes rather than restarting, and a new Stage 2 build re-runs the producers that read
+it. `--force` recomputes everything.
 
 Measured on the cold run of 2026-09-12, 24 cores with the kernels:
 
@@ -242,7 +244,7 @@ Measured on a **cold run** — `data/` and `reports/` wiped first — on 24 core
 
 Those are the benched steps (856 s of the 906 s); the rest is process start-up across the 41 steps and the LaTeX compile. `reports/timings.jsonl` carries one line per step, and the run prints its own five slowest at the end.
 
-The run **exits non-zero**, and should: `s3_nse/t06_mua_nse.py`'s twin-invariance check is red while the sort engine's unstable empty cell is open. Every other step passed, and the PDF was produced -- a failed exhibit does not abandon the run.
+That run **exited non-zero**, as it should have: its grid had 54 of the sort engine's unstable empty cells, so `s3_nse/t06_mua_nse.py`'s twin-invariance check was red. Every other step passed, and the PDF was produced -- a failed exhibit does not abandon the run. The defect does not bite every run: the 2026-09-23 run on the 2026-09-21 data had none, and every step passed.
 
 ### Disk and memory
 
@@ -319,8 +321,8 @@ Without the fast kernels every sort takes roughly fourteen times as long (43.8 s
 - ❗**Section 5's PATH COUNTS are not reproducible run to run, and the reason is in
   PyBondLab.** Running the identical MUA grid twice over identical data flips a small
   number of restricted-breakpoint-universe cells (`ig_bp`, `lg_bp`) between a full
-  279-month series and nothing at all, always in EW/VW pairs -- measured at roughly
-  0.1-0.5% of the 23,328 cells. **Every cell that is populated is bit-identical
+  279-month series and nothing at all, always in EW/VW pairs -- measured at up to
+  about 0.5% of the 23,328 cells, and at none on some runs (2026-09-23). **Every cell that is populated is bit-identical
   between runs**: the arithmetic is stable, and no printed VALUE moves. What moves is
   how many paths there are, and therefore every count Section 5 reports.
 
