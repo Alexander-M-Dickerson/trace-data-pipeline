@@ -2,7 +2,8 @@
 (`blocks/<mode>/factors.parquet`, the seam steps 4 and 7 read).
 
 Two sources (cfg.FACTOR_SOURCE / --factor-source):
-  pinned -- copy the golden Dec-2025 vintage (Phase-A exact; the reproduction path). A10.
+  pinned -- use the factor panel PUBLISHED for this vintage (downloaded from OSBAP), or
+            FACTORS_PINNED_FILE. The route that reproduces a published panel exactly.
   public -- assemble fresh from the public fetchers (lib/factor_fetch) + the published extended BBW
             series (lib/extended_factors). Runs with NO private input, anywhere -- but does NOT
             bit-match the pinned vintage (FRED/EPU/HKM/Ludvigson back-revise history; A10). The

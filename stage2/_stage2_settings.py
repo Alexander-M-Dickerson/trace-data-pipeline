@@ -525,13 +525,13 @@ def validate_config(config: dict) -> None:
             f"Use 'public' (default) or 'pinned'."
         )
     if config["factor_source"] == "pinned":
-        pinned = config["factors_pinned_file"]
-        if not pinned:
-            problems.append(
-                "FACTOR_SOURCE='pinned' requires FACTORS_PINNED_FILE to name a factors parquet."
-            )
-        elif not Path(pinned).exists():
-            problems.append(f"FACTORS_PINNED_FILE not found: {pinned}")
+        # The same precedence steps/compute_factors._pinned_factors uses to find the file:
+        # FACTORS_PINNED_FILE, else a copy already downloaded, else the published file for this
+        # vintage. Until 2026-09-23 this check demanded FACTORS_PINNED_FILE, so the documented
+        # `--factor-source pinned` refused to start and the download could never be reached.
+        origin, ok = pinned_factor_origin(config)
+        if not ok:
+            problems.append(origin)
 
     # --- WRDS credentials (needed only for the first-run caches) -----------
     cached = FACTOR_CACHE_DIR.exists() and any(FACTOR_CACHE_DIR.glob("*.parquet"))
@@ -658,6 +658,29 @@ def factor_source_for(mode: str | None = None) -> str:
     return FACTOR_SOURCE
 
 
+def pinned_factor_origin(config: dict) -> tuple[str, bool]:
+    """Where FACTOR_SOURCE='pinned' will read its factor panel from, and whether it can.
+
+    Mirrors steps/compute_factors._pinned_factors: an explicit FACTORS_PINNED_FILE, then a
+    copy already downloaded to stage2/data/, then the file published for this vintage."""
+    explicit = config.get("factors_pinned_file")
+    if explicit:
+        if Path(explicit).exists():
+            return f"{explicit} (FACTORS_PINNED_FILE)", True
+        return f"FACTORS_PINNED_FILE not found: {explicit}", False
+    vintage = release_vintage()
+    cache = STAGE2_DATA / FACTORS_PINNED_ZIPKEY.format(vintage=vintage)
+    if cache.exists():
+        return f"{cache} (downloaded earlier, vintage {vintage})", True
+    url = FACTORS_PINNED_URL.get(vintage)
+    if url:
+        return f"{url} (published factors for vintage {vintage}; downloaded on first run)", True
+    return (f"FACTOR_SOURCE='pinned', but no factor panel is published for vintage {vintage} "
+            f"(published: {sorted(FACTORS_PINNED_URL) or 'none'}).\n"
+            f"    Set FACTORS_PINNED_FILE to a factors parquet you have, or use "
+            f"FACTOR_SOURCE='public'."), False
+
+
 def print_config_summary(config: dict) -> None:
     """Print a readable summary of the resolved configuration."""
     line = "=" * 78
@@ -670,6 +693,8 @@ def print_config_summary(config: dict) -> None:
     print(f"  FISD characteristics : {config['fisd_file'] or '(not found)'}")
     print(f"  Callable flags       : {config['call_dummy_file'] or '(not found)'}")
     print(f"  Factor source        : {config['factor_source']}")
+    if config["factor_source"] == "pinned":
+        print(f"  Pinned factors       : {pinned_factor_origin(config)[0]}")
     print(f"  Panel start          : {config['start_date']}")
     print(f"  Beta window          : {config['beta_window']} months "
           f"(min {config['beta_min_obs']} obs)")
