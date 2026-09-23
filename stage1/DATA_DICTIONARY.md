@@ -20,13 +20,13 @@ Stage 1 produces a single enriched daily bond dataset that combines:
 - Bond analytics computed via QuantLib (duration, convexity, YTM, credit spreads)
 - Bond characteristics from FISD (coupon, maturity, issuer, amount outstanding)
 - Credit ratings from S&P and Moody's
-- Equity identifiers 
+- Equity identifiers (CRSP PERMNO/PERMCO and Compustat GVKEY)
 - Fama-French industry classifications
 
 ❗**Before using this data, read
 [Sample-defining operations](#sample-defining-operations).** Six row filters and a
 per-date winsorization are applied before the file is written. None of them is visible
-in the schema, and the largest drops ~9% of bond-days.
+in the schema, and the largest drops 7% of bond-days.
 
 ---
 
@@ -201,7 +201,7 @@ join key for the previous issuer-month linker and is no longer used; derive it a
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `db_type` | Int8 | Source TRACE database: 1=Enhanced, 2=Standard, 3=144A. ❗**2 does not appear in the default configuration.** Standard is opt-in (`TRACE_MEMBERS` is `enhanced 144a`), and when it is run it survives only for dates after the last Enhanced date. Under the old trailing `DATE_CUT_OFF` that window was always cut away, so `db_type == 2` returned zero rows by construction; under `auto:complete` it can survive, because Standard extends the same public tape rather than being a separate population. |
+| `db_type` | Int8 | Source TRACE database: 1=Enhanced, 2=Standard, 3=144A. ❗**2 does not appear in the default configuration.** Standard is opt-in (`TRACE_MEMBERS` is `enhanced 144a`), and when it is run it survives only for dates after the last Enhanced date. Every automatic `DATE_CUT_OFF`, `auto:complete` included, ends the sample on or before the last Enhanced date, so that window is always cut away and `db_type == 2` has zero rows by construction (`tests/smoke_assertions.py` checks this). Only a literal `DATE_CUT_OFF` later than the last Enhanced date lets it through. |
 
 ---
 
@@ -301,7 +301,30 @@ output file.
 | 18 | Caa2 | High Yield |
 | 19 | Caa3 | High Yield |
 | 20 | Ca | High Yield |
-| 21 | C/D | Default |
+| 21 | C | Default (Moody's has no D) |
+
+#### NAIC Categories (sp_naic)
+
+`sp_naic` is computed during processing but is not in the main file. It is saved as
+`sp_naic_numeric` in `stage1/data/sp_ratings_<stamp>.parquet`.
+
+| Code | Category | S&P Ratings |
+|------|----------|-------------|
+| 1 | Highest Quality | AAA through A- (numeric 1-7) |
+| 2 | High Quality | BBB+, BBB, BBB- (8-10) |
+| 3 | Medium Quality | BB+, BB, BB- (11-13) |
+| 4 | Low Quality | B+, B, B- (14-16) |
+| 5 | Lowest Quality | CCC+, CCC, CCC- (17-19) |
+| 6 | In or Near Default | CC, C, D (20-22) |
+
+#### Composite Ratings
+
+| Variable | Description |
+|----------|-------------|
+| `spc_rating` | S&P rating; if missing, filled with `mdy_rating` (Moody's 21 → 22 for default alignment) |
+| `mdc_rating` | Moody's rating, first rescaled 21 → 22 so its default bucket lines up with S&P's; if still missing, filled with `sp_rating` on the raw 1-22 scale. There is no S&P 22 → 21 mapping. |
+
+`comp_rating` (their average) is computed during processing but is not in the output.
 
 ---
 
@@ -309,21 +332,23 @@ output file.
 
 **The panel is not the raw join.** Six row filters and one transformation are applied
 before the file is written, in this order. None of them is visible in the schema, so
-this section is the only place they are recorded. All are in
-`stage1_pipeline.py::step10a_build_filter_tables`.
+this section is the only place they are recorded. Filter 1 is applied in
+`stage1_pipeline.py::step4_merge_fisd`; the others, and the winsorization, in
+`step10a_build_filter_tables`, which also records all six.
 
 ### Row filters (applied in order)
 
 | # | Filter | Rule | Removes |
 |---|---|---|---|
-| 1 | `valid_accrued_vars` | accrued-interest inputs must be present | ~0.0% |
-| 2 | `valid_rating` | `spc_rating` **or** `mdc_rating` must be non-null | ~1.5% |
-| 3 | `valid_maturity` | `bond_maturity >= 1.0` — **every bond-day inside one year of maturity is dropped** | ~9.4% |
-| 4 | `distressed_errors` | `flag_refined_any != 1` (the ultra-distressed filter) | ~0.0% |
-| 5 | `2002_07_filter` | `prc_dip != 1` — first price change in **July 2002** exceeding **35** points of par | ~0.0% |
-| 6 | `high_prc` | `prc_high != 1`, i.e. `pr <= 300` (% of par) | ~0.0% |
+| 1 | `valid_accrued_vars` | the inputs QuantLib needs: `bond_maturity > 0`, `bond_age > 0`, `dated_date` present, and `interest_frequency` not in {-1, 13, 16} | 0.17% |
+| 2 | `valid_rating` | `spc_rating` **or** `mdc_rating` must be non-null | 1.12% |
+| 3 | `valid_maturity` | `bond_maturity >= 1.0` — **every bond-day inside one year of maturity is dropped** | 7.02% |
+| 4 | `distressed_errors` | `flag_refined_any != 1` (the ultra-distressed filter) | 0.01% |
+| 5 | `2002_07_filter` | `prc_dip != 1` — first price change in **July 2002** exceeding **35** points of par | 6 rows |
+| 6 | `high_prc` | `prc_high != 1`, i.e. `pr <= 300` (% of par) | 20 rows |
 
-The percentages are from a representative run and are of the pre-filter row count; the
+The figures are from the 2026-09-21 run, which the 2026 vintage was built from, as a share of
+the 34,189,014 rows before filter 1. Together the six removed 8.32%, leaving 31,344,732. The
 exact figures for **your** run are logged line by line, and land in Table 2 of the
 Stage 1 data report. Filter 3 is much the largest, and is a deliberate sample choice —
 bonds within a year of maturity behave differently and are conventionally excluded.
@@ -347,26 +372,6 @@ final_df[var] = final_df.groupby('trd_exctn_dt')[var].transform(winsorize_group)
 - **The bounds depend on the cross-section on that date**, so the same bond-day can take
   a different value in a run over a different universe. This is why a small test sample
   will not reproduce a full run's `ytm` exactly at the tails.
-
-#### NAIC Categories (sp_naic)
-
-| Code | Category | S&P Ratings |
-|------|----------|-------------|
-| 1 | Highest Quality | AAA through A- (numeric 1-7) |
-| 2 | High Quality | BBB+, BBB, BBB- (8-10) |
-| 3 | Medium Quality | BB+, BB, BB- (11-13) |
-| 4 | Low Quality | B+, B, B- (14-16) |
-| 5 | Lowest Quality | CCC+, CCC, CCC- (17-19) |
-| 6 | In or Near Default | CC, C, D (20-22) |
-
-#### Composite Ratings
-
-| Variable | Description |
-|----------|-------------|
-| `spc_rating` | S&P rating; if missing, filled with `mdy_rating` (Moody's 21 → 22 for default alignment) |
-| `mdc_rating` | Moody's rating, first rescaled 21 → 22 so its default bucket lines up with S&P's; if still missing, filled with `sp_rating` on the raw 1-22 scale. There is no S&P 22 → 21 mapping. |
-
-`comp_rating` (their average) is computed during processing but is not in the output.
 
 ---
 

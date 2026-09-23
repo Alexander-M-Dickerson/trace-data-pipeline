@@ -210,7 +210,7 @@ For each bond (`id_col` group):
    - Forward median: `window = w + 1, min_periods=1` on the reversed series, i.e. $\{P_i, \ldots, P_{i+w}\}$
    - Backward median: `window = w + 1, min_periods=1` on the original series, i.e. $\{P_{i-w}, \ldots, P_i\}$
 3. **Compose anchor**: centered; if NaN, forward; if still NaN, backward; if still NaN, the median of the whole de-duplicated frame (all bonds)
-4. **Merge back**: Join anchor values to the original DataFrame via `(id_col, date_col, price_col)`, `validate="m:1"`. Rows that find no match (their price was not in the de-duplicated view) fall back to the plain `(id_col, date_col)` median.
+4. **Merge back**: Join anchor values to the original DataFrame via `(id_col, date_col, price_col)`, `validate="m:1"`. Every row finds its match, because every `(id_col, date_col, price_col)` is in the de-duplicated view by construction. A row whose anchor is still missing after the join falls back to the plain `(id_col, date_col)` median.
 
 ### Step 3: Candidate Testing
 For each row $i$ and each factor $f \in \mathcal{F}$:
@@ -256,10 +256,12 @@ ELSE:
 ### Step 5: Output Generation
 
 **If `output_type = "uncleaned"`** (default for auditing):
-- Return DataFrame with three added columns:
+- Return DataFrame with seven added columns:
   - `dec_shift_flag` (int8): `1` if correction accepted, `0` otherwise
   - `dec_shift_factor` (float): Chosen factor $f^*$ (or `1.0` if no correction)
   - `suggested_price` (float): Corrected price $\tilde{P}_i(f^*)$ (or original $P_i$ if no correction)
+  - `anchor_price` (float): the anchor the tests used
+  - `anchor_med_center`, `anchor_med_fwd`, `anchor_med_back` (float): the three medians it was composed from
 
 **If `output_type = "cleaned"`** (apply corrections):
 - Overwrite `price_col` with `suggested_price` where `dec_shift_flag == 1`
@@ -419,12 +421,16 @@ DS_PARAMS = {
 
 ## Typical Usage in Pipeline
 
+Stage 0 calls this inside each chunk and writes no trade-level file, so the input below is
+a trade-level frame you hold yourself (the file name is illustrative).
+
 ```python
+import pandas as pd
 from create_daily_standard_trace import decimal_shift_corrector
 from _trace_settings import DS_PARAMS
 
-# Load raw TRACE data
-df_raw = pd.read_parquet("trace_enhanced_20240115_raw.parquet")
+# Trade-level TRACE data (illustrative file name)
+df_raw = pd.read_parquet("my_trades.parquet")
 
 # Apply decimal shift corrector (returns cleaned data + audit info)
 # DS_PARAMS already carries output_type="cleaned". Passing it explicitly AND

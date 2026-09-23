@@ -38,7 +38,7 @@ needed to recompute everything regardless.
 ```
 stage3/reports/tables/      one .tex file per exhibit
 stage3/reports/figures/     the figures, as PDF
-stage3/reports/timings.jsonl   one line per run: phases, wall clock, the run's own checks
+stage3/reports/timings.jsonl   one line per step: phases, wall clock, the step's own checks
 ```
 
 Stage 3 produces the exhibits on the user's data. It does not compare them with the numbers
@@ -46,6 +46,8 @@ printed in the paper: on newer data they are expected to differ.
 
 ## When something fails
 
-`run_stage3.sh` stops at the first failing step and says which. See "If something goes wrong" in
+A failed producer (a sort or a grid) stops `run_stage3.sh`, because everything after it would read
+missing data; `--keep-going` overrides that. A failed exhibit does not stop it: the other steps
+run, the PDF is built, and the exit code is non-zero. See "If something goes wrong" in
 [QUICKSTART_stage3.md](QUICKSTART_stage3.md). `python _run_stage3.py --section <name>` reruns one
 section.

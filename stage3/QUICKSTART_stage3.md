@@ -1,7 +1,7 @@
 # Quickstart — Stage 3
 
 Stage 3 turns the Stage-2 monthly panel into the paper's 33 tables and 11 figures.
-It runs **on your own computer**, like Stage 2, and needs no WRDS connection.
+It runs **on your own computer** and opens no WRDS connection.
 
 If you have just finished Stage 2, everything below should work with no configuration.
 
@@ -12,11 +12,11 @@ If you have just finished Stage 2, everything below should work with no configur
   (`python -m pip install -r ../requirements.txt`); the source is at
   [github.com/GiulioRossetti94/PyBondLab](https://github.com/GiulioRossetti94/PyBondLab).
 - **pdflatex** — only for the last step, which compiles the exhibits into one PDF. TeX
-  Live or MiKTeX. Without it, run with `--no-compile` and you still get every table and
-  figure as a file; you just do not get `exhibits.pdf`.
+  Live or MiKTeX. Without it you still get every table and figure as a file; you just do not
+  get `exhibits.pdf` (`python make_report.py --no-compile` writes its `.tex` without compiling).
 
 `python tools/check_inputs.py` warns if pdflatex is missing rather than failing, because
-`--no-compile` is a legitimate way to run.
+running without the PDF is legitimate.
 
 ---
 
@@ -56,11 +56,11 @@ alternative to exporting any of them.
 | `STAGE0_DIR`, `STAGE1_DIR`, `STAGE2_DIR` | the sibling folders | where the earlier stages live |
 | `STAGE2_PANEL`, `STAGE2_MMN`, `STAGE2_BBW`, `STAGE2_FACTORS`, `STAGE1_DAILY` | derived from the above | one input file each, when the layout is not standard |
 | `STAGE3_MODE` | `stage1` | which panel to read: Stage 2 writes `main_panel_<mode>.parquet` |
-| `STAGE3_DATA` | `stage3/data` | where intermediate results are written. Point it at a fast disk, or at a scratch area to leave the repo clean |
+| `STAGE3_DATA` | `stage3/data` | where intermediate results are written. Point it at a fast disk, or at a scratch area (the small input records under `stage3/data/_inputs/` stay in the repo either way) |
 | `STAGE3_REPORTS` | `stage3/reports` | where tables, figures, `timings.jsonl` and the PDF go |
 | `PYBONDLAB_DIR` | the installed package | a PyBondLab checkout to use instead. Section 5 needs one with the fast kernels; everything else falls back on its own |
 | `STAGE3_WORKERS` | cores, clamped | processes for the two grids. `--workers` overrides per run |
-| `STAGE3_MEMORY_LIMIT` | `4GB` | DuckDB's memory cap in the data appendix |
+| `STAGE3_MEMORY_LIMIT` | 60% of free RAM (`4GB` without `psutil`) | DuckDB's memory cap in the data appendix |
 | `STAGE3_WORKER_THREADS` | set by `fastrun.pmap` | internal: how many threads one worker may use. Set by the parent, read by the child; you do not set this |
 | `NUMBA_NUM_THREADS` | set by the grid runners | internal, same idea, for numba inside a worker |
 | `STAGE3_ALLOW_STALE_LEDGER` | unset | ❗a correctness bypass — see below |
@@ -90,7 +90,8 @@ build it resolved, and records it in every manifest:
 
 > ❗`fast kernels: NO` means **only Section 5 is blocked** — the two uncertainty grids
 > need `PyBondLab.fast_sorts` and `PyBondLab.anomaly_assay_fast`, and the 0.2.0 release
-> does not carry them. Everything else runs on the slow path automatically, with the
+> does not carry them. The grids are producers, and a failed producer stops the run, so add
+> `--keep-going` to get everything else. That runs on the slow path automatically, with the
 > same numbers: `_run_stage3.py` asks once at startup and prints which path it took.
 > Expect roughly fourteen times the sort time there (43.8 s against 3.2 s, measured on
 > one sort).
@@ -162,7 +163,7 @@ broken at once.
 reports/tables/     33 .tex files, one per exhibit
 reports/figures/    11 .pdf files
 data/<section>/     the statistics frames behind them, as CSV, plus a manifest per result
-reports/timings.jsonl   one line per run: phases, wall clock, and its own check
+reports/timings.jsonl   one line per step: phases, wall clock, and its own check
 ```
 
 Each run prints a `PASS` or `FAIL` line saying what it checked — every printed cell
@@ -173,7 +174,7 @@ silently.
 
 ❗One check can go red without anything being wrong with your install:
 `s3_nse/t06_mua_nse.py`'s twin-invariance check fails whenever the sort engine's unstable
-empty cell bites (see *What is not reproducible* in README_stage3.md). It does not bite
+empty cell bites (see *Conventions that will bite* in README_stage3.md). It does not bite
 every run: the 2026-09-12 run had 54 such cells and `t06` failed; the 2026-09-23 run had
 none and every step passed. When it bites, the run continues, the PDF is produced, and the
 exit code is non-zero. The grid step prints how many such cells it found.
@@ -193,7 +194,7 @@ panel. That is why they are minutes rather than hours.
 
 `--workers` and `--threads` are exposed on both grid runners, and both now clamp their
 own defaults so `workers * threads` stays at or below your core count. Measured peak on
-this build is **0.7 GB per DUA worker** (`max_worker_rss_gb` in the grid's own manifest),
+this build is **0.7 GB per DUA worker** (`max_worker_rss_gb` in the grid's line in `reports/timings.jsonl`),
 so on a normal machine the grids are bounded by cores, not by memory.
 
 ---

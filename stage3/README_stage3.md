@@ -14,7 +14,7 @@ IA.XVIII and IA.XIX exist as `_full` or `_paper` depending on `--sample` — so
 `reports/tables/` holds 33 files after any single run, and 38 if you have run both
 windows.
 
-It runs on your own computer, like Stage 2. It needs no WRDS connection.
+It runs on your own computer and opens no WRDS connection.
 
 **Beyond Stage 2's requirements it needs two things:** `PyBondLab`, installed by the
 repository's `requirements.txt`, and **pdflatex** (TeX Live or MiKTeX) for the last step.
@@ -28,7 +28,7 @@ python _run_stage3.py --list     # the 41 steps, and what is already built
 bash run_stage3.sh               # everything, ending in reports/exhibits.pdf
 ```
 
-The last step compiles every exhibit into **`reports/exhibits.pdf`** — 58 pages. That
+The last step compiles every exhibit into **`reports/exhibits.pdf`** — 60 pages on the 2026 data. That
 is deliberately part of the run and not an afterthought: the exhibits are LaTeX
 fragments, and a fragment that will not compile looks perfectly fine sitting on disk.
 Compiling is what catches it.
@@ -45,7 +45,7 @@ Compiling is what catches it.
 | `reports/tables/` | the paper's tables, as LaTeX fragments |
 | `reports/figures/` | the paper's figures, as PDF |
 | **`reports/exhibits.pdf`** | **all 44 of them compiled into one document**, in the paper's order and under the paper's exhibit numbers, with a provenance page |
-| `reports/timings.jsonl` | one line per run: phases, wall clock, and the run's own check |
+| `reports/timings.jsonl` | one line per step: phases, wall clock, and the step's own check |
 
 Nothing downstream of a statistics frame recomputes a regression. Each section computes
 its numbers **once**; every table and figure is a formatter over that frame. That is why
@@ -64,7 +64,7 @@ tree beside this folder and all overridable from the environment:
 | `STAGE2_PANEL` | the monthly bond panel | every section |
 | `STAGE2_MMN` | the unadjusted `*_mmn` signal twins | the three approaches (Section 3) |
 | `STAGE2_BBW` | `bbw_factors.parquet` — **MKTB** | every CAPM_B alpha |
-| `STAGE2_FACTORS` | `factors.parquet` — the risk-free rate, VIX, the macro set | excess returns, Figure 7 |
+| `STAGE2_FACTORS` | `factors.parquet` — Stage 3 reads only the risk-free rate and VIX from it | excess returns, Figure 7 |
 | `STAGE1_DAILY` | the daily bond-day panel | the data appendix only |
 
 > ❗**`STAGE2_BBW` and `STAGE2_FACTORS` are different files.** MKTB lives in the first,
@@ -97,9 +97,11 @@ export PYBONDLAB_DIR=/path/to/PyBondLab     # a checkout; unset = whatever is in
 > ❗**Only the uncertainty grids (`--section nse`) need the fast kernels** —
 > `PyBondLab.fast_sorts` and `PyBondLab.anomaly_assay_fast`. The 0.2.0 release that
 > Stage 2 pins does not carry them, and `pblenv.require_fast()` says so before the
-> fan-out starts rather than letting 108 workers each fail on an import.
+> fan-out starts rather than letting each of the 108 signal tasks fail on an import.
 >
-> **Everything else genuinely runs without them.** `_run_stage3.py` asks the installed
+> **Everything else genuinely runs without them**, but not by default: the grids are
+> producers, and a failed producer stops `run_stage3.sh`, so without the kernels add
+> `--keep-going` to get the zoo and the PDF. `_run_stage3.py` asks the installed
 > engine once and takes the slow path automatically — same numbers, longer. Measured on
 > one sort: 43.8 s without the kernels against 3.2 s with them. `--no-fast` forces the
 > slow path even when they are available, which is how you check the two agree.
@@ -140,9 +142,9 @@ Measured on the cold run of 2026-09-12, 24 cores with the kernels:
 
 | section | producer | cost |
 |---|---|---|
-| `lib` | the three approaches, all bonds and both rating splits | 24–29 s each |
+| `lib` | the three approaches, all bonds and both rating splits | 21–29 s each |
 | `lib` | the 108-signal month-end/month-begin sorts, x4 | 30–36 s each |
-| `lab` | the winsorization sweep, 2 tails x 3 ratings | 20 s |
+| `lab` | the winsorization sweep, 2 tails x 3 ratings | 12 s |
 | `nse` | the **MUA grid** — 108 signals x 216 method choices | 158 s |
 | `nse` | the **status ledger** — one row per grid cell, read by every Section-5 denominator | 13 s |
 | `nse` | the **DUA grid** — 108 signals x 108 filters x 3 ratings | 264 s, then 33 s for its statistics |
@@ -176,8 +178,9 @@ grids from minutes into hours — and is what the kernels are for.
 
 ## The flags that change the answer
 
-Most flags only change speed or scope. These four change what the exhibits say, so each
-is worth understanding before you use it.
+Most flags only change speed or scope. These four are worth understanding before you use
+them: three change what the exhibits say, and `--no-fast` is the check that the fast and slow
+engines agree.
 
 ### `--sample {frontier,paper}` on `_run_stage3.py`
 
@@ -307,8 +310,9 @@ Without the fast kernels every sort takes roughly fourteen times as long (43.8 s
   Stage 3 reproduces that ladder explicitly in a **status ledger**
   (`data/s3_nse/mua_summary/mua_status_{window}.parquet`, one row for every one of the
   23,328 cells) and `nse_engine.usable()` is the only thing that reads it. Table 6's
-  `N`, Table IA.XVIII's `n_spec` and Table IA.XIX's pool are therefore the same number
-  by construction rather than by coincidence. See
+  `N`, Table IA.XVIII's `n_spec` and Table IA.XIX's pool therefore agree by construction
+  rather than by coincidence: the first two are the ledger's `ok` count, the third that count
+  less the 648 baselines. See
   [DATA_DICTIONARY.md](DATA_DICTIONARY.md#the-degeneracy-ledger).
 
 - ❗**A signal's own start or end date is NOT degeneracy.** Signals do not all span the
@@ -336,16 +340,17 @@ Without the fast kernels every sort takes roughly fourteen times as long (43.8 s
   or the thread count.
 
   What Stage 3 does about it: `s3_nse/run_mua_grid.py` counts the affected cells every run,
-  prints a warning and records `n_unstable_empty_cells` in the manifest, so two runs
-  can be compared; `mua_summarize` reindexes onto the full 216 so the statistics frame
+  prints a warning and records `n_unstable_empty_cells` in its line in
+  `reports/timings.jsonl`, so two runs can be compared; `mua_summarize` reindexes onto the full 216 so the statistics frame
   is a rectangle either way; and `s3_nse/t06_mua_nse.py` **fails** its twin-invariance check
   when it bites, rather than printing a number as though nothing happened.
-- Three sample windows coexist. Section 3 and Section 5 run on a fixed T = 268 and
-  assert it. Section 4's window **spans** 269 months, but its series are not all that
-  long — each is its own length, T 257 to 268 in this build — so there is no single T to
-  assert there; every row carries its own. The zoo SORTS to the panel's own frontier and
-  every zoo exhibit then truncates to 2024-12-31. Every window in the build gives 4
-  Newey-West lags.
+- Under `--sample paper`, three sample windows coexist. Section 3 and Section 5 run on a
+  fixed T = 268 and assert it. Section 4's window **spans** 269 months, but its series are not
+  all that long — each is its own length, T 257 to 268 — so there is no single T to assert
+  there; every row carries its own. The zoo SORTS to the panel's own frontier and every zoo
+  exhibit then truncates to 2024-12-31. Under the default `--sample frontier` every section
+  instead runs to the panel's last month (T = 279 for Section 3 on the 2026 data). Every
+  window gives 4 Newey-West lags.
 
 ### Where the paper disagrees with itself
 

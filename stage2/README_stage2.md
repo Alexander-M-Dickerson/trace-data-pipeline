@@ -30,8 +30,8 @@ returns, bond characteristics, 108 signals, factor time series, and rolling fact
 must **never** be submitted with `qsub`. Two reasons:
 
 1. It needs more memory than a WRDS grid slot allows — the panel is worked on whole.
-2. It opens no TRACE database connection at all. Everything it reads is a parquet file
-   Stage 0 and Stage 1 already wrote.
+2. It reads no TRACE data. Its inputs are the files Stage 0 and Stage 1 wrote, plus a few
+   series it fetches once, from WRDS and the web, and caches (see [External data](#external-data)).
 
 `run_pipeline.sh` therefore does not submit it. When your WRDS run finishes, download
 `stage0/` and `stage1/` to your own machine and run Stage 2 there.
@@ -64,8 +64,9 @@ blanked for licensing reasons, and Stage 2 keeps only bond-days carrying at leas
 agency rating — so that file yields an empty panel. Stage 2 detects this and refuses to
 start. Run Stages 0 and 1 yourself on WRDS and use their output.
 
-Python packages beyond Stage 1's: `duckdb`, `numba`, `scipy`, `PyBondLab`,
-`pandas_market_calendars`, `openpyxl`.
+Python packages beyond Stage 1's: `duckdb`, `numba`, `scipy`, `statsmodels`,
+`pandas_market_calendars` and `PyBondLab` (pinned at 0.2.0). `requirements.txt` installs them all;
+`numba` only below Python 3.14, so use Python 3.10-3.13 for Stage 2.
 
 ---
 
@@ -86,10 +87,9 @@ Useful flags (passed straight through to `_run_stage2.py`):
 | Flag | Effect |
 |---|---|
 | `--dry-run` | Validate the configuration and exit |
-| `--limit-cusips 200` | Build on the first 200 CUSIPs — a fast development loop |
+| `--limit-cusips 200` | Build on the first 200 CUSIPs — a fast development loop. ❗It writes to the same `output/` as a full build, replacing its panel and blocks |
 | `--from-step N --to-step M` | Run part of the pipeline (steps 1-7) |
 | `--factor-source pinned` | Use the factor file published with your vintage (downloaded once) instead of rebuilding it from public sources. Needed to reproduce a published panel exactly |
-| `--validate` | Run the validation sweep after building |
 
 ---
 
@@ -125,7 +125,7 @@ testing without editing the file.
 | `output/blocks/<mode>/` | Per-step intermediates: `betas_std`, `betas_x`, `mom_ret`, `mom_retx`, `returns_alt`, `factors`, `factors_merged`, `bbw_factors`, `illiq_factors` |
 | `output/blocks/<mode>/betas_<bm>`, `mom_retx_<bm>` | **Optional.** The 68 beta/momentum columns re-estimated on an alternative Treasury benchmark — only if you run `make_excess_blocks.py`. See below |
 | `data_reports/` | The LaTeX data report, its figures and the PDF |
-| `manifests/` | A JSON run manifest per build: inputs, hashes, config, timings |
+| `manifests/` | JSON run manifests: inputs, hashes, config, timings. A full build writes one for the whole run and one per group of steps |
 | `release/` | What `make_release.py` packages for publication: the redacted panel, the factor panel, the Stage 1 daily panel in its 32-column public layout (`--what daily`, which withholds the agency ratings, `permco` and `gvkey` and refuses any column nobody has classified), and `osbap_bbw_factors_<vintage>.zip`, the corrected Bai-Bali-Wen four factors for every return definition on the TRACE and extended samples with the authors' original series beside them (`--what bbw`, built from `blocks/<mode>/bbw_factors*.parquet` and `factors_merged.parquet`; the original lives in `reference/`) |
 
 `<mode>` is the build label (`stage1` by default); released files are renamed to the
@@ -163,10 +163,10 @@ the split exists to remove.
 
 ## Alternative Treasury benchmarks: rebuilding the betas
 
-The panel ships five Treasury benchmarks beside `tret`, but every duration-adjusted quantity in
-it -- the 68 beta and momentum columns, plus `ret_vwx` and `str` -- is built from
-`ret_vw - tret`. So out of the box the panel offers alternative *benchmarks* and not alternative
-*systems*: nothing can be sorted on a `tret_bns`-adjusted beta.
+The panel ships five Treasury benchmarks beside `tret`, but its 68 beta and momentum columns are
+estimated on `ret_vw`, and their duration-adjusted versions (the `betas_x` and `mom_retx`
+blocks) on `ret_vw - tret` only. So out of the box the panel offers alternative *benchmarks* and
+not alternative *systems*: nothing can be sorted on a `tret_bns`-adjusted beta.
 
 `make_excess_blocks.py` closes that. It is **optional** and runs **after** a normal Stage 2
 build, reading the blocks that build already wrote. It changes no panel and overwrites nothing.
@@ -201,9 +201,8 @@ plus its factor sorts; the output is comparable in size to `betas_x`.
 
 **A sanity check worth running.** `corr(b_mktb, b_mktb)` between a benchmark block and `betas_x`
 should be high but never exactly 1.0. Exactly 1.0 means the factor swap did not take. Expect
-about 0.98 on the TRACE era, and materially lower before it -- pre-1986 the long end of the
-Treasury curve is extrapolated flat, so the benchmarks diverge most where the curve is least
-anchored.
+about 0.98 on the TRACE era, and lower before 2002-08 (about 0.92 for 1997-2002), where the
+rolling window runs on pre-TRACE quote returns.
 
 ---
 

@@ -5,7 +5,7 @@
 - ✅ **Stage 0 completed** with outputs in `stage0/{enhanced,standard,144a}/`
 - ✅ **SSH access to WRDS Cloud** (or local Python environment)
 - ✅ **WRDS account** with FISD and ratings data access
-- ✅ **Python ≥ 3.10** (the 2026-09-10 production run used 3.14.5 on the WRDS Cloud)
+- ✅ **Python ≥ 3.10** (the 2026-09-21 run, which the 2026 vintage was built from, used 3.14.5 on the WRDS Cloud)
 - ✅ **`.pgpass`** configured for passwordless WRDS authentication
 
 ---
@@ -23,7 +23,7 @@ Stage 1 enriches your cleaned TRACE data from Stage 0 with:
 
 **Output:** A research-ready dataset of 44 columns per bond-day.
 
-**Runtime:** about 2.5 hours on the WRDS Cloud with the 4 slots `run_pipeline.sh` requests (2.4 h on the 2026-09-10 run).
+**Runtime:** about 2.5-2.7 hours on the WRDS Cloud with the 4 slots `run_stage1.sh` requests (2.4 h on the 2026-09-10 run, 2.7 h on 2026-09-21).
 
 ---
 
@@ -88,6 +88,9 @@ nano config.py
 # Your WRDS username
 WRDS_USERNAME = os.getenv("WRDS_USERNAME", "your_wrds_username")
 
+# Which TRACE datasets to include
+TRACE_MEMBERS = os.getenv("TRACE_MEMBERS", "enhanced 144a").split()  # add "standard" to opt in
+
 # Output format
 OUTPUT_FORMAT = "parquet"  # The only supported value
 ```
@@ -99,15 +102,12 @@ nano stage1/_stage1_settings.py
 
 **Optional customizations in `stage1/_stage1_settings.py`:**
 ```python
-# Which TRACE datasets to include
-TRACE_MEMBERS = ["enhanced", "144a"]  # the default; add "standard" to opt in
-
 # Date cutoff. The default rolls with the data: "auto:complete" is the last month
 # every source covers through its final trading session. A literal date overrides it.
 DATE_CUT_OFF = "auto:complete"
 
 # Parallel processing (adjust based on your machine)
-N_CORES = None  # Auto-detects available cores
+N_CORES = None  # follows the slots the job was granted ($NSLOTS), else 4; or set STAGE1_N_CORES
 ```
 
 **Notes:**
@@ -140,9 +140,14 @@ cd ~/trace-data-pipeline  # the repo root
 # You should be in your root directory
 pwd  # Verify your current location
 
+# Fetch the five input files first (login node: compute nodes have no internet)
+bash download_inputs.sh
+
 # Submit the job
 qsub stage1/run_stage1.sh
 ```
+
+Stage 1 checks for those files before it starts and stops if one is missing.
 
 ❗**Submit from the repo ROOT, never from `stage1/`.** `run_stage1.sh` declares
 `#$ -o stage1/logs/stage1.out` and then does `cd stage1`, all resolved against `-cwd`.
@@ -152,18 +157,20 @@ not exist, so Grid Engine parks the job in `Eqw` — and the `cd` fails too.
 **What happens:**
 1. Loads treasury yields (Liu-Wu zero-coupon curve)
 2. Loads TRACE data from Stage 0 outputs
-3. Fetches FISD bond characteristics from WRDS
+3. Reads the FISD bond characteristics Stage 0 saved
 4. Merges FISD with TRACE
 5. Computes bond analytics (duration, convexity, YTM, credit spreads) using QuantLib
-6. Merges S&P and Moody's credit ratings
+6. Connects to WRDS and merges S&P and Moody's credit ratings
 7. Merges bond-firm linker (equity identifiers)
-8. Applies ultra-distressed bond filters
-9. Applies final filters (price > 300%, July 2002 anomaly)
-10. Generates data quality reports
+8. Flags probable price errors (the ultra-distressed filters)
+9. Flags prices above 300% of par and large first price changes in July 2002
+10. Removes the flagged rows, rows with no rating and rows with under a year to maturity,
+    winsorizes `ytm` and `credit_spread` within each date, saves the file and builds the
+    data-quality report
 
 ---
 
-### 6. Monitor Progress
+### 4. Monitor Progress
 
 **On WRDS Cloud:**
 
@@ -196,7 +203,7 @@ Output will print to your terminal in real-time.
 
 ---
 
-### 7. Check Output
+### 5. Check Output
 
 **Output location (from root directory):**
 ```bash
@@ -224,8 +231,8 @@ stage1/
 ```python
 import pandas as pd
 
-# Load the data
-df = pd.read_parquet('data/stage1_20251117.parquet')  # Use your date
+# Load the data (from stage1/)
+df = pd.read_parquet('data/stage1_YYYYMMDD.parquet')  # Use your date
 
 print(f"Shape: {df.shape}")
 print(f"Columns: {df.columns.tolist()}")
@@ -235,15 +242,14 @@ print(df.head())
 # Check key variables
 print(f"\nKey variables available:")
 print(f"- Identifiers: cusip_id, permno, permco, gvkey")
-print(f"- TRACE prices: prc_ew, prc_vw, prc_hi, prc_lo")
+print(f"- TRACE prices: pr, prc_ew, prc_vw_par, prc_hi, prc_lo")
 print(f"- Bond analytics: ytm, mod_dur, convexity, credit_spread")
-print(f"- Ratings: sp_rating_num, moodys_rating_num")
-print(f"- Filters: ultra_distressed_flag")
+print(f"- Ratings: sp_rating, mdy_rating, spc_rating, mdc_rating")
 ```
 
 ---
 
-### 7. Computing Returns
+### 6. Computing Returns
 
 Once you have the Stage 1 output, you can compute bond returns for empirical analysis.
 
@@ -301,7 +307,8 @@ gap_mask = df['day_gap'] > max_gap
 df.loc[gap_mask, ['ret_c', 'ret_d']] = np.nan
 ```
 
-For **business day gaps** (excluding weekends and holidays), see `stage2/illiq_helper_functions.py:business_days_between_vectorized()`.
+For **business-day gaps** (excluding weekends and holidays), count NYSE sessions between the two
+dates, for example with `numpy.busday_count` and a holiday list from `pandas_market_calendars`.
 
 #### Key Variables
 
@@ -322,7 +329,7 @@ For detailed explanations of the accrued interest variables (`acclast`, `accpmt`
 
 ---
 
-### 8. Download Data (WRDS Cloud Users)
+### 7. Download Data (WRDS Cloud Users)
 
 **Windows users (WinSCP):**
 - Connect to WRDS Cloud via WinSCP
@@ -349,6 +356,7 @@ Most settings are automatically configured. Only customize if needed.
 | Setting | Description | Default | Auto? |
 |---------|-------------|---------|-------|
 | `WRDS_USERNAME` | Your WRDS username | `"your_wrds_username"` | ✅ Pre-set |
+| `TRACE_MEMBERS` | TRACE datasets to include | `["enhanced", "144a"]` | Customizable; `"standard"` is opt-in |
 | `OUTPUT_FORMAT` | Output file format | `"parquet"` | ✅ Pre-set |
 
 #### Stage 1 Configuration (`stage1/_stage1_settings.py`)
@@ -357,9 +365,8 @@ Most settings are automatically configured. Only customize if needed.
 |---------|-------------|---------|-------|
 | `ROOT_PATH` | Parent directory | `""` | ✅ Auto-detected |
 | `STAGE0_DATE_STAMP` | Stage 0 output date | Auto-detected | ✅ Auto-detected from files |
-| `TRACE_MEMBERS` | TRACE datasets to include | `["enhanced", "144a"]` | Customizable; `"standard"` is opt-in |
 | `DATE_CUT_OFF` | Latest date to include | `"auto:complete"` | ✅ Rolls with the data |
-| `N_CORES` | CPU cores for parallel processing | Auto-detected | ✅ Auto-detected |
+| `N_CORES` | Worker processes | `None`: the slots granted, else 4 | ✅ Follows the job's slots |
 | ~~`GENERATE_REPORTS`~~ | does not exist -- reports always run | — | — |
 | ~~`OUTPUT_FIGURES`~~ | does not exist -- figures always run | — | — |
 
@@ -467,10 +474,9 @@ wrds-pgdata.wharton.upenn.edu:9737:wrds:your_username:your_password
 
    There is no switch for Stage 1's reports; they always run.
 
-2. **Use more CPU cores:**
-   ```python
-   N_CORES = 20  # If available on your machine
-   ```
+2. **On your own machine only, use more workers** (`export STAGE1_N_CORES=20`). On WRDS leave
+   `N_CORES = None`: it follows the 4 slots the job was granted, and a larger number starts more
+   workers than the job has cores and memory for.
 
 3. **Check you're not in the middle of a WRDS outage:**
    ```bash

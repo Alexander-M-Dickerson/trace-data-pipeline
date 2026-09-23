@@ -12,7 +12,7 @@ factors). There are two sources, and they give different numbers:
 | `--factor-source` | what it does | use it when |
 |---|---|---|
 | `public` (default) | assembles the factors from the live public sources | the user wants the newest data |
-| `pinned` | downloads the factor panel published for this vintage from openbondassetpricing.com | the user wants to reproduce a published panel exactly |
+| `pinned` | downloads the factor panel published for this vintage (from the osbap-site GitHub release, the file openbondassetpricing.com links to) | the user wants to reproduce a published panel exactly |
 
 The public sources revise their history (Ken French restates factors, FRED re-adjusts CPI,
 Ludvigson re-estimates uncertainty), so a `public` build will not match a published release
@@ -20,7 +20,8 @@ bit for bit. That is expected, not a bug.
 
 ## The commands, in order
 
-Run from `stage2/`. Set `WRDS_USERNAME` first if the cache under `stage2/data/` is empty.
+Run from `stage2/`. If the cache under `stage2/data/` is empty, `export WRDS_USERNAME=...` first:
+stage 2 reads it from the environment only, not from `config.py`.
 
 ```bash
 python _run_stage2.py --dry-run [--factor-source pinned]   # 1. resolve and print every input
@@ -28,15 +29,17 @@ python _run_stage2.py [--factor-source pinned]             # 2. the build, about
 python validate_coverage.py                                # 3. every column reaches the panel's end
 python -m pytest tests -q                                  # 4. the stage's own tests
 python make_excess_blocks.py --mode stage1 --verify       # 5. optional: other Treasury benchmarks
-python make_release.py                                     # 6. optional: the redacted public package
+python make_release.py --what panel                        # 6. optional: the redacted public panel
 ```
 
 1. **Dry run.** Show the user the resolved paths: the daily panel, the FISD file, the callable
    flags, and the factor source (with `pinned`, the file or URL it will use). All three input files
    must carry the same date stamp and come from the user's own stage 0/1 folder.
-2. **Build.** Run it in the background with a log. It prints one line per step (7 steps). It
-   checks its own output at the end: the 145 column names and their order are fixed in
-   `lib/contract.py`, and a build that changes them fails.
+2. **Build.** Run it in the background with a log. It runs the 7 steps in fresh processes: step
+   1, step 2, then steps 3-4 and 5-6 as two processes side by side, then step 7. It prints a
+   line as each starts and ends. It checks its own output at the end: the 145
+   column names and their order are fixed in `lib/contract.py`, and a build that changes them
+   fails.
 3. **Coverage.** Every column should reach the panel's last month. A column whose source stops
    publishing early is listed under "UPSTREAM-LIMITED" with the reason (for the 2026 vintage,
    `b_cptlt`: He-Kelly-Manela end in 2025-05). That is not a failure. Anything that ends early
@@ -44,15 +47,20 @@ python make_release.py                                     # 6. optional: the re
 4. **Tests.** They should all pass; some are skipped when a reference build is not present.
 5. **Optional: other Treasury benchmarks.** `python make_excess_blocks.py --mode stage1 --verify`,
    then `--benchmark all`, re-estimates the 68 beta and momentum columns on the two alternative
-   Treasury benchmarks (see "Alternative Treasury benchmarks" in [README_stage2.md](README_stage2.md)). It needs the
-   `_bns`/`_cls` factor twins, which both factor sources provide.
+   Treasury benchmarks (see "Alternative Treasury benchmarks" in [README_stage2.md](README_stage2.md)). It builds
+   the `_bns`/`_cls` factor twins itself (step 3 again, per benchmark) and takes their history
+   before 2002-08 from the extended BBW series, so the factor source makes no difference here.
 6. **Release.** Writes the version that may be shared: `permco` and `gvkey` blanked, the composite
    ratings reduced to investment grade / high yield. It refuses to write a file that still carries
-   licensed values. The user's own unredacted panel stays in `output/panel/`.
+   licensed values. The user's own unredacted panel stays in `output/panel/`. Plain
+   `make_release.py` means `--what all`, which also builds the BBW bundle; that one needs step 5
+   and then step 4 again (`_run_stage2.py --from-step 4 --to-step 4`), or it stops with an
+   error after writing the panel and factor bundles.
 
 ## Reproducing a published panel: what "identical" means
 
-With `--factor-source pinned`, a build from the same WRDS run reproduces the published panel:
+With `--factor-source pinned`, a build from the same WRDS run reproduces the published panel
+once the release redaction is applied (`permco`, `gvkey`, `spc_rat`, `mdc_rat`; step 6):
 same rows, same columns, and identical values in all but six liquidity columns (`cs_sprd`,
 `spd_rel`, `spd_abs`, `ar_sprd`, `p_fht`, `vov`). Those six can differ by less than 1e-12 on a
 few hundred rows, because DuckDB adds numbers across threads in whatever order the threads
@@ -71,4 +79,5 @@ Every column is defined in [DATA_DICTIONARY.md](DATA_DICTIONARY.md).
 
 See the table under "If something goes wrong" in [QUICKSTART_stage2.md](QUICKSTART_stage2.md). To
 resume after a failure, `python _run_stage2.py --from-step N` restarts at step N. A quick test on a
-small sample: `python _run_stage2.py --limit-cusips 200`.
+small sample: `python _run_stage2.py --limit-cusips 200`, which writes to the same `output/`
+folder and replaces a full build's panel, so run it before the full build, not after.

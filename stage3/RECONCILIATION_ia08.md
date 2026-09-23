@@ -85,7 +85,7 @@ This is the one that matters. `dcs6` is an FDR survivor.
 | `stage2/DATA_DICTIONARY.md`, Cluster I table | "searches with **±1** month bandwidth" (no tie-break stated, as first read) |
 | **the code** | `DSPREAD_BANDWIDTH = 1`; `offsets = [0, -1, +1]` |
 
-`_stage2_settings.py:132` sets the bandwidth to 1. `lib/value.py:779-781` builds the
+`_stage2_settings.py:140` sets the bandwidth to 1. `lib/value.py:779-781` builds the
 search order as `[0]` then `[-j, +j]` for `j` in `1..bandwidth`, and `lib/value.py:816`
 takes the first hit. So the search is **one month either side**, and when both are
 available it takes the **earlier** month — the longer lag — not the later one.
@@ -183,8 +183,9 @@ own alphabet reports a clean bill of health for 139 names and invents a defect i
 
 ## 7. Stage 2's dictionary has no citation column
 
-78 of the 145 rows in IA.VIII carry a citation, drawing on 36 distinct works (35 when
-first counted; the momentum correction in section 4 brought in `gebhardt2005stock`).
+78 of the 145 rows in IA.VIII carry a citation, drawing on 37 distinct works (35 when
+first counted; the momentum correction in section 4 brought in `gebhardt2005stock`, and
+section 11 `dickerson-bayesian`).
 `stage2/DATA_DICTIONARY.md` carries none, so a reader there cannot find where a signal
 comes from without opening the paper.
 

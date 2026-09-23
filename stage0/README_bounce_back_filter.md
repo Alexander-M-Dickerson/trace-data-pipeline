@@ -27,7 +27,7 @@ The algorithm must distinguish these errors from **genuine price moves** (e.g., 
 For each observation $i$, compute a **strictly backward-looking anchor** $B_i$ using only past data:
 
 $$
-B_i = \text{median}\left(\text{unique}(\{P_{i-w}, \ldots, P_{i-1}\})\right)
+B_i = \text{median}\left(\text{unique}(\{P_{i-w-1}, \ldots, P_{i-1}\})\right)
 $$
 
 where:
@@ -157,7 +157,7 @@ If a sequence of trades $\{P_i, P_{i+1}, \ldots, P_j\}$ all satisfy $|P_k - P_{\
 After flagging a par block ending at row $j$, suppress further flags for the next $C$ rows (default: $C = 2$):
 
 $$
-\text{No flags issued for rows } j+1, j+2, \ldots, j+C
+\text{No non-par flags issued for rows } j+1, j+2, \ldots, j+C
 $$
 
 This prevents cascading false positives in par-trading regions.
@@ -241,9 +241,10 @@ def flag_price_change_errors(
 ❗**This function does NOT sort, and it ignores `date_col` and `time_col` entirely.**
 Both appear in the signature but never in the body; the only columns it reads are
 `id_col` and `price_col`. Row order is whatever the caller supplies, and the algorithm
-is wholly order-dependent -- so `clean_trace_data` sorts by
-`[cusip_id, trd_exctn_dt, trd_exctn_tm, trd_rpt_dt, trd_rpt_tm, msg_seq_nb]`
-immediately before calling it (the "Pre BB sort"). Handing it an unsorted frame
+is wholly order-dependent -- so `clean_trace_data` sorts immediately before calling it
+(the "Pre BB sort"): Enhanced by
+`[cusip_id, trd_exctn_dt, trd_exctn_tm, trd_rpt_dt, trd_rpt_tm, msg_seq_nb]`, Standard and
+144A by `[cusip_id, trd_exctn_dt, trd_exctn_tm, msg_seq_nb]`. Handing it an unsorted frame
 produces silently wrong flags.
 
 1. Copy the input. (No sort, no `reset_index`.)
@@ -256,86 +257,87 @@ For each bond group (`id_col`), iterate through rows $i = 0, 1, \ldots, n-1$:
 ```
 INITIALIZE:
   filtered = zeros array of length n
-  par\_cooldown\_until = -1  (local index)
+  par_cooldown_until = -1  (local index)
 
 FOR i = 0 to n-1:
 
   # Check cooldown (skip non-par flags if within cooldown)
-  IF (i <= par\_cooldown\_until) AND (P[i] is not at par):
+  IF (i <= par_cooldown_until) AND (P[i] is not at par):
       CONTINUE to next i
 
   # Candidate opening conditions
-  cond\_jump     = |ΔP[i]| >= τ - δ\_slack
-  cond\_far\_prev = |P[i] - B[i]| >= τ - δ\_slack
-  cond\_par      = (|P[i] - P\_par| <= ε\_par) AND (|P[i] - B[i]| >= α·τ)
+  cond_jump     = |ΔP[i]| >= τ - δ_slack
+  cond_far_prev = |P[i] - B[i]| >= τ - δ_slack
+  cond_par      = (|P[i] - P_par| <= ε_par) AND (|P[i] - B[i]| >= α·τ)
 
-  par\_only = cond\_par AND NOT cond\_jump
+  par_only = cond_par AND NOT cond_jump
+  par_start = cond_par   (the candidate opened at par)
 
-  IF (cond\_jump OR cond\_far\_prev OR cond\_par):
+  IF (cond_jump OR cond_far_prev OR cond_par):
 
       # Lookahead scan for bounce-back
-      j\_match  = NULL  (opposite big move)
-      k\_return = NULL  (return to anchor)
+      j_match  = NULL  (opposite big move)
+      k_return = NULL  (return to anchor)
 
-      IF NOT par\_only:
+      IF NOT par_only:
           FOR j = i+1 to min(i+L, n-1):
               # Path A: Opposite-signed large move
-              IF sign(ΔP[j]) == -sign(ΔP[i]) AND |ΔP[j]| >= τ - δ\_slack:
-                  j\_match = j
+              IF sign(ΔP[j]) == -sign(ΔP[i]) AND |ΔP[j]| >= τ - δ_slack:
+                  j_match = j
                   BREAK
 
               # Path B: Return to anchor
               IF |P[j] - B[i]| <= α·τ:
-                  k\_return = j
+                  k_return = j
                   BREAK
 
       # Resolution check
-      IF (j\_match OR k\_return):
-          j\_stop = j\_match if j\_match else k\_return
-          flag\_start = i
+      IF (j_match OR k_return):
+          j_stop = j_match if j_match else k_return
+          flag_start = i
 
           # Blame reassignment
           IF i-1 >= 0:
-              dev\_prev = |P[i-1] - B[i-1]|
-              dev\_curr = |P[i] - B[i]|
-              IF (dev\_prev - dev\_curr >= δ\_reassign) AND (dev\_prev >= α·τ):
-                  flag\_start = i-1
+              dev_prev = |P[i-1] - B[i-1]|
+              dev_curr = |P[i] - B[i]|
+              IF (dev_prev - dev_curr >= δ_reassign) AND (dev_prev >= α·τ):
+                  flag_start = i-1
 
           # Flag the start row
-          IF (NOT par\_start) OR (P[flag\_start] is at par):
-              filtered[flag\_start] = 1
+          IF (NOT par_start) OR (P[flag_start] is at par):
+              filtered[flag_start] = 1
 
           # Extend plateau flags
-          span\_end = min(j\_stop, flag\_start + S)
-          FOR k = flag\_start+1 to span\_end:
-              IF par\_start:
+          span_end = min(j_stop, flag_start + S)
+          FOR k = flag_start+1 to span_end:
+              IF par_start:
                   IF P[k] is at par:
                       filtered[k] = 1
               ELSE:
-                  IF |P[k] - B[flag\_start]| >= α·τ:
+                  IF |P[k] - B[flag_start]| >= α·τ:
                       filtered[k] = 1
                   ELSE:
                       BREAK
 
           # Par cooldown
-          IF par\_start:
-              par\_cooldown\_until = max(par\_cooldown\_until, j\_stop + C)
+          IF par_start:
+              par_cooldown_until = max(par_cooldown_until, j_stop + C)
 
-          i = j\_stop + 1
+          i = j_stop + 1
           CONTINUE
 
       # Persistent par block (no quick-correction found)
-      IF par\_start:
-          run\_end = i
-          WHILE (run\_end+1 < n) AND (P[run\_end+1] is at par):
-              run\_end += 1
-          run\_len = run\_end - i + 1
+      IF par_start:
+          run_end = i
+          WHILE (run_end+1 < n) AND (P[run_end+1] is at par):
+              run_end += 1
+          run_len = run_end - i + 1
 
-          IF run\_len >= ℓ\_min:
-              FOR k = i to run\_end:
+          IF run_len >= ℓ_min:
+              FOR k = i to run_end:
                   filtered[k] = 1
-              par\_cooldown\_until = max(par\_cooldown\_until, run\_end + C)
-              i = run\_end + 1
+              par_cooldown_until = max(par_cooldown_until, run_end + C)
+              i = run_end + 1
               CONTINUE
 
   i += 1  (advance to next row)
@@ -358,16 +360,16 @@ FOR i = 0 to n-1:
 | 0 | 09:00:00 | 92.0 | — | — | |
 | 1 | 09:15:00 | 93.5 | +1.5 | 92.0 | |
 | 2 | 09:30:00 | 94.0 | +0.5 | 92.75 | |
-| 3 | 09:45:00 | **165.0** | **+71.0** | 93.2 | **Error spike** |
-| 4 | 10:00:00 | 168.0 | +3.0 | 93.2 | Plateau |
-| 5 | 10:15:00 | **92.5** | **-75.5** | 93.2 | **Bounce-back** |
-| 6 | 10:30:00 | 93.8 | +1.3 | 93.2 | Normal |
+| 3 | 09:45:00 | **165.0** | **+71.0** | 93.5 | **Error spike** |
+| 4 | 10:00:00 | 168.0 | +3.0 | 93.75 | Plateau |
+| 5 | 10:15:00 | **92.5** | **-75.5** | 94.0 | **Bounce-back** |
+| 6 | 10:30:00 | 93.8 | +1.3 | 93.75 | Normal |
 
 **Algorithm Execution**:
 
 1. **Row 3 (Candidate Opening)**:
    - $|\Delta P_3| = |165.0 - 94.0| = 71.0 \geq \tau - \delta_{\mathrm{slack}} = 35.0 - 1.0 = 34.0$ ✓
-   - $|P_3 - B_3| = |165.0 - 93.2| = 71.8 \geq 34.0$ ✓
+   - $|P_3 - B_3| = |165.0 - 93.5| = 71.5 \geq 34.0$ ✓
    - **Candidate opened** at row 3
 
 2. **Lookahead Scan** ($i=3$, $L=5$):
@@ -418,7 +420,7 @@ FOR i = 0 to n-1:
    - $|P_2 - B_2| = |52.0 - 89.75| = 37.75 \geq 34.0$ ✓
    - **Candidate opened**
 
-2. **Lookahead Scan** (rows 3-6):
+2. **Lookahead Scan** (rows 3-5):
    - Row 3: $\Delta P_3 = -0.5$ (same sign, not opposite) ✗
    - Row 4: $\Delta P_4 = +1.0$ (opposite sign) ✓, but $|\Delta P_4| = 1.0 \not\geq 34.0$ ✗
    - Row 5: $\Delta P_5 = -0.3$ (same sign) ✗
@@ -549,7 +551,7 @@ repeats.)
 
 | Row | Price | `filtered_error` | Notes |
 |-----|-------|------------------|-------|
-| 2 | 185.0 | **1** | True error (reassigned) |
+| 2 | 185.0 | **1** | True error (candidate start) |
 | 3 | 180.0 | **1** | Plateau flagged |
 | 4 | 79.5 | 0 | Bounce-back preserved |
 
@@ -581,12 +583,20 @@ BB_PARAMS = {
 
 ## Typical Usage in Pipeline
 
+Stage 0 calls this inside each chunk and writes no trade-level file, so the input below is
+a trade-level frame you hold yourself (the file name is illustrative).
+
 ```python
+import pandas as pd
 from create_daily_standard_trace import flag_price_change_errors
 from _trace_settings import BB_PARAMS
 
-# Load cleaned TRACE data (after decimal shift correction)
-df_clean = pd.read_parquet("trace_enhanced_20240115_cleaned.parquet")
+# Trade-level TRACE data, after the decimal-shift correction (illustrative file name)
+df_clean = pd.read_parquet("my_trades_after_decimal_shift.parquet")
+
+# The function does not sort, and its result depends on row order
+df_clean = df_clean.sort_values(
+    ["cusip_id", "trd_exctn_dt", "trd_exctn_tm", "msg_seq_nb"]).reset_index(drop=True)
 
 # Apply bounce-back filter
 df_flagged = flag_price_change_errors(
@@ -643,10 +653,10 @@ After flagging a par block, the baseline may be shifted by the flagged rows. Coo
 | Aspect | Decimal Shift Corrector | Bounce-Back Filter |
 |--------|------------------------|--------------------|
 | **Error Type** | Multiplicative (10x, 100x) | Additive (transient spikes) |
-| **Anchor** | Rolling unique-median (centered) | Trailing unique-median (backward-looking) |
+| **Anchor** | Median of the de-duplicated prices (centered) | Trailing unique-median (backward-looking) |
 | **Detection Method** | Test specific factors {0.1, 0.01, 10, 100} | Detect large jumps + reversion pattern |
 | **Action** | **Correct** prices | **Flag** (remove) transactions |
-| **Sequence** | Applied first (Stage 2) | Applied after decimal correction (Stage 7) |
+| **Sequence** | Applied first (Filter 2) | Applied after decimal correction (Filter 7) |
 
 ---
 
@@ -661,4 +671,4 @@ After flagging a par block, the baseline may be shifted by the flagged rows. Coo
 - `README_decimal_shift_corrector.md` — Documentation for the decimal shift corrector
 - `_trace_settings.py` — Default configuration parameters
 - `create_daily_enhanced_trace.py` — Full pipeline implementation
-- `FAQ.md` — Common questions about TRACE data cleaning
+- [FAQ.md](../FAQ.md) — Common questions about TRACE data cleaning

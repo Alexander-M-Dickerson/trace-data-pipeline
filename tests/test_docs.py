@@ -71,6 +71,9 @@ DOC_FILES = [
     "stage3/README_stage3.md", "stage3/QUICKSTART_stage3.md",
     "stage3/DATA_DICTIONARY.md", "stage3/INDEX.md",
     "stage3/RECONCILIATION_ia08.md",
+    # The maps and the instructions an AI assistant reads (CLAUDE.md files only import these).
+    "INDEX.md", "CODE_MAP.md",
+    "AGENTS.md", "stage2/AGENTS.md", "stage3/AGENTS.md",
 ]
 
 # Named in prose but produced at runtime or shipped inside a download, so they are
@@ -148,11 +151,14 @@ def check_qsub_paths(docs):
           not bad, str(bad))
 
 
+def slug(h):
+    """A heading's in-page anchor, as GitHub renders it."""
+    return re.sub(r"[^\w\s-]", "", h.strip().lower()).replace(" ", "-")
+
+
 def check_toc(docs):
     """Every `## ` section must appear in its file's table of contents, and every
     in-page anchor must resolve. Both drifted silently across three releases."""
-    def slug(h):
-        return re.sub(r"[^\w\s-]", "", h.strip().lower()).replace(" ", "-")
     SKIP = {"Table of Contents", "Contents"}
     missing_all, dead_all = [], []
     for fname, text in docs_all.items():
@@ -216,9 +222,141 @@ def check_fences(docs):
     check("no code fence opens while another is open", not nested, str(nested))
 
 
+def _paragraphs(text):
+    """A doc as paragraphs, each a list of sentences, outside code fences and with bold and
+    code marks removed. A table row or a list item is its own paragraph, so two rows of one
+    table are never read together."""
+    text = re.sub(r"```.*?```", "", text, flags=re.S).replace("**", "").replace("`", "")
+    units = []
+    for block in re.split(r"\n\s*\n", text):
+        para = []
+        for line in block.splitlines():
+            s = line.strip()
+            if s.startswith("|") or re.match(r"([-*]|\d+\.)\s", s):
+                units.append(" ".join(para))
+                para = []
+                if s.startswith("|"):
+                    units.append(s)
+                    continue
+            para.append(s)
+        units.append(" ".join(para))
+    return [[s for s in re.split(r"(?<=[.!?])\s+", u) if s] for u in units if u.strip()]
+
+
+def check_stage2_wrds(docs):
+    """No doc may say Stage 2 needs no WRDS connection while Stage 2's code opens one.
+
+    2026-09-23: seven places said it. Stage 2's first run connects to WRDS to fetch and cache
+    CRSP Treasury returns, Fama-French factors, VIX and FISD cash-flow terms, so a user who
+    believed the docs found out when the build stopped. The rule reads the code, so it goes
+    quiet by itself if Stage 2 ever stops connecting.
+
+    A sentence that denies a WRDS connection is read with the sentence before it, because
+    two of the seven put the subject first ("Stage 2 happens on your own computer. It needs
+    no WRDS connection."). Not counted as naming Stage 2: "unlike Stage 2", "Stage 2's
+    panel" (another stage's input), the adjective "Stage-2 panel", a path such as
+    stage2/tests, and any pair that talks about what happens after the first run. A
+    sentence that names no stage at all cannot be tied to one, so it is not caught.
+    """
+    opens = sorted(p.name for p in (ROOT / "stage2" / "lib").glob("*.py")
+                   if "wrds.Connection(" in p.read_text(encoding="utf-8"))
+    if not opens:
+        return
+    names = re.compile(r"(?<!unlike )\bstage 2\b(?!'s)", re.I)
+    denies = re.compile(r"\bno WRDS connection|\bnot need a WRDS connection|\bneeds? no WRDS\b",
+                        re.I)
+    bad = []
+    for f, t in docs.items():
+        for para in _paragraphs(t):
+            for i, s in enumerate(para):
+                pair = para[max(0, i - 1):i + 1]
+                if (denies.search(s) and any(names.search(p) for p in pair)
+                        and not any("first run" in p for p in pair)):
+                    bad.append(f"{f}: {s[:90]}")
+    check("no doc says Stage 2 needs no WRDS connection", not bad,
+          f"{bad} -- stage2/lib opens WRDS in {opens}" if bad else f"(opens WRDS: {opens})")
+
+
+def check_quoted_counts(docs):
+    """No doc may quote how many tests or checks a suite has.
+
+    The counts go stale with every test added: CONTRIBUTING said 154 and 77 when pytest
+    collected 213 and 78, and a tree said 17 test files when there were 21. Say what the
+    suite checks, not how many. "Stage 2 checks ..." is a stage number, not a count.
+    """
+    pat = re.compile(r"(\b[A-Za-z]+[\s-])?\b(\d[\d,]*) (tests|checks|test files)\b")
+    not_counts = {"stage", "section", "step", "table", "figure", "phase", "version"}
+    bad = [f"{f}: {m.group(0).strip()}" for f, t in docs.items() for m in pat.finditer(t)
+           if (m.group(1) or "").strip(" -").lower() not in not_counts]
+    check("no doc quotes a test count", not bad, str(bad))
+
+
+def _tracked_code():
+    """Every tracked .py/.sh outside a tests/ folder, except package __init__ files. None when
+    git is not available (a downloaded zip), in which case the code-map check is skipped."""
+    import subprocess
+    try:
+        out = subprocess.run(["git", "ls-files", "*.py", "*.sh"], cwd=ROOT, capture_output=True,
+                             text=True, check=True).stdout.split()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return sorted(f for f in out
+                  if "tests" not in f.split("/")[:-1] and not f.endswith("__init__.py"))
+
+
+def check_code_map(docs):
+    """Every code file is in CODE_MAP.md, by its full path.
+
+    The README and QUICKSTART each carried a hand-kept file tree; both drifted in 2.2.0, again
+    in 2.2.3, and again by 2026-09-23 (13 Stage 2 files missing). The trees were replaced by
+    CODE_MAP.md and this check. Full paths, because names repeat: helper_functions.py is in
+    both stage1/ and stage3/. Stage 3's drivers may be listed in stage3/INDEX.md instead,
+    which is generated from the code. That every path the map names exists is checked by
+    "every file named in the docs exists".
+    """
+    tracked = _tracked_code()
+    if not tracked:
+        print("[SKIP] code map coverage: git lists no tracked code here")
+        return
+    cmap = docs.get("CODE_MAP.md", "")
+    s3 = docs.get("stage3/INDEX.md", "")
+    missing = [f for f in tracked
+               if f"`{f}`" not in cmap
+               and not (f.startswith("stage3/") and f"`{f[len('stage3/'):]}`" in s3)]
+    check("CODE_MAP.md names every code file", not missing,
+          f"{len(missing)} missing: {missing}" if missing else f"{len(tracked)} files")
+
+
+def check_links(docs):
+    """Every relative link resolves, and every `other.md#anchor` names a real heading.
+
+    check_toc covers anchors inside one page; this covers links between files, which is what
+    a moved or renamed doc breaks.
+    """
+    broken = []
+    for fname, text in docs.items():
+        here = (ROOT / fname).parent
+        for m in re.finditer(r"\]\(([^)\s]+)\)", re.sub(r"```.*?```", "", text, flags=re.S)):
+            target = m.group(1)
+            if target.startswith(("http://", "https://", "mailto:", "#")):
+                continue
+            path, _, anchor = target.partition("#")
+            dest = here / path
+            if not dest.exists():
+                broken.append(f"{fname} -> {target}")
+            elif anchor and dest.suffix == ".md":
+                body = re.sub(r"```.*?```", "", dest.read_text(encoding="utf-8"), flags=re.S)
+                heads = re.findall(r"^#{1,6}\s+(.+?)\s*$", body, re.M)
+                if anchor not in {slug(h) for h in heads}:
+                    broken.append(f"{fname} -> {target} (no such heading)")
+    check("every link between docs resolves", not broken, str(broken))
+
+
 def main():
     global docs_all
-    docs = {f: (ROOT / f).read_text(encoding="utf-8") for f in DOC_FILES}
+    absent = [f for f in DOC_FILES if not (ROOT / f).exists()]
+    check("every doc this file checks exists", not absent, str(absent))
+    docs = {f: (ROOT / f).read_text(encoding="utf-8") for f in DOC_FILES if f not in absent}
     # A wider set for the structural checks: they apply to every doc that
     # carries a tree, a TOC, a qsub line or a config snippet.
     docs_all = dict(docs)
@@ -297,6 +435,10 @@ def main():
     check_toc(docs)
     check_output_format(docs)
     check_fences(docs)
+    check_stage2_wrds(docs_all)
+    check_quoted_counts(docs_all)
+    check_code_map(docs)
+    check_links(docs_all)
 
     print()
     if FAILURES:
@@ -304,6 +446,13 @@ def main():
         return 1
     print("all documentation checks passed")
     return 0
+
+
+def test_documentation():
+    """So pytest runs these checks too. Until 2026-09-23 this file had no test function, so
+    `pytest tests` collected nothing from it and the checks ran only when someone remembered."""
+    FAILURES.clear()
+    assert main() == 0, f"documentation checks failed: {FAILURES}"
 
 
 if __name__ == "__main__":

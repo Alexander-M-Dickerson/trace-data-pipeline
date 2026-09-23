@@ -52,7 +52,7 @@ TWO INPUTS THIS REPO DID NOT HAVE, both in stage2/data/ beside crsp_treasury_ret
                               maturity still come from the stage0 extract; this file supplies only
                               the schedule anchors, so the two vintages cannot disagree on terms.
 
-TWO TRAPS IN THE GSW FILE, both load-bearing:
+TWO TRAPS IN THE GSW FILE, both of which change results:
   1. TAU2 = -999.99 is a SENTINEL, not a parameter. BETA3 is exactly 0 on every such row, so the
      fourth Svensson term must be switched OFF, not evaluated: n/TAU2 with a negative TAU2 returns
      a finite, wrong number rather than raising.

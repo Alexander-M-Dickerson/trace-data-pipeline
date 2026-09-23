@@ -31,11 +31,9 @@ If you want to get started quickly, see **[QUICKSTART_stage1.md](QUICKSTART_stag
 - [Troubleshooting](#troubleshooting)
 - [Performance Optimization](#performance-optimization)
 - [License & Citation](#license--citation)
-
-
+- [Support](#support)
 - [Version History](#version-history)
 
-- [Support](#support)
 ---
 
 ## Overview
@@ -69,14 +67,14 @@ The result is a research-ready dataset of 44 columns per bond-day observation.
 versions (`QuantLib>=1.36`, `joblib>=1.4`, `pandas>=2.2.3`, `numpy>=2.0`, `pyarrow>=20.0.0`,
 `wrds>=3.3.0`, plus `tqdm`, `openpyxl`, `requests` and `matplotlib` for the reports).
 
-The 2026-09-10 production run, which the 2026 data vintage was built from, used Python 3.14.5,
-pandas 2.2.3, NumPy 2.4.6, QuantLib 1.37 and joblib 1.5.1 on the WRDS Cloud. The log files print
+The 2026-09-21 run, which the 2026 data vintage was built from, used Python 3.14.5, pandas
+2.2.3, NumPy 2.4.6, QuantLib 1.37 and joblib 1.5.1 on the WRDS Cloud. The log files print
 your Python and package versions, so a run can always be matched to the environment that made it.
 
 **WRDS Access Required:**
 - TRACE (already used in Stage 0)
-- FISD (Mergent Fixed Income Securities Database)
-- S&P and Moody's ratings databases
+- FISD (Mergent Fixed Income Securities Database), including its ratings table
+  `fisd.fisd_ratings`, which holds both the S&P and the Moody's ratings
 
 ---
 
@@ -84,35 +82,25 @@ your Python and package versions, so a run can always be matched to the environm
 
 ```
 stage1/
-  # Shell script for job submission
-  run_stage1.sh                # Submits Stage 1 job to SGE
+  run_stage1.sh                # SGE job script; submit it from the repository root
+  _stage1_settings.py          # Stage 1 settings: paths, filters, parameters
+  _run_stage1.py               # Entry point, called by run_stage1.sh
+  create_daily_stage1.py       # Wires the settings into the pipeline and runs it
+  stage1_pipeline.py           # The steps, in order (run_all_steps)
+  helper_functions.py          # The functions the steps call: bond analytics, filters
+  _linker_join.py              # Attaches permno/permco/gvkey from the linker (step 7)
+  _distressed_plot_helpers.py  # Figures and LaTeX for the distressed-bond report
 
-  # Configuration
-  _stage1_settings.py          # Central configuration: paths, filters, parameters
-
-  # Python runner (called by shell script)
-  _run_stage1.py               # Runner (calls CreateDailyStage1)
-
-  # Core processing module
-  create_daily_stage1.py       # Main Stage 1 class (wraps all steps)
-
-  # Helper functions (DO NOT EDIT)
-  helper_functions.py          # All utility functions used by create_daily_stage1.py
-  _debug_stage1_vFinal.py      # Original debug script (reference only)
-
-  # Output directories (created automatically)
-  logs/                        # Job logs (.out and .err files)
-  data/                        # Final enriched dataset + reports
-    stage1_YYYYMMDD.parquet    # Main output file
-    reports/                   # LaTeX reports and figures (if generated)
+  logs/                        # stage1.out, stage1.err, stage1_<timestamp>.log
+  data/                        # the output, the downloaded inputs, the distressed report
+  data_reports/                # the data-quality report
 ```
 
-**Important file relationships:**
-- `_stage1_settings.py` → Contains ALL user-configurable parameters
-- `run_stage1.sh` → Submits `_run_stage1.py` to SGE
-- `_run_stage1.py` → Loads config and calls `create_daily_stage1.py`
-- `create_daily_stage1.py` → Wraps `helper_functions.py` into a clean pipeline
-- `helper_functions.py` → Contains all the actual processing logic (DO NOT EDIT)
+**How they call each other:** `run_stage1.sh` runs `_run_stage1.py`, which loads the settings
+and calls `create_daily_stage1.py`, which runs `stage1_pipeline.run_all_steps()`. The steps call
+`helper_functions.py` and `_linker_join.py`. Every setting you are meant to change is in
+`_stage1_settings.py` or the root `config.py`. [CODE_MAP.md](../CODE_MAP.md) covers every file in
+the repository.
 
 ---
 
@@ -137,13 +125,7 @@ The equivalent by hand, if `requirements.txt` is unavailable:
 python -m pip install --user pandas numpy wrds pyarrow tqdm QuantLib joblib openpyxl requests matplotlib
 ```
 
-Using `requirements.txt` (recommended):
-
-```bash
-python -m pip install --user -r requirements.txt
-```
-
-Or if using a virtual environment (recommended):
+Or, in a virtual environment:
 
 ```bash
 # Create virtual environment in project root
@@ -152,101 +134,63 @@ source venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
-### 2. Navigate to stage1 directory and configure settings
+### 2. Configure
+
+Your WRDS username goes in the root `config.py`, or in the environment, which stages 0 and 1
+read (Stage 2, on your own computer, reads only the environment):
 
 ```bash
-cd ~/proj/stage1  # or wherever you cloned the repo
+export WRDS_USERNAME="your_wrds_id"
 ```
 
-**CRITICAL:** Edit `_stage1_settings.py`:
-
-```python
-# Set your WRDS username
-WRDS_USERNAME = os.getenv("WRDS_USERNAME", "your_wrds_username_here")
-
-# Set ROOT_PATH (parent directory containing stage0/ and stage1/)
-# Option 1: Leave blank for auto-detection (recommended)
-ROOT_PATH = ""  # Auto-detects from current working directory
-
-# Option 2: Manually specify (uncomment if needed)
-# ROOT_PATH = Path("~/proj").expanduser()                          # Linux/Mac/WRDS
-# ROOT_PATH = Path("C:\\Users\\YourName\\Documents\\trace_data")   # Windows
-
-# Stage 0's date stamp is AUTO-DETECTED from its parquet filenames. Leave blank
-# unless detection fails, in which case set it to match your stage 0 output.
-STAGE0_DATE_STAMP = ""
-```
-
-`TRACE_MEMBERS` is not here -- it is in the root `config.py`, defaults to
-`["enhanced", "144a"]`, and is overridable from the environment:
+A wrong username is not caught at startup: it fails when step 6 first connects to WRDS, about
+1 hour 45 minutes into a full run. `TRACE_MEMBERS` (which TRACE databases to process) is also in
+`config.py`, defaults to `["enhanced", "144a"]`, and can be set from the environment:
 `TRACE_MEMBERS="enhanced standard 144a" ./run_pipeline.sh`.
 
-To edit via command line using `nano`:
+In `stage1/_stage1_settings.py`, `ROOT_PATH` can stay blank: it is found from the folder you run
+from (the repository root, or `stage1/`). Stage 0's date stamp is read from
+`stage0/enhanced/trace_enhanced_<stamp>.parquet`; there is nothing to set.
+
+### 3. Download the required data files (login node)
+
+Stage 1 needs five files from the internet: the Liu-Wu Treasury yields, the bond-firm linker and
+the three Fama-French industry files. It checks for them before it starts and stops if one is
+missing. WRDS compute nodes have no internet, so fetch them on the login node, from the
+repository root:
 
 ```bash
-nano _stage1_settings.py
+bash download_inputs.sh
 ```
 
-Change the settings at the top. Save with Ctrl + O, then Enter. Exit with Ctrl + X.
-
-Verify your changes:
-```bash
-grep "WRDS_USERNAME\|ROOT_PATH\|STAGE0_DATE_STAMP" _stage1_settings.py
-```
-
-### 3. Download Required Data Files (WRDS Only)
-
-**IMPORTANT for WRDS users:** WRDS compute nodes (where SGE jobs run) don't have internet access. You must pre-download required data files on the login node.
-
-```bash
-# Create data directory
-mkdir -p data
-
-# Download Liu-Wu treasury yields from Google Sheets (run on WRDS login node)
-wget -O data/liu_wu_yields.xlsx "https://docs.google.com/spreadsheets/d/11HsxLl_u2tBNt3FyN5iXGsIKLwxvVz7t/export?format=xlsx&id=11HsxLl_u2tBNt3FyN5iXGsIKLwxvVz7t"
-
-# Download the bond-firm linker (for equity identifiers)
-wget -O data/bond_firm_linker_2026.zip "https://openbondassetpricing.com/wp-content/uploads/2026/09/bond_firm_linker_2026.zip"
-
-# Unzip the linker file
-unzip data/bond_firm_linker_2026.zip -d data/
-
-# Verify downloads
-ls -lh data/liu_wu_yields.xlsx
-ls -lh data/bond_firm_linker_2026/fl_linker.parquet
-
-# Clean up zip file (optional)
-rm data/bond_firm_linker_2026.zip
-```
-
-**Note:** If you're running locally (Mac/Windows) with internet access, the pipeline will automatically download these files, so you can skip this step.
+`run_pipeline.sh` does this for you; run it yourself only when you submit stage 1 on its own.
+On your own machine, run the same script (it needs `wget`).
 
 ### 4. Make script executable (older clones only)
 
-The script ships executable, so a fresh clone needs nothing here. An older clone may need:
+The script ships executable, so a fresh clone needs nothing here. An older clone may need,
+from the repository root:
 
 ```bash
-chmod +x run_stage1.sh
+chmod +x stage1/run_stage1.sh
 ```
 
 ### 5. Fix line endings (if editing on Windows)
 
 ```bash
-sed -i 's/\r$//' run_stage1.sh
+sed -i 's/\r$//' stage1/run_stage1.sh
 ```
 
 ### 6. Submit the job
 
-**On WRDS Cloud (SGE):**
+**On WRDS Cloud (SGE), from the repository root:**
 ```bash
-qsub stage1/run_stage1.sh   # from the repo ROOT
+qsub stage1/run_stage1.sh
 ```
 
-**On local machine or Mac:**
+**On your own machine**, from the repository root:
 ```bash
-bash run_stage1.sh
-# or
-./run_stage1.sh
+bash stage1/run_stage1.sh
 ```
 
 **Monitor progress:**
@@ -259,13 +203,13 @@ tail -f stage1/logs/stage1.out
 tail -f stage1/logs/stage1.err  # Check for errors
 ```
 
-**Expected runtime:** about 2.5 hours on the WRDS Cloud, on the 4 slots and 40 GB `run_pipeline.sh` requests (2.4 h on the 2026-09-10 run, 2.6 h on 2026-09-09).
+**Expected runtime:** about 2.5-2.7 hours on the WRDS Cloud, on the 4 slots and 40 GB `run_stage1.sh` requests (2.6 h on 2026-09-09, 2.4 h on 2026-09-10, 2.7 h on 2026-09-21).
 
 ---
 
 ## What Stage 1 Does
 
-`run_all_steps()` makes 13 calls in sequence. Two are easy to miss and both matter:
+`run_all_steps()` runs the steps below in order. Two are easy to miss and both matter:
 `variable_drop()`, which removes `issuer_cusip`, `prclean`, `coupon`, `principal_amt`,
 `sp_naic`, `comp_rating` and `callable` and does the integer dtype casts; and
 `step8b_build_distressed_report()`.
@@ -282,7 +226,8 @@ tail -f stage1/logs/stage1.err  # Check for errors
 - Drops duplicates by (cusip_id, date)
 
 ### Step 3: Load FISD Data
-- Connects to WRDS and fetches bond characteristics from FISD
+- Reads the FISD bond characteristics Stage 0 saved,
+  `stage0/enhanced/trace_enhanced_fisd_<stamp>.parquet` (no WRDS connection yet)
 - Includes: coupon, maturity, offering amount, issuer, security type, etc.
 - Loads Fama-French industry mappings
 
@@ -300,32 +245,41 @@ tail -f stage1/logs/stage1.err  # Check for errors
 - Memory-efficient chunking for large datasets
 
 ### Step 6: Merge Credit Ratings
-- Fetches S&P and Moody's ratings from WRDS
+- Connects to WRDS, for the first time in the run, and reads from FISD the S&P and Moody's
+  ratings (`fisd.fisd_ratings`), the amount-outstanding history and the call data
 - Merges ratings by (cusip_id, date) with forward-fill logic
 - Converts letter ratings to numeric scores
 - Creates composite rating variables
 
 ### Step 7: Merge the bond-firm linker
-- Reads `bond_firm_linker_2026/fl_linker.parquet`, which `download_inputs.sh` fetched on the login node (a run with internet access downloads it itself)
+- Reads `bond_firm_linker_2026/fl_linker.parquet`, which `download_inputs.sh` fetched on the login node
 - Adds equity identifiers: PERMNO, PERMCO and GVKEY, joined on the linker's dated identity window `[i0, i1]`, the same window Stage 2 joins (`LINKER_WINDOW` in `_stage1_settings.py`)
 - Enables cross-referencing with other datasets
 
 ### Step 8: Ultra-Distressed Bond Filters
-- Applies sophisticated filters to flag potentially erroneous prices:
-  - **Intraday inconsistency**: Large within-day price moves for low-priced bonds
-  - **Anomaly detection**: Ultra-low prices inconsistent with recent history
-  - **Plateau detection**: Suspicious flat pricing at very low levels
-  - **Round number detection**: Prices at suspicious round numbers (0.01, 0.10, etc.)
-  - **High spike detection**: Extreme high-low spreads that recover quickly
+- Four filters flag prices that are probably errors (details in
+  [README_distressed_filter.md](README_distressed_filter.md)):
+  - **Anomaly**: ultra-low prices out of line with the bond's recent prices
+  - **Upward spike**: a price above 5% of par (or a round price above 0.50), at least 3 times the median of the bond's
+    recent lower prices, that falls back within 5 observations
+  - **Plateau**: runs of flat pricing at very low levels
+  - **Intraday inconsistency**: a large gap between the day's high and low for a low-priced bond
+- Round prices (0.01, 0.10, 0.50 and so on) make a price more suspect inside these filters; they
+  are not a separate filter
 
 ### Step 9: Final Filters
-- Removes prices above threshold (default: 300% of par)
-- Handles July 2002 TRACE pricing anomaly (first month of data)
-- Tracks all filter statistics
+- Flags prices above 300% of par
+- Flags each bond's first price change in July 2002 (TRACE's first month) when it is larger than
+  35 points of par
 
-### Step 10a: Build Filter Tables
-- Creates LaTeX summary tables documenting all filters
-- Saves final enriched dataset to `data/stage1_YYYYMMDD.parquet`
+### Step 10a: Apply the filters and save
+- Removes, in order: rows without valid accrued-interest inputs (tested in step 4), rows with no
+  S&P or Moody's rating, rows with less than one year to maturity, the rows step 8 flagged, and
+  the two step 9 flags
+- Winsorizes `ytm` and `credit_spread` at the 0.5th and 99.5th percentiles within each date
+- Creates the LaTeX tables that count each filter; see
+  [DATA_DICTIONARY.md](DATA_DICTIONARY.md#sample-defining-operations)
+- Saves the dataset to `data/stage1_YYYYMMDD.parquet`
 
 ### Step 10: Generate Reports
 - Generates comprehensive LaTeX data quality report
@@ -354,9 +308,8 @@ In `stage1/_stage1_settings.py`:
 # Root path (where stage0/ and stage1/ live). Leave blank to auto-detect.
 ROOT_PATH = ""
 
-# Stage 0 output date stamp. AUTO-DETECTED from the stage0 parquet filenames; a
-# literal here is only the fallback for when detection fails.
-STAGE0_DATE_STAMP = ""
+# There is no date-stamp setting: it is read from
+# stage0/enhanced/trace_enhanced_<stamp>.parquet.
 
 # Date filter. The DEFAULT IS ROLLING, not a fixed date:
 #   "auto:complete"  the last month EVERY source covers through its final trading
@@ -410,6 +363,7 @@ ULTRA_DISTRESSED_CONFIG = {
     # Intraday inconsistency thresholds
     'intraday_range_threshold': 0.75,  # 75% within-day move triggers flag
     'intraday_price_threshold': 20,    # Only for prices below 20% of par
+    'price_cols': ['prc_hi', 'prc_lo'],  # the day's high and low
 
     # Anomaly detection
     'ultra_low_threshold': 0.10,       # 0.10% of par = $1
@@ -417,15 +371,17 @@ ULTRA_DISTRESSED_CONFIG = {
 
     # Plateau detection
     'plateau_ultra_low_threshold': 0.15,  # 0.15% of par = $1.50
-    'min_plateau_days': 2,                # Minimum days for plateau flag
+    'min_plateau_days': 2,                # minimum observations (days the bond traded)
 
     # Suspicious round numbers
     'suspicious_round_numbers': [0.001, 0.01, 0.05, 0.10, 0.25, 0.50, 1.00],
 
-    # High spike detection
-    'high_spike_threshold': 5.0,       # High/Low > 5x
-    'min_spike_ratio': 3.0,            # vs. recent median
+    # Upward spike detection
+    'high_spike_threshold': 5.0,       # spike candidate: a price above 5% of par (or round and above 0.50)
+    'min_spike_ratio': 3.0,            # at least 3x the median of recent lower prices
     'recovery_ratio': 2.0,             # Quick recovery pattern
+
+    'target_rows_per_chunk': 500000,   # rows per chunk while filtering
 }
 ```
 
@@ -434,7 +390,7 @@ ULTRA_DISTRESSED_CONFIG = {
 ```python
 FINAL_FILTER_CONFIG = {
     'price_threshold': 300,    # Remove prices above 300% of par
-    'dip_threshold': 35,       # Handle July 2002 pricing anomaly (below 35% of par)
+    'dip_threshold': 35,       # flag a first July 2002 price change larger than 35 points
 }
 ```
 
@@ -447,15 +403,15 @@ FINAL_FILTER_CONFIG = {
 Submit to Sun Grid Engine:
 
 ```bash
-cd ~/proj/stage1
-qsub stage1/run_stage1.sh   # from the repo ROOT
+cd ~/trace-data-pipeline     # the repository root
+qsub stage1/run_stage1.sh
 ```
 
 Monitor job:
 ```bash
-qstat                        # Check job status
-tail -f logs/stage1.out      # Follow output log
-tail -f logs/stage1.err      # Check for errors
+qstat                               # Check job status
+tail -f stage1/logs/stage1.out      # Follow output log
+tail -f stage1/logs/stage1.err      # Check for errors
 ```
 
 Job states:
@@ -477,11 +433,9 @@ cd /path/to/stage1
 python3 _run_stage1.py
 ```
 
-Or via shell script:
+Or via the shell script, from the repository root:
 ```bash
-bash run_stage1.sh
-# or
-./run_stage1.sh
+bash stage1/run_stage1.sh
 ```
 
 **Note:** On Windows, you may need to use:
@@ -502,14 +456,19 @@ stage1/
 │   ├── stage1.err                  # Standard error
 │   └── stage1_YYYYMMDD_HHMMSS.log  # Detailed processing log
 │
-└── data/                           # All output data files
-    ├── stage1_YYYYMMDD.parquet     # Main enriched dataset
-    └── reports/                    # Data quality reports (if generated)
-        ├── stage1_data_report.tex
-        ├── references.bib
-        └── figures/
-            ├── fig_*.pdf
-            └── ...
+├── data/
+│   ├── stage1_YYYYMMDD.parquet     # the output
+│   ├── call_dummy_YYYYMMDD.parquet # callable flag per bond (read by Stage 2)
+│   ├── sp_ratings_YYYYMMDD.parquet, moodys_ratings_YYYYMMDD.parquet
+│   ├── ultra_distressed_cusips_YYYYMMDD.csv   # bonds the distressed filter flagged
+│   ├── liu_wu_yields.xlsx, Siccodes12/17/30.txt, bond_firm_linker_2026/  # downloaded inputs
+│   └── data_reports/               # the distressed-bond report and its figures
+│
+└── data_reports/                   # the data-quality report
+    ├── stage1_data_report_YYYYMMDD.tex (and .pdf)
+    ├── references.bib
+    ├── stage1_*.pdf                # figures
+    └── time_series_data/
 ```
 
 ### Main output file
@@ -523,7 +482,7 @@ reference; this is a summary.
 
 **Identifiers:**
 - `cusip_id` - 9-character CUSIP identifier
-- `permno` - CRSP PERMNO (equity identifier); NULL where no dated equity link exists
+- `permno` - CRSP PERMNO (equity identifier); NULL where no identity window of the linker covers the date
 - `permco` - CRSP PERMCO (company identifier)
 - `gvkey` - Compustat GVKEY (company identifier)
 - `trd_exctn_dt` - Trade execution date
@@ -589,40 +548,39 @@ fall into each scheme's "Other" bucket, so these are never null):
 
 ### Log files
 
-**`logs/stage1.out`** - Standard output from job execution
+**`logs/stage1.out`** - Standard output from job execution, including the configuration summary
 
 **`logs/stage1.err`** - Standard error messages (check here first if job fails)
 
 **`logs/stage1_YYYYMMDD_HHMMSS.log`** - Detailed processing log with:
-- Configuration summary
 - System and package versions
 - Memory usage tracking
 - Row counts at each step
 - Filter statistics
 - Timing information
 
-### Reports (if generated)
+### Reports
 
 **Location:** `stage1/data_reports/` -- figures and `time_series_data/*.csv` sit in that same directory, not a `figures/` subfolder
 
 **Files:**
-- `stage1_data_report.tex` - LaTeX source for data quality report
+- `stage1_data_report_<STAMP>.tex` - LaTeX source for data quality report
 - `references.bib` - Bibliography file
-- `figures/*.pdf` - Time-series figures
+- `stage1_*.pdf` - figures
 
 **Report contents:**
 - Summary statistics tables
 - Filter application statistics
 - Sample composition by year, rating, industry
-- Time-series plots (if `OUTPUT_FIGURES = True`)
+- Time-series figures
 
-Compile the LaTeX report:
+Compile the LaTeX report (the files carry the run stamp):
 ```bash
 cd stage1/data_reports
-pdflatex stage1_data_report_<STAMP>.tex   # the file carries the run stamp
-bibtex stage1_data_report
-pdflatex stage1_data_report_<STAMP>.tex   # the file carries the run stamp
-pdflatex stage1_data_report_<STAMP>.tex   # the file carries the run stamp
+pdflatex stage1_data_report_<STAMP>.tex
+bibtex stage1_data_report_<STAMP>
+pdflatex stage1_data_report_<STAMP>.tex
+pdflatex stage1_data_report_<STAMP>.tex
 ```
 
 ---
@@ -672,7 +630,7 @@ $$
 R_{\text{clean},t} = \frac{P_t}{P_{t-1}} - 1
 $$
 
-where $P_t$ can be any of the clean price measures: `pr`, `prc_ew`, `prc_vw`, `prc_first`, `prc_last`, etc.
+where $P_t$ can be any of the clean price measures: `pr`, `prc_ew`, `prc_vw_par`, `prc_first`, `prc_last`, etc.
 
 **Use case**: Useful for analyzing pure price movements or when comparing bonds with different coupon structures.
 
@@ -778,26 +736,23 @@ Stage 1 expects Stage 0 outputs to follow this structure:
 ROOT_PATH/
 ├── stage0/
 │   ├── enhanced/
-│   │   └── trace_enhanced_YYYYMMDD.parquet    # Required if "enhanced" in TRACE_MEMBERS
+│   │   ├── trace_enhanced_YYYYMMDD.parquet    # Required if "enhanced" in TRACE_MEMBERS
+│   │   └── trace_enhanced_fisd_YYYYMMDD.parquet  # Always required: step 3 reads it
 │   ├── standard/
 │   │   └── trace_standard_YYYYMMDD.parquet    # Required if "standard" in TRACE_MEMBERS
 │   └── 144a/
 │       └── trace_144a_YYYYMMDD.parquet        # Required if "144a" in TRACE_MEMBERS
 │
-└── stage1/
-    ├── _stage1_settings.py
-    ├── create_daily_stage1.py
-    ├── _run_stage1.py
-    ├── run_stage1.sh
-    ├── helper_functions.py
+└── stage1/                                    # the code, listed under Repo layout above
     ├── logs/                                   # Created automatically
-    └── data/                                   # Created automatically
+    └── data/                                   # the downloaded inputs, then the output
 ```
 
 **Important:**
-- `STAGE0_DATE_STAMP` in `_stage1_settings.py` must match the date stamp in your Stage 0 output filenames
-- `ROOT_PATH` can be left blank (auto-detects from current directory) or manually specified
-- If you run the script from `~/proj/stage1`, ROOT_PATH is automatically set to `~/proj`
+- The date stamp is read from `stage0/enhanced/trace_enhanced_<stamp>.parquet`, and every
+  member you process must carry the same stamp
+- `ROOT_PATH` can be left blank (it is found from the folder you run from) or set by hand
+- Run from `~/proj/stage1` or from `~/proj`: either way `ROOT_PATH` becomes `~/proj`
 
 ---
 
@@ -808,24 +763,26 @@ This code is designed to run on **WRDS Cloud**, **Mac**, and **Windows** with mi
 ### WRDS Cloud (Linux)
 
 ```python
-# In _stage1_settings.py:
-ROOT_PATH = ""  # Auto-detect (recommended)
+# In the root config.py (or: export WRDS_USERNAME=your_wrds_id):
 WRDS_USERNAME = os.getenv("WRDS_USERNAME", "your_wrds_id")
+# In stage1/_stage1_settings.py:
+ROOT_PATH = ""  # Auto-detect (recommended)
 ```
 
-Submit with SGE from the `stage1/` directory:
+Submit with SGE from the repository root:
 ```bash
-cd ~/proj/stage1
-qsub stage1/run_stage1.sh   # from the repo ROOT
+cd ~/trace-data-pipeline     # the repository root
+qsub stage1/run_stage1.sh
 ```
 
 ### Mac
 
 ```python
-# In _stage1_settings.py:
+# In the root config.py (or: export WRDS_USERNAME=your_wrds_id):
+WRDS_USERNAME = os.getenv("WRDS_USERNAME", "your_wrds_id")
+# In stage1/_stage1_settings.py:
 ROOT_PATH = ""  # Auto-detect (recommended)
 # Or manually: ROOT_PATH = Path("~/Documents/trace_data")
-WRDS_USERNAME = os.getenv("WRDS_USERNAME", "your_wrds_id")
 ```
 
 Run locally from the `stage1/` directory:
@@ -837,10 +794,11 @@ python3 _run_stage1.py
 ### Windows
 
 ```python
-# In _stage1_settings.py:
+# In the root config.py (or set the WRDS_USERNAME environment variable):
+WRDS_USERNAME = os.getenv("WRDS_USERNAME", "your_wrds_id")
+# In stage1/_stage1_settings.py:
 ROOT_PATH = ""  # Auto-detect (recommended)
 # Or manually: ROOT_PATH = Path("C:\\Users\\YourName\\Documents\\trace_data")
-WRDS_USERNAME = os.getenv("WRDS_USERNAME", "your_wrds_id")
 ```
 
 Run from Command Prompt or PowerShell from the `stage1\` directory:
@@ -850,7 +808,7 @@ python _run_stage1.py
 ```
 
 **Note:**
-- Auto-detection works when you run the script from the `stage1/` directory
+- Auto-detection works when you run from the `stage1/` directory or the repository root
 - Manual override available if running from a different location
 
 ---
@@ -861,9 +819,9 @@ python _run_stage1.py
 
 **Error: "WRDS_USERNAME not set"**
 
-Solution: Set in `_stage1_settings.py`:
+Solution: Set it in the root `config.py`:
 ```python
-WRDS_USERNAME = "your_wrds_username_here"
+WRDS_USERNAME = os.getenv("WRDS_USERNAME", "your_wrds_username_here")
 ```
 
 Or set environment variable:
@@ -874,9 +832,9 @@ export WRDS_USERNAME="your_wrds_username_here"
 **Error: "Stage0 directory not found"**
 
 Solution:
-1. Ensure you're running the script from the `stage1/` directory:
+1. Run from the repository root or from the `stage1/` directory:
    ```bash
-   cd ~/proj/stage1  # or wherever your stage1 folder is
+   cd ~/proj  # or wherever you cloned the repository
    ```
 2. If auto-detection doesn't work, manually specify `ROOT_PATH` in `_stage1_settings.py`:
    ```python
@@ -885,7 +843,7 @@ Solution:
 
 **Error: "Stage0 output files not found"**
 
-Solution: Verify `STAGE0_DATE_STAMP` matches your Stage 0 output files. Check:
+Solution: The date stamp is read from `stage0/enhanced/trace_enhanced_<stamp>.parquet`, and every member in `TRACE_MEMBERS` needs a file with that same stamp. Check:
 ```bash
 ls stage0/enhanced/trace_enhanced_*.parquet
 ls stage0/standard/trace_standard_*.parquet
@@ -917,29 +875,26 @@ chmod 600 ~/.pgpass
 cat ~/.pgpass  # Should contain: wrds-pgdata.wharton.upenn.edu:9737:wrds:your_username:your_password
 ```
 
-**Error: "No tables found in WRDS"**
+**WRDS refuses access to a table**
 
-Solution: Verify your WRDS account has access to:
-- FISD (Mergent Fixed Income Securities Database)
-- S&P ratings (COMPUSTAT or Capital IQ)
-- Moody's ratings
+Stage 1 reads only FISD from WRDS: `fisd.fisd_ratings` (both the S&P and the Moody's ratings),
+`fisd.fisd_amt_out_hist`, `fisd.fisd_mergedissue` and `fisd.fisd_mergedredemption`. Check that
+your subscription includes FISD.
 
 ### Memory Issues
 
 **Error: "MemoryError" or "Killed"**
 
-Solution: Reduce parallel processing:
+Solution: use more, smaller chunks, and leave the worker count alone:
 ```python
 # In _stage1_settings.py:
-N_CORES = 4    # Reduce from default 10
-N_CHUNKS = 4   # Increase from default 2
+N_CHUNKS = 20    # default 10; more chunks means a smaller peak
+N_CORES = None   # default: follows the slots the job was granted
 ```
 
-Or request more memory on WRDS:
-```bash
-# In run_stage1.sh, add:
-#$ -l m_mem_free=16G
-```
+Or request more memory on WRDS, in `run_stage1.sh`. `m_mem_free` is charged per slot and WRDS
+allows 48 GB per job, so with its 4 slots the most is `-l m_mem_free=12G` (48 GB). A request over
+the limit waits in the queue forever, without an error.
 
 ### Performance Issues
 
@@ -960,7 +915,7 @@ Solutions:
    N_CORES = None   # recommended: follow the grant
    ```
 
-4. Process fewer TRACE datasets:
+4. Process fewer TRACE datasets, in the root `config.py`:
    ```python
    TRACE_MEMBERS = ["enhanced"]  # Only process Enhanced
    ```
@@ -990,7 +945,7 @@ N_CHUNKS = 10     # default
 ### Output Format
 
 ```python
-OUTPUT_FORMAT = "parquet"  # The only supported value; anything else raises at import
+OUTPUT_FORMAT = "parquet"  # The only supported value: Stage 0 refuses any other; Stage 1 always writes Parquet
 ```
 Convert after the fact if you need CSV -- see the [FAQ](../FAQ.md).
 

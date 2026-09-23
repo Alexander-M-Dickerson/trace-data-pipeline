@@ -47,10 +47,59 @@ exactly as a user would. Each fix carries a test.
 - `stage3/INDEX.md` states the path counts of the released 2026 data (18,064, not 18,026).
 - The factor bundle's README says `--factor-source pinned` downloads the file itself.
 
+A full audit of every guide against the code and the 2026-09-21 run followed. What was wrong:
+
+- **Stage 2 needs WRDS once.** Seven places said Stage 2 needs no WRDS connection; its first run
+  fetches CRSP Treasury returns, Fama-French factors, VIX and FISD coupon terms, then caches them.
+- **Stage 3 without the fast kernels** stops at the first uncertainty grid; the guides said
+  everything else still ran. `--keep-going` runs the rest.
+- **Python.** Stages 2 and 3 need Python 3.10-3.13: `requirements.txt` installs `numba` only
+  below 3.14, and Stage 2 imports it.
+- **Instructions that did not work as written:** the stage 1 manual download (it missed the three
+  industry files, and "a run with internet downloads them itself" is false, since Stage 1 checks
+  for them before it starts); `qsub` from `stage1/`; the stage 1 memory advice (`16G` per slot is
+  over the WRDS cap, and the `N_CHUNKS` advice was backwards); a `start_date` for Enhanced;
+  raising `CONCURRENCY` past the connection limit; `STAGE0_WORKERS` (it applies to every member,
+  unchecked); stage 0's log paths and its CSV output option; `make_release.py` with no
+  arguments (it stops at the BBW bundle unless step 4 re-ran after `make_excess_blocks.py`);
+  `--validate` (does nothing in a public build); `--no-compile` (a `make_report.py` flag);
+  `--limit-cusips` (it replaces a full build's output).
+- **Settings in the wrong place:** `WRDS_USERNAME` and `TRACE_MEMBERS` are in `config.py`; stage
+  1's date stamp is auto-detected, with nothing to set; a `FILTER_SWITCHES` key left out falls
+  back to the engine's default, so leaving out `volume_filter_toggle` switches the $10,000
+  floor ON, rather than raising.
+- **What the data is:** stage 0 prices, volumes and `trade_count` use inter-dealer trades too
+  (only bid and ask are customer-only); `bid_count`/`ask_count` are floats, and `bid_count` is
+  NULL, not 0, on a day with no dealer buys;
+  agency de-duplication and the pre/post-2012 rules are Enhanced-only; the 144A FISD file has an
+  extra screen; stage 1's rating and one-year-maturity filters and its per-date winsorization
+  were missing from the guides; the July 2002 and spike thresholds were misdescribed; Standard
+  TRACE rows never survive the automatic sample end; the distressed-bond CSV carries numbers only
+  for the flagged bonds; the monthly panel's 68 beta and momentum columns are estimated on
+  `ret_vw`, not `ret_vw - tret`; VaR and expected shortfall use monthly returns over 36 months,
+  not daily returns; `eput` is tax (not trade) policy uncertainty and `rsj` a signed jump; the
+  NSE Ratio is a standard deviation over the mean standard error; the Table IA.XIX pool is the
+  ledger's count less the 648 baselines.
+- **Stale:** the 2026 vintage was built from the 2026-09-21 run, not the 2026-09-10 one; run
+  times (stage 0 Enhanced 2-2.6 h, the report job ~20 min, end to end ~5 h); the "4.94x" stage 0
+  speed-up added up chunk times that overlap, and the real gain is about 2x; the stage 1 filter
+  shares and several panel statistics; quoted test counts, now removed.
+- **Worked examples:** the bounce-back Example 1 baselines (93.50, 93.75, 94.00, 93.75, not
+  93.2); the distressed-filter median (44.9) and why 100.0 is a spike candidate (above 5, not a
+  round number); the decimal-shift corrector adds seven columns, not three.
+
 ### Added
 - `AGENTS.md` (read by Codex) and `CLAUDE.md` (read by Claude Code) at the root and in `stage2/`
   and `stage3/`: how to run the local stages with an AI assistant -- the commands in order, the
   one choice that changes the numbers (the factor source), what "done" means, and the traps.
+  The root file also covers stages 0 and 1 on WRDS.
+- `INDEX.md`, which doc answers which question, and `CODE_MAP.md`, what each stage reads and
+  writes and what every code file does. They replace the file trees in `README.md` and
+  `QUICKSTART.md`, which had gone out of date three times.
+- `tests/test_docs.py` now runs under pytest and reads the new files. Four new checks: no doc may
+  say Stage 2 needs no WRDS connection while its code opens one; no doc may quote a test count;
+  every code file must be in `CODE_MAP.md`; every link between docs, and its `#section`, must
+  resolve. Each was seen to fail on the defects above, or on a planted one, before the fixes.
 
 ## [3.3.0] - 2026-09-22
 

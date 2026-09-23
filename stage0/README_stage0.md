@@ -52,7 +52,8 @@ stage0/
 
   # Configuration
   _trace_settings.py          # Central configuration: filters, parameters, CONCURRENCY,
-                              # WRDS username, and the grid resource requests
+                              # and the grid resource requests (the WRDS username is in
+                              # the root config.py)
 
   # Python runners (called by shell scripts)
   _run_enhanced_trace.py      # Enhanced runner (calls CreateDailyEnhancedTRACE)
@@ -83,10 +84,11 @@ Stage 1 and the reports run alongside each other and the whole thing still goes 
 submission.
 
 Each `run_*.sh` is a thin SGE wrapper that sets `-cwd` (current working directory),
-exports your environment (`-V`), and writes logs into `./logs/`. Cores and memory are
-**not** set in these scripts: `run_pipeline.sh` computes them per member from
+exports your environment (`-V`), and writes logs into `stage0/logs/`. The three data-job
+scripts set no cores or memory: `run_pipeline.sh` computes them per member from
 `CONCURRENCY` and passes them on the `qsub` command line, so the request cannot drift
-away from the worker count.
+away from the worker count. `run_build_data_reports.sh` carries its own request
+(`-pe onenode 5 -l m_mem_free=8G`).
 
 ---
 
@@ -111,8 +113,9 @@ lands in cannot affect its result. What *does* change is the audit tables, whose
 column follows the new grouping.
 
 **Several chunks are fetched at once**, each worker process holding its own WRDS
-connection. `CONCURRENCY` in `_trace_settings.py` sets how many; `STAGE0_WORKERS`
-overrides it for a single run.
+connection. `CONCURRENCY` in `_trace_settings.py` sets how many. `STAGE0_WORKERS` overrides
+it for a single run, but for every member at once, 144A included, and neither the connection
+check nor the `qsub` request sees the override: keep twice its value at 6 or below.
 
 **Output is sorted canonically before export**, by `(cusip_id, trd_exctn_dt)`. Row order
 no longer depends on the work plan, which is what makes it possible to *prove* a
@@ -238,7 +241,7 @@ Once connected, you will see a WRDS prompt. From there, you can use **Option A, 
 
 #### Option D - Transferring files from your local computer
 
-If you already have the `stage0` folder on your local computer and want to upload it after editing the scripts, you can use the secure copy protocol `scp`.
+If you already have the repository on your local computer and want to upload it after editing the scripts, you can use the secure copy protocol `scp`. Upload the whole repository: as the note above says, `stage0/` alone cannot run.
 
 Log in to wrds-cloud with SSH and create a folder called proj:
 
@@ -246,13 +249,13 @@ Log in to wrds-cloud with SSH and create a folder called proj:
 mkdir proj
 ```
 
-Transfer all the files in your local folder to the proj folder in WRDS cloud:
+Transfer the repository to the proj folder in WRDS cloud:
 ```bash
-scp -r ~/path/to/stage0 wrds_username@wrds-cloud.wharton.upenn.edu:/home/university/wrds_username/proj/
+scp -r ~/path/to/trace-data-pipeline wrds_username@wrds-cloud.wharton.upenn.edu:/home/university/wrds_username/proj/
 ```
 
 Replace:
-- `~/path/to/stage0` with the path to the folder on your local computer
+- `~/path/to/trace-data-pipeline` with the path to the repository on your local computer
 - `/home/university/wrds_username/` with the full WRDS destination path you see when you run `pwd` after connecting to WRDS
 
 ---
@@ -261,33 +264,20 @@ Replace:
 
 **Python version:** 3.10 or higher (the 2026-09-10 production run used Python 3.14.5, the WRDS Cloud default)
 
-**Required packages:**
-
-- `pandas >= 2.2.3`
-- `numpy >= 2.2.5`
-- `wrds >= 3.3.0` (Python client for WRDS database access)
-- `pandas_market_calendars >= 5.1.1`
-- `pyarrow >= 20.0.0`
-- `tqdm`
-
-**Optional (for report generation):**
-- `matplotlib >= 3.8.0`
-
-Everything else used by the scripts is from the Python standard library (e.g., `logging`, `time`, `gc`, `functools`, `typing`, `pathlib`, `sys`).
-
-This code was tested using the versions explicitly listed above. The log files print out your Python version and package versions for reproducibility.
+**Required packages:** everything in the repository's `requirements.txt`, which states the
+minimum versions. For stage 0 that is `pandas`, `numpy`, `wrds`, `SQLAlchemy`,
+`pandas_market_calendars`, `pyarrow` and `matplotlib`. matplotlib is not optional: the report
+job, which `run_pipeline.sh` always submits, imports it. The log files print your Python and
+package versions, so a run can be matched to the environment that made it.
 
 ### Installation
 
-Install required packages on WRDS (if managing your own environment):
+From the repository root, on WRDS:
 ```bash
-pip install --user pandas numpy wrds pandas-market-calendars pyarrow tqdm matplotlib
+python -m pip install --user -r requirements.txt
 ```
 
-Or using the system's pip explicitly:
-```bash
-python -m pip install --user pandas numpy wrds pandas-market-calendars pyarrow tqdm matplotlib
-```
+[quickstart.md](quickstart.md) explains the choice between `--user` and a virtual environment.
 
 ---
 
@@ -295,12 +285,12 @@ python -m pip install --user pandas numpy wrds pandas-market-calendars pyarrow t
 
 ### 1. Install required Python packages
 
-SSH into the WRDS cloud and install required Python packages. The essential packages are `pyarrow`, `pandas_market_calendars`, `wrds`, and `tqdm`. The rest should come as standard with Python on WRDS. Extract the GitHub repo.
+SSH into the WRDS cloud, put the repository there (see [Getting the code onto WRDS](#getting-the-code-onto-wrds)), and install the packages in `requirements.txt` (see [Requirements](#requirements)).
 
 ### 2. Navigate to the repository and configure settings
 
 ```bash
-cd ~/trace-data-pipeline
+cd ~/proj/trace-data-pipeline   # wherever you put the repository
 ```
 
 **CRITICAL:** set your WRDS username. It lives in the shared `config.py` at the repo
@@ -329,7 +319,7 @@ That looks exactly like the connection limit and is not.
 
 The WRDS password should be handled by the `.pgpass` file which you should have set up following the WRDS documentation.
 
-Review the default filter settings in `_trace_settings.py`. All filters are enabled by default with recommended values from Dickerson, Robotti and Rossetti (2026). See the [Configuration](#configuration-choices-you-can-edit) section for more details.
+Review the default filter settings in `_trace_settings.py`. All filters but two (`trading_time` and `volume_filter_toggle`) are on by default, with recommended values from Dickerson, Robotti and Rossetti (2026). See the [Configuration](#configuration-choices-you-can-edit) section for more details.
 
 ### 3. Make scripts executable (older clones only)
 
@@ -369,8 +359,8 @@ Submit the complete automated pipeline:
 4. `build_reports` is held on every stage-0 job actually submitted.
 5. Stage 1 is held on **the same stage-0 jobs**, not on the report job. Since v2.2.2
    the two run alongside each other, so the report job is off the critical path
-   entirely. That release also parallelised the report's re-clean: it went from ~51
-   minutes to ~15 (14 min on the 2026-09-09 run).
+   entirely. That release also parallelised the report's re-clean: the job went from ~51
+   minutes to about 20 (22 min on the 2026-09-21 run).
 
 **Output from the script:**
 ```
@@ -382,11 +372,11 @@ Submit the complete automated pipeline:
 [submit] Build data reports (waits for 4821094,4821095) ...
 ```
 
-> **Tip:** Check status with `qstat`. The report job will show status `hqw` (hold) until the data jobs finish. Tail logs with `tail -f logs/01_enhanced.out` (or `.err`).
+> **Tip:** Check status with `qstat`. The report job will show status `hqw` (hold) until the data jobs finish. Tail logs with `tail -f stage0/logs/01_enhanced.out` (or `.err`).
 
-**Total runtime:** about 4.5-5 hours for the complete pipeline. The 2026-09-09 production
-run took 4.63 h end to end: Enhanced 2.01 h and 144A 0.70 h in parallel, then the reports
-(0.23 h) and Stage 1 (2.62 h) side by side.
+**Total runtime:** about 5 hours for the complete pipeline. The 2026-09-21 run, which the 2026
+vintage was built from, took 5.3 h end to end: Enhanced 2.58 h and 144A 0.63 h in parallel,
+then the reports (0.37 h) and Stage 1 (2.69 h) side by side.
 
 If you are having errors after attempting to debug, feel free to contact Alex Dickerson at `alexander.dickerson1@unsw.edu.au` for help.
 
@@ -436,12 +426,12 @@ the root `config.py`, or from the `--data-type` flag. `DATA_TYPES` was moved out
 as TRACE_MEMBERS"), so adding it back there has no effect:
 
 ```bash
-# One dataset, without touching config.py:
-python3 _build_error_files.py --data-type enhanced
+# One dataset, without touching config.py (from the repository root):
+cd stage0 && python3 _build_error_files.py --data-type enhanced
 ```
 
 ```python
-# In config.py -- applies to every stage:
+# In config.py -- read by run_pipeline.sh, the report job and Stage 1:
 TRACE_MEMBERS = ["enhanced"]
 ```
 
@@ -468,8 +458,8 @@ Calls `CreateDailyEnhancedTRACE` with the default cleaning/filters and audit log
 
 Calls `CreateDailyStandardTRACE` with the same controls for the Standard table:
 - Default start date is set to `2024-10-01` (you can change this in `_trace_settings.py`)
-- Applies pre-2012 and post-2012 cleaning rules
-- Handles reversal trades specific to Standard TRACE
+- Removes cancellations, corrections and reversals using Standard TRACE's status codes (the
+  pre/post-2012 rules and the agency de-duplication are Enhanced's)
 - Same decimal-shift and bounce-back filters as Enhanced
 - Same daily aggregation metrics
 - **Saves all outputs to `standard/` subfolder**
@@ -477,7 +467,7 @@ Calls `CreateDailyStandardTRACE` with the same controls for the Standard table:
 ### Rule 144A TRACE (`_run_144a_trace.py`)
 
 Calls `CreateDailyStandardTRACE` with `data_type='144a'`:
-- Default start date is `2002-07-01` (Rule 144A has been available since TRACE inception, but most data only start around 2008)
+- Default start date is `2002-07-01`, though the data are negligible before 2014 (29 bond-days before 2014 in the 2026-09-21 run, then 70,668 in 2014)
 - Uses the same cleaning pipeline as Standard TRACE
 - Same parameter blocks for filters and aggregation
 - **Saves all outputs to `144a/` subfolder**
@@ -497,7 +487,7 @@ Both `create_daily_enhanced_trace.py` and `create_daily_standard_trace.py`:
    | # | Filter | What it does |
    |---|---|---|
    | 0 | price-scale normalization | rescales unit-quoted bonds to percent of par (a no-op under the default FISD screen) |
-   | 1 | Dick-Nielsen | cancellations, corrections, reversals, and agency de-duplication |
+   | 1 | Dick-Nielsen | cancellations, corrections, reversals; agency de-duplication in Enhanced only |
    | 2 | decimal-shift corrector | fixes multiplicative price errors (10x, 0.1x, 100x, 0.01x) |
    | 3 | trading time | intraday window — **off by default** |
    | 4 | trading calendar | drops non-session dates |
@@ -583,9 +573,10 @@ All filters are boolean toggles:
 - `trd_exe_mat_filter`: Remove trades after maturity date (default: `True`)
 - `flag_initial_price_errors`: Flag implausible opening prints (default: `True`)
 
-❗All ELEVEN keys must be present in any `FILTER_SWITCHES` you write. They are read with
-a hard subscript, so an omitted key is a `KeyError` inside every chunk, not a default.
-`trading_time` is the only one off by default.
+❗Write all ELEVEN keys in any `FILTER_SWITCHES` you write. A key you leave out raises no
+error: it falls back to the engine's own default, which is not always the settings file's.
+Leave out `volume_filter_toggle` and the $10,000 dollar floor switches ON.
+`trading_time` and `volume_filter_toggle` are the two off by default.
 
 ### Decimal-Shift Corrector Parameters (`DS_PARAMS`)
 
@@ -623,8 +614,8 @@ Fine-tune the bounce-back price-error detection:
 - `lookahead`: Maximum rows ahead to search for bounce - `5`
 - `max_span`: Maximum path length from start to resolution - `5`
 - `window`: Backward window for trailing median anchor - `5`
-- `back_to_anchor_tol`: Fraction of displacement to recover - `0.25`
-- `candidate_slack_abs`: Slack around anchor when opening - `1.0`
+- `back_to_anchor_tol`: how close the price must come back to the anchor, as a fraction of `threshold_abs` (0.25 × 35 = 8.75 points) - `0.25`
+- `candidate_slack_abs`: subtracted from `threshold_abs` when opening a candidate (a jump of 34 points opens one) - `1.0`
 - `reassignment_margin_abs`: Margin for tie-breaking in clusters - `5.0`
 - `use_unique_trailing_median`: Use unique values in median - `True`
 - `par_spike_heuristic`: Enable special handling at par - `True`
@@ -636,15 +627,14 @@ Fine-tune the bounce-back price-error detection:
 ### Common Arguments (`COMMON_KWARGS`)
 
 Settings applied to all runners:
-- `output_format`: `"parquet"` (lightweight) or `"csv"` (larger `.csv.gzip`)
+- `output_format`: `"parquet"`, the only supported value. It comes from `OUTPUT_FORMAT` in
+  the root `config.py`, and `_trace_settings.py` refuses anything else when it loads
 - `chunk_size`: CUSIPs per batch - `250`. Since v2.2.0 this no longer decides Stage 0's
   own chunking (see `target_rows_per_chunk`), but it is still read by the report job for
   its independent chunking of flagged CUSIPs, so it is kept.
 - `target_rows_per_chunk`: trade rows per chunk - `750_000`. THIS is what sizes Stage 0's
   work units. Set to `None` to fall back to fixed `chunk_size` chunks.
   Override for one run with `STAGE0_TARGET_ROWS`.
-- `n_workers`: chunks fetched at once, one WRDS connection each. Comes from `CONCURRENCY`
-  per member; override for one run with `STAGE0_WORKERS`.
 - `limit_chunks`: process only the first N chunks - `None`. A dev/test escape hatch;
   never set it for a production run. Override with `STAGE0_LIMIT_CHUNKS`.
 - `clean_agency`: Apply agency de-duplication - `True`
@@ -659,9 +649,13 @@ Settings applied to all runners:
 ### Per-Dataset Overrides (`PER_DATASET`)
 
 Specific settings for each dataset:
-- **Enhanced**: No extra arguments (uses defaults)
-- **Standard**: `start_date="2024-10-01"`, `data_type="standard"`
-- **144A**: `start_date="2002-07-01"`, `data_type="144a"`
+- **Enhanced**: `n_workers` only. Enhanced takes no `start_date`: it always starts at 2002-07-01
+- **Standard**: `start_date="2024-10-01"`, `data_type="standard"`, `n_workers`
+- **144A**: `start_date="2002-07-01"`, `data_type="144a"`, `n_workers`
+
+`n_workers` is how many chunks are fetched at once, one WRDS connection each. It comes from
+`CONCURRENCY` for each member; `STAGE0_WORKERS` overrides it for one run (see the warning under
+[How Stage 0 spends its time](#how-stage-0-spends-its-time-and-why-it-is-no-longer-4-hours)).
 
 ---
 
@@ -748,7 +742,7 @@ data/
 
 ### Files produced
 
-**Logs** (under `./logs/`):
+**Logs** (under `stage0/logs/`):
 - `01_enhanced.out`, `01_enhanced.err`: Enhanced TRACE job logs
 - `02_standard.out`, `02_standard.err`: Standard TRACE job logs
 - `03_144a.out`, `03_144a.err`: 144A TRACE job logs
@@ -767,7 +761,8 @@ differ between members.
 - **Prices**: `prc_ew`, `prc_vw`, `prc_vw_par`, `prc_first`, `prc_last`, `prc_hi`, `prc_lo`
 - **Trade timing**: `time_ew`, `time_last`
 - **Volumes** (millions): `qvolume`, `dvolume`
-- **Bid/Ask**: `prc_bid`, `prc_ask`, `bid_count`, `ask_count`
+- **Counts**: `trade_count`, `bid_count`, `ask_count`
+- **Bid/Ask**: `prc_bid`, `prc_ask`, `bid_last`, `bid_time_ew`, `bid_time_last`
 
 **Audit files** (Parquet format, in respective subfolders):
 - `dick_nielsen_filters_audit_{dtype}_{date}.parquet`: Dick-Nielsen step-by-step audit
@@ -787,7 +782,7 @@ the data report draws a figure family from each:
   -- the screened FISD universe. ❗**Stage 1 reads the Enhanced one**, so it is an input
   to the next stage, not just an artifact.
 - `cusip_row_counts_{date}.parquet` -- the per-CUSIP row counts behind the chunk
-  packing, cached so a re-run does not repeat the ~93 s aggregate.
+  packing (31 s to count on the 2026-09-21 run). Reused only by a re-run on the same day.
 
 ### Downloading outputs
 
@@ -796,11 +791,11 @@ the data report draws a figure family from each:
 **Mac/Linux users:** Use `scp` from your local machine:
 ```bash
 # Download all outputs preserving folder structure
-scp -r wrds_username@wrds-cloud.wharton.upenn.edu:~/proj/stage0/enhanced ./local_destination/stage0/
-scp -r wrds_username@wrds-cloud.wharton.upenn.edu:~/proj/stage0/standard ./local_destination/stage0/
-scp -r wrds_username@wrds-cloud.wharton.upenn.edu:~/proj/stage0/144a ./local_destination/stage0/
-scp -r wrds_username@wrds-cloud.wharton.upenn.edu:~/proj/stage0/data_reports ./local_destination/stage0/
-scp -r wrds_username@wrds-cloud.wharton.upenn.edu:~/proj/stage0/logs ./local_destination/stage0/
+scp -r wrds_username@wrds-cloud.wharton.upenn.edu:~/proj/trace-data-pipeline/stage0/enhanced ./local_destination/stage0/
+scp -r wrds_username@wrds-cloud.wharton.upenn.edu:~/proj/trace-data-pipeline/stage0/standard ./local_destination/stage0/
+scp -r wrds_username@wrds-cloud.wharton.upenn.edu:~/proj/trace-data-pipeline/stage0/144a ./local_destination/stage0/
+scp -r wrds_username@wrds-cloud.wharton.upenn.edu:~/proj/trace-data-pipeline/stage0/data_reports ./local_destination/stage0/
+scp -r wrds_username@wrds-cloud.wharton.upenn.edu:~/proj/trace-data-pipeline/stage0/logs ./local_destination/stage0/
 ```
 
 ---
@@ -811,30 +806,24 @@ When you run `./run_pipeline.sh`, reports are generated automatically for the me
 
 ### Configuration
 
-Edit the top of `_build_error_files.py`:
+Two settings in the root `config.py` control the report job:
 
 ```python
-DATE           = ""          # Leave this BLANK -- date is inherited [NB]
-output_figures = True        # Set to False for tables only (faster)
-DATA_TYPES     = ['enhanced', 'standard', '144a']  # Which datasets to process
-IN_DIR         = ""          # Leave blank for current directory
-OUT_DIR        = ""          # Leave blank for current directory
+STAGE0_OUTPUT_FIGURES = True   # False: tables only (also settable from the environment)
+TRACE_MEMBERS = ["enhanced", "144a"]   # which datasets get a report
 ```
 
+`DATE`, `IN_DIR` and `OUT_DIR` at the top of `_build_error_files.py` can stay blank.
+
 **Important notes:**
-- `output_figures = True` creates hundreds of time-series plots and can take 30+ minutes for Enhanced TRACE
-- `output_figures = False` only generates filter tables and runs in seconds
+- With figures, the job re-cleans the flagged bonds and draws hundreds of time-series
+  plots: 22 minutes for the whole job on the 2026-09-21 run
+- `STAGE0_OUTPUT_FIGURES = False` builds only the filter tables and runs in seconds
 - For Enhanced TRACE with figures, the LaTeX document can exceed 500 pages
-- `DATA_TYPES` controls which datasets are processed - modify this to process only specific datasets
 
 ### Running the report generator separately
 
 If you want to regenerate reports with different settings or didn't run `./run_pipeline.sh`:
-
-Make the script executable (first time only):
-```bash
-chmod +x run_build_data_reports.sh
-```
 
 Submit the job:
 ```bash
@@ -855,6 +844,8 @@ data_reports/
     │   ├── ...
     │   ├── enhanced_fig_page_001_bb.pdf
     │   ├── enhanced_fig_page_002_bb.pdf
+    │   ├── ...
+    │   ├── enhanced_ie_fig_page_001_ie.pdf
     │   └── ...
     ├── standard/
     │   ├── standard_data_report.tex
@@ -870,7 +861,7 @@ Each `*_data_report.tex` file includes:
 1. **Table 1**: Filter toggles and parameter settings
 2. **Table 2**: FISD universe construction parameters
 3. **Table 3**: Transaction-level filter records (Panel A: FISD, Panel B: DRR filters, Panel C: Dick-Nielsen)
-4. **Figures** (if enabled): Time-series plots showing decimal-shift corrections and bounce-back eliminations
+4. **Figures** (if enabled): Time-series plots showing decimal-shift corrections, bounce-back eliminations and initial-price errors
 
 ### Compiling the LaTeX report
 
@@ -912,13 +903,14 @@ Or use your favorite LaTeX editor (TeXShop, TeXstudio, Overleaf, etc.).
   `CONCURRENCY` — in that order, since the per-worker peak is set by chunk size.
 
 - **Runtime expectations**:
-  - Enhanced TRACE (full sample): was 4-8 hours serial; materially less since v2.2.0
-    pulls 5 chunks at once. How much less depends on how fetch and clean divide up on the
-    day — measured 4.5x on the chunk loop itself.
+  - Enhanced TRACE (full sample): about 4 hours serial before v2.2.0; since then it pulls 5
+    chunks at once and takes 2-2.6 hours (2.0 h on 2026-09-09, 2.6 h on 2026-09-21), about
+    twice as fast.
   - Standard TRACE (from 2024): 30-60 minutes, and opt-in
   - Rule 144A (full sample): 30-60 minutes (39 minutes on the 2026-09-10 run)
   - Data reports (with figures): was ~50 minutes for Enhanced; since v2.2.2 its
-    re-clean pulls 5 chunks at once (~9 min), and the job no longer blocks stage 1
+    re-clean pulls 5 chunks at once (22 minutes for the whole job on 2026-09-21), and the job
+    no longer blocks stage 1
 
 - **Disk space**: Enhanced TRACE generates ~31M rows. On the 2026-09-10 run the Enhanced panel was about 2.2 GB and the 144A panel about 250 MB, and the whole `stage0/` folder about 2.7 GB.
 
@@ -990,17 +982,17 @@ Or use your favorite LaTeX editor (TeXShop, TeXstudio, Overleaf, etc.).
 - **Job killed due to memory**:
   - Lower `TARGET_ROWS_PER_CHUNK` in `_trace_settings.py` (try 400_000) -- this, not
     `chunk_size`, sizes a Stage 0 chunk. Or lower `CONCURRENCY`; each worker holds one.
-  - Request more memory in the shell scripts by adding:
-    ```bash
-    #$ -l m_mem_free=8G
-    ```
+  - Or give each worker more memory: raise `MEM_PER_SLOT_GB` in `_trace_settings.py`.
+    `run_pipeline.sh` passes it to `qsub`, so editing the job scripts changes nothing.
+    Slots × memory must stay within the WRDS limit of 48 GB per job, and `qsub_resources()`
+    refuses a request over it.
 
 ### Report generation issues
 
 - **Figures not generating**:
   - Verify that `matplotlib` is installed
   - Check that CUSIP lists exist in the expected location
-  - Ensure `output_figures = True` in `_build_error_files.py`
+  - Ensure `STAGE0_OUTPUT_FIGURES = True` in the root `config.py`
 
 - **LaTeX compilation errors**:
   - Ensure all figure files are present
@@ -1019,21 +1011,21 @@ qstat -u wrds_username   # View only your jobs
 
 ### Real-time log monitoring
 ```bash
-tail -f logs/01_enhanced.out      # Follow Enhanced output log
-tail -f logs/01_enhanced.err      # Follow Enhanced error log
-tail -f logs/02_standard.out      # Follow Standard output log
+tail -f stage0/logs/01_enhanced.out      # Follow Enhanced output log
+tail -f stage0/logs/01_enhanced.err      # Follow Enhanced error log
+tail -f stage0/logs/02_standard.out      # Follow Standard output log
 ```
 
 ### Checking job completion
 ```bash
-ls -lh *.parquet         # List generated parquet files
-wc -l logs/*.out         # Count lines in log files
+ls -lh stage0/*/*.parquet       # List generated parquet files
+wc -l stage0/logs/*.out        # Count lines in log files
 ```
 
 ### Resubmitting failed jobs
 
 If a job fails:
-1. Review the error log: `cat logs/01_enhanced.err`
+1. Review the error log: `cat stage0/logs/01_enhanced.err`
 2. Fix the issue in configuration or code
 3. Resubmit from the repo root: `qsub -pe onenode 5 -l m_mem_free=8G stage0/run_enhanced_trace.sh` (or just `./run_pipeline.sh`)
 
@@ -1071,14 +1063,17 @@ COMMON_KWARGS = dict(
 )
 ```
 
+❗Stage 1 reads `stage0/` beside it and the report job reads its current folder, so neither
+finds output written anywhere else. Use this only when you run stage 0 on its own.
+
 ### Disabling specific filters
 
 To disable any filter, set it to `False` in `_trace_settings.py`:
 
 ```python
-# ALL ELEVEN keys must be present. They are read with a hard subscript
-# (`if f["flag_initial_price_errors"]:`), not .get(), so an omitted key is a
-# KeyError inside every chunk rather than a default.
+# Write ALL ELEVEN keys. An omitted key falls back to the engine's own default,
+# not to this file's: leave out volume_filter_toggle and the $10,000 dollar
+# floor switches ON.
 FILTER_SWITCHES = dict(
     dick_nielsen              = True,
     decimal_shift_corrector   = False,  # Disable decimal shift correction
@@ -1148,7 +1143,7 @@ adds columns.
 - **Restore the old fixed-CUSIP behaviour**: `target_rows_per_chunk = None`
 
 The row counts behind the packing are measured once per run and cached beside the output
-as `cusip_row_counts_<stamp>.parquet` (about 93 s for the Enhanced universe). If that
+as `cusip_row_counts_<stamp>.parquet` (31 s for the Enhanced universe on the 2026-09-21 run). If that
 query fails, the planner falls back to fixed `chunk_size` chunks rather than aborting.
 
 ### Parallel processing
@@ -1164,18 +1159,11 @@ behind them:
 ./run_pipeline.sh
 ```
 
-### Output format choice
+### Output format
 
-- **Parquet** (default): Smaller files, faster read/write, better compression
-- **CSV**: Larger files, human-readable, compatible with older tools
-
-```python
-COMMON_KWARGS = dict(
-    ...
-    output_format = "parquet",  # or "csv"
-    ...
-)
-```
+Parquet only. `OUTPUT_FORMAT` in the root `config.py` must be `"parquet"`: Stage 1 and the
+report job read Parquet files, and `_trace_settings.py` refuses any other value when it loads.
+To get CSV, convert the Parquet files afterwards (see the [FAQ](../FAQ.md)).
 
 ---
 

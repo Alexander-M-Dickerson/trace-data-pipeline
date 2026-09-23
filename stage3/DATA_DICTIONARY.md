@@ -33,7 +33,7 @@ the manifests under `data/` carry those individually.
 travel -- in a zip, on OSF, in a replication archive -- and an absolute path records one
 machine's home directory and tells a reader nothing they can act on.
 
-`reports/exhibits.tex` is the assembled source, and `reports/exhibits.build.log` the
+`reports/exhibits.tex` is the assembled source, and `reports/exhibits.build.log` (kept only when the compile fails) the
 pdflatex transcript.
 
 ---
@@ -110,10 +110,10 @@ high-yield rating filter) and are all-NaN rather than absent.
 called with `skip_invalid=False`, so it always returns all 216 columns -- but a small
 number of restricted-breakpoint-universe cells (`ig_bp`, `lg_bp`) come back ALL-NaN in
 one run and fully populated in the next, over identical data, always in EW/VW pairs.
-Roughly 0.1-0.5% of the grid. **Values are bit-identical wherever a cell is populated**;
+Anywhere from none to about 0.5% of the grid. **Values are bit-identical wherever a cell is populated**;
 it is presence that moves, and with it every count Section 5 prints.
 
-`s3_nse/run_mua_grid.py` measures this every run as `n_unstable_empty_cells` in its manifest.
+`s3_nse/run_mua_grid.py` measures this every run as `n_unstable_empty_cells`, in its line in `reports/timings.jsonl`.
 `mua_summarize` reindexes onto the full 216 -- derived from `mua_engines.all_spec_ids()`,
 not typed out -- so the SUMMARY is a rectangle regardless. An empty cell arrives there
 with `n_obs = 0` and no statistics, and the status ledger classifies it `no_series`
@@ -190,7 +190,7 @@ Two consecutive cold runs of 2026-09-12, over identical data:
 
 ❗**Those are two measurements of a quantity that moves, not a disagreement.** The
 sort engine returns a few restricted-breakpoint cells as an empty series in one run and a
-full one in the next (see *What is not reproducible* in README_stage3.md), so
+full one in the next (see *Conventions that will bite* in README_stage3.md), so
 `no_series` breathes by a handful. Every exhibit reads the count from the ledger the run
 itself wrote, which is why Table 6, Table IA.XVIII and Table IA.XIX agree with each other
 within any one document even though no two documents need agree. Read your own run's
@@ -295,8 +295,9 @@ series' own** length here, not one shared number — 257 to 268 in this build.
 
 **Section 5** (`data/s3_nse/*.csv`) — the two NSE tables are one row per cluster:
 `cluster_name`, `mu_mean`, `mu_median`, `nse_mu`, `ratio_mu`, the same four for alpha,
-and `n_paths`. NSE is the interquartile range of the estimate across paths; Ratio divides
-it by the average conventional standard error. The other Section-5 frames are shaped by
+and `n_paths`. NSE is the interquartile range of the estimate across paths; Ratio is the
+standard deviation of the estimate across paths divided by the average conventional standard
+error. The other Section-5 frames are shaped by
 what they report, not by cluster — `table_ia17_*` is one row per (cluster, location,
 filter type), `table_ia18_*` one row per printed row of the portfolio-size table, and
 `table_ia19_*` one row per cluster with a triple of columns per grid dimension.
@@ -334,13 +335,17 @@ plus size and mtime, so it ships without naming anyone's home directory.
 A number whose inputs, code version and engine are not recorded cannot be defended
 later, which is why this block is written by one function rather than by each caller.
 
-`reports/timings.jsonl` carries one line per run: the phase split, the wall clock, and
+`reports/timings.jsonl` carries one line per step: the phase split, the wall clock, and
 the run's own check — with `ok` written **before** the timings, because a fast run that
 produced an incomplete artifact is not a result.
 
 ---
 
 ## Sample windows
+
+The `lib`, `lab` and zoo rows are the windows of `--sample paper`. Under the default,
+`--sample frontier`, every section runs to the panel's last month instead (T = 279 for Section 3
+on the 2026 data), which is the `full` row.
 
 | window | span | T | used by |
 |---|---|---|---|

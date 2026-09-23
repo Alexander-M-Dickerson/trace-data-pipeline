@@ -8,6 +8,8 @@
 pandas>=2.2.3
 numpy>=2.0
 pyarrow>=20.0.0
+# Stage 1 runs without numba (plain Python, slower). Stage 2 imports it directly, so run
+# Stages 2 and 3 on Python 3.10-3.13, where this line installs it.
 numba>=0.60; python_version<"3.14"
 
 # WRDS database access
@@ -40,7 +42,7 @@ requests
 duckdb>=1.5.0
 
 # Portfolio sorts behind the BBW bond factors (steps/step3_bbw.py).
-# PINNED, and the pin is load-bearing: the factor series -- and therefore roughly forty
+# PINNED, and the pin matters: the factor series -- and therefore roughly forty
 # beta columns -- come out of these double sorts. Verified 2026-09-10 that the published
 # 0.2.0 reproduces the factors this repository ships, bit for bit (max|d| = 0 on all
 # eleven BBW factors over 281 months). Do not float this to a newer release without
@@ -69,8 +71,9 @@ psutil>=5.9
 # The pin above is Stage 2's, and it is exact for a reason. Stage 3's two UNCERTAINTY
 # GRIDS (Section 5) need `PyBondLab.fast_sorts` and `PyBondLab.anomaly_assay_fast`,
 # which the 0.2.0 release does not carry -- without them those grids are hours rather
-# than minutes, and Stage 3 refuses to start them rather than letting 108 workers each
-# fail on an import.
+# than minutes, and Stage 3 refuses to start them rather than letting each of the 108
+# signal tasks fail on an import. A refused grid stops `run_stage3.sh`; `--keep-going`
+# runs everything else.
 #
 # Do NOT float the pin to fix that: Stage 2's factor series, and the ~40 beta columns
 # behind them, depend on it. Instead point Stage 3 at a checkout that has the kernels:

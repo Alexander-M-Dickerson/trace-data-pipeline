@@ -14,6 +14,7 @@ The companion repository is [PyBondLab](https://github.com/GiulioRossetti94/PyBo
 [![Stage 3](https://img.shields.io/badge/Stage%203-Public%20Beta-green)](stage3/)
 
 [📄 Link to paper](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4575879)
+
 ---
 
 ## Which machine am I on?
@@ -30,8 +31,10 @@ Getting this straight first will save you an afternoon.
 
 **Why the split?** Stages 0 and 1 read the raw TRACE transaction tape, which is a WRDS
 database — so they have to run where the data is, submitted to the WRDS job grid. Stage 2
-reads nothing but the file Stage 1 produced, so there is no reason to queue for it; it runs
-faster on your own machine and needs no WRDS connection at all.
+works from the files Stage 1 produced, so there is no reason to queue for it; it runs faster
+on your own machine. Its first run still connects to WRDS once, to fetch and cache a few
+series (CRSP Treasury returns, Fama-French factors, VIX and FISD coupon terms), so it needs
+your WRDS login; later runs read the cache.
 
 ### Step by step
 
@@ -55,16 +58,21 @@ faster on your own machine and needs no WRDS connection at all.
 
 **On your own computer:**
 
-8. Install the same requirements (`pip install -r requirements.txt`) in a Python 3.10+
-   environment. You do **not** need a WRDS connection from here.
-9. `cd stage2 && python _run_stage2.py`
+8. Install the same requirements (`pip install -r requirements.txt`) in a Python 3.10-3.13
+   environment: Stages 2 and 3 need `numba`, which `requirements.txt` installs only below
+   Python 3.14. `export WRDS_USERNAME=...` in that shell: Stage 2's first run fetches a few
+   series from WRDS, and it reads the name from the environment, not from `config.py`.
+9. `cd stage2 && python _run_stage2.py` (add `--factor-source pinned` to reproduce a
+   published panel exactly; see [stage2/QUICKSTART_stage2.md](stage2/QUICKSTART_stage2.md))
 10. You now have `stage2/output/panel/main_panel_<mode>.parquet` — 145 columns per bond-month.
 
 **Still on your own computer, if you want the research output too:**
 
 11. `cd stage3 && python tools/check_inputs.py` — confirms Stage 3 can see what Stage 2 made.
 12. `bash run_stage3.sh` — portfolio sorts, the uncertainty grids, and 33 tables and
-    11 figures into `stage3/reports/`.
+    11 figures into `stage3/reports/`. The two uncertainty grids need a PyBondLab build
+    with the fast kernels (`PYBONDLAB_DIR`, see [stage3/QUICKSTART_stage3.md](stage3/QUICKSTART_stage3.md));
+    without one the run stops at the first grid.
 
 Stages 0-2 build the DATA. Stage 3 is what the data was built for: it reproduces every
 exhibit of *The Corporate Bond Factor Replication Crisis* from the panel you just made.
@@ -106,7 +114,7 @@ Processes raw intraday TRACE transaction data to clean daily panels. Handles thr
 Enriches Stage 0 daily panels with comprehensive bond analytics and characteristics:
 - **Bond analytics** via QuantLib (duration, convexity, YTM, credit spreads)
 - **Credit ratings** from S&P and Moody's with numeric conversions
-- **Equity identifiers** equity linkers
+- **Equity identifiers** (CRSP PERMNO/PERMCO and Compustat GVKEY) from the bond-firm linker
 - **FISD bond characteristics** (coupon, maturity, issuer, amount outstanding, etc.)
 - **Fama-French industry classifications** (12, 17 and 30 industries)
 - **Ultra-distressed filters** to flag potentially erroneous prices
@@ -182,7 +190,7 @@ Please reach out to `alexander.dickerson1@unsw.edu.au` if you would like to coll
 - **Bond characteristics** from FISD (maturity, coupon, offering amount, issuer, security features)
 - **Computed bond analytics** via QuantLib (duration, convexity, yields, credit spreads, accrued interest)
 - **Credit ratings** from S&P and Moody's with numeric conversions
-- **External identifiers** 
+- **Equity identifiers** (PERMNO, PERMCO, GVKEY) from the bond-firm linker
 - **Ultra-distressed bond filters** to flag potentially erroneous prices
 - **Fama-French industry classifications** (12, 17 and 30 industry groups)
 - Produces a daily bond-level dataset of 44 columns (Stage 2 turns it into the 108-signal monthly panel)
@@ -226,10 +234,8 @@ nano config.py
 
 *Note: Password comes from `.pgpass`, not code.*
 
-2. **Install Stage 1 dependencies:**
+2. **Install the dependencies** (Stages 0 and 1 both need them):
 ```bash
-# Stage 0 uses system Python (no installation needed)
-# Stage 1 requires additional packages
 python -m pip install --user -r requirements.txt
 ```
 
@@ -272,6 +278,10 @@ This runs the real Stage 0 → Stage 1 code on a handful of CUSIP chunks and ass
 ---
 
 ## Documentation
+
+**Start here:** [INDEX.md](INDEX.md) says which doc answers which question.
+[CODE_MAP.md](CODE_MAP.md) says what each stage reads and writes and what every code file does.
+Using Claude Code or Codex? It reads [AGENTS.md](AGENTS.md) by itself.
 
 **Stage 0 - TRACE Data Processing:**
 - **[README](stage0/README_stage0.md)**: Complete guide for intraday to daily TRACE processing
@@ -349,131 +359,22 @@ The pipeline generates a large folder (~5 GB) with hundreds of files. **Zip the 
 
 ```
 trace-data-pipeline/
-├── LICENSE                           # MIT License
-├── README.md                         # This file
-├── QUICKSTART.md                     # Fast-track guide (all stages)
-├── FAQ.md                            # Common questions
-├── CONTRIBUTING.md                   # Contribution guidelines
-├── CHANGELOG.md                      # Version history
-├── requirements.txt                  # Python dependencies (all stages)
-├── config.py                         # Shared settings (TRACE_MEMBERS, username, ...)
-├── run_pipeline.sh                   # ✨ One-push button orchestrator (ROOT)
-├── check_disk_space.sh               # Is there room for a run? Measures the disk, called by run_pipeline.sh
-├── download_inputs.sh                # Fetches stage 1's external inputs (LOGIN NODE)
-├── run_smoke_test.sh                 # Whole-chain validation in minutes
-├── .gitignore
-│
-├── tests/                            # Run before committing; only the probe needs WRDS
-│   ├── smoke_assertions.py           # The 28 cross-stage invariants
-│   ├── test_chunk_plan.py            # Chunk-partition properties
-│   ├── test_chunk_scheduler.py       # Ordering + failure handling
-│   ├── test_merge_keys.py            # Lookups must be one row per key
-│   ├── test_linker_window.py         # Stage 1 joins the linker's identity window, as Stage 2 does
-│   ├── test_cut_off_basis.py         # The auto:complete sample-end rule
-│   ├── test_public_boundary.py       # No private path or name in committed files
-│   ├── test_docs.py                  # Docs vs the code they describe
-│   └── probe_wrds_connections.py     # Measures your account's connection ceiling
-│
-├── stage0/                           # ✅ PUBLIC BETA - Intraday to daily processing
-│   ├── README_stage0.md              # Detailed documentation
-│   ├── quickstart.md                 # Fast-track guide
-│   ├── README_bounce_back_filter.md
-│   ├── README_decimal_shift_corrector.md
-│   ├── _trace_settings.py            # Configuration (CONCURRENCY, filters, FISD, ...)
-│   ├── create_daily_enhanced_trace.py
-│   ├── create_daily_standard_trace.py
-│   ├── _chunk_runner.py              # Chunk planning + the concurrent scheduler
-│   ├── _wrds_pool.py                 # One WRDS connection per worker process
-│   ├── _run_enhanced_trace.py        # Runner scripts
-│   ├── _run_standard_trace.py
-│   ├── _run_144a_trace.py
-│   ├── _build_error_files.py         # Report generation
-│   ├── _error_plot_helpers.py        # Plotting utilities
-│   ├── run_enhanced_trace.sh         # Individual job scripts
-│   ├── run_standard_trace.sh
-│   ├── run_144a_trace.sh
-│   ├── run_build_data_reports.sh
-│   │
-│   ├── enhanced/                     # Enhanced TRACE output (auto-created)
-│   ├── standard/                     # Standard TRACE output (auto-created, opt-in)
-│   ├── 144a/                         # Rule 144A output (auto-created)
-│   │
-│   └── data_reports/                 # Quality reports (auto-created)
-│       ├── enhanced/
-│       ├── standard/
-│       └── 144a/
-│
-├── stage1/                           # ✅ PUBLIC BETA - Daily bond analytics
-│   ├── README_stage1.md              # Detailed documentation
-│   ├── QUICKSTART_stage1.md          # Fast-track guide
-│   ├── DATA_DICTIONARY.md            # Every output column
-│   ├── README_distressed_filter.md
-│   ├── _stage1_settings.py           # Configuration file
-│   ├── create_daily_stage1.py        # Driver
-│   ├── stage1_pipeline.py            # Main processing module
-│   ├── _linker_join.py               # The bond-firm linker join (identity window)
-│   ├── helper_functions.py           # Utility functions
-│   ├── _distressed_plot_helpers.py
-│   ├── _run_stage1.py                # Runner script
-│   ├── run_stage1.sh                 # Job submission script
-│   │
-│   ├── data/                         # Stage 1 output + downloaded inputs
-│   │   ├── stage1_YYYYMMDD.parquet   # Enriched dataset
-│   │   ├── liu_wu_yields.xlsx        # Downloaded treasury yields
-│   │   ├── bond_firm_linker_2026/    # Downloaded bond->firm linker
-│   │   ├── Siccodes12.txt            # FF12 industry file
-│   │   ├── Siccodes17.txt            # FF17 industry file
-│   │   ├── Siccodes30.txt            # FF30 industry file
-│   │   └── data_reports/             # Ultra-distressed filter report
-│   │
-│   ├── data_reports/                 # Stage 1 data-quality report (LaTeX/PDF)
-│   └── logs/                         # Execution logs (auto-created)
-│
-├── smoke/                            # Scratch root for run_smoke_test.sh (auto-created)
-│
-├── stage2/                           # Monthly asset-pricing panel (runs on YOUR machine)
-│   ├── _run_stage2.py                # Entry point
-│   ├── _stage2_settings.py           # Settings + fail-loud input contract
-│   ├── _build_data_report.py         # LaTeX/PDF data report
-│   ├── make_release.py               # Packages a vintage for publication
-│   ├── make_excess_blocks.py         # Optional: betas and momentum on another Treasury benchmark
-│   ├── lib/                          # Engine: returns, illiquidity, betas, value, ...
-│   │   └── contract.py               # The panel's frozen 145-column contract
-│   ├── steps/                        # step1..step7 + the factor build
-│   ├── reference/                    # The original BBW factors, shipped in the BBW bundle
-│   ├── tests/                        # Contract, parity and boundary gates
-│   ├── DATA_DICTIONARY.md            # Every column, every factor model
-│   ├── data/  output/  data_reports/ # Gitignored build artifacts
-│   └── logs/
-│
-└── stage3/                           # Sorts and the paper's exhibits (runs on YOUR machine)
-    ├── _run_stage3.py                # Entry point: 41 steps, producers, exhibits, then the PDF
-    ├── run_stage3.sh                 # Input contract, then the above
-    ├── _stage3_settings.py           # Every path and constant
-    ├── paths.py                      # Paths derived from the settings
-    ├── pblenv.py                     # Which PyBondLab, asserted and fingerprinted
-    ├── drrlib.py                     # Newey-West, CAPM_B alpha, paired difference, manifests
-    ├── fastrun.py                    # Process-parallel fan-out for the grids
-    ├── make_report.py                # Assembles every exhibit into one compiled PDF
-    ├── captions.py  bench.py  latex_format.py  helper_functions.py
-    ├── s0_data/                      # The data appendix
-    ├── s1_lib/                       # The paper's Section 3 - latent implementation bias
-    ├── s2_lab/                       # The paper's Section 4 - look-ahead bias
-    ├── s3_nse/                       # The paper's Section 5 - non-standard errors
-    ├── s4_zoo/                       # The factor zoo
-    ├── spec/inputs.json              # The five-file input contract
-    ├── spec/signal_definitions.json  # What each of the 145 panel columns MEANS
-    ├── tools/check_inputs.py         # Enforces the input contract
-    ├── tools/build_index.py          # Generates INDEX.md; --check gates it
-    ├── tests/                        # Contract, purge, provenance and index gates
-    ├── INDEX.md                      # Every exhibit -> its driver, label and sample
-    ├── README_stage3.md  QUICKSTART_stage3.md  DATA_DICTIONARY.md
-    ├── RECONCILIATION_ia08.md        # Table IA.VIII vs Stage 2 vs the code
-    └── data/  reports/               # Gitignored build artifacts
+├── README.md  QUICKSTART.md  FAQ.md  CONTRIBUTING.md  CHANGELOG.md
+├── INDEX.md                # where to look for each task
+├── CODE_MAP.md             # what each stage reads and writes, and what every file does
+├── AGENTS.md  CLAUDE.md    # instructions for AI assistants (Codex, Claude Code)
+├── config.py               # settings shared by stages 0-2
+├── run_pipeline.sh         # runs stages 0 and 1 on WRDS
+├── download_inputs.sh  check_disk_space.sh  run_smoke_test.sh
+├── requirements.txt
+├── tests/                  # repo-wide tests, including the docs against the code
+├── stage0/                 # WRDS: raw TRACE to daily panels
+├── stage1/                 # WRDS: daily bond analytics
+├── stage2/                 # your computer: the monthly panel
+└── stage3/                 # your computer: the paper's tables and figures
 ```
 
-> ⚠ **`s1_lib/` is the paper's Section 3 and `s3_nse/` its Section 5.** The folder
-> numbers are the order the sections were built, not the section numbers.
+Every file, what it does, and what each stage reads and writes: [CODE_MAP.md](CODE_MAP.md).
 
 ---
 
@@ -535,7 +436,7 @@ Stage 0 produces daily panels in dataset-specific subfolders with the following 
 
 **Structure:** Panel data with one row per (cusip_id, trd_exctn_dt) combination
 
-**Output size:** about 2.7 GB for the full sample with Enhanced and 144A (the 2026-09-10 run)
+**Output size:** about 2.7 GB for the full sample with Enhanced and 144A (2.68 GB on the 2026-09-21 run)
 
 **Data download:** Available in zipped parquet format on [Open Bond Asset Pricing](https://openbondassetpricing.com/data)
 
@@ -613,7 +514,7 @@ All prices are in **percentage of par**.
 | `coupon`* | float32 | Annual coupon rate (%) |
 | `principal_amt`* | Int16 | Principal amount per bond (typically $1,000) |
 | `bond_age` | float32 | Bond age since issuance (years) |
-| `bond_amt_outstanding` | Int64 | Units of the bond outstanding |
+| `bond_amt_outstanding` | Int64 | Amount outstanding, in thousands of dollars (as FISD reports it) |
 | `callable`* | Int8 | Callable flag: 1=callable, 0=not callable |
 
 #### Industry Classifications
@@ -632,13 +533,15 @@ All prices are in **percentage of par**.
 | `sp_naic`* | Int8 | S&P NAIC category (1-6) |
 | `mdy_rating`† | Int8 | Moody's credit rating (1-21, where 21=default) |
 | `spc_rating`† | Int8 | S&P composite rating (1-22); missing values filled with mdy_rating (scaled to 22 for default) |
-| `mdc_rating`† | Int8 | Moody's composite rating (1-22); missing values filled with sp_rating (scaled to 21 for default) |
+| `mdc_rating`† | Int8 | Moody's composite rating (1-22): mdy_rating with its default code 21 moved to 22; missing values filled with sp_rating |
 | `comp_rating`* | float64 | Average of spc_rating and mdc_rating |
 
 **Notes:**
 - \*Columns marked with an asterisk are not in the main Stage 1 file. Where to get each:
   - `coupon`, `principal_amt` -- merge `stage0/enhanced/trace_enhanced_fisd_YYYYMMDD.parquet`
-  - `callable` -- `stage1/data/call_dummy_YYYYMMDD.parquet`
+    (keyed by `complete_cusip`)
+  - `callable` -- `stage1/data/call_dummy_YYYYMMDD.parquet`, keyed by `issue_id`: map it to
+    CUSIPs through the FISD file's `issue_id`
   - `sp_naic` -- as `sp_naic_numeric` in `stage1/data/sp_ratings_YYYYMMDD.parquet`
   - `issuer_cusip` -- it is simply `cusip_id[:6]`; no merge needed
   - `comp_rating` -- **not written anywhere**. It is computed and then dropped before
@@ -660,22 +563,21 @@ defined in [stage2/DATA_DICTIONARY.md](stage2/DATA_DICTIONARY.md).
 
 Using `./run_pipeline.sh` (complete automated pipeline from ROOT):
 - **Stage 0 - Data processing** (Enhanced and 144A in parallel):
-  - Enhanced TRACE: **~2 hours**. It was ~4 hours before v2.2.0; it now pulls 5 CUSIP
-    chunks at a time over separate WRDS connections. Measured 2026-09-09: 485 chunks in
-    2.01 h against a serial-equivalent 9.93 h, a **4.94x** speedup.
+  - Enhanced TRACE: **~2-2.5 hours**. It was ~4 hours before v2.2.0; it now pulls 5 CUSIP
+    chunks at a time over separate WRDS connections, about twice as fast (2.0 h on
+    2026-09-09, 2.6 h on 2026-09-21).
   - 144A TRACE: **~45 minutes**
   - Standard TRACE: ~30-60 minutes, and OPT-IN since v2.2.0 (`TRACE_MEMBERS`). When
     requested it is scheduled after the other two, not beside them.
-- **Stage 0 - Report generation**: ~10-15 minutes since v2.2.2 (was ~50); waits for every
-  member submitted, and runs ALONGSIDE Stage 1 rather than before it
+- **Stage 0 - Report generation**: ~20 minutes since v2.2.2 (was ~50; 22 on 2026-09-21);
+  waits for every member submitted, and runs ALONGSIDE Stage 1 rather than before it
 - **Stage 1 - Bond analytics**: **~2.5-3 hours** (waits for the Stage 0 DATA jobs)
 
-**End to end: about 4.5-5 hours.** The 2026-09-10 production run took 4.7 h wall clock
-(07:33 to 12:16) and wrote a Stage 1 panel of 31,412,833 rows ending 2025-12-31. That run
-predates `DATE_CUT_OFF = "auto:complete"`, which ends the sample at the last month every
-source covers through its final trading session. Cut there, the panel is 31,344,732 rows over
-70,684 CUSIPs, 2002-07-01 to 2025-11-28, and that is the file the 2026 vintage was built from.
-A run with the current code writes that cut directly.
+**End to end: about 5 hours.** The 2026-09-21 run, which the 2026 vintage was built from, took
+5.3 h wall clock (04:17 to 09:34) and wrote a Stage 1 panel of 31,344,732 rows over 70,684
+CUSIPs, 2002-07-01 to 2025-11-28. Its `DATE_CUT_OFF = "auto:complete"` ends the sample at the
+last month every source covers through its final trading session. (The earlier 2026-09-10
+run predates that rule; cut the same way afterwards, it gave the same 31,344,732 rows.)
 
 **How it works:**
 The script uses SGE's `-hold_jid` to create automatic dependency chains:
@@ -686,9 +588,10 @@ The script uses SGE's `-hold_jid` to create automatic dependency chains:
    — it reads only the member panels and the FISD file, nothing the reports produce.
 4. All jobs submitted with a single command from ROOT.
 
-**Resource Usage** (requested per member by `run_pipeline.sh`; `m_mem_free` is charged
-PER SLOT, so the total is `slots x mem` and must stay within the WRDS caps of 8 cores and
-48 GB per job):
+**Resource Usage** (`m_mem_free` is charged PER SLOT, so the total is `slots x mem` and must
+stay within the WRDS caps of 8 cores and 48 GB per job). The stage 0 member jobs are sized
+by `run_pipeline.sh` from `stage0/_trace_settings.py`; the report job and Stage 1 carry their
+requests in their own job scripts:
 
 | job | request | total |
 |---|---|---|
@@ -698,10 +601,12 @@ PER SLOT, so the total is `slots x mem` and must stay within the WRDS caps of 8 
 | Data reports | `-pe onenode 5 -l m_mem_free=8G` | 40 GB |
 | Stage 1 | `-pe onenode 4 -l m_mem_free=10G` | 40 GB |
 
-- **Disk**: ~1-2 GB per dataset (Parquet)
-- Tune with `CONCURRENCY`, `MEM_PER_SLOT_GB` and `TARGET_ROWS_PER_CHUNK` in
-  `stage0/_trace_settings.py` — not by editing the job scripts, whose directives the
-  command-line request overrides.
+- **Disk**: about 5 GB for a full run (on 2026-09-21: the Enhanced panel 2.2 GB, 144A 0.25 GB,
+  the Stage 1 panel 2.7 GB)
+- Tune stage 0 with `CONCURRENCY`, `MEM_PER_SLOT_GB` and `TARGET_ROWS_PER_CHUNK` in
+  `stage0/_trace_settings.py`, not by editing its job scripts, whose directives the
+  command-line request overrides. The report job's and Stage 1's requests are in
+  `stage0/run_build_data_reports.sh` and `stage1/run_stage1.sh`.
 
 ---
 

@@ -26,7 +26,7 @@ Transforms raw TRACE data into a research-ready bond dataset with:
 - ✅ **WRDS account** with TRACE, FISD, and ratings access
 - ✅ **WRDS Cloud access** (or local Python environment)
 - ✅ **`.pgpass`** configured for passwordless WRDS authentication
-- ✅ **Python ≥ 3.10** (Python 3.12+ recommended)
+- ✅ **Python ≥ 3.10** (the 2026-09-21 run used 3.14.5 on the WRDS Cloud; Stages 2 and 3, on your own computer, need 3.10-3.13)
 
 ---
 
@@ -94,14 +94,9 @@ Save and exit (Ctrl+O, Enter, Ctrl+X).
 
 ### Step 2: Install Dependencies
 
-**For Stage 0 (TRACE extraction):**
+**For Stages 0 and 1** (both need it; stage 0 uses `pandas_market_calendars` and `SQLAlchemy`,
+which the system Python may not have):
 ```bash
-# No installation needed - uses system Python with pandas, numpy, wrds, pyarrow
-```
-
-**For Stage 1 (bond analytics):**
-```bash
-# Stage 1 requires additional packages
 python -m pip install --user -r requirements.txt
 ```
 
@@ -113,7 +108,7 @@ source venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
-**Required packages for Stage 1** (minimums, from `requirements.txt`):
+**Required packages for Stages 0 and 1** (minimums, from `requirements.txt`):
 - pandas>=2.2.3, numpy>=2.0, pyarrow>=20.0.0, wrds>=3.3.0, tqdm
 - QuantLib>=1.36, joblib>=1.4
 - openpyxl, requests, matplotlib>=3.8.0
@@ -161,7 +156,7 @@ qsub run_smoke_test.sh      # result in smoke_test.out
    - Apply quality filters
    - Generate final dataset
 
-**Runtime:** about 4.5-5 hours total on the WRDS Cloud with default settings (measured 4.63 h on 2026-09-09 and 4.7 h on 2026-09-10)
+**Runtime:** about 5 hours total on the WRDS Cloud with default settings (5.3 h on 2026-09-21, the run the 2026 vintage was built from)
 
 ---
 
@@ -219,16 +214,19 @@ trace-data-pipeline/
 │   │   ├── decimal_shift_cusips_enhanced_YYYYMMDD.parquet
 │   │   ├── init_price_cusips_enhanced_YYYYMMDD.parquet
 │   │   └── cusip_row_counts_YYYYMMDD.parquet        # the chunk plan's row census
-│   ├── 144a/                                        # same nine, named for the member
-│   │   └── trace_144a_YYYYMMDD.parquet
+│   ├── 144a/                                        # the same nine files, named for the member
+│   │   ├── trace_144a_YYYYMMDD.parquet              # (cusip_row_counts has no member name)
+│   │   └── trace_fisd_144a_YYYYMMDD.parquet         # note the word order: fisd before 144a
 │   ├── standard/                                    # only if you opt Standard in
 │   │   └── trace_standard_YYYYMMDD.parquet
 │   ├── data_reports/                                # NOT under the member folders
 │   │   ├── enhanced/
 │   │   │   ├── enhanced_data_report.tex
-│   │   │   └── enhanced_fig_page_NNN_{ds,bb}.pdf
+│   │   │   ├── references.bib
+│   │   │   ├── enhanced_fig_page_NNN_{ds,bb}.pdf
+│   │   │   └── enhanced_ie_fig_page_NNN_ie.pdf
 │   │   └── 144a/
-│   └── logs/                                        # NN_member.out / .err
+│   └── logs/                                        # NN_member.out / .err, _data_reports.out / .err
 └── stage1/
     ├── data/
     │   ├── stage1_YYYYMMDD.parquet                  # THE final dataset
@@ -352,9 +350,13 @@ print(df.head())
 ## Now switch to your own computer: Stage 2
 
 Everything above happened **on WRDS**. Stage 2 happens **on your own computer**, on the
-files you just downloaded. It needs no WRDS connection.
+files you just downloaded. Its first run connects to WRDS once, to fetch and cache a few
+series (CRSP Treasury returns, Fama-French factors, VIX and FISD coupon terms), so
+`export WRDS_USERNAME=...` first (Stage 2 reads it from the environment, not `config.py`);
+later runs read the cache.
 
-First install the requirements there, in a Python 3.10+ environment:
+First install the requirements there, in a Python 3.10-3.13 environment (Stages 2 and 3
+need `numba`, which `requirements.txt` installs only below Python 3.14):
 
 ```bash
 cd trace-data-pipeline          # the folder you just unzipped
@@ -368,6 +370,10 @@ cd stage2
 python _run_stage2.py --dry-run     # resolve and validate the config, build nothing
 python _run_stage2.py               # the full build, ~8-18 minutes on 24 cores
 ```
+
+To reproduce a published panel exactly, add `--factor-source pinned`: it uses the factor file
+published with your vintage instead of rebuilding it from public sources that revise their
+history. See [stage2/QUICKSTART_stage2.md](stage2/QUICKSTART_stage2.md).
 
 It writes `output/panel/main_panel_<mode>.parquet` -- 145 columns per bond-month -- plus the
 unadjusted `_mmn` twins, the factor series, and the beta and momentum blocks. Every column is
@@ -455,17 +461,19 @@ qstat -f  # Check cluster load
 
 **Speed up:**
 1. Process fewer datasets (edit `TRACE_MEMBERS` in `config.py`)
-2. Disable reports (`STAGE0_OUTPUT_FIGURES = False` in `config.py`)
+2. Not the reports: `STAGE0_OUTPUT_FIGURES = False` in `config.py` skips their figures, but the
+   report job runs beside Stage 1, so the run does not finish any sooner
 
 ---
 
 ### Memory errors ("Killed")
 
-**Fix:** Reduce parallel processing. A WRDS job may hold at most 48 GB, and Stage 1 asks for
+**Fix:** Use more, smaller chunks. A WRDS job may hold at most 48 GB, and Stage 1 asks for
 40 GB (4 slots of 10 GB):
 ```python
 # In stage1/_stage1_settings.py
-N_CORES = 1  # Use fewer cores on WRDS
+N_CHUNKS = 20    # default 10; more chunks means a smaller peak
+N_CORES = None   # leave it: it follows the 4 slots the job was granted
 ```
 
 ---
@@ -484,74 +492,8 @@ After the pipeline completes:
 
 ## File Structure Overview
 
-```
-trace-data-pipeline/
-├── config.py                        # Shared configuration (WRDS_USERNAME, TRACE_MEMBERS)
-├── run_pipeline.sh                  # Main pipeline orchestrator
-├── check_disk_space.sh              # Is there room for a run? Called by run_pipeline.sh
-├── download_inputs.sh               # Stage 1's external inputs (LOGIN NODE)
-├── run_smoke_test.sh                # Whole-chain check in minutes
-├── README.md                        # Detailed documentation
-├── QUICKSTART.md                    # This file
-│
-├── FAQ.md                           # Common questions
-│
-├── tests/                           # Run before you commit
-│   ├── smoke_assertions.py          # The 28 cross-stage invariants
-│   ├── test_chunk_plan.py           # No WRDS needed
-│   ├── test_chunk_scheduler.py      # No WRDS needed
-│   ├── test_merge_keys.py           # No WRDS needed by default
-│   ├── test_linker_window.py        # No WRDS needed
-│   ├── test_cut_off_basis.py        # No WRDS needed
-│   ├── test_public_boundary.py      # No WRDS needed
-│   ├── test_docs.py                 # No WRDS needed
-│   └── probe_wrds_connections.py    # Measures your connection ceiling
-│
-├── stage0/                          # TRACE data extraction
-│   ├── run_enhanced_trace.sh        # SGE job script
-│   ├── run_standard_trace.sh
-│   ├── run_144a_trace.sh
-│   ├── run_build_data_reports.sh
-│   ├── create_daily_enhanced_trace.py
-│   ├── create_daily_standard_trace.py
-│   ├── _chunk_runner.py             # Chunk planning + concurrent scheduler
-│   ├── _wrds_pool.py                # One WRDS connection per worker
-│   ├── _trace_settings.py           # Stage 0 configuration (incl. CONCURRENCY)
-│   ├── logs/                        # Job logs
-│   ├── enhanced/                    # Enhanced TRACE outputs
-│   ├── standard/                    # Standard TRACE outputs
-│   └── 144a/                        # 144A TRACE outputs
-│
-├── stage1/                          # Bond analytics and enrichment
-│   ├── run_stage1.sh                # SGE job script
-│   ├── _run_stage1.py               # Main entry point
-│   ├── stage1_pipeline.py           # Pipeline logic
-│   ├── _stage1_settings.py          # Stage 1 configuration
-│   ├── QUICKSTART_stage1.md         # Stage 1 specific guide
-│   ├── DATA_DICTIONARY.md           # Every one of the 44 columns
-│   ├── logs/                        # Job logs
-│   ├── data_reports/                # Data-quality report (LaTeX/PDF)
-│   └── data/                        # Stage 1 outputs
-│       ├── stage1_YYYYMMDD.parquet  # Final dataset
-│       ├── liu_wu_yields.xlsx       # Treasury yields (auto-downloaded)
-│       ├── bond_firm_linker_2026/   # Equity linker (auto-downloaded)
-│       ├── Siccodes12.txt           # FF12 industries (auto-downloaded)
-│       ├── Siccodes17.txt           # FF17 industries (auto-downloaded)
-│       └── Siccodes30.txt           # FF30 industries (auto-downloaded)
-│
-├── stage2/                          # Monthly panel -- YOUR machine, not the grid
-│   ├── _run_stage2.py               # Main entry point
-│   ├── _stage2_settings.py          # Stage 2 configuration
-│   ├── make_release.py              # Packages a vintage (and redacts it)
-│   ├── DATA_DICTIONARY.md           # Every one of the 145 columns
-│   ├── lib/  steps/  tests/         # Engine, the seven steps, 17 test files
-│   └── output/panel/                # main_panel_<mode>.parquet
-│
-└── stage3/                          # Sorts and the paper's exhibits -- YOUR machine, optional
-    ├── run_stage3.sh                # Input check, then the 41 steps
-    ├── README_stage3.md  QUICKSTART_stage3.md  INDEX.md
-    └── reports/exhibits.pdf         # Every table and figure, compiled
-```
+What each stage reads and writes, and what every file in the repository does:
+[CODE_MAP.md](CODE_MAP.md). For which doc answers which question: [INDEX.md](INDEX.md).
 
 ---
 

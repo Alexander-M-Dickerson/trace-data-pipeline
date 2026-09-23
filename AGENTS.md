@@ -20,6 +20,12 @@ on two machines:
 Stages 2 and 3 are what most users run locally with an assistant. Each has its own instructions:
 [stage2/AGENTS.md](stage2/AGENTS.md) and [stage3/AGENTS.md](stage3/AGENTS.md).
 
+## Where to look
+
+- [INDEX.md](INDEX.md): which doc answers which question, and which command does which job.
+- [CODE_MAP.md](CODE_MAP.md): what each stage reads and writes, and what every code file does.
+- [FAQ.md](FAQ.md): the questions users actually ask. Check it before answering from memory.
+
 ## Rules for the assistant
 
 1. **Read the stage's QUICKSTART before running anything**: `stage2/QUICKSTART_stage2.md`,
@@ -40,15 +46,46 @@ Stages 2 and 3 are what most users run locally with an assistant. Each has its o
 7. **Outputs are not committed.** `stage2/data/`, `stage2/output/`, `stage3/data/` and
    `stage3/reports/` are gitignored. Do not add them to git.
 
+## Stages 0 and 1 on WRDS
+
+If the user runs you on the WRDS Cloud, these are the rules that cost people a day when missed.
+[QUICKSTART.md](QUICKSTART.md) has the full walk-through.
+
+- **Run `bash download_inputs.sh` on the login node.** Compute nodes have no internet, so stage 1
+  cannot fetch its inputs itself.
+- **Before a full run, suggest `qsub run_smoke_test.sh`.** It runs the real code on a few CUSIP
+  chunks in about 10 minutes and catches most setup problems.
+- **Submit from the repository root**: `./run_pipeline.sh`. It submits the jobs in order, each
+  waiting on the ones it needs.
+- **Set `WRDS_USERNAME` and `TRACE_MEMBERS` in the root `config.py`** (or the environment). Stages
+  0 and 1 read them from there. (Stage 2, on the user's computer, reads `WRDS_USERNAME` from the
+  environment only: `export WRDS_USERNAME=...`.)
+- **Change stage 0's job sizes in `stage0/_trace_settings.py`** (`CONCURRENCY`, `MEM_PER_SLOT_GB`).
+  `run_pipeline.sh` passes them to `qsub`, which overrides the settings inside the stage 0 job
+  scripts, so editing those scripts changes nothing. Memory (`m_mem_free`) is charged per slot,
+  and WRDS allows 8 slots and 48 GB per job; a request over that waits in the queue forever
+  without an error, so `qsub_resources()` refuses to make one.
+- **WRDS limits how many database connections one account holds at once**, measured at 7
+  (`MAX_WRDS_CONNECTIONS`). The Enhanced and 144A jobs run at the same time, so their
+  `CONCURRENCY` values together must stay below it. A failed connection shows up as
+  `EOFError: EOF when reading a line`, which looks like a keyboard problem. It has two causes:
+  first check the credentials (`WRDS_USERNAME` still the placeholder, or no `~/.pgpass`), which
+  is the commoner one; only then this limit.
+- **To move the results off WRDS**, zip from `~` with a relative path, exactly as QUICKSTART writes
+  it. An absolute path makes an archive nested four folders deep.
+
 ## What the user must provide
 
 - The folder produced on WRDS by stages 0 and 1, unzipped on their computer. Stage 2 finds its
   three inputs by date stamp: `stage1/data/stage1_<YYYYMMDD>.parquet`,
   `stage0/enhanced/trace_enhanced_fisd_<YYYYMMDD>.parquet`,
   `stage1/data/call_dummy_<YYYYMMDD>.parquet`.
-- A WRDS account (`WRDS_USERNAME`) for stage 2's first run, which fetches and caches Treasury
-  returns, Fama-French factors and VIX. Later runs use the cache.
-- Python 3.10+ with `python -m pip install -r requirements.txt`.
+- A WRDS account, with `WRDS_USERNAME` set in the environment, for stage 2's first run, which fetches and caches Treasury
+  returns, Fama-French factors, VIX and FISD coupon terms. Later runs use the cache.
+- Python 3.10-3.13 with `python -m pip install -r requirements.txt`. Stages 2 and 3 need
+  `numba`, which `requirements.txt` installs only below Python 3.14.
+- For stage 3's two uncertainty grids, a PyBondLab build with the fast kernels
+  (`PYBONDLAB_DIR`); see [stage3/AGENTS.md](stage3/AGENTS.md).
 
 ## Traps that have caught people
 
@@ -59,5 +96,11 @@ Stages 2 and 3 are what most users run locally with an assistant. Each has its o
   factors from live public sources, which revise their history. To reproduce a published vintage
   exactly, use `--factor-source pinned` (stage2/AGENTS.md).
 - **Do not run the stage 2 steps yourself in one Python process.** A long-lived process makes
-  DuckDB lose its parallelism and steps take several times longer. The runner starts a fresh
-  process per step.
+  DuckDB lose its parallelism and steps take several times longer. The runner starts the steps in
+  fresh processes.
+
+## Before changing code
+
+Run `python -m pytest stage2/tests tests stage3/tests -q`. It needs no WRDS or network, takes
+seconds, and includes `tests/test_docs.py`, which fails when a doc stops matching the code. If you
+add or rename a code file, add it to [CODE_MAP.md](CODE_MAP.md).

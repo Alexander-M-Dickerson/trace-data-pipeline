@@ -1,6 +1,6 @@
-# Line endings are load-bearing: these scripts are submitted to the WRDS Cloud
+# Line endings matter: these scripts are submitted to the WRDS Cloud
 # Grid Engine and run under bash on Linux. A CRLF line ending makes bash fail with
-# a `\r: command not found` / `^M` error, which is why QUICKSTART.md documents that
+# a `\r: command not found` / `^M` error, which is why FAQ.md and stage0/README_stage0.md document that
 # symptom. Do not rely on a contributor's global core.autocrlf setting -- pin it here.
 * text=auto
 

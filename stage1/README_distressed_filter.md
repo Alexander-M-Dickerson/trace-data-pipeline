@@ -7,7 +7,7 @@ The **ultra-distressed filter** detects anomalous prices in distressed corporate
 The algorithm employs four independent filters operating on daily aggregated price data, using lookback/lookforward windows, round-number heuristics, and ratio-based thresholds to identify error candidates.
 
 **When This Filter Is Most Useful**: This filter primarily addresses data quality issues that arise when Stage 0 applies minimal or no volume filtering, or when filtering only on par volume. Such configurations retain micro trades at obscure round numbers that may represent placeholder values or data entry errors. This filter provides a cleanup mechanism for these edge cases.
-These bond prices are often associated with debt issues trading in default. Thank you to Colin Philipps (FINRA) for some clarification on these extremely low/rounded prices in TRACE, "_... not the TRACE system adding anything to the tape but are transactions reported broker dealers. Likely they are cleaning up positions/books. TRACE only transmits what is submitted to the system._".
+These bond prices are often associated with debt issues trading in default. Thank you to Colin Philipps (FINRA) for some clarification on these extremely low/rounded prices in TRACE, "_... not the TRACE system adding anything to the tape but are transactions reported [by] broker dealers. Likely they are cleaning up positions/books. TRACE only transmits what is submitted to the system._".
 
 ---
 
@@ -90,8 +90,8 @@ $$
 $$
 
 where:
-- $L_{\text{back}} = 5$ = lookback window (days)
-- $L_{\text{fwd}} = 5$ = lookforward window (days)
+- $L_{\text{back}} = 5$ = lookback window (observations: days on which the bond traded)
+- $L_{\text{fwd}} = 5$ = lookforward window (observations)
 - Only prices **strictly greater than** $P_i$ are collected
 
 Compute the **median of surrounding prices**:
@@ -120,11 +120,11 @@ where:
 |-----|---------------|-----------|------------|----------------------|--------|-------|----------|
 | 1 | 45.0 | $450 | No | — | — | — | No |
 | 2 | 44.5 | $445 | No | — | — | — | No |
-| 3 | **0.05** | **$0.50** | Yes (< 0.10 AND round) | {45.0, 44.5, 45.2, 44.8} | 44.85 | 897× | **Yes** |
+| 3 | **0.05** | **$0.50** | Yes (< 0.10 AND round) | {45.0, 44.5, 45.2, 44.8} | 44.9 | 898× | **Yes** |
 | 4 | 45.2 | $452 | No | — | — | — | No |
 | 5 | 44.8 | $448 | No | — | — | — | No |
 
-Day 3 is flagged because: (1) price 0.05 < τ_low = 0.10, (2) 0.05 is a round number, and (3) surrounding median / current price = 44.85 / 0.05 ≈ 897 ≥ 3.0.
+Day 3 is flagged because: (1) price 0.05 < τ_low = 0.10, (2) 0.05 is a round number, and (3) surrounding median / current price = 44.9 / 0.05 = 898 ≥ 3.0.
 
 #### Anomaly Classification
 
@@ -205,12 +205,12 @@ $$
 |-----|---------------|-----------|------------|---------------------|--------|-------------|-----------|----------|
 | 1 | 12.5 | $125 | No | — | — | — | — | No |
 | 2 | 11.8 | $118 | No | — | — | — | — | No |
-| 3 | **100.0** | **$1,000** | Yes (round & > 0.50) | {12.5, 11.8} | 12.15 | 8.23× | Check day 4 | — |
+| 3 | **100.0** | **$1,000** | Yes (> 5.0) | {12.5, 11.8} | 12.15 | 8.23× | Check day 4 | — |
 | 4 | 12.2 | $122 | — | — | — | — | 12.2 ≤ 24.3 ✓ | — |
 | 5 | 11.5 | $115 | No | — | — | — | — | No |
 
 Day 3 is flagged because:
-1. Candidate: 100.0 is a round number AND > 0.50 ✓
+1. Candidate: 100.0 > τ_high = 5.0 ✓
 2. Pre-spike median = (11.8 + 12.5) / 2 = 12.15
 3. Spike ratio = 100.0 / 12.15 = 8.23 ≥ 3.0 ✓
 4. Recovery threshold = 12.15 × 2.0 = 24.3; Day 4 price 12.2 ≤ 24.3 ✓
@@ -261,7 +261,7 @@ $$
 \ell_{\text{plateau}} \geq \ell_{\min}
 $$
 
-where $\ell_{\min} = 2$ (default minimum plateau days).
+where $\ell_{\min} = 2$ (default minimum plateau length, in observations).
 
 #### Plateau Suspicion Criteria
 
@@ -323,7 +323,7 @@ Days 3-5 are flagged because:
 For each row $i$, collect available intraday prices:
 
 $$
-\mathcal{I}_i = \{P_i^{\text{first}}, P_i^{\text{last}}, P_i^{\text{high}}, P_i^{\text{low}}\}
+\mathcal{I}_i = \{P_i^{\text{high}}, P_i^{\text{low}}\} \quad (\texttt{prc\_hi}, \texttt{prc\_lo})
 $$
 
 Compute **intraday range** and **mean**:
@@ -400,6 +400,7 @@ def ultra_distressed_filter(
     intraday_price_threshold: float = 20.0,
     verbose: bool = False,
     keep_flag_columns: bool = False,
+    n_jobs: int = -1,              # accepted, not used
 ) -> pd.DataFrame
 ```
 
@@ -431,8 +432,8 @@ def ultra_distressed_filter(
 |-----------|------|---------|----------------------|-------------|
 | `ultra_low_threshold` | `float` | `0.10` | $\tau_{\text{low}}$ | Price threshold for ultra-low detection (0.10% of par = $1) |
 | `min_normal_price_ratio` | `float` | `3.0` | $\rho_{\text{anomaly}}$ | Minimum ratio of surrounding median to current price |
-| `lookback` | `int` | `5` | $L_{\text{back}}$ | Number of days to look back for surrounding prices |
-| `lookforward` | `int` | `5` | $L_{\text{fwd}}$ | Number of days to look forward for surrounding prices |
+| `lookback` | `int` | `5` | $L_{\text{back}}$ | Number of the bond's earlier observations to look back over |
+| `lookforward` | `int` | `5` | $L_{\text{fwd}}$ | Number of the bond's later observations to look forward over |
 
 ### Spike Detection Parameters (Filter 2)
 
@@ -447,7 +448,7 @@ def ultra_distressed_filter(
 | Parameter | Type | Default | Mathematical Notation | Description |
 |-----------|------|---------|----------------------|-------------|
 | `plateau_ultra_low_threshold` | `float` | `0.15` | $\tau_{\text{plateau}}$ | Price threshold for plateau candidates (0.15% of par = $1.50) |
-| `min_plateau_days` | `int` | `2` | $\ell_{\min}$ | Minimum consecutive days to qualify as plateau |
+| `min_plateau_days` | `int` | `2` | $\ell_{\min}$ | Minimum consecutive observations (days the bond traded) to qualify as plateau |
 | `pre_post_price_ratio` | `float` | `3.0` | $\rho_{\text{plateau}}$ | Minimum ratio of adjacent prices to plateau price |
 
 ### Round Number Parameters (All Filters)
@@ -890,13 +891,18 @@ ULTRA_DISTRESSED_CONFIG = {
     # Round numbers (all filters)
     'suspicious_round_numbers': [0.001, 0.01, 0.05, 0.10, 0.25, 0.50, 1.00],
 
-    # Spike detection (Filter 2)
+    # Intraday inconsistency (Filter 4)
     'price_cols': ['prc_hi', 'prc_lo'],
+
+    # Spike detection (Filter 2)
     'high_spike_threshold': 5.0,       # 5% of par = $50
     'min_spike_ratio': 3.0,
     'recovery_ratio': 2.0,
 
     'verbose': True,
+
+    # Chunking (read by stage1_pipeline.py, not a parameter of the function)
+    'target_rows_per_chunk': 500000,
 }
 ```
 
@@ -1004,7 +1010,7 @@ Intraday inconsistencies can occur even when daily aggregates appear normal:
 
 ### Numba Compilation
 
-Core detection functions (`_detect_anomalies_ultra`, `_detect_spikes_ultra`, `_detect_plateaus_ultra`) are compiled with Numba using:
+Core detection functions (`_detect_anomalies_ultra`, `_detect_spikes_ultra`, `_detect_plateaus_ultra`) are compiled with Numba when it is installed (`requirements.txt` installs it only below Python 3.14; without it the same code runs as plain Python, more slowly), using:
 - `nopython=True`: Pure NumPy operations (no Python overhead)
 - `cache=True`: Compiled functions cached across runs
 - `fastmath=True`: Aggressive floating-point optimizations
@@ -1028,7 +1034,7 @@ At function exit, individual flag columns are **dropped** to conserve RAM:
 | **Data Level** | Intraday transactions | Daily aggregates |
 | **Error Type** | Transient price spikes (both up/down) | Persistent anomalies, plateaus, inconsistencies |
 | **Detection Method** | Reversion pattern (lookahead for bounce-back) | Ratio-based outlier detection + plateau sequences |
-| **Action** | **Flag** transactions | **Flag** daily observations |
+| **Action** | **Flag** transactions | **Delete** flagged daily observations (in step 10a) |
 | **Sequence** | Applied in Stage 0 (intraday) | Applied in Stage 1 (daily) |
 | **Primary Use Case** | Real-time transaction filtering | Post-aggregation quality control |
 

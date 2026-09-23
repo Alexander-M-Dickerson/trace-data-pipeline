@@ -71,9 +71,9 @@ The main panel includes several identifiers, additional variables, and signals. 
 
 **Main panel usage:** Use month-end returns (`ret_vw`) with the MMN-adjusted signals provided in the main panel.
 
-As an alternative, researchers may access and download the unadjusted (noisy) price-based signals from [openbondassetpricing.com](https://openbondassetpricing.com/). The file is named `mmn_price_based_signals_YYYYmmdd.parquet`; all variables in this file have the suffix `_mmn` (e.g., `ytm_mmn`, `cs_mmn`, `val_hz_mmn`).
+As an alternative, researchers may access and download the unadjusted (noisy) price-based signals from [openbondassetpricing.com](https://openbondassetpricing.com/). The file is named `mmn_price_based_signals_<YYYY>.parquet` (`mmn_price_based_signals_<stamp>.parquet` in your own build); all variables in this file have the suffix `_mmn` (e.g., `ytm_mmn`, `cs_mmn`, `val_hz_mmn`).
 
-**Noisy signals usage:** If using signals from `mmn_price_based_signals_YYYYmmdd.parquet`, you **must** use month-begin returns (`ret_vw_bgn`) to avoid microstructure bias.
+**Noisy signals usage:** If using signals from `mmn_price_based_signals_<YYYY>.parquet`, you **must** use month-begin returns (`ret_vw_bgn`) to avoid microstructure bias.
 
 Our recommendation is to use the main panel data as provided with `ret_vw`. However, results are extremely similar using either method.
 
@@ -160,7 +160,8 @@ For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month r
 | `sig_dt` | Signal Date | Date when price-based signal was observed (minimum 1 BD before month-end price). |
 | `sig_gap` | Signal Gap | Business days between signal observation and month-end price; ranges 1–10 BD. |
 | `rfret` | Risk-Free Rate | Monthly risk-free rate from Fama-French. Used for excess returns: $r^x = r - r^f$. |
-**The five `tret_*` benchmarks before 1986.** The Treasury curve's long end is held flat beyond the longest tenor the Gurkaynak-Sack-Wright curve actually fitted, because no Treasury that long existed to price. This is the convention of Gurkaynak, Sack and Wright (2007) and of Ghaderi, Plante, Roussanov and Seo (2026), whose Appendix A states it in as many words -- "we conservatively apply flat extrapolation when necessary". It is what makes a 1973 start possible at all: without it no bond outliving the fitted curve could be priced, and the early sample would simply be absent. Measured cost: RMSE 15.8 bps, bias -0.3 bps, and exactly zero for any bond whose cash flows end inside the fitted range. The benchmarks diverge from one another most in this early period, for the same reason -- the curve is least anchored there.
+
+**The five benchmarks beyond the fitted curve.** A cash flow later than the longest tenor the Gurkaynak-Sack-Wright curve fitted on that day is priced with the curve's yield held flat from there on: the convention of Gurkaynak, Sack and Wright (2007) and of Ghaderi, Plante, Roussanov and Seo (2026) ("we conservatively apply flat extrapolation when necessary"). A bond whose cash flows all end inside the fitted range is unaffected.
 
 ---
 
@@ -366,8 +367,9 @@ A bond with no rating stays missing in both -- it is never silently labelled inv
 
 This is applied by `make_release.redact_for_publication`, and `make_release.assert_publishable`
 refuses to package a frame that still carries full identifiers or raw ratings. Measured against
-the released vintage: `permco` and `gvkey` are 100% null there, ratings take only {1, 11}, while
-the raw build has them 86.6% / 86.4% populated on the 1..22 scale.
+the released vintage: `permco` and `gvkey` are 100% null there and ratings take only {1, 11}.
+In the raw 2026 build `permco` and `gvkey` are 88.8% / 88.7% populated, and both ratings are
+present on every row, on the full 1..22 scale.
 
 ## Bond Returns
 
@@ -599,7 +601,7 @@ To address this, we compute price-based signals using prices observed **at least
 
 | Category | Variables |
 |----------|-----------|
-| Yields & Spreads | `ytm`, `md_dur`, `convx`, `cs`, `dcs6` |
+| Yields & Spreads | `ytm`, `md_dur`, `convx`, `cs`, `dcs6`, `cs_mu12_1` |
 | Value | `bbtm`, `val_hz`, `val_hz_dts`, `val_ipr`, `val_ipr_dts` |
 | Size | `sze` |
 | Short-term Reversal | `str` |
@@ -609,9 +611,9 @@ To address this, we compute price-based signals using prices observed **at least
 
 **Usage with main panel:** Use month-end returns (`ret_vw`) with the MMN-adjusted signals above.
 
-**Noisy versions available separately:** The unadjusted (noisy) versions of all signals above are provided in `mmn_price_based_signals_YYYYmmdd.parquet` with the `_mmn` suffix (e.g., `ytm_mmn`, `cs_mmn`, `val_hz_mmn`, `ami_mmn`, etc.).
+**Noisy versions available separately:** The unadjusted (noisy) versions of all signals above are provided in `mmn_price_based_signals_<YYYY>.parquet` with the `_mmn` suffix (e.g., `ytm_mmn`, `cs_mmn`, `val_hz_mmn`, `ami_mmn`, etc.).
 
-**Usage with noisy signals:** If using signals from `mmn_price_based_signals_YYYYmmdd.parquet`, you **must** use month-begin returns (`ret_vw_bgn`) to avoid microstructure bias. Both methods produce similar results.
+**Usage with noisy signals:** If using signals from `mmn_price_based_signals_<YYYY>.parquet`, you **must** use month-begin returns (`ret_vw_bgn`) to avoid microstructure bias. Both methods produce similar results.
 
 | Variable | Description |
 |----------|-------------|
@@ -709,11 +711,11 @@ Compute as: `ret_vw - tret` (month-end) or `ret_vw_bgn - tret` (month-begin)
 | `tret_mat` | `tret`'s twin -- same series, nodes and rounding, interpolated at MATURITY rather than modified duration (Bessembinder, Kahle, Maxwell & Xu 2009) |
 | `rfret` | Monthly risk-free rate from Fama-French |
 
-> **The four `tret_*` columns are benchmarks only — nothing else in the panel uses them.** Every
-> duration-adjusted quantity we ship (`ret_vwx`, the 68 rolling beta and momentum columns, `str`,
-> `var_95`, `es_95`) is built from `ret_vw - tret`, the incumbent duration-interpolated benchmark.
-> Subtracting a different `tret_*` from `ret_vw` is left to you; no beta or momentum column has
-> been re-estimated against one.
+> **The five alternative `tret_*` columns are benchmarks only — nothing else in the panel uses
+> them.** The panel's 68 rolling beta and momentum columns are estimated on `ret_vw` itself. Their
+> duration-adjusted versions, on `ret_vw - tret`, ship as separate blocks (`betas_x`, 51 columns,
+> and `mom_retx`, 17), and `stage2/make_excess_blocks.py` re-estimates those 68 on `tret_bns` or
+> `tret_cls` (see "Alternative Treasury benchmarks" in `README_stage2.md`).
 
 ---
 
@@ -1158,12 +1160,12 @@ table below. They are not the same number.
 |---|---|---|
 | grain | one value per bond-month | one value per month |
 | construction | measured on the bond's own trades | equal-weighted mean across **USA-domiciled** bonds |
-| units | a **level** — e.g. `roll` averages 0.79, `vov` 0.13, `spd_rel` 0.0068 | for ten of the twelve illiquidity factors, the monthly **CHANGE** in that mean — `ROLL` averages −0.009 and is positive only 45% of the time |
+| units | a **level** — e.g. on the 2026 build `roll` averages 0.96, `vov` 0.16, `spd_rel` 0.0083 | for ten of the twelve illiquidity factors, the monthly **CHANGE** in that mean — `ROLL` averages −0.011 and is positive only 42.5% of the time |
 
 The differenced factors are `AMD`, `LIX`, `ILLIQ`, `ROLL`, `SPRD`, `CSS`, `ARS`, `FHTS`,
 `VOV` and `RVOL`. The two that are **not** differenced, and are levels of the mean, are
 `PSB` and `RSJ`. (Verified against the build: `max|factor − diff(level)| = 0` for the ten,
-and `max|factor − level| = 0` for the two.)
+and, for the two, `PSB` equals the level and `RSJ` the level divided by 100.)
 
 Differencing is deliberate. An illiquidity level is highly persistent, so a beta estimated
 on the level would load mostly on the trend; the innovation is the priced quantity.
@@ -1213,7 +1215,7 @@ on the level would load mostly on the trend; the innovation is the priced quanti
 | `cptlt` | Intermediary capital: the value-weighted investment return, in excess of `rf` | HKM |
 | `cptl` | Intermediary capital risk factor (the non-traded HKM factor) | HKM |
 | `rvol` | Realized volatility | Computed |
-| `rsj` | Realized skewness (scaled: /100) | Computed |
+| `rsj` | Realized signed jump (scaled: /100) | Computed |
 | `psb` | Pastor-Stambaugh bond liquidity | Computed |
 | `amd` | Amihud illiquidity | Computed |
 | `illiq` | Aggregate illiquidity factor | Computed |
@@ -1230,10 +1232,11 @@ on the level would load mostly on the trend; the innovation is the priced quanti
 | `mktb_up` | Positive bond market return: max(mktb, 0) | Computed |
 | `epu` | Economic policy uncertainty index level | BBD |
 | `epum` | Monetary policy uncertainty index level | BBD |
-| `eput` | Trade policy uncertainty index level | BBD |
+| `eput` | Tax policy uncertainty index level | BBD |
 
 ❗**The ten `_bns` / `_cls` series are OPTIONAL and only exist if you ran
-`stage2/make_excess_blocks.py --benchmark {bns,cls,all}`.** They are the BBW bond-market factors
+`stage2/make_excess_blocks.py --benchmark {bns,cls,all}`** (and reach `factors_merged.parquet`
+only if step 4 runs again afterwards). They are the BBW bond-market factors
 re-estimated on the alternative Treasury benchmark's excess return, and they exist because a
 benchmark's betas must regress on *that* benchmark's own factors. Pairing a `tret_bns` excess
 return with the `tret`-based factors produces `b_*` columns that look perfectly normal and mean
@@ -1326,7 +1329,8 @@ $$\text{imom}_{i,t} = \frac{1}{N_{ind}-1} \sum_{j \in \text{ind}(i), j \neq i} \
 
 #### Short-Term Reversal and Risk Measures
 
-Downside risk measures computed from daily returns within the month (Bai, Bali & Wen, 2019):
+Downside risk measures computed from the bond's monthly returns over a rolling 36-month window,
+at least 12 months (Bai, Bali & Wen, 2019):
 
 **Short-Term Reversal:**
 
@@ -1340,7 +1344,7 @@ $$\text{VaR}_\alpha = -F^{-1}(\alpha)$$
 
 $$\text{ES}_\alpha = -\mathbb{E}[r \mid r < -\text{VaR}_\alpha]$$
 
-where $F^{-1}$ is the empirical quantile function of daily returns within the month.
+where $F^{-1}$ is the empirical quantile function of the monthly returns in the window.
 
 | Variable | Description |
 |----------|-------------|
@@ -1575,8 +1579,8 @@ Measured on the 2026 panel (1.95 M bond-months):
 | pair | \|corr\| | why they are close |
 |---|---|---|
 | `mcap_e` / `sze` | 0.9998 | both are market value; `sze` is the panel's size variable and `mcap_e` the end-of-month market cap |
-| `mcap_s` / `sze` | 0.9981 | as above, `mcap_s` measured at the signal date |
-| `mcap_s` / `mcap_e` | 0.9979 | the same quantity a few business days apart |
+| `mcap_s` / `sze` | 0.9981 | as above, `mcap_s` being the previous month-end market cap |
+| `mcap_s` / `mcap_e` | 0.9979 | the same quantity a month apart |
 | `fce_val` / `mcap_e` | 0.9817 | face value against market value; they differ only through the price |
 | `dvol` / `dvol_idio` | 0.9817 | total daily volatility is mostly idiosyncratic for corporate bonds |
 | `b_mktbx_dcapm` / `b_defb` | **0.9750** | see below |
@@ -1697,7 +1701,8 @@ will not reproduce a panel published today. Shipping the exact factor file a rel
 what lets a published number be checked — point Stage 2 at it with `FACTOR_SOURCE = "pinned"`.
 
 ❗In `factors_<YYYY>.parquet` the columns `mktb`, `mktbx`, `term`, `drf`, `crf`, `drfx`, `crfx`,
-`defb` and `termb` are the **published extended (pre-TRACE) series**, which end in 2023-01. They
+`defb` and `termb`, and the eight `mktb_bns` ... `term_cls` twins, are the **published extended
+(pre-TRACE) series**, which end in 2023-01. They
 are not the bond-market factors the panel uses: Stage 2 drops them on read and rebuilds them from
 its own TRACE data, keeping the extended values only before 2002-08.
 

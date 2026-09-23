@@ -25,8 +25,8 @@ This is a **two-machine pipeline**, and the hand-off is a file you copy yourself
 |---|---|---|
 | Stages 0 and 1 | **WRDS Cloud** | they read the raw TRACE tape, which is a WRDS database |
 | the hand-off | you | zip on WRDS, `scp` down (~5 GB) |
-| Stage 2 | **your own computer** | it reads only Stage 1's output file; no WRDS connection needed |
-| Stage 3 | **your own computer** | it reads only Stage 2's panel; optional, and no WRDS connection needed |
+| Stage 2 | **your own computer** | it reads Stage 1's output; its first run connects to WRDS once to fetch and cache a few series |
+| Stage 3 | **your own computer** | it reads Stage 2's panel and Stage 1's daily file; optional, and no WRDS connection needed |
 
 ### Can I run Stages 0 and 1 on my own machine?
 Technically yes, with a working WRDS connection -- but you would be pulling hundreds of
@@ -42,39 +42,39 @@ start. The download is there for people who want the daily panel itself.
 ### How long does processing take?
 Using `./run_pipeline.sh` (complete automated pipeline):
 - **Pre-stage (data downloads)**: ~5 minutes
-- **Stage 0 (Enhanced TRACE)**: **~2 hours**. It was ~4 hours serial; since v2.2.0 it
-  pulls 5 CUSIP chunks at once over separate WRDS connections. The 2026-09-09 run did
-  485 chunks in 2.01 h against a serial-equivalent 9.93 h -- a **4.94x** speedup.
+- **Stage 0 (Enhanced TRACE)**: **~2-2.5 hours**. It was ~4 hours serial; since v2.2.0 it
+  pulls 5 CUSIP chunks at once over separate WRDS connections, about twice as fast (2.0 h
+  on 2026-09-09, 2.6 h on 2026-09-21).
 - **Stage 0 (Rule 144A)**: **~45 minutes**, running at the same time as Enhanced
 - **Stage 0 (Standard TRACE)**: ~30-60 minutes, and OPT-IN since v2.2.0. When requested
   it is scheduled after the other two rather than beside them.
-- **Stage 0 (Report generation)**: **~15 minutes** since v2.2.2, and it no longer blocks
-  Stage 1 -- the two run side by side. It was ~50 minutes before that release.
+- **Stage 0 (Report generation)**: **~20 minutes** since v2.2.2 (22 on 2026-09-21), and it no
+  longer blocks Stage 1 -- the two run side by side. It was ~50 minutes before that release.
 - **Stage 1 (Bond analytics)**: **~2.5-3 hours**
 
-**End to end: about 4.5-5 hours.** The 2026-09-09 run took 4.63 h and the 2026-09-10 run
-4.7 h.
+**End to end: about 5 hours.** The 2026-09-21 run took 5.3 h.
 
-Then, on your own machine: **Stage 2 about 8-13 minutes**, and **Stage 3 about 15 minutes**
-on 24 cores with a PyBondLab build carrying the fast kernels. Without those kernels Stage
-3 still runs, and the two uncertainty grids become the long part; see
-[stage3/README_stage3.md](stage3/README_stage3.md).
+Then, on your own machine: **Stage 2 about 8-18 minutes** (the first run also downloads its
+inputs), and **Stage 3 about 15-20 minutes** on 24 cores with a PyBondLab build carrying the
+fast kernels. Without those kernels Stage 3's two uncertainty grids refuse to start; see
+[Why does Stage 3 refuse to run Section 5?](#why-does-stage-3-refuse-to-run-section-5)
 
 ### What if I only want Enhanced TRACE?
-You can customize which datasets to process in `config.py` (applies to all stages):
+Set which datasets to process in `config.py` (read by `run_pipeline.sh`, the report job and
+Stage 1):
 ```python
 TRACE_MEMBERS = ["enhanced"]  # Process only Enhanced TRACE
 ```
 
-Or run Stage 0 jobs individually:
-```bash
-qsub stage0/run_enhanced_trace.sh    # Enhanced only
-qsub stage0/run_standard_trace.sh    # Standard only
-qsub stage0/run_144a_trace.sh        # 144A only
-```
+Or for one run, without editing anything: `TRACE_MEMBERS=enhanced ./run_pipeline.sh`.
+Submitting a stage 0 job script by hand (`qsub stage0/run_enhanced_trace.sh`, from the
+repository root) skips the cores and memory `run_pipeline.sh` requests for it, so prefer the
+line above.
 
 ### What Python version do I need?
-Python 3.10 or higher is required. Check your version:
+Python 3.10 or higher for stages 0 and 1 (the WRDS Cloud runs 3.14). On your own computer,
+Stages 2 and 3 need 3.10-3.13, because `requirements.txt` installs `numba` only below 3.14.
+Check your version:
 ```bash
 python --version
 ```
@@ -102,7 +102,7 @@ Settings are organized hierarchically:
    - `WRDS_USERNAME`: Your WRDS username
    - `OUTPUT_FORMAT`: Output file format. `"parquet"` only -- see the FAQ entry below.
    - `AUTHOR`: Your name
-   - `TRACE_MEMBERS`: Which datasets to process (enhanced, standard, 144a) - **shared across all stages**
+   - `TRACE_MEMBERS`: Which datasets to process (enhanced, standard, 144a) - read by `run_pipeline.sh`, the report job and Stage 1
    - `STAGE0_OUTPUT_FIGURES`: Control Stage 0 error plot generation (can be slow)
 
 2. **Stage 0 settings** (`stage0/_trace_settings.py`):
@@ -123,13 +123,15 @@ WRDS_USERNAME = os.getenv("WRDS_USERNAME", "your_wrds_id")
 Most other settings are **auto-detected**:
 - ✅ `ROOT_PATH`: Auto-detected from working directory
 - ✅ `STAGE0_DATE_STAMP`: Auto-detected from Stage 0 output files
-- ✅ `N_CORES`: Auto-detected from available CPUs
+- ✅ `N_CORES`: follows the slots the job was granted (`$NSLOTS`), else 4
 
 ### How do I change the date range?
 
-**Stage 0:** Edit `stage0/_trace_settings.py` and modify `PER_DATASET`:
+**Stage 0:** Standard and 144A take a `start_date` in `PER_DATASET` in
+`stage0/_trace_settings.py`. Enhanced does not: it always starts at 2002-07-01, and giving it
+a `start_date` fails. To drop early Enhanced years, filter the Stage 1 output instead.
 ```python
-# Keep each member's existing keys and add start_date -- do not replace the dict.
+# Keep each member's existing keys -- do not replace the dict.
 # ❗Dropping `n_workers` from "enhanced" silently returns Stage 0 to the serial,
 # ~4-hour path, because the engine default is n_workers=1.
 PER_DATASET = {
@@ -141,7 +143,8 @@ PER_DATASET = {
 }
 ```
 
-**Stage 1:** Edit `stage1/_stage1_settings.py`:
+**Stage 1:** Edit `stage1/_stage1_settings.py`. The default, `"auto:complete"`, ends the
+sample at the last month every source covers in full; a literal date overrides it:
 ```python
 DATE_CUT_OFF = "2023-12-31"  # Only include data through this date
 ```
@@ -165,8 +168,9 @@ Stage 0's work — it is read by the data-report job for its own chunking. Chang
 not affect Stage 0 memory.)
 
 **Worker count** — each worker holds one chunk, so this multiplies the above. Lower
-`CONCURRENCY` in `stage0/_trace_settings.py`, or `STAGE0_WORKERS=3 ./run_pipeline.sh`
-for one run.
+`CONCURRENCY` in `stage0/_trace_settings.py`. (`STAGE0_WORKERS=N ./run_pipeline.sh` sets
+the count for one run, but for every member at once, 144A's included, and neither the
+connection check nor the `qsub` request sees it: keep 2 x N at 6 or below.)
 
 **Requesting more memory** is not done in the job scripts. `run_pipeline.sh` computes the
 request per member and passes it on the `qsub` command line, which overrides anything in
@@ -221,16 +225,19 @@ pd.read_parquet("stage1/data/stage1_YYYYMMDD.parquet").to_csv("stage1.csv.gz", i
 ```
 
 ### How do I control Stage 0 error plot generation?
-Stage 0 error plots take about 5 minutes for Enhanced TRACE (measured 2026-09-09), and the report job runs beside Stage 1, so they no longer delay anything. Control them in `config.py`:
+With figures on, the report job re-cleans the flagged bonds and draws their plots: about 20
+minutes on the 2026-09-21 run. It runs beside Stage 1, so it delays nothing. Control it in
+`config.py`:
 ```python
-STAGE0_OUTPUT_FIGURES = False  # Skip error plots (tables only - faster)
-STAGE0_OUTPUT_FIGURES = True   # Generate error plots (slow but comprehensive)
+STAGE0_OUTPUT_FIGURES = False  # Tables only: skips the re-clean and the plots
+STAGE0_OUTPUT_FIGURES = True   # Tables and error plots
 ```
 
 **Note:** Stage 1 always generates reports and figures regardless of this setting (essential for data quality).
 
 ### How do I change which datasets to process across all stages?
-Edit `TRACE_MEMBERS` in `config.py` once, and it applies to all stages:
+Edit `TRACE_MEMBERS` in `config.py` once. `run_pipeline.sh`, the report job and Stage 1 read
+it; Stages 2 and 3 work on whatever Stage 1 produced:
 ```python
 TRACE_MEMBERS = ["enhanced"]                       # Enhanced only
 TRACE_MEMBERS = ["enhanced", "standard"]           # Two datasets
@@ -271,7 +278,7 @@ df <- read_parquet('stage0/enhanced/trace_enhanced_20260910.parquet')
 ```
 
 ### What columns are in the output files?
-All datasets (Enhanced, Standard, 144A) share the same 21-column structure:
+All datasets (Enhanced, Standard, 144A) have the same 21 columns (their order differs):
 
 **Identifiers**:
 - `cusip_id`: 9-character CUSIP identifier
@@ -302,19 +309,20 @@ All datasets (Enhanced, Standard, 144A) share the same 21-column structure:
 - `bid_time_last`: Time of the last dealer-bid trade
 
 **Count metrics**:
-- `trade_count`: Number of trades
+- `trade_count`: Number of trades, customer and inter-dealer
 - `bid_count`: Number of dealer buys (= customer sells)
 - `ask_count`: Number of dealer sells (= customer buys)
 
 ❗**TRACE reports the DEALER's side.** The bid/ask split is
-`rpt_side_cd == 'B'` (dealer buying) and `'S'` (dealer selling), both filtered to
-`cntra_mp_id == 'C'` (the counterparty is a customer). So a customer BUY appears as
+`rpt_side_cd == 'B'` (dealer buying) and `'S'` (dealer selling), both restricted to
+customer counterparties (`cntra_mp_id == 'C'` in Enhanced, `contra_party_type == 'C'` in
+Standard and 144A). The prices, volumes and `trade_count` use all trades. So a customer BUY appears as
 `rpt_side_cd == 'S'`. Getting this backwards is the single commonest TRACE bug.
 
 ### What do the audit files contain?
 Audit files track row counts at each filter stage:
 - `dick_nielsen_filters_audit_*.parquet`: Dick-Nielsen filter effects
-- `drr_filters_audit_*.parquet`: Decimal-shift and bounce-back filter effects
+- `drr_filters_audit_*.parquet`: row counts before and after each cleaning step (the start, Dick-Nielsen as one row, then decimal shift, trading time, calendar, price, volume, bounce-back, yield, amount outstanding, maturity, initial price)
 - `fisd_filters_*.parquet`: FISD universe construction audit
 
 These help you understand how many transactions were removed at each cleaning step.
@@ -328,14 +336,15 @@ These files identify bonds that were corrected:
 Useful for understanding which bonds had price errors.
 
 ### What is the ultra_distressed_cusips CSV file? (Stage 1)
-Stage 1 exports `stage1/data/ultra_distressed_cusips_{date}.csv`, one row for **every** CUSIP
-in the panel, flagged or not. Filter on `flagged_observations > 0` for the flagged bonds. In
-the 2026-09-10 run the file has 76,592 rows, of which 1,045 CUSIPs carry 10,185 flagged
+Stage 1 exports `stage1/data/ultra_distressed_cusips_{date}.csv`. Only the flagged bonds carry
+numbers: filter on `flagged_observations > 0`. The file also holds a row for every other CUSIP
+code the run saw, with zeros and no dates, so those rows say nothing about that bond. In the
+2026-09-21 run the file has 76,495 rows, of which 1,045 CUSIPs carry 10,182 flagged
 bond-days (0.03% of all bond-days).
 
 **Columns**:
 - `cusip_id`: Bond identifier
-- `total_observations`: Bond-days for this CUSIP
+- `total_observations`: Bond-days for this CUSIP (0 on the unflagged rows)
 - `flagged_observations`: Bond-days the filter flagged
 - `pct_flagged`: Percentage flagged (%)
 - `first_trade_date`: Earliest trade date
@@ -502,10 +511,10 @@ print(f, len(df), "rows,", df.cusip_id.nunique(), "cusips,",
 PY
 ```
 
-A healthy full run is tens of millions of rows spanning 2002-07 to your data frontier.
-For reference, the 2026-09-10 production run wrote 31,412,833 rows from 2002-07-01 to
-2025-12-31, and its `stage1.err` held 689 lines that were *all* this one harmless pattern
-(683 on the 2026-09-09 run).
+A healthy full run is tens of millions of rows spanning 2002-07 to the last complete month
+(with the default `DATE_CUT_OFF = "auto:complete"`).
+For reference, the 2026-09-21 run wrote 31,344,732 rows from 2002-07-01 to 2025-11-28, and
+its `stage1.err` held 689 lines that were *all* this one harmless pattern.
 
 **What WOULD indicate a real failure:** a non-zero exit status from the job, a `stage1.out`
 that stops mid-step, or a missing/short `stage1_YYYYMMDD.parquet`. Stage 0's `.err` files
@@ -539,6 +548,9 @@ qstat  # Look for 'hqw' status - this means it's waiting for dependencies
 Before it starts, `run_pipeline.sh` runs `check_disk_space.sh`. On WRDS the limit that matters is
 your HOME QUOTA, 10 GB on most accounts. The check takes that limit from `quota` and then
 MEASURES what your home directory holds, with `du`, at that moment.
+
+The check asks for 4 GB, but a full run writes about 5 GB (the 2026-09-21 run's stage 0 and
+Stage 1 files), so give it more than the minimum.
 
 **Enough room (4 GB or more):**
 ```
@@ -605,14 +617,16 @@ DIRECTORY  USED / LIMIT
    ```python
    TARGET_ROWS_PER_CHUNK = 1_500_000   # default 750_000
    ```
-   Or raise `CONCURRENCY` to pull more chunks at once, within the WRDS connection
-   ceiling of 7 held simultaneously (`tests/probe_wrds_connections.py` measures it).
+   `CONCURRENCY` is already at the WRDS connection limit with the default members (Enhanced
+   5 + 144A 1 = 6, with one of the 7 kept spare), and `run_pipeline.sh` refuses more. Raise
+   Enhanced's only if you drop 144A from `TRACE_MEMBERS`
+   (`tests/probe_wrds_connections.py` measures your account's limit).
 
 2. **Disable Stage 0 error plot generation**:
    - Set `STAGE0_OUTPUT_FIGURES = False` in `config.py`
-   - Worth much less than it used to be. The whole report job now takes ~15 minutes and
-     runs alongside Stage 1, so switching the figures off saves minutes and takes
-     nothing off the critical path.
+   - Worth much less than it used to be. The whole report job now takes ~20 minutes and
+     runs alongside Stage 1, so switching the figures off takes nothing off the critical
+     path.
 
 3. **Memory optimizations (automatic)**:
    - CUSIP columns use category dtype (~75% memory savings)
@@ -738,8 +752,9 @@ See [stage1/QUICKSTART_stage1.md](stage1/QUICKSTART_stage1.md) to get started.
 ### How do I run Stage 1?
 The easiest way is to use `./run_pipeline.sh` which automatically runs both Stage 0 and Stage 1.
 
-Alternatively, run Stage 1 manually (after Stage 0 completes):
+Alternatively, run Stage 1 manually (after Stage 0 completes), from the repository root:
 ```bash
+bash download_inputs.sh      # login node: Stage 1 stops at once if its inputs are missing
 qsub stage1/run_stage1.sh
 ```
 
@@ -775,8 +790,8 @@ python tools/check_inputs.py     # are the five inputs there and the right shape
 bash run_stage3.sh               # everything, ending in reports/exhibits.pdf
 ```
 
-Like Stage 2, it runs on your own machine and opens no WRDS connection. 906 s -- about
-15 minutes -- on 24 cores, measured on a cold run on 2026-09-12. See [stage3/QUICKSTART_stage3.md](stage3/QUICKSTART_stage3.md).
+It runs on your own machine and opens no WRDS connection. 906 s -- about 15 minutes -- on 24
+cores, measured on a cold run on 2026-09-12; 18 minutes on 2026-09-23. See [stage3/QUICKSTART_stage3.md](stage3/QUICKSTART_stage3.md).
 
 ### Are Stage 3's numbers the paper's printed numbers?
 **No, and nothing in Stage 3 compares them to the paper's.** It produces exhibits from
@@ -791,11 +806,14 @@ corrected.
 ### Why does Stage 3 refuse to run Section 5?
 Section 5's two uncertainty grids need a PyBondLab build carrying `fast_sorts` and
 `anomaly_assay_fast`. The 0.2.0 release the repository pins does not have them, and Stage
-3 says so before fanning out rather than letting 108 workers each fail on an import.
-Point `PYBONDLAB_DIR` at a build that has them.
+3 says so before fanning out rather than letting each of the 108 signal tasks fail on an
+import. Point `PYBONDLAB_DIR` at a build that has them.
 
-Everything else runs on the pinned release: Stage 3 asks the installed engine once at
-startup and takes the slow path automatically, with the same numbers. The pin is not
+The grids are producers, and a failed producer stops the run, so without the kernels
+`bash run_stage3.sh` stops at the first grid. Add `--keep-going` to run everything else,
+and build the PDF, without Section 5. Everything else runs on the pinned release: Stage 3
+asks the installed engine once at startup and takes the slow path automatically, with the
+same numbers. The pin is not
 floated to fix this -- Stage 2's factor series depend on it exactly.
 
 ### What is redacted in the published panel?

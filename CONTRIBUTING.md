@@ -70,8 +70,8 @@ The repo ships a test suite. Run it before submitting a pull request.
 pytest:
 
 ```bash
-python -m pytest stage2/tests tests -q      # 154 tests, no WRDS, no network
-python -m pytest stage3/tests -q            # 77 tests for the exhibit package
+python -m pytest stage2/tests tests -q      # Stage 2 and the whole repo, no WRDS, no network
+python -m pytest stage3/tests -q            # the exhibit package
 ```
 
 That covers the frozen 145-column contract and its order, the `_mmn` twin rule, the release
@@ -84,11 +84,11 @@ panel = report = dictionary gate passes *vacuously* until you have run a build. 
 tests skip unless `STAGE2_REFERENCE_OUTPUT` / `STAGE2_REFERENCE_ROOT` point at a reference
 tree. `pytest -rs` lists what skipped and why.
 
-Four files under `tests/` are scripts rather than pytest modules -- pytest imports them and
+`tests/test_docs.py` checks the documentation against the code, and pytest runs it. Three
+files under `tests/` are scripts rather than pytest modules -- pytest imports them and
 collects nothing -- so run them directly:
 
 ```bash
-python tests/test_docs.py               # documentation structure
 python tests/test_chunk_plan.py         # chunk-partition properties
 python tests/test_chunk_scheduler.py    # ordering + failure handling
 python tests/test_merge_keys.py         # one row per key on every lookup
@@ -115,7 +115,9 @@ Then:
 
 1. **Check logs** for errors or warnings
 2. **Verify outputs** match the published schema (21 columns from Stage 0, 44 from Stage 1)
-3. **Run on a small sample** before the full dataset (`STAGE0_LIMIT_CHUNKS=5`)
+3. **Run on a small sample** before the full dataset: the smoke test above (`qsub
+   run_smoke_test.sh` on WRDS, 5 chunks by default) writes only to `smoke/`. (`STAGE0_LIMIT_CHUNKS=5 ./run_pipeline.sh` also works, but writes into the real
+   `stage0/` and `stage1/` folders.)
 
 ## License
 

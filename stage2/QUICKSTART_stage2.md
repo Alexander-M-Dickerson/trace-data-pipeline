@@ -17,7 +17,7 @@ the external series, took 18.2 minutes, and the next one there 11.6 (2026-09-23)
 | file | from | why |
 |---|---|---|
 | `stage1/data/stage1_<YYYYMMDD>.parquet` | Stage 1 | the daily bond panel Stage 2 aggregates |
-| `stage0/enhanced/trace_enhanced_fisd_<YYYYMMDD>.parquet` | Stage 0 | 144A flag, country, SIC, offering amount |
+| `stage0/enhanced/trace_enhanced_fisd_<YYYYMMDD>.parquet` | Stage 0 | 144A flag, country, SIC, FISD issue id |
 | `stage1/data/call_dummy_<YYYYMMDD>.parquet` | Stage 1 | callable flag |
 
 All three are found automatically — newest date stamp wins.
@@ -69,7 +69,9 @@ python3 _run_stage2.py
 
 or, equivalently, `bash run_stage2.sh`.
 
-Seven steps run in sequence, each in a fresh process:
+Seven steps run in fresh processes: step 1, step 2, then steps 3-4 and 5-6 as two processes
+side by side, then step 7. The console prints a line as each starts and ends; each process has
+its own log under `output/logs/`.
 
 | step | what it does |
 |---|---|
@@ -84,11 +86,13 @@ Seven steps run in sequence, each in a fresh process:
 Useful flags:
 
 ```bash
-python3 _run_stage2.py --limit-cusips 200      # a fast smoke build
+python3 _run_stage2.py --limit-cusips 200      # a fast smoke build (replaces output/ -- see below)
 python3 _run_stage2.py --from-step 4           # resume after a failure
 python3 _run_stage2.py --factor-source pinned  # reproduce a published vintage exactly
-python3 _run_stage2.py --validate              # run the validation sweep afterwards
 ```
+
+❗`--limit-cusips` writes to the same `output/` as a full build, so it replaces that build's
+panel and blocks. Run it before a full build, not after.
 
 ### 3. Check what you built
 
@@ -96,10 +100,10 @@ python3 _run_stage2.py --validate              # run the validation sweep afterw
 python3 validate_coverage.py
 ```
 
-Every column should reach within a month of the panel's last date. Three are expected to
-lag, and the gate says so by name: `b_cptlt` (He-Kelly-Manela have not published past
-2025-05) and `b_dcpi` / `b_cpi_vol6` (FRED's CPIAUCSL is missing an observation). Those are
-upstream limits, not build failures.
+Every column should reach within a month of the panel's last date. On the 2026 data the gate
+names one that does not: `b_cptlt` (He-Kelly-Manela have not published past 2025-05).
+`b_dcpi` and `b_cpi_vol6` end one month early (FRED's CPIAUCSL is missing an observation),
+which the gate allows. Those are upstream limits, not build failures.
 
 ### 4. Build the data report (optional)
 
@@ -135,11 +139,11 @@ so a panel that builds is a panel you can read positionally.
 
 | symptom | cause |
 |---|---|
-| "the OSBAP download cannot drive Stage 2" | you pointed it at the public Stage 1 file; ratings are stripped from it |
-| a missing-input box at start-up | Stage 0/1 output is absent or has a different date stamp; `--dry-run` shows where it looked |
+| "Every agency rating column is empty in ..." | you pointed it at the public Stage 1 file; ratings are stripped from it |
+| a missing-input box at start-up | Stage 0/1 output is absent; `--dry-run` shows where it looked (each input is the newest file of its kind, so check that the three come from the same run) |
 | `FileNotFoundError` on a factor | first run with no cache and no internet; the fetchers need one online run |
 | WRDS asks for a password on every step | no `.pgpass`; create one, or run `wrds.Connection()` once interactively |
 | the build asserts on the column contract | something changed the panel's columns; the message names them — see `lib/contract.py` |
-| step 2 takes several times its usual ~2 minutes | you are running steps in one process; use `_run_stage2.py`, which forks per step |
+| step 2 takes several times its usual ~2 minutes | you are running steps in one process; a full `_run_stage2.py` build starts each group of steps in a fresh process (a `--from-step`/`--to-step` run does not) |
 
 More detail in [`README_stage2.md`](README_stage2.md).
