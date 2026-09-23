@@ -77,8 +77,12 @@ FACTORS_PINNED_FILE = None
 # re-seasonally-adjusts CPI, Ludvigson re-estimates its history -- so a fresh build will
 # NOT reproduce an older release. Set FACTOR_SOURCE = "pinned" to fetch and use one of
 # these instead; it is cached under stage2/data/ like any other download.
+# ❗The URL must serve the file the vintage's panel was BUILT with -- the one the site's download
+# links serve, on the osbap-site release. Until 2026-09-23 this pointed at a WordPress upload from
+# 2026-09-10 that predates the eight _bns/_cls twin factors (36 columns, not 44), so the pinned
+# route could not build the tret_bns/tret_cls blocks.
 FACTORS_PINNED_URL = {
-    "2026": "https://openbondassetpricing.com/wp-content/uploads/2026/09/osbap_stage2_factors_2026.zip",
+    "2026": "https://github.com/Alexander-M-Dickerson/osbap-site/releases/download/data-2026/osbap_stage2_factors_2026.zip",
 }
 FACTORS_PINNED_ZIPKEY = "factors_{vintage}.parquet"
 
@@ -658,6 +662,12 @@ def factor_source_for(mode: str | None = None) -> str:
     return FACTOR_SOURCE
 
 
+def pinned_cache_source(cache: Path) -> str | None:
+    """The URL a downloaded pinned factor file came from (recorded beside it), or None."""
+    note = Path(str(cache) + ".source")
+    return note.read_text(encoding="utf-8").strip() if note.exists() else None
+
+
 def pinned_factor_origin(config: dict) -> tuple[str, bool]:
     """Where FACTOR_SOURCE='pinned' will read its factor panel from, and whether it can.
 
@@ -670,9 +680,11 @@ def pinned_factor_origin(config: dict) -> tuple[str, bool]:
         return f"FACTORS_PINNED_FILE not found: {explicit}", False
     vintage = release_vintage()
     cache = STAGE2_DATA / FACTORS_PINNED_ZIPKEY.format(vintage=vintage)
-    if cache.exists():
-        return f"{cache} (downloaded earlier, vintage {vintage})", True
     url = FACTORS_PINNED_URL.get(vintage)
+    if cache.exists() and pinned_cache_source(cache) == url:
+        return f"{cache} (downloaded earlier from {url})", True
+    if cache.exists() and not url:
+        return f"{cache} (downloaded earlier, vintage {vintage})", True
     if url:
         return f"{url} (published factors for vintage {vintage}; downloaded on first run)", True
     return (f"FACTOR_SOURCE='pinned', but no factor panel is published for vintage {vintage} "

@@ -56,3 +56,19 @@ def test_an_explicit_file_must_exist(tmp_path):
     present.write_bytes(b"x")
     origin, ok = cfg.pinned_factor_origin(_config(factors_pinned_file=str(present)))
     assert ok
+
+
+def test_a_copy_from_a_stale_url_is_fetched_again(monkeypatch, tmp_path):
+    """A download is reused only if it came from the URL registered now. A copy from an older
+    URL (on 2026-09-23, a WordPress upload that predated the _bns/_cls twins) is not."""
+    monkeypatch.setattr(cfg, "STAGE2_DATA", tmp_path)
+    monkeypatch.setattr(cfg, "release_vintage", lambda: "2026")
+    monkeypatch.setattr(cfg, "FACTORS_PINNED_URL", {"2026": "https://example.org/new.zip"})
+    cache = tmp_path / cfg.FACTORS_PINNED_ZIPKEY.format(vintage="2026")
+    cache.write_bytes(b"x")
+    (tmp_path / (cache.name + ".source")).write_text("https://example.org/old.zip\n", encoding="utf-8")
+    origin, ok = cfg.pinned_factor_origin(_config())
+    assert ok and "new.zip" in origin and "downloaded on first run" in origin
+    (tmp_path / (cache.name + ".source")).write_text("https://example.org/new.zip\n", encoding="utf-8")
+    origin, ok = cfg.pinned_factor_origin(_config())
+    assert ok and "downloaded earlier" in origin

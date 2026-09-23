@@ -67,10 +67,13 @@ def _pinned_factors(force_fetch: bool = False) -> Path:
 
     vintage = cfg.release_vintage()
     cache = cfg.STAGE2_DATA / cfg.FACTORS_PINNED_ZIPKEY.format(vintage=vintage)
-    if cache.exists() and not force_fetch:
+    url = cfg.FACTORS_PINNED_URL.get(vintage)
+    # Reuse a download only if it came from the URL registered now. A copy fetched from an older
+    # URL is fetched again: on 2026-09-23 a cached file from a stale URL would otherwise have
+    # been kept forever, even after the URL was corrected.
+    if cache.exists() and not force_fetch and (not url or cfg.pinned_cache_source(cache) == url):
         return cache
 
-    url = cfg.FACTORS_PINNED_URL.get(vintage)
     if not url:
         raise FileNotFoundError(
             f"No published factor panel is registered for vintage {vintage}.\n"
@@ -92,6 +95,7 @@ def _pinned_factors(force_fetch: bool = False) -> Path:
                 f"{member} not found in {url}; the zip holds {names}")
         cache.parent.mkdir(parents=True, exist_ok=True)
         cache.write_bytes(z.read(member))
+    Path(str(cache) + ".source").write_text(url + "\n", encoding="utf-8")
     print(f"[factors] cached {cache}")
     return cache
 
