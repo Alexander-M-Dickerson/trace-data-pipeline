@@ -448,23 +448,26 @@ def main() -> int:
     ran, skipped, failed = [], [], []
     for section, kind, script, sargs, target in steps:
         label = _label(script, sargs)
+        stale_in = kind == "producer" and inputs_are_stale(section, script, sargs)
         if (kind == "producer" and not args.force and _target(target).exists()
                 and not window_is_stale(script, sample_end)
-                and not inputs_are_stale(section, script, sargs)):
+                and not stale_in):
             print(f"[skip] {label}  ({target} exists)")
             skipped.append(label)
             continue
         if kind == "producer" and window_is_stale(script, sample_end):
             print(f"[rebuild] {label}  "
                   "(what it wrote does not cover the window you asked for)")
-        elif (kind == "producer" and not args.force and _target(target).exists()
-              and inputs_are_stale(section, script, sargs)):
+        elif kind == "producer" and not args.force and _target(target).exists() and stale_in:
             print(f"[rebuild] {label}  "
                   "(it was built from different Stage 2 inputs, or nothing records which)")
         argv = [sys.executable, script, *sargs]
         if use_fast and script in ACCEPTS_FAST:
             argv.append("--fast")
-        if args.force and script in ACCEPTS_FORCE:
+        # ❗A producer re-run because its inputs changed must not reuse its own old files: the MUA
+        # and DUA grids skip every per-signal parquet that exists unless told --force, so without
+        # this the runner printed [rebuild] and the grid re-used the old panel's series anyway.
+        if (args.force or stale_in) and script in ACCEPTS_FORCE:
             argv.append("--force")
         flag = SAMPLE_FLAG.get(script)
         if flag and not any(a == flag for a in sargs):
