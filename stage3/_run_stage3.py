@@ -280,6 +280,47 @@ def engine_status() -> dict:
             "version": prov.get("version"), "tree": prov.get("tree_sha256"), "why": ""}
 
 
+def _inputs_marker(script: str, sargs) -> Path:
+    """Where a producer's run records the inputs it read."""
+    import re
+    name = re.sub(r"[^A-Za-z0-9_.-]+", "_", _label(script, sargs)).strip("_")
+    return HERE / "data" / "_inputs" / f"{name}.json"
+
+
+def inputs_fingerprint(section: str) -> dict:
+    """Size and modification time of every input the section reads."""
+    fp = {}
+    for k in SECTION_INPUTS.get(section, S.INPUTS):
+        v = S.INPUTS.get(k)
+        p = Path(v) if v else None
+        fp[k] = [str(p), p.stat().st_size, p.stat().st_mtime_ns] if p and p.exists() else None
+    return fp
+
+
+def inputs_are_stale(section: str, script: str, sargs) -> bool:
+    """Was this producer's output built from DIFFERENT inputs than the ones there now?
+
+    ❗Until 2026-09-23 a producer was skipped whenever its output existed. After a Stage 2
+    rebuild that reused results computed on the OLD panel: the 2026-09-22 run built Tables 5,
+    6 and IA.XVII-IA.XIX from uncertainty grids made on 2026-09-12, while every other exhibit
+    read the new panel. Now each producer records the inputs it read, and is re-run when they
+    differ -- or when there is no record, since then nothing says what it was built from.
+    """
+    import json
+    m = _inputs_marker(script, sargs)
+    try:
+        return json.loads(m.read_text(encoding="utf-8")) != inputs_fingerprint(section)
+    except Exception:
+        return True
+
+
+def _record_inputs(section: str, script: str, sargs) -> None:
+    import json
+    m = _inputs_marker(script, sargs)
+    m.parent.mkdir(parents=True, exist_ok=True)
+    m.write_text(json.dumps(inputs_fingerprint(section), indent=1), encoding="utf-8")
+
+
 def needed_inputs(steps) -> list[str]:
     """The inputs the SELECTED steps read -- not all five."""
     want: set[str] = set()
@@ -297,7 +338,8 @@ def would_run(steps, force: bool, sample_end: str = "") -> tuple[list, list]:
     """
     run, skip = [], []
     for st in steps:
-        stale = bool(sample_end) and window_is_stale(st[2], sample_end)
+        stale = ((bool(sample_end) and window_is_stale(st[2], sample_end))
+                 or (st[1] == "producer" and inputs_are_stale(st[0], st[2], st[3])))
         (run if st[1] != "producer" or force or stale or not _target(st[4]).exists()
          else skip).append(st)
     return run, skip
@@ -407,13 +449,18 @@ def main() -> int:
     for section, kind, script, sargs, target in steps:
         label = _label(script, sargs)
         if (kind == "producer" and not args.force and _target(target).exists()
-                and not window_is_stale(script, sample_end)):
+                and not window_is_stale(script, sample_end)
+                and not inputs_are_stale(section, script, sargs)):
             print(f"[skip] {label}  ({target} exists)")
             skipped.append(label)
             continue
         if kind == "producer" and window_is_stale(script, sample_end):
             print(f"[rebuild] {label}  "
                   "(what it wrote does not cover the window you asked for)")
+        elif (kind == "producer" and not args.force and _target(target).exists()
+              and inputs_are_stale(section, script, sargs)):
+            print(f"[rebuild] {label}  "
+                  "(it was built from different Stage 2 inputs, or nothing records which)")
         argv = [sys.executable, script, *sargs]
         if use_fast and script in ACCEPTS_FAST:
             argv.append("--fast")
@@ -432,6 +479,8 @@ def main() -> int:
         dt = time.perf_counter() - t
         if r.returncode == 0:
             ran.append((label, dt))
+            if kind == "producer":
+                _record_inputs(section, script, sargs)
             print(f"[ok  ] {label}  {dt:.1f}s\n")
         else:
             failed.append((label, r.returncode))

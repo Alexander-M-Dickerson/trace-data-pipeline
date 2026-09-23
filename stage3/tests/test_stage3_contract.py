@@ -801,3 +801,23 @@ def test_the_prose_cluster_counts_are_recorded_as_a_paper_defect():
     for n in ("22", "21", "14", "13", "15", "18"):
         assert n in doc, f"the prose-vs-table cluster counts no longer name {n}"
     assert "contradicts its own table" in doc
+
+
+# ------------------------------------------------ a rebuilt Stage 2 re-runs the producers
+def test_a_producer_is_rerun_when_its_stage2_inputs_change(tmp_path, monkeypatch):
+    """Until 2026-09-23 a producer was skipped whenever its output existed, so a rebuilt Stage 2
+    panel was paired with results computed on the old one (the 2026-09-22 run built Tables 5, 6
+    and IA.XVII-IA.XIX from uncertainty grids made on 2026-09-12). Each producer now records the
+    inputs it read; a missing record, or a changed input, makes it stale."""
+    import _run_stage3 as R
+    panel = tmp_path / "main_panel_stage1.parquet"
+    panel.write_bytes(b"old panel")
+    monkeypatch.setattr(R, "HERE", tmp_path)
+    monkeypatch.setattr(R.S, "INPUTS", {"STAGE2_PANEL": str(panel)})
+    monkeypatch.setattr(R, "SECTION_INPUTS", {"nse": ("STAGE2_PANEL",)})
+    script, sargs = "s3_nse/run_mua_grid.py", []
+    assert R.inputs_are_stale("nse", script, sargs)          # no record: nothing says what it read
+    R._record_inputs("nse", script, sargs)
+    assert not R.inputs_are_stale("nse", script, sargs)      # same inputs: skip is safe
+    panel.write_bytes(b"a rebuilt panel, a different size")
+    assert R.inputs_are_stale("nse", script, sargs)          # Stage 2 rebuilt: run it again
