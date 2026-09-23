@@ -442,12 +442,13 @@ SELECT cusip, date, ret_vw, tret, tret_bns, tret_cls, ret_std, ret_type FROM (
     #   perturb the numeric path.
     #
     # ❗THE IDS COME FROM THE PUBLISHED LINKER, JOINED ON THE DECLARED WINDOW -- not from the pin.
-    #   Stage 1 attaches its own ids by joining the EVIDENCE window (w0/w1, "when is the mapping
-    #   provable"), which is right for an equity join and wrong for labelling a firm in a panel.
-    #   Inheriting them here made stage 2 disagree with our combined panel -- which joins the
-    #   IDENTITY window -- about firm membership on 2.14% of bond-months, moving every within-firm
-    #   portfolio while single sorts matched exactly. lib/linker.py has the measurement; the rule is
-    #   cfg.LINKER_WINDOW, and its authority is the linker's own contract (CONTRACTS.md s4).
+    #   Stage 1 and stage 2 both join the IDENTITY window (i0/i1, "whose bond is this"), stage 1
+    #   since 2026-09-21. Stage 2 still makes its own join rather than inheriting stage 1's ids, so
+    #   the monthly panel's firm labels never depend on which stage 1 run it was built from: they
+    #   come from the linker, at the month-end date this block keys on. The rule is
+    #   cfg.LINKER_WINDOW; its authority is the linker's own contract (CONTRACTS.md s4).
+    #   History: until 2026-09-21 stage 1 joined the EVIDENCE window (w0/w1), and inheriting those
+    #   ids made the panels disagree about firm membership on 2.14% of bond-months (lib/linker.py).
     lo, hi = linker.register(con, "_linker")
     _copy("firm_ids", f"""
         SELECT e.cusip_id AS cusip, e.date_end_ref::TIMESTAMP AS date,

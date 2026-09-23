@@ -21,6 +21,9 @@ relink used the identity window. Same linker, different question, and the two pa
 firm membership on 2.14% of TRACE-era bond-months -- 43,779 rows where one carried a firm id and the
 other did not. Single sorts never touch `permno` and matched exactly; within-firm sorts group by it,
 so 8,479 firm-months existed in one panel and not the other and every within-firm portfolio moved.
+Stage 1 has joined the identity window too since 2026-09-21 (commit 706c7b1, stage1/_linker_join.py),
+so every stage now labels a bond with the same firm; this module keeps its own join so the monthly
+panel never depends on which stage 1 run it was built from.
 
 ❗THE CACHE IS THE TRAP, exactly as in lib/quote.py. A cached linker that predates the identity
 window would let this module fall back to the evidence window and reproduce the original bug
