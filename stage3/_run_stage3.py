@@ -280,11 +280,26 @@ def engine_status() -> dict:
             "version": prov.get("version"), "tree": prov.get("tree_sha256"), "why": ""}
 
 
+def without_kernels(steps, eng: dict) -> tuple[list, bool]:
+    """Leave Section 5 out when PyBondLab's fast kernels are absent. Returns (steps, dropped).
+
+    Its two uncertainty grids refuse to start without them (`pblenv.require_fast`), and a
+    refused grid is a failed producer, which stops the run. Until 2026-09-24 that also skipped
+    the zoo and the PDF, while every guide said the rest ran on the slow path. Now Section 5 is
+    left out before the run starts, everything else runs, and the run exits non-zero.
+    """
+    if eng.get("fast") or not eng.get("ok"):
+        return steps, False
+    kept = [s for s in steps if s[0] != "nse"]
+    return kept, len(kept) != len(steps)
+
+
 def _inputs_marker(script: str, sargs) -> Path:
-    """Where a producer's run records the inputs it read."""
+    """Where a producer's run records the inputs it read: beside its results, under
+    STAGE3_DATA. (Until 2026-09-24 always stage3/data, wherever STAGE3_DATA pointed.)"""
     import re
     name = re.sub(r"[^A-Za-z0-9_.-]+", "_", _label(script, sargs)).strip("_")
-    return HERE / "data" / "_inputs" / f"{name}.json"
+    return Path(S.DATA) / "_inputs" / f"{name}.json"
 
 
 def inputs_fingerprint(section: str) -> dict:
@@ -412,6 +427,12 @@ def main() -> int:
         return 0
 
     eng = engine_status()
+    steps, nse_dropped = without_kernels(steps, eng)
+    if nse_dropped and not steps:
+        print("\nABORT: Section 5's two uncertainty grids need PyBondLab's fast kernels\n"
+              "  (PyBondLab.fast_sorts and PyBondLab.anomaly_assay_fast), and the build in use\n"
+              "  does not have them. Point PYBONDLAB_DIR at a build that does.")
+        return 1
     use_fast = eng["fast"] and not args.no_fast
     import drrlib as _D
     sample_end = _D.resolve_sample_end(args.sample)
@@ -425,12 +446,9 @@ def main() -> int:
         if not eng["ok"]:
             print("  ...but PyBondLab is unavailable, so every producer would fail.")
         elif not eng["fast"]:
-            # Only mention the grids if any of them is actually in this run.
-            nse = [st for st in will_run
-                   if st[0] == "nse" and st[1] == "producer"]
-            print("  Sort kernels are absent: the producers would take the slow "
-                  "path" + (",\n  and the two uncertainty grids would refuse to "
-                            "start at all." if nse else " -- same numbers, longer."))
+            print("  Sort kernels are absent: the producers would take the slow path -- same "
+                  "numbers, longer." + ("\n  Section 5 would be skipped: its uncertainty grids "
+                                        "need the kernels." if nse_dropped else ""))
         return 0
     if missing:
         return 1
@@ -439,8 +457,12 @@ def main() -> int:
         return 1
     if not eng["fast"] and not args.no_fast:
         print("\n❗PyBondLab's sort kernels are not available, so the producers will\n"
-              "  take the slow path -- considerably longer. `--section nse` will refuse\n"
-              "  to start: the uncertainty grids need them. See README_stage3.md.")
+              "  take the slow path -- considerably longer."
+              + ("\n  Section 5 (Tables 5, 6, IA.XVII-IA.XIX, Figures IA.3-IA.6) is SKIPPED:\n"
+                 "  its uncertainty grids need the kernels. Everything else runs, and the run\n"
+                 "  exits non-zero because Section 5 is missing. Point PYBONDLAB_DIR at a\n"
+                 "  build with the kernels to include it. See README_stage3.md."
+                 if nse_dropped else ""))
 
     print(f"\nrunning {len(steps)} step(s), "
           f"{'with' if use_fast else 'WITHOUT'} the sort kernels\n")
@@ -494,11 +516,11 @@ def main() -> int:
             # red check is no reason to abandon the other thirty-nine steps and the
             # report. The run still exits non-zero either way.
             #
-            # This is not hypothetical: `t06_mua_nse.py` is step 27 of 40 and its
-            # twin-invariance check fails on every run while the engine's
-            # restricted-universe cells keep flipping. Stopping there silently skipped
-            # Tables IA.XVII-IA.XIX, the Section-5 figures, the whole zoo and the PDF --
-            # from the command the README calls "everything".
+            # This is not hypothetical: `t06_mua_nse.py` is step 30 of 41, and its
+            # twin-invariance check fails on any run where the engine's restricted-universe
+            # cells flip. Stopping there silently skipped Tables IA.XVII-IA.XIX, the
+            # Section-5 figures, the whole zoo and the PDF -- from the command the README
+            # calls "everything".
             if kind == "producer" and not args.keep_going:
                 print("  a producer failed, so everything downstream would read "
                       "missing or stale data.\n  Stopping. Use --keep-going to "
@@ -513,9 +535,11 @@ def main() -> int:
             print(f"  slowest: {dt:7.1f}s  {label}")
     for label, code in failed:
         print(f"  FAILED exit {code}: {label}")
+    if nse_dropped:
+        print("  SKIPPED: Section 5 -- its uncertainty grids need PyBondLab's fast kernels")
     print(f"\ntables  -> {S.REPORTS / 'tables'}"
           f"\nfigures -> {S.REPORTS / 'figures'}")
-    return 1 if failed else 0
+    return 1 if failed or nse_dropped else 0
 
 
 if __name__ == "__main__":

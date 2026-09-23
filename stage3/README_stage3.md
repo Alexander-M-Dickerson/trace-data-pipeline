@@ -99,9 +99,8 @@ export PYBONDLAB_DIR=/path/to/PyBondLab     # a checkout; unset = whatever is in
 > Stage 2 pins does not carry them, and `pblenv.require_fast()` says so before the
 > fan-out starts rather than letting each of the 108 signal tasks fail on an import.
 >
-> **Everything else genuinely runs without them**, but not by default: the grids are
-> producers, and a failed producer stops `run_stage3.sh`, so without the kernels add
-> `--keep-going` to get the zoo and the PDF. `_run_stage3.py` asks the installed
+> **Everything else genuinely runs without them.** `run_stage3.sh` leaves Section 5 out,
+> says so, and exits non-zero because it is missing. `_run_stage3.py` asks the installed
 > engine once and takes the slow path automatically — same numbers, longer. Measured on
 > one sort: 43.8 s without the kernels against 3.2 s with them. `--no-fast` forces the
 > slow path even when they are available, which is how you check the two agree.

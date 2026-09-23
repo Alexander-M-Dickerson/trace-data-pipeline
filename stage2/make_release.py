@@ -683,6 +683,12 @@ def _bbw_extended(blocks: Path) -> pd.DataFrame:
     if not p.exists():
         raise FileNotFoundError(f"no {p}; run step 4 with --input-mode {blocks.name} first")
     fm = pd.read_parquet(p)
+    if any(ext_col not in fm.columns for _, _, ext_col in bbw_columns()):
+        # Step 4 writes factors_merged before make_excess_blocks.py builds the _bns/_cls twins,
+        # so the file lacks their columns unless step 4 ran again afterwards. Until 2026-09-23
+        # that stopped the release here. The file IS step 4's build_factor_matrix(); building
+        # it now picks the twins up, and _gate_bbw still checks the result against the blocks.
+        fm = _factor_matrix(blocks)
     fm["date"] = pd.to_datetime(fm["date"])
     fm = fm.sort_values("date").reset_index(drop=True)
     out = pd.DataFrame({"date": fm["date"]})
@@ -692,6 +698,16 @@ def _bbw_extended(blocks: Path) -> pd.DataFrame:
         out[pub] = fm[ext_col].to_numpy()
     have = out.drop(columns="date").notna().any(axis=1)
     return out[have].reset_index(drop=True)
+
+
+def _factor_matrix(blocks: Path) -> pd.DataFrame:
+    """Step 4's factor matrix (what it writes as factors_merged), built from `blocks` now."""
+    import sys
+    steps = str(Path(__file__).resolve().parent / "steps")
+    if steps not in sys.path:
+        sys.path.insert(0, steps)
+    import step4_betas
+    return step4_betas.build_factor_matrix(blocks)
 
 
 def _gate_bbw(trace: pd.DataFrame, ext: pd.DataFrame) -> None:
@@ -1108,7 +1124,17 @@ def main() -> int:
         rc |= release_factors(args.mode, out_dir, vintage)
     if args.what in ("all", "bbw"):
         print("\n" + "=" * 78 + f"\nBBW FOUR-FACTOR BUNDLE ({vintage})\n" + "=" * 78)
-        rc |= release_bbw(args.mode, out_dir, vintage)
+        try:
+            rc |= release_bbw(args.mode, out_dir, vintage)
+        except FileNotFoundError as exc:
+            # The BBW bundle needs make_excess_blocks.py's benchmark twins, which most users
+            # never build. Under `--what all` that used to stop the run before the daily
+            # bundle; it is now skipped, loudly, and the exit code says so.
+            if args.what == "bbw":
+                raise
+            print(f"[bbw] SKIPPED: {exc}\n"
+                  "      Run `python make_excess_blocks.py --benchmark all` first to build it.")
+            rc |= 1
     if args.what in ("all", "daily"):
         print("\n" + "=" * 78 + f"\nDAILY PANEL, PUBLIC LAYOUT ({vintage})\n" + "=" * 78)
         rc |= release_daily(out_dir, vintage)

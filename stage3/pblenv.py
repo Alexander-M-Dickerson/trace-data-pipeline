@@ -167,12 +167,12 @@ def require_fast(what: str) -> None:
         "  PyBondLab.anomaly_assay_fast), and the build on sys.path does not have them.\n"
         f"  Active build: {location()}"
         + (f" (v{_ACTIVE['version']})" if _ACTIVE else "") + "\n"
-        f"  Get a build that does from {PYBONDLAB_URL}\n"
-        "  and either install it or point PYBONDLAB_DIR at the checkout.\n"
+        "  The 0.2.0 release (PyPI, and " + PYBONDLAB_URL + ") carries only the\n"
+        "  second. Point PYBONDLAB_DIR at a PyBondLab checkout that has both.\n"
         "\n"
-        "  Only the uncertainty grids (--section nse) need them. Sections 3 and 4 and\n"
-        "  the zoo run without: `python _run_stage3.py` detects their absence and takes\n"
-        "  the slow path automatically.")
+        "  Only the uncertainty grids (--section nse) need them. `bash run_stage3.sh`\n"
+        "  detects their absence, leaves Section 5 out, and runs Sections 3 and 4, the\n"
+        "  zoo and the PDF on the slow path.")
 
 
 if __name__ == "__main__":

@@ -120,10 +120,9 @@ def fetch_vix_monthly(force: bool = False) -> pd.DataFrame:
     """['date','vix','dvix','dvixlag'] -- EOM VIX (VXO fallback pre-1990) scaled /100/sqrt(12);
     dvix = first diff (first month: intra-month last-first) (create_factors.fetch_vix_monthly)."""
     def build(url: str) -> pd.DataFrame:
-        import os
 
         import wrds
-        _u = os.environ.get("WRDS_USERNAME", "")
+        _u = cfg.wrds_username()
         if not _u:
             raise RuntimeError("WRDS_USERNAME is not set. Stage 2 needs it only for its first run, to fetch and cache Treasury returns, Fama-French factors and VIX. Set it in config.py or as an environment variable.")
         db = wrds.Connection(wrds_username=_u)

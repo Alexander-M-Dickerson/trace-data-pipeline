@@ -935,7 +935,9 @@
       "mnemonic": "var_95",
       "group": "Cluster V: Volatility & Risk",
       "name": "95% Value-at-Risk",
-      "description": "5th percentile loss from empirical daily return distribution over a 36(12) rolling window.",
+      "description": "5th percentile loss from the empirical distribution of monthly returns over a 36(12) rolling window.",
+      "paper_prints": "5th percentile loss from empirical daily return distribution over a 36(12) rolling window.",
+      "why_corrected": "The printed row says daily returns. The code uses monthly ones: stage2/steps/step6_momentum.py passes lib/var_es.py the bond-month return panel, and the window is 36 months with at least 12, which is what the 36(12) in the same sentence counts.",
       "citation": "\\citet{BaiBaliWen_2019}",
       "citation_keys": [
         "BaiBaliWen_2019"
@@ -946,7 +948,9 @@
       "mnemonic": "es_90",
       "group": "Cluster V: Volatility & Risk",
       "name": "90% Expected Shortfall",
-      "description": "Mean of worst 10% of daily returns over a 36(12) rolling window.",
+      "description": "Mean of worst 10% of monthly returns over a 36(12) rolling window.",
+      "paper_prints": "Mean of worst 10% of daily returns over a 36(12) rolling window.",
+      "why_corrected": "The printed row says daily returns. The code uses monthly ones: stage2/steps/step6_momentum.py passes lib/var_es.py the bond-month return panel, and the window is 36 months with at least 12, which is what the 36(12) in the same sentence counts.",
       "citation": "\\citet{BaiBaliWen_2019}",
       "citation_keys": [
         "BaiBaliWen_2019"
@@ -957,7 +961,9 @@
       "mnemonic": "var_90",
       "group": "Cluster V: Volatility & Risk",
       "name": "90% Value-at-Risk",
-      "description": "10th percentile loss from empirical daily return distribution over a 36(12) rolling window.",
+      "description": "10th percentile loss from the empirical distribution of monthly returns over a 36(12) rolling window.",
+      "paper_prints": "10th percentile loss from empirical daily return distribution over a 36(12) rolling window.",
+      "why_corrected": "The printed row says daily returns. The code uses monthly ones: stage2/steps/step6_momentum.py passes lib/var_es.py the bond-month return panel, and the window is 36 months with at least 12, which is what the 36(12) in the same sentence counts.",
       "citation": "\\citet{BaiBaliWen_2019}",
       "citation_keys": [
         "BaiBaliWen_2019"

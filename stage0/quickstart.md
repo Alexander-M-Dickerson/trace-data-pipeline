@@ -95,8 +95,7 @@ clone gives "Permission denied", either `bash run_pipeline.sh` or
 `chmod +x *.sh stage0/*.sh stage1/*.sh` once.
 
 `run_pipeline.sh` first checks your home quota (`check_disk_space.sh`: it stops if less than
-4 GB is free; `FORCE_RUN=1 ./run_pipeline.sh` overrides). A full run writes about 5 GB, so
-leave more than the minimum. It then fetches Stage 1's external inputs (on the login node,
+6 GB is free, since a full run writes about 5 GB; `FORCE_RUN=1 ./run_pipeline.sh` overrides). It then fetches Stage 1's external inputs (on the login node,
 which is the only place with internet), and submits Stage 0 for each member in
 `TRACE_MEMBERS`, the data-report job, and Stage 1.
 

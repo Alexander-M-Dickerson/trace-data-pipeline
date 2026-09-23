@@ -136,8 +136,8 @@ python -m pip install -r requirements.txt
 
 ### 2. Configure
 
-Your WRDS username goes in the root `config.py`, or in the environment, which stages 0 and 1
-read (Stage 2, on your own computer, reads only the environment):
+Your WRDS username goes in the root `config.py`, or in the environment, which every stage
+reads:
 
 ```bash
 export WRDS_USERNAME="your_wrds_id"

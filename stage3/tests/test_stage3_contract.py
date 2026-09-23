@@ -812,7 +812,7 @@ def test_a_producer_is_rerun_when_its_stage2_inputs_change(tmp_path, monkeypatch
     import _run_stage3 as R
     panel = tmp_path / "main_panel_stage1.parquet"
     panel.write_bytes(b"old panel")
-    monkeypatch.setattr(R, "HERE", tmp_path)
+    monkeypatch.setattr(R.S, "DATA", tmp_path / "data")
     monkeypatch.setattr(R.S, "INPUTS", {"STAGE2_PANEL": str(panel)})
     monkeypatch.setattr(R, "SECTION_INPUTS", {"nse": ("STAGE2_PANEL",)})
     script, sargs = "s3_nse/run_mua_grid.py", []
@@ -821,3 +821,23 @@ def test_a_producer_is_rerun_when_its_stage2_inputs_change(tmp_path, monkeypatch
     assert not R.inputs_are_stale("nse", script, sargs)      # same inputs: skip is safe
     panel.write_bytes(b"a rebuilt panel, a different size")
     assert R.inputs_are_stale("nse", script, sargs)          # Stage 2 rebuilt: run it again
+
+
+def test_the_input_records_live_under_stage3_data(tmp_path, monkeypatch):
+    """Until 2026-09-24 they went to stage3/data/_inputs whatever STAGE3_DATA said."""
+    import _run_stage3 as R
+    monkeypatch.setattr(R.S, "DATA", tmp_path / "elsewhere")
+    assert R._inputs_marker("s3_nse/run_mua_grid.py", []).parent == tmp_path / "elsewhere" / "_inputs"
+
+
+def test_without_the_fast_kernels_section_5_is_left_out_and_the_rest_runs():
+    """A refused grid is a failed producer, and a failed producer stops the run, so until
+    2026-09-24 a build without the kernels also lost the zoo and the PDF."""
+    import _run_stage3 as R
+    steps = list(R.STEPS)
+    kept, dropped = R.without_kernels(steps, {"ok": True, "fast": False})
+    assert dropped and kept and all(s[0] != "nse" for s in kept)
+    assert {s[0] for s in kept} == {s[0] for s in steps} - {"nse"}
+    assert R.without_kernels(steps, {"ok": True, "fast": True}) == (steps, False)
+    only_nse = [s for s in steps if s[0] == "nse"]
+    assert R.without_kernels(only_nse, {"ok": True, "fast": False}) == ([], True)

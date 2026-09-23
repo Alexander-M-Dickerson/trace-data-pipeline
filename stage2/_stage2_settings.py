@@ -12,7 +12,7 @@ WHERE THIS RUNS
 ---------------
 Stage 2 runs on YOUR OWN MACHINE, not on the WRDS cluster. Download the stage0/ and
 stage1/ output folders from WRDS first, then run stage 2 against them locally. It is
-CPU- and memory-hungry (a full build is roughly 7 minutes on 24 cores / 128 GB) and it
+CPU- and memory-hungry (a full build is 8 to 18 minutes on 24 cores / 128 GB) and it
 needs no TRACE database access -- only the parquet files Stage 1 produced.
 
 Processing knobs below are carried over verbatim from the reference implementation;
@@ -79,8 +79,9 @@ FACTORS_PINNED_FILE = None
 # these instead; it is cached under stage2/data/ like any other download.
 # ❗The URL must serve the file the vintage's panel was BUILT with -- the one the site's download
 # links serve, on the osbap-site release. Until 2026-09-23 this pointed at a WordPress upload from
-# 2026-09-10 that predates the eight _bns/_cls twin factors (36 columns, not 44), so the pinned
-# route could not build the tret_bns/tret_cls blocks.
+# 2026-09-10 that predates the eight _bns/_cls twin factors (36 columns, not 44). Step 4 drops
+# those columns unread, so no build changed; the point is that the pinned file IS the published
+# one.
 FACTORS_PINNED_URL = {
     "2026": "https://github.com/Alexander-M-Dickerson/osbap-site/releases/download/data-2026/osbap_stage2_factors_2026.zip",
 }
@@ -278,6 +279,39 @@ LOG_DIR = STAGE2_DIR / "logs"
 MANIFEST_DIR = STAGE2_DIR / "manifests"    # committed JSON run manifests
 FACTOR_CACHE_DIR = STAGE2_DATA / "factor_cache"
 
+# What Stage 2 fetches from WRDS on its first run, cached in STAGE2_DATA after one fetch. Both
+# factor sources need these four; the public source also fetches monthly VIX into
+# FACTOR_CACHE_DIR. The credentials check in validate_config asks for WRDS_USERNAME only while
+# one of them is missing.
+WRDS_CACHES = ("crsp_treasury_returns.parquet", "ff5_factors.parquet", "cboe_vix.parquet",
+               "fisd_cashflow_terms.parquet")
+
+
+def wrds_username() -> str:
+    """The WRDS username for Stage 2's first-run fetches: the environment, else config.py.
+
+    config.py's default is the placeholder "your_wrds_username", so a name starting "your_"
+    counts as unset. Until 2026-09-23 the fetchers read only the environment while their own
+    error said "Set it in config.py", and the placeholder passed the credentials check.
+    """
+    name = (os.environ.get("WRDS_USERNAME") or WRDS_USERNAME or "").strip()
+    return "" if not name or name.lower().startswith("your_") else name
+
+
+def wrds_credentials_problem(config: dict) -> str | None:
+    """None if Stage 2 can run: every WRDS cache is present, or there is a username to fetch
+    the missing ones with. Otherwise the message to show."""
+    needed = [STAGE2_DATA / f for f in WRDS_CACHES]
+    if config["factor_source"] == "public":
+        needed.append(FACTOR_CACHE_DIR / "vix_monthly.parquet")
+    missing = [p.name for p in needed if not p.exists()]
+    if not missing or config["wrds_username"]:
+        return None
+    return ("WRDS_USERNAME is not set (or is still the config.py placeholder), and these WRDS\n"
+            f"    caches are missing: {', '.join(missing)}.\n"
+            "    Stage 2's first run fetches them from WRDS once, then reads the cache. Set\n"
+            "    WRDS_USERNAME in config.py or as an environment variable.")
+
 # ============================================================================
 # INPUT RESOLUTION
 # ============================================================================
@@ -392,7 +426,7 @@ def get_config() -> dict:
     """Return the full Stage 2 configuration dictionary."""
     return {
         # User settings
-        "wrds_username": WRDS_USERNAME,
+        "wrds_username": wrds_username(),
         "author": AUTHOR,
 
         # Paths
@@ -537,15 +571,22 @@ def validate_config(config: dict) -> None:
         if not ok:
             problems.append(origin)
 
-    # --- WRDS credentials (needed only for the first-run caches) -----------
-    cached = FACTOR_CACHE_DIR.exists() and any(FACTOR_CACHE_DIR.glob("*.parquet"))
-    if not config["wrds_username"] and not cached:
+    # --- WRDS credentials (needed only until the first-run caches exist) ---
+    # Until 2026-09-23 this looked in FACTOR_CACHE_DIR, where none of the WRDS caches live, and
+    # accepted config.py's placeholder name, so it never fired.
+    creds = wrds_credentials_problem(config)
+    if creds:
+        problems.append(creds)
+
+    # --- numba --------------------------------------------------------------
+    # Stage 2's rolling kernels are numba. requirements.txt installs it only below Python 3.14,
+    # to leave the WRDS stages (which run 3.14 and use numba only if present) as they were run.
+    import importlib.util
+    if importlib.util.find_spec("numba") is None:
         problems.append(
-            "WRDS_USERNAME not set, and the factor caches are empty.\n"
-            "    Stage 2's first run fetches Treasury returns, Fama-French factors and\n"
-            "    VIX from WRDS, then caches them. Set WRDS_USERNAME in config.py or as\n"
-            "    an environment variable. Later runs need no credentials."
-        )
+            "numba is not installed, and Stage 2's kernels need it.\n"
+            "    requirements.txt installs it only below Python 3.14. On 3.14 install it\n"
+            "    yourself (python -m pip install \"numba>=0.63\"), or use Python 3.10-3.13.")
 
     if problems:
         raise FileNotFoundError(

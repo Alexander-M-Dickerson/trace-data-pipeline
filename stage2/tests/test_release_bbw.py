@@ -181,3 +181,37 @@ def test_release_bbw_writes_a_verifiable_bundle(tmp_path, monkeypatch):
 def test_what_all_includes_the_bundle():
     src = (Path(mr.__file__)).read_text(encoding="utf-8")
     assert 'if args.what in ("all", "bbw"):' in src, "--what all no longer builds the BBW bundle"
+
+
+def test_a_factors_merged_without_the_twins_is_rebuilt_not_refused(tmp_path, monkeypatch):
+    """Step 4 writes factors_merged before make_excess_blocks.py builds the _bns/_cls twins, so
+    on a normal build the file lacks their columns. Until 2026-09-23 the release stopped there
+    unless step 4 ran again; it now builds step 4's matrix itself, and the gate still checks it."""
+    blocks = _write_blocks(tmp_path / "stage1")
+    full = pd.read_parquet(blocks / "factors_merged.parquet")
+    twins = [c for c in full.columns if c.endswith(("_bns", "_cls"))]
+    assert twins
+    full.drop(columns=twins).to_parquet(blocks / "factors_merged.parquet", index=False)
+    calls = []
+    monkeypatch.setattr(mr, "_factor_matrix", lambda b: calls.append(b) or full.copy())
+    ext = mr._bbw_extended(blocks)
+    assert calls == [blocks]
+    mr._gate_bbw(mr._bbw_trace(blocks), ext)
+
+
+def test_what_all_skips_a_bbw_bundle_it_cannot_build_and_still_builds_daily(monkeypatch, tmp_path):
+    """Most users never build the benchmark twins. `--what all` used to stop at the BBW bundle,
+    before the daily one; it now skips it, says so, and exits non-zero."""
+    done = []
+    monkeypatch.setattr(mr, "release_panel", lambda *a: done.append("panel") or 0)
+    monkeypatch.setattr(mr, "release_factors", lambda *a: done.append("factors") or 0)
+    monkeypatch.setattr(mr, "release_daily", lambda *a: done.append("daily") or 0)
+
+    def no_twins(*a):
+        raise FileNotFoundError("no bbw_factors_bns.parquet")
+    monkeypatch.setattr(mr, "release_bbw", no_twins)
+    monkeypatch.setattr(sys, "argv", ["make_release.py", "--out-dir", str(tmp_path)])
+    assert mr.main() == 1 and done == ["panel", "factors", "daily"]
+    monkeypatch.setattr(sys, "argv", ["make_release.py", "--what", "bbw", "--out-dir", str(tmp_path)])
+    with pytest.raises(FileNotFoundError):
+        mr.main()

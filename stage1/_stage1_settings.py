@@ -572,8 +572,8 @@ def validate_config(config: dict) -> None:
             f"{config['stage1_data']}:\n" + "\n".join(missing_external) + "\n\n"
             "These are downloaded on the WRDS login node (compute nodes have no\n"
             "internet access). From the project ROOT, run:\n"
-            "  ./run_pipeline.sh          # downloads them, then submits the jobs\n"
-            "or fetch them by hand -- see the PRE-STAGE block in run_pipeline.sh."
+            "  bash download_inputs.sh    # fetches them (run_pipeline.sh does this too)\n"
+            "then submit again."
         )
 
     # Validate output format

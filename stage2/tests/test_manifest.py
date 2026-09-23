@@ -41,3 +41,23 @@ def test_sha_cache_hits(tmp_path, monkeypatch):
     cache = json.loads((tmp_path / "sha_cache.json").read_text())
     assert list(cache.values()) == [d1]
     assert mf.sha256_file(f) == d1
+
+
+def test_concurrent_step_groups_get_different_manifests():
+    """A full build starts steps 3-4 and 5-6 as two child processes in the same second. Until
+    2026-09-23 both took the run id monthly_<stamp>_<mode>, so one manifest overwrote the other."""
+    a = mf.RunManifest(input_mode="stage1", tag="steps3-4").doc["run_id"]
+    b = mf.RunManifest(input_mode="stage1", tag="steps5-6").doc["run_id"]
+    assert a != b and a.endswith("_stage1_steps3-4") and b.endswith("_stage1_steps5-6")
+    assert mf.RunManifest(input_mode="stage1").doc["run_id"].endswith("_stage1")
+
+
+def test_validate_imports_modules_that_exist():
+    """--validate imported `validate_monthly`, which is not in this repository (2026-09-23)."""
+    import ast
+    from pathlib import Path
+    stage2 = Path(cfg.__file__).resolve().parent
+    tree = ast.parse((stage2 / "build_panel.py").read_text(encoding="utf-8"))
+    local = {n.names[0].name for n in ast.walk(tree) if isinstance(n, ast.Import)
+             and n.names[0].name.startswith("validate")}
+    assert local and all((stage2 / f"{m}.py").exists() for m in local), local

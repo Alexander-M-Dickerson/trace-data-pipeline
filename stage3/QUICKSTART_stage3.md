@@ -90,8 +90,8 @@ build it resolved, and records it in every manifest:
 
 > ❗`fast kernels: NO` means **only Section 5 is blocked** — the two uncertainty grids
 > need `PyBondLab.fast_sorts` and `PyBondLab.anomaly_assay_fast`, and the 0.2.0 release
-> does not carry them. The grids are producers, and a failed producer stops the run, so add
-> `--keep-going` to get everything else. That runs on the slow path automatically, with the
+> does not carry them. `run_stage3.sh` then leaves Section 5 out, says so, runs everything
+> else and exits non-zero. The rest runs on the slow path automatically, with the
 > same numbers: `_run_stage3.py` asks once at startup and prints which path it took.
 > Expect roughly fourteen times the sort time there (43.8 s against 3.2 s, measured on
 > one sort).

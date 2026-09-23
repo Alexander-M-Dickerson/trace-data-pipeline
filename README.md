@@ -58,10 +58,10 @@ your WRDS login; later runs read the cache.
 
 **On your own computer:**
 
-8. Install the same requirements (`pip install -r requirements.txt`) in a Python 3.10-3.13
-   environment: Stages 2 and 3 need `numba`, which `requirements.txt` installs only below
-   Python 3.14. `export WRDS_USERNAME=...` in that shell: Stage 2's first run fetches a few
-   series from WRDS, and it reads the name from the environment, not from `config.py`.
+8. Install the same requirements (`pip install -r requirements.txt`) in a Python 3.10+
+   environment (on Python 3.14 also `pip install "numba>=0.63"`: `requirements.txt` installs
+   numba only below 3.14). Stage 2's first run fetches a few series from WRDS, so set your
+   username in `config.py` or `export WRDS_USERNAME=...`.
 9. `cd stage2 && python _run_stage2.py` (add `--factor-source pinned` to reproduce a
    published panel exactly; see [stage2/QUICKSTART_stage2.md](stage2/QUICKSTART_stage2.md))
 10. You now have `stage2/output/panel/main_panel_<mode>.parquet` — 145 columns per bond-month.
@@ -72,7 +72,7 @@ your WRDS login; later runs read the cache.
 12. `bash run_stage3.sh` — portfolio sorts, the uncertainty grids, and 33 tables and
     11 figures into `stage3/reports/`. The two uncertainty grids need a PyBondLab build
     with the fast kernels (`PYBONDLAB_DIR`, see [stage3/QUICKSTART_stage3.md](stage3/QUICKSTART_stage3.md));
-    without one the run stops at the first grid.
+    without one the run leaves them out and says so.
 
 Stages 0-2 build the DATA. Stage 3 is what the data was built for: it reproduces every
 exhibit of *The Corporate Bond Factor Replication Crisis* from the panel you just made.

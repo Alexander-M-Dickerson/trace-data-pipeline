@@ -8,8 +8,10 @@
 pandas>=2.2.3
 numpy>=2.0
 pyarrow>=20.0.0
-# Stage 1 runs without numba (plain Python, slower). Stage 2 imports it directly, so run
-# Stages 2 and 3 on Python 3.10-3.13, where this line installs it.
+# Not installed on Python 3.14, which the WRDS Cloud runs, so the WRDS stages stay as they were
+# run (stage 1 falls back to plain Python without it). Stages 2 and 3 need it: on your own
+# computer on 3.14, `pip install "numba>=0.63"` (the first release with 3.14 wheels). Stage 2
+# stops at start-up with that instruction if numba is missing.
 numba>=0.60; python_version<"3.14"
 
 # WRDS database access
@@ -72,7 +74,7 @@ psutil>=5.9
 # GRIDS (Section 5) need `PyBondLab.fast_sorts` and `PyBondLab.anomaly_assay_fast`,
 # which the 0.2.0 release does not carry -- without them those grids are hours rather
 # than minutes, and Stage 3 refuses to start them rather than letting each of the 108
-# signal tasks fail on an import. A refused grid stops `run_stage3.sh`; `--keep-going`
+# signal tasks fail on an import. Without them `run_stage3.sh` leaves Section 5 out and
 # runs everything else.
 #
 # Do NOT float the pin to fix that: Stage 2's factor series, and the ~40 beta columns

@@ -14,12 +14,11 @@ def load_ff5(force_fetch: bool = False) -> pd.DataFrame:
     if FF5_CACHE.exists() and not force_fetch:
         return pd.read_parquet(FF5_CACHE)
 
-    import os
 
     import wrds
     from pandas.tseries.offsets import MonthEnd
 
-    _u = os.environ.get("WRDS_USERNAME", "")
+    _u = cfg.wrds_username()
     if not _u:
         raise RuntimeError("WRDS_USERNAME is not set. Stage 2 needs it only for its first run, to fetch and cache Treasury returns, Fama-French factors and VIX. Set it in config.py or as an environment variable.")
     db = wrds.Connection(wrds_username=_u)

@@ -143,15 +143,6 @@ def build(live: bool = False) -> list[dict]:
                 db.close()
         except Exception as e:
             rows.append({"source": "[live] WRDS", "last": f"CONNECT_FAILED {str(e)[:60]}"})
-        # local DB TRACE frontier (the ultimate daily-input source)
-        try:
-            dbp = str(cfg.REPO / "raw_data" / "wrds_trace.duckdb").replace("\\", "/")
-            c = duckdb.connect(dbp, read_only=True)
-            for t in ("trace_enhanced", "trace_btds144a"):
-                mx = c.execute(f"SELECT MAX(CAST(trd_exctn_dt AS DATE)) FROM {t}").fetchone()[0]
-                rows.append({"source": f"[live] DB {t}", "kind": "db", "last": str(mx)[:10]})
-        except Exception as e:
-            rows.append({"source": "[live] DB", "last": f"ERR {str(e)[:50]}"})
     return rows
 
 

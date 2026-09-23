@@ -643,7 +643,7 @@ def main():
                         new_chunk_size = max(1, chunk_size // 4)
                         if new_chunk_size != chunk_size:
                             logging.info(
-                                "[%s] Too many chunks (%s). Halving chunk_size %s -> %s and re-partitioning.",
+                                "[%s] Too many chunks (%s). Cutting chunk_size to a quarter, %s -> %s, and re-partitioning.",
                                 dtype, f"{len(cusip_chunks):,}", chunk_size, new_chunk_size
                             )
                             chunk_size   = new_chunk_size

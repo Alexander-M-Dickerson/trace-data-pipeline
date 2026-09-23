@@ -1041,11 +1041,11 @@ To process a specific date range, modify the per-dataset overrides in `_trace_se
 # ❗Keep `n_workers` on every member. Dropping it returns that member to the serial
 # path (the engine default is n_workers=1) while run_pipeline.sh still requests 5 slots.
 PER_DATASET = {
-    "enhanced": dict(n_workers=WORKERS_OVERRIDE or CONCURRENCY["enhanced"]),
+    "enhanced": dict(n_workers=workers("enhanced")),
     "standard": dict(start_date="2020-01-01", data_type="standard",
-                     n_workers=WORKERS_OVERRIDE or CONCURRENCY["standard"]),
+                     n_workers=workers("standard")),
     "144a":     dict(start_date="2020-01-01", data_type="144a",
-                     n_workers=WORKERS_OVERRIDE or CONCURRENCY["144a"]),
+                     n_workers=workers("144a")),
 }
 ```
 

@@ -65,8 +65,9 @@ agency rating — so that file yields an empty panel. Stage 2 detects this and r
 start. Run Stages 0 and 1 yourself on WRDS and use their output.
 
 Python packages beyond Stage 1's: `duckdb`, `numba`, `scipy`, `statsmodels`,
-`pandas_market_calendars` and `PyBondLab` (pinned at 0.2.0). `requirements.txt` installs them all;
-`numba` only below Python 3.14, so use Python 3.10-3.13 for Stage 2.
+`pandas_market_calendars` and `PyBondLab` (pinned at 0.2.0). `requirements.txt` installs them all,
+except `numba` on Python 3.14: there, `pip install "numba>=0.63"` yourself. The dry run says if
+it is missing.
 
 ---
 
@@ -90,6 +91,7 @@ Useful flags (passed straight through to `_run_stage2.py`):
 | `--limit-cusips 200` | Build on the first 200 CUSIPs — a fast development loop. ❗It writes to the same `output/` as a full build, replacing its panel and blocks |
 | `--from-step N --to-step M` | Run part of the pipeline (steps 1-7) |
 | `--factor-source pinned` | Use the factor file published with your vintage (downloaded once) instead of rebuilding it from public sources. Needed to reproduce a published panel exactly |
+| `--validate` | After the build, run the column-coverage check (`validate_coverage.py`) and record it in the run manifest |
 
 ---
 

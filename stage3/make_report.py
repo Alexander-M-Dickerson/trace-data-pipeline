@@ -334,11 +334,12 @@ def title_page(window: str, prov: dict) -> str:
                  r"line above is the run's own assertion about them, and it did not "
                  r"hold. See \texttt{reports/timings.jsonl}.}")
     L.append(r"\vfill")
+    # Until 2026-09-24 this also said Table IA.VIII was absent. Stage 3 has produced it, from
+    # spec/signal_definitions.json, since 2026-09-12.
     L.append(r"{\footnotesize " + NOT_DATA_FIGURES + r" of the paper are schematics drawn "
              r"in \LaTeX{} -- a research framework, a return timeline and a look-ahead "
-             r"illustration -- and Table IA.VIII is its signal dictionary, a written "
-             r"list of the panel's fields. None of the four has any computation behind "
-             r"it, so Stage 3 does not produce them and they are absent here.}")
+             r"illustration. None of the three has any computation behind it, so Stage 3 "
+             r"does not produce them and they are absent here.}")
     L.append(r"\end{titlepage}")
     return "\n".join(L)
 

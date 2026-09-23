@@ -51,19 +51,13 @@ A full audit of every guide against the code and the 2026-09-21 run followed. Wh
 
 - **Stage 2 needs WRDS once.** Seven places said Stage 2 needs no WRDS connection; its first run
   fetches CRSP Treasury returns, Fama-French factors, VIX and FISD coupon terms, then caches them.
-- **Stage 3 without the fast kernels** stops at the first uncertainty grid; the guides said
-  everything else still ran. `--keep-going` runs the rest.
-- **Python.** Stages 2 and 3 need Python 3.10-3.13: `requirements.txt` installs `numba` only
-  below 3.14, and Stage 2 imports it.
 - **Instructions that did not work as written:** the stage 1 manual download (it missed the three
   industry files, and "a run with internet downloads them itself" is false, since Stage 1 checks
   for them before it starts); `qsub` from `stage1/`; the stage 1 memory advice (`16G` per slot is
   over the WRDS cap, and the `N_CHUNKS` advice was backwards); a `start_date` for Enhanced;
-  raising `CONCURRENCY` past the connection limit; `STAGE0_WORKERS` (it applies to every member,
-  unchecked); stage 0's log paths and its CSV output option; `make_release.py` with no
-  arguments (it stops at the BBW bundle unless step 4 re-ran after `make_excess_blocks.py`);
-  `--validate` (does nothing in a public build); `--no-compile` (a `make_report.py` flag);
-  `--limit-cusips` (it replaces a full build's output).
+  raising `CONCURRENCY` past the connection limit; stage 0's log paths and its CSV output
+  option; `--no-compile` (a `make_report.py` flag); `--limit-cusips` (it replaces a full
+  build's output).
 - **Settings in the wrong place:** `WRDS_USERNAME` and `TRACE_MEMBERS` are in `config.py`; stage
   1's date stamp is auto-detected, with nothing to set; a `FILTER_SWITCHES` key left out falls
   back to the engine's default, so leaving out `volume_filter_toggle` switches the $10,000
@@ -76,8 +70,7 @@ A full audit of every guide against the code and the 2026-09-21 run followed. Wh
   were missing from the guides; the July 2002 and spike thresholds were misdescribed; Standard
   TRACE rows never survive the automatic sample end; the distressed-bond CSV carries numbers only
   for the flagged bonds; the monthly panel's 68 beta and momentum columns are estimated on
-  `ret_vw`, not `ret_vw - tret`; VaR and expected shortfall use monthly returns over 36 months,
-  not daily returns; `eput` is tax (not trade) policy uncertainty and `rsj` a signed jump; the
+  `ret_vw`, not `ret_vw - tret`; `eput` is tax (not trade) policy uncertainty and `rsj` a signed jump; the
   NSE Ratio is a standard deviation over the mean standard error; the Table IA.XIX pool is the
   ledger's count less the 648 baselines.
 - **Stale:** the 2026 vintage was built from the 2026-09-21 run, not the 2026-09-10 one; run
@@ -87,6 +80,43 @@ A full audit of every guide against the code and the 2026-09-21 run followed. Wh
 - **Worked examples:** the bounce-back Example 1 baselines (93.50, 93.75, 94.00, 93.75, not
   93.2); the distressed-filter median (44.9) and why 100.0 is a spike candidate (above 5, not a
   round number); the decimal-shift corrector adds seven columns, not three.
+
+### Fixed -- code the documentation audit found
+- Stage 2 read `WRDS_USERNAME` from the environment only, although its own error said "Set it in
+  config.py". Its start-up check looked for the WRDS caches in the wrong folder and accepted
+  `config.py`'s placeholder name, so it never fired. Stage 2 now takes the name from `config.py`
+  or the environment, treats the placeholder as unset, and checks the four caches it fetches.
+- Stage 2 needs `numba`, which `requirements.txt` does not install on Python 3.14 (so the WRDS
+  stages stay as they were run). Stage 2 now stops at start-up with the instruction when numba
+  is missing, instead of failing mid-build.
+- `_run_stage2.py --validate` acted only in a mode public builds never use, and imported a
+  module that does not exist. It now runs the column-coverage check and records it.
+- A full build's steps 3-4 and 5-6 start in the same second, and their run manifests shared one
+  name, so one overwrote the other. A partial run's manifest now names its steps.
+- `make_release.py` with no arguments stopped at the BBW bundle, before the daily one, unless
+  step 4 had re-run after `make_excess_blocks.py`. The BBW bundle now builds step 4's factor
+  matrix itself; and under `--what all`, a build without the benchmark twins skips the BBW
+  bundle, says so and exits 1.
+- `stage2/run_build_data_reports.sh` was committed without the executable bit, while Stage 2
+  tells users to run it as `./run_build_data_reports.sh`.
+- Stage 3 without PyBondLab's fast kernels stopped at the first uncertainty grid, and so also
+  skipped the zoo and the PDF, while every guide said the rest ran. It now leaves Section 5 out,
+  runs everything else, and exits non-zero. The refusal message no longer sends users to a
+  release that lacks the kernels.
+- Stage 3 wrote its input records to `stage3/data/_inputs/` whatever `STAGE3_DATA` said.
+- The exhibits PDF's title page said Table IA.VIII was absent; Stage 3 has produced it since
+  2026-09-12.
+- Table IA.VIII described `var_90`, `var_95` and `es_90` as measures of daily returns. They are
+  computed from monthly returns, over 36 months with at least 12. The three rows are corrected,
+  with the printed text kept beside them (sixteen corrected rows now).
+- `STAGE0_WORKERS` applied to every stage 0 member, but the connection check and the `qsub`
+  request ignored it: `STAGE0_WORKERS=4` held 8 connections against a ceiling of 7 and passed.
+  Both now see it.
+- `check_disk_space.sh` asked for 4 GB; a full run writes about 5.1 GB. It now asks for 6.
+- Stale messages and comments: the stage 1 missing-file error now names `download_inputs.sh`,
+  and comments on 144A's chunk count, the report job's chunk size, Stage 2's run time and the
+  inputs `download_inputs.sh` fetches say what the code does. A live check of a private
+  database is gone from `stage2/check_external_data.py`.
 
 ### Added
 - `AGENTS.md` (read by Codex) and `CLAUDE.md` (read by Claude Code) at the root and in `stage2/`

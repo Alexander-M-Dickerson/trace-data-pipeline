@@ -20,8 +20,9 @@ bit for bit. That is expected, not a bug.
 
 ## The commands, in order
 
-Run from `stage2/`. If the cache under `stage2/data/` is empty, `export WRDS_USERNAME=...` first:
-stage 2 reads it from the environment only, not from `config.py`.
+Run from `stage2/`. If the cache under `stage2/data/` is empty, the first run needs the WRDS
+username, in the root `config.py` or `export WRDS_USERNAME=...`; the dry run says if it is
+missing.
 
 ```bash
 python _run_stage2.py --dry-run [--factor-source pinned]   # 1. resolve and print every input
@@ -53,9 +54,8 @@ python make_release.py --what panel                        # 6. optional: the re
 6. **Release.** Writes the version that may be shared: `permco` and `gvkey` blanked, the composite
    ratings reduced to investment grade / high yield. It refuses to write a file that still carries
    licensed values. The user's own unredacted panel stays in `output/panel/`. Plain
-   `make_release.py` means `--what all`, which also builds the BBW bundle; that one needs step 5
-   and then step 4 again (`_run_stage2.py --from-step 4 --to-step 4`), or it stops with an
-   error after writing the panel and factor bundles.
+   `make_release.py` means `--what all`, which also builds the BBW bundle when step 5 has been
+   run, and otherwise skips it, says so and exits 1 after writing the other bundles.
 
 ## Reproducing a published panel: what "identical" means
 

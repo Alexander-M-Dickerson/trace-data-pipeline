@@ -15,7 +15,9 @@
 
 set -uo pipefail
 
-NEED_GB="${DISK_CHECK_NEED_GB:-4.0}"
+# A full run writes about 5.1 GB (the 2026-09-21 run: stage 0 panels 2.5 GB, the stage 1 panel
+# 2.7 GB), so 6 GB leaves a margin. Until 2026-09-24 this was 4.0, below what a run writes.
+NEED_GB="${DISK_CHECK_NEED_GB:-6.0}"
 MEASURE_TIMEOUT="${DISK_CHECK_TIMEOUT:-120}"      # seconds allowed for `du` over $HOME
 
 echo ""

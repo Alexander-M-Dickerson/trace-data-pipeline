@@ -92,7 +92,12 @@ def run(input_mode: str, from_step: int, to_step: int, limit_cusips: int | None,
     cfg.INPUT_MODE = input_mode
     cfg.FACTOR_SOURCE = factor_source or cfg.factor_source_for(input_mode)
     cfg.ensure_dirs()
-    manifest = mf.RunManifest(input_mode=input_mode)
+    # A full build's steps 3-4 and 5-6 start as two child processes in the same second, and
+    # the run id was only that second-resolution stamp, so one child's manifest overwrote the
+    # other's. A partial run's id now names its steps.
+    manifest = mf.RunManifest(input_mode=input_mode,
+                              tag=None if (from_step, to_step) == (1, 7)
+                              else f"steps{from_step}-{to_step}")
     manifest.add_input("daily", cfg.daily_input(input_mode))
     for role in ("linker", "call", "fisd"):
         path = cfg.AUX.get(role)
@@ -137,12 +142,16 @@ def run(input_mode: str, from_step: int, to_step: int, limit_cusips: int | None,
             manifest.add_gate(f"step{num}_{mod_name}", status="BUILT", wall_s=wall,
                               output={n: str(p) for n, p in blocks.items()})
 
+    # --validate. Until 2026-09-23 it acted only in "golden" mode, which a public build never
+    # uses, and that branch imported a `validate_monthly` module that does not exist here (the
+    # file is validate_stage2.py). A public build has no reference to diff against, so it runs
+    # the check that does apply: every column reaches the panel's last month.
     if validate and input_mode == "golden":
-        import validate_monthly
+        import validate_stage2
         all_pass = True
-        for step_name in validate_monthly._specs():
+        for step_name in validate_stage2._specs():
             try:
-                passed, report = validate_monthly.validate_step(step_name)
+                passed, report = validate_stage2.validate_step(step_name)
             except FileNotFoundError as exc:
                 print(f"[validate:{step_name}] skipped: {exc}")
                 continue
@@ -150,6 +159,17 @@ def run(input_mode: str, from_step: int, to_step: int, limit_cusips: int | None,
             manifest.add_gate(f"validate_{step_name}", status="PASS" if passed else "FAIL",
                               wall_s=0.0, validation=report)
         print("[validate] overall:", "PASS" if all_pass else "FAIL")
+    elif validate:
+        import validate_coverage
+        built = cfg.PANEL_DIR / f"main_panel_{input_mode}.parquet"
+        if built.exists():
+            ok, report = validate_coverage.check_coverage(built)
+            print(validate_coverage.format_report(report))
+            manifest.add_gate("validate_coverage", status="PASS" if ok else "FAIL",
+                              wall_s=0.0, validation=report)
+            print("[validate] coverage:", "PASS" if ok else "FAIL")
+        else:
+            print(f"[validate] skipped: no panel at {built}")
 
     panel = cfg.PANEL_DIR / f"main_panel_{input_mode}.parquet"
     if panel.exists():

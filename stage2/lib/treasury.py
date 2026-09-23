@@ -27,13 +27,12 @@ _TERM_ORDER = [1 / 12, 1, 2, 5, 7, 10, 20, 30]
 
 def fetch_treasury_returns(wrds_username: str | None = None) -> pd.DataFrame:
     """One-time WRDS fetch (upstream load_treasury_returns, verbatim queries). Long format out."""
-    import os
 
     import wrds
     from pandas.tseries.offsets import MonthEnd
 
     # (WRDS auth: .pgpass holds the password)
-    _u = os.environ.get("WRDS_USERNAME", "")
+    _u = cfg.wrds_username()
     if not _u:
         raise RuntimeError("WRDS_USERNAME is not set. Stage 2 needs it only for its first run, to fetch and cache Treasury returns, Fama-French factors and VIX. Set it in config.py or as an environment variable.")
     username = wrds_username or _u

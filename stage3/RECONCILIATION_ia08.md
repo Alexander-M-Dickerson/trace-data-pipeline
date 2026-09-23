@@ -10,7 +10,7 @@ does not describe what the code does is wrong however carefully it was written, 
 only way to find out is to open the function.
 
 Stage 3 now generates the table from `spec/signal_definitions.json`
-(`s4_zoo/t_ia08.py`). Thirteen rows there differ from the printed table; each carries
+(`s4_zoo/t_ia08.py`). Sixteen rows there differ from the printed table; each carries
 `paper_prints` and `why_corrected`, is marked `†` in the rendered table, and is listed
 below. `python s4_zoo/t_ia08.py --diffs` prints them.
 
@@ -85,7 +85,7 @@ This is the one that matters. `dcs6` is an FDR survivor.
 | `stage2/DATA_DICTIONARY.md`, Cluster I table | "searches with **±1** month bandwidth" (no tie-break stated, as first read) |
 | **the code** | `DSPREAD_BANDWIDTH = 1`; `offsets = [0, -1, +1]` |
 
-`_stage2_settings.py:140` sets the bandwidth to 1. `lib/value.py:779-781` builds the
+`DSPREAD_BANDWIDTH` in `_stage2_settings.py` sets the bandwidth to 1. `lib/value.py:779-781` builds the
 search order as `[0]` then `[-j, +j]` for `j` in `1..bandwidth`, and `lib/value.py:816`
 takes the first hit. So the search is **one month either side**, and when both are
 available it takes the **earlier** month — the longer lag — not the later one.
@@ -274,17 +274,26 @@ and cited nowhere.
 
 **Fixed here**, and the manuscript row and its bibliography entry are corrected with it.
 
+## 12. VaR and expected shortfall are monthly, not daily
+
+`var_90`, `var_95` and `es_90` were printed as measures of "daily" returns. The code computes
+them from monthly ones: `stage2/steps/step6_momentum.py` passes `lib/var_es.py` the bond-month
+return panel, and the window is 36 months with at least 12 -- the "36(12)" the same sentence
+already printed.
+
+**Fixed here** (2026-09-24), in `stage2/DATA_DICTIONARY.md`, and in the manuscript rows.
+
 ---
 
 ## How to re-run this
 
 ```bash
 cd stage3
-python s4_zoo/t_ia08.py --diffs     # the thirteen corrected rows and what settled each
+python s4_zoo/t_ia08.py --diffs     # the sixteen corrected rows and what settled each
 python s4_zoo/t_ia08.py             # -> reports/tables/table_ia08.tex
 python -m pytest tests/ -k ia08 -q  # every sorted signal has a definition
 ```
 
-The spec is `spec/signal_definitions.json`. It is the paper's text with thirteen rows
+The spec is `spec/signal_definitions.json`. It is the paper's text with sixteen rows
 corrected, each recording what was printed and why it changed — so the printed table can
 always be reconstructed from it, and no correction is silent.

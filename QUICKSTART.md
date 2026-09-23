@@ -26,7 +26,7 @@ Transforms raw TRACE data into a research-ready bond dataset with:
 - ✅ **WRDS account** with TRACE, FISD, and ratings access
 - ✅ **WRDS Cloud access** (or local Python environment)
 - ✅ **`.pgpass`** configured for passwordless WRDS authentication
-- ✅ **Python ≥ 3.10** (the 2026-09-21 run used 3.14.5 on the WRDS Cloud; Stages 2 and 3, on your own computer, need 3.10-3.13)
+- ✅ **Python ≥ 3.10** (the 2026-09-21 run used 3.14.5 on the WRDS Cloud)
 
 ---
 
@@ -351,12 +351,10 @@ print(df.head())
 
 Everything above happened **on WRDS**. Stage 2 happens **on your own computer**, on the
 files you just downloaded. Its first run connects to WRDS once, to fetch and cache a few
-series (CRSP Treasury returns, Fama-French factors, VIX and FISD coupon terms), so
-`export WRDS_USERNAME=...` first (Stage 2 reads it from the environment, not `config.py`);
-later runs read the cache.
+series (CRSP Treasury returns, Fama-French factors, VIX and FISD coupon terms), so it needs
+your WRDS username, in `config.py` or `export WRDS_USERNAME=...`; later runs read the cache.
 
-First install the requirements there, in a Python 3.10-3.13 environment (Stages 2 and 3
-need `numba`, which `requirements.txt` installs only below Python 3.14):
+First install the requirements there, in a Python 3.10+ environment. Stages 2 and 3 need `numba`; `requirements.txt` installs it below Python 3.14, and on 3.14 you install it yourself (`pip install "numba>=0.63"`). Stage 2 stops at start-up if it is missing.
 
 ```bash
 cd trace-data-pipeline          # the folder you just unzipped

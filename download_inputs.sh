@@ -1,8 +1,8 @@
 #!/bin/bash
 # download_inputs.sh -- fetch the external files stage 1 needs.
 #
-# Stage 1 needs four things this repo does not ship: the Liu-Wu zero-coupon treasury
-# curve, the bond-firm linker, and the Fama-French industry classifications. They come
+# Stage 1 needs three things this repo does not ship: the Liu-Wu zero-coupon treasury
+# curve, the bond-firm linker, and the Fama-French industry classifications (three files). They come
 # off the internet, and WRDS COMPUTE NODES HAVE NO INTERNET -- so this has to run on
 # the login node, before anything is submitted.
 #

@@ -83,10 +83,12 @@ class RunManifest:
         m.write()
     """
 
-    def __init__(self, input_mode: str, run_id: str | None = None):
+    def __init__(self, input_mode: str, run_id: str | None = None, tag: str | None = None):
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         self.doc: dict[str, Any] = {
-            "run_id": run_id or f"monthly_{stamp}_{input_mode}",
+            # `tag` keeps two runs started in the same second apart (a full build's concurrent
+            # step groups): monthly_<stamp>_<mode>_<tag>.
+            "run_id": run_id or f"monthly_{stamp}_{input_mode}" + (f"_{tag}" if tag else ""),
             "git_commit": git_commit(),
             "created_utc": datetime.now(timezone.utc).isoformat(),
             "input_mode": input_mode,

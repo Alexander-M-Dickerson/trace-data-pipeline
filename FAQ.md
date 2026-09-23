@@ -72,8 +72,7 @@ repository root) skips the cores and memory `run_pipeline.sh` requests for it, s
 line above.
 
 ### What Python version do I need?
-Python 3.10 or higher for stages 0 and 1 (the WRDS Cloud runs 3.14). On your own computer,
-Stages 2 and 3 need 3.10-3.13, because `requirements.txt` installs `numba` only below 3.14.
+Python 3.10 or higher (the WRDS Cloud runs 3.14). Stages 2 and 3 need `numba`; `requirements.txt` installs it below Python 3.14, and on 3.14 you install it yourself (`pip install "numba>=0.63"`). Stage 2 stops at start-up if it is missing.
 Check your version:
 ```bash
 python --version
@@ -135,11 +134,11 @@ a `start_date` fails. To drop early Enhanced years, filter the Stage 1 output in
 # ❗Dropping `n_workers` from "enhanced" silently returns Stage 0 to the serial,
 # ~4-hour path, because the engine default is n_workers=1.
 PER_DATASET = {
-    "enhanced": dict(n_workers=WORKERS_OVERRIDE or CONCURRENCY["enhanced"]),
+    "enhanced": dict(n_workers=workers("enhanced")),
     "standard": dict(start_date="2024-10-01", data_type="standard",
-                     n_workers=WORKERS_OVERRIDE or CONCURRENCY["standard"]),
+                     n_workers=workers("standard")),
     "144a":     dict(start_date="2002-07-01", data_type="144a",
-                     n_workers=WORKERS_OVERRIDE or CONCURRENCY["144a"]),
+                     n_workers=workers("144a")),
 }
 ```
 
@@ -549,17 +548,17 @@ Before it starts, `run_pipeline.sh` runs `check_disk_space.sh`. On WRDS the limi
 your HOME QUOTA, 10 GB on most accounts. The check takes that limit from `quota` and then
 MEASURES what your home directory holds, with `du`, at that moment.
 
-The check asks for 4 GB, but a full run writes about 5 GB (the 2026-09-21 run's stage 0 and
-Stage 1 files), so give it more than the minimum.
+It asks for 6 GB: a full run writes about 5 GB (the 2026-09-21 run's stage 0 and Stage 1
+files).
 
-**Enough room (4 GB or more):**
+**Enough room (6 GB or more):**
 ```
 === DISK SPACE CHECK ===
 [info] Home quota limit: 10 GB
 [info] Measuring what your home directory holds right now ...
 [info] In use: 2.30 GB, measured now with du
 [info] Available: 7.70 GB (measured now with du)
-[ok] Enough room for a run (7.70 GB available, 4.0 GB needed)
+[ok] Enough room for a run (7.70 GB available, 6.0 GB needed)
 ```
 
 **Not enough:** the check stops, shows the available space, and lists the largest things in
@@ -567,7 +566,7 @@ your home directory so you can see what to delete.
 ```
 ║  NOT ENOUGH DISK SPACE FOR A RUN                               ║
 ║  Available: 1.50 GB                                            ║
-║  Needed:    4.0 GB                                             ║
+║  Needed:    6.0 GB                                             ║
 
 The largest things in your home directory:
       1.43 GB  ~/old_run
@@ -809,11 +808,10 @@ Section 5's two uncertainty grids need a PyBondLab build carrying `fast_sorts` a
 3 says so before fanning out rather than letting each of the 108 signal tasks fail on an
 import. Point `PYBONDLAB_DIR` at a build that has them.
 
-The grids are producers, and a failed producer stops the run, so without the kernels
-`bash run_stage3.sh` stops at the first grid. Add `--keep-going` to run everything else,
-and build the PDF, without Section 5. Everything else runs on the pinned release: Stage 3
-asks the installed engine once at startup and takes the slow path automatically, with the
-same numbers. The pin is not
+Without the kernels `bash run_stage3.sh` leaves Section 5 out, says so, runs everything
+else and builds the PDF, and exits non-zero because Section 5 is missing. Everything else
+runs on the pinned release: Stage 3 asks the installed engine once at startup and takes the
+slow path automatically, with the same numbers. The pin is not
 floated to fix this -- Stage 2's factor series depend on it exactly.
 
 ### What is redacted in the published panel?

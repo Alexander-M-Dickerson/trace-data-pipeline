@@ -147,7 +147,7 @@ J5=$(qsub -terse -N stage1_pipeline -hold_jid "${HOLD_STAGE0}" stage1/run_stage1
 
 # Stage 2 is deliberately NOT submitted here. It builds the monthly panel on the
 # USER'S OWN MACHINE, not on the grid: it needs more memory than a WRDS slot allows
-# and opens no database connection. Download stage0/ and stage1/ when this pipeline
+# and reads no TRACE data (its first run fetches a few series from WRDS and caches them). Download stage0/ and stage1/ when this pipeline
 # finishes, then run ./run_stage2.sh locally. See stage2/README_stage2.md.
 
 # Summary

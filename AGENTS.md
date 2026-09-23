@@ -57,9 +57,8 @@ If the user runs you on the WRDS Cloud, these are the rules that cost people a d
   chunks in about 10 minutes and catches most setup problems.
 - **Submit from the repository root**: `./run_pipeline.sh`. It submits the jobs in order, each
   waiting on the ones it needs.
-- **Set `WRDS_USERNAME` and `TRACE_MEMBERS` in the root `config.py`** (or the environment). Stages
-  0 and 1 read them from there. (Stage 2, on the user's computer, reads `WRDS_USERNAME` from the
-  environment only: `export WRDS_USERNAME=...`.)
+- **Set `WRDS_USERNAME` and `TRACE_MEMBERS` in the root `config.py`** (or the environment). Every
+  stage that needs them reads them from there.
 - **Change stage 0's job sizes in `stage0/_trace_settings.py`** (`CONCURRENCY`, `MEM_PER_SLOT_GB`).
   `run_pipeline.sh` passes them to `qsub`, which overrides the settings inside the stage 0 job
   scripts, so editing those scripts changes nothing. Memory (`m_mem_free`) is charged per slot,
@@ -80,10 +79,10 @@ If the user runs you on the WRDS Cloud, these are the rules that cost people a d
   three inputs by date stamp: `stage1/data/stage1_<YYYYMMDD>.parquet`,
   `stage0/enhanced/trace_enhanced_fisd_<YYYYMMDD>.parquet`,
   `stage1/data/call_dummy_<YYYYMMDD>.parquet`.
-- A WRDS account, with `WRDS_USERNAME` set in the environment, for stage 2's first run, which fetches and caches Treasury
-  returns, Fama-French factors, VIX and FISD coupon terms. Later runs use the cache.
-- Python 3.10-3.13 with `python -m pip install -r requirements.txt`. Stages 2 and 3 need
-  `numba`, which `requirements.txt` installs only below Python 3.14.
+- A WRDS account (`WRDS_USERNAME`, in `config.py` or the environment) for stage 2's first run,
+  which fetches and caches Treasury returns, Fama-French factors, VIX and FISD coupon terms.
+  Later runs use the cache.
+- Python 3.10+ with `python -m pip install -r requirements.txt`. Stages 2 and 3 need `numba`; `requirements.txt` installs it below Python 3.14, and on 3.14 you install it yourself (`pip install "numba>=0.63"`). Stage 2 stops at start-up if it is missing.
 - For stage 3's two uncertainty grids, a PyBondLab build with the fast kernels
   (`PYBONDLAB_DIR`); see [stage3/AGENTS.md](stage3/AGENTS.md).
 

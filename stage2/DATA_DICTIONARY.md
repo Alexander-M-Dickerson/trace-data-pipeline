@@ -265,9 +265,9 @@ For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month r
 | `rsj` | Realized Signed Jump | Within-month asymmetry in positive vs. negative squared returns: $(RV^+ - RV^-)/RV$. Requires a minimum of 5 daily returns. |
 | `rsk` | Realized Skewness | Within-month third moment of daily returns scaled by realized volatility. Requires a minimum of 5 daily returns. |
 | `rkt` | Realized Kurtosis | Within-month fourth moment of daily returns scaled by realized volatility. Requires a minimum of 5 daily returns. |
-| `var_90` | 90% Value-at-Risk | 10th percentile loss from empirical daily return distribution over a 36(12) rolling window. |
-| `var_95` | 95% Value-at-Risk | 5th percentile loss from empirical daily return distribution over a 36(12) rolling window. |
-| `es_90` | 90% Expected Shortfall | Mean of worst 10% of daily returns over a 36(12) rolling window. |
+| `var_90` | 90% Value-at-Risk | 10th percentile loss from the empirical distribution of monthly returns over a 36(12) rolling window. |
+| `var_95` | 95% Value-at-Risk | 5th percentile loss from the empirical distribution of monthly returns over a 36(12) rolling window. |
+| `es_90` | 90% Expected Shortfall | Mean of worst 10% of monthly returns over a 36(12) rolling window. |
 | `dvol_sys` | Systematic Volatility | Standard deviation of systematic returns (CAPMB fitted values) within the month. Requires a minimum of 5 daily returns. |
 | `dvol_idio` | Idiosyncratic Volatility | Standard deviation of idiosyncratic returns (CAPMB residuals) within the month. Requires a minimum of 5 daily returns. |
 | `ivol_mkt` | Idiosyncratic Volatility (MKT) | Residual volatility from joint MKTRF+MKTB regression. |

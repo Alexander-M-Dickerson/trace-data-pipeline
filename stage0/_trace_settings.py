@@ -174,13 +174,24 @@ def reports_workers() -> int:
     return max(1, min(int(n), MAX_WRDS_CONNECTIONS - 2))   # leave stage 1 one, plus a spare
 
 
+def workers(member: str) -> int:
+    """Chunks a stage0 member fetches at once: STAGE0_WORKERS if set, else CONCURRENCY.
+
+    ❗STAGE0_WORKERS applies to EVERY member. Until 2026-09-24 only the runners read it, so
+    the connection check and the qsub request below still used CONCURRENCY: with
+    STAGE0_WORKERS=4, Enhanced and 144A held 8 connections against a ceiling of 7 and the
+    check passed.
+    """
+    return int(os.environ.get("STAGE0_WORKERS", "0")) or int(CONCURRENCY.get(member, 1))
+
+
 def validate_connection_budget(members) -> None:
     """Fail at submit time, not four hours into a run, if the budget is over the cap.
 
     Only Enhanced and 144A overlap; Standard is scheduled after them.
     """
     concurrent = [m for m in members if m in ("enhanced", "144a")]
-    total = sum(CONCURRENCY.get(m, 1) for m in concurrent)
+    total = sum(workers(m) for m in concurrent)
     if total > MAX_WRDS_CONNECTIONS - 1:
         raise ValueError(
             f"WRDS connection budget exceeded: {concurrent} would hold {total} "
@@ -225,7 +236,7 @@ def qsub_resources(member: str) -> str:
     the scheduler can never satisfy, because that failure mode is an invisible
     permanent pend.
     """
-    slots = max(1, int(CONCURRENCY.get(member, 1)))
+    slots = max(1, workers(member))
     mem = int(MEM_PER_SLOT_GB.get(member, 16))
     if slots > MAX_SLOTS_PER_JOB:
         raise ValueError(
@@ -292,19 +303,19 @@ COMMON_KWARGS = dict(
 # --- Per-dataset overrides (only where needed) ------------------------
 # Concurrency can be forced from the environment, which is how the smoke test proves
 # the pool path without editing settings:  STAGE0_WORKERS=1 ./run_smoke_test.sh
-WORKERS_OVERRIDE = int(os.environ.get("STAGE0_WORKERS", "0")) or None
+# `workers()` above applies it, so the connection check and the qsub request see it too.
 
 PER_DATASET = {
     # Enhanced is the long pole -- ~4 hours, and its chunk loop was strictly serial on
     # one connection while the job held a whole node. CONCURRENCY holds the budget.
-    "enhanced": dict(n_workers=WORKERS_OVERRIDE or CONCURRENCY["enhanced"]),
+    "enhanced": dict(n_workers=workers("enhanced")),
     # Standard runs AFTER the other two, so it may use the whole budget. 144A is
-    # small (136 chunks vs Enhanced's 485) and runs alongside Enhanced, so it takes
-    # one connection -- see CONCURRENCY and validate_connection_budget above.
+    # small (22 chunks on the 2026-09-21 run, against Enhanced's 485) and runs alongside
+    # Enhanced, so it takes one connection -- see CONCURRENCY and validate_connection_budget.
     "standard": dict(start_date="2024-10-01", data_type="standard",
-                     n_workers=WORKERS_OVERRIDE or CONCURRENCY["standard"]),
+                     n_workers=workers("standard")),
     "144a":     dict(start_date="2002-07-01", data_type="144a",
-                     n_workers=WORKERS_OVERRIDE or CONCURRENCY["144a"]),
+                     n_workers=workers("144a")),
 }
 
 def get_config(kind: str) -> dict:

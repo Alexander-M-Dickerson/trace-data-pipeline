@@ -147,11 +147,10 @@ def fetch_gsw(dest: Path | None = None) -> Path:
 def fetch_fisd_terms(dest: Path | None = None, wrds_username: str | None = None) -> Path:
     """One-time WRDS fetch of the coupon-schedule anchors, cached. Same pattern as
     `treasury.fetch_treasury_returns`: the series is historical and stable."""
-    import os
 
     import wrds
     dest = Path(dest or TERMS_FILE)
-    user = wrds_username or os.environ.get("WRDS_USERNAME", "")
+    user = wrds_username or cfg.wrds_username()
     if not user:
         raise RuntimeError(
             "WRDS_USERNAME is not set. duration_adjusted needs it only for its first run, to "
