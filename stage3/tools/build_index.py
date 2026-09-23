@@ -322,6 +322,13 @@ def render(rs: list[dict]) -> str:
     return "\n".join(L)
 
 
+def _without_samples(text: str) -> str:
+    """The index with each exhibit row's sample cell blanked: the part the CODE decides."""
+    import re
+    row = re.compile(r"^(\|[^|]*\|[^|]*\|[^|]*\|)[^|]*(\|[^|]*\|)\s*$")
+    return "\n".join(row.sub(r"\1 \2", line) for line in text.splitlines())
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--check", action="store_true",
@@ -334,7 +341,11 @@ def main() -> int:
 
     if args.check:
         have = OUT.read_text(encoding="utf-8") if OUT.exists() else ""
-        if have != text:
+        # The sample cell is read from the user's OWN run, so it legitimately differs from the
+        # committed file on any other data (on 2026-09-23 a fresh run on the 2026-09-21 panel
+        # counted 18,064 construction paths where the committed file said 18,026). The check
+        # is about the code's map -- exhibit, label, driver, stem -- so it compares that.
+        if _without_samples(have) != _without_samples(text):
             print("INDEX.md is out of date. Run `python tools/build_index.py`.")
             return 1
         print(f"INDEX.md is current ({len(rs)} exhibits).")
