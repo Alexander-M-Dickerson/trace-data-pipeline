@@ -1,0 +1,74 @@
+# Stage 2 with an AI assistant
+
+Stage 2 builds the monthly bond asset pricing panel from stage 1's daily panel, on the user's own
+computer. Read the repository's [AGENTS.md](../AGENTS.md) first; this file adds what is specific to
+stage 2. The full human guide is [QUICKSTART_stage2.md](QUICKSTART_stage2.md).
+
+## Ask the user one question before building: which factors?
+
+Stage 2 needs a monthly factor panel (Fama-French, VIX, uncertainty indices, the BBW bond
+factors). There are two sources, and they give different numbers:
+
+| `--factor-source` | what it does | use it when |
+|---|---|---|
+| `public` (default) | assembles the factors from the live public sources | the user wants the newest data |
+| `pinned` | downloads the factor panel published for this vintage from openbondassetpricing.com | the user wants to reproduce a published panel exactly |
+
+The public sources revise their history (Ken French restates factors, FRED re-adjusts CPI,
+Ludvigson re-estimates uncertainty), so a `public` build will not match a published release
+bit for bit. That is expected, not a bug.
+
+## The commands, in order
+
+Run from `stage2/`. Set `WRDS_USERNAME` first if the cache under `stage2/data/` is empty.
+
+```bash
+python _run_stage2.py --dry-run [--factor-source pinned]   # 1. resolve and print every input
+python _run_stage2.py [--factor-source pinned]             # 2. the build, about 10-20 min
+python validate_coverage.py                                # 3. every column reaches the panel's end
+python -m pytest tests -q                                  # 4. the stage's own tests
+python make_excess_blocks.py --mode stage1 --verify       # 5. optional: other Treasury benchmarks
+python make_release.py                                     # 6. optional: the redacted public package
+```
+
+1. **Dry run.** Show the user the resolved paths: the daily panel, the FISD file, the callable
+   flags, and the factor source (with `pinned`, the file or URL it will use). All three input files
+   must carry the same date stamp and come from the user's own stage 0/1 folder.
+2. **Build.** Run it in the background with a log. It prints one line per step (7 steps). It
+   checks its own output at the end: the 145 column names and their order are fixed in
+   `lib/contract.py`, and a build that changes them fails.
+3. **Coverage.** Every column should reach the panel's last month. A column whose source stops
+   publishing early is listed under "UPSTREAM-LIMITED" with the reason (for the 2026 vintage,
+   `b_cptlt`: He-Kelly-Manela end in 2025-05). That is not a failure. Anything that ends early
+   WITHOUT a named upstream reason is a problem to report.
+4. **Tests.** They should all pass; some are skipped when a reference build is not present.
+5. **Optional: other Treasury benchmarks.** `python make_excess_blocks.py --mode stage1 --verify`,
+   then `--benchmark all`, re-estimates the 68 beta and momentum columns on the two alternative
+   Treasury benchmarks (see "Alternative Treasury benchmarks" in [README_stage2.md](README_stage2.md)). It needs the
+   `_bns`/`_cls` factor twins, which both factor sources provide.
+6. **Release.** Writes the version that may be shared: `permco` and `gvkey` blanked, the composite
+   ratings reduced to investment grade / high yield. It refuses to write a file that still carries
+   licensed values. The user's own unredacted panel stays in `output/panel/`.
+
+## Reproducing a published panel: what "identical" means
+
+With `--factor-source pinned`, a build from the same WRDS run reproduces the published panel:
+same rows, same columns, and identical values in all but six liquidity columns (`cs_sprd`,
+`spd_rel`, `spd_abs`, `ar_sprd`, `p_fht`, `vov`). Those six can differ by less than 1e-12 on a
+few hundred rows, because DuckDB adds numbers across threads in whatever order the threads
+finish. That is floating-point rounding, not a different result.
+
+## What the user ends up with
+
+```
+stage2/output/panel/main_panel_<mode>.parquet   the 145-column panel (mode is "stage1" by default)
+stage2/output/blocks/<mode>/                    betas, momentum, returns, factors, the _mmn sidecar
+```
+
+Every column is defined in [DATA_DICTIONARY.md](DATA_DICTIONARY.md).
+
+## When something fails
+
+See the table under "If something goes wrong" in [QUICKSTART_stage2.md](QUICKSTART_stage2.md). To
+resume after a failure, `python _run_stage2.py --from-step N` restarts at step N. A quick test on a
+small sample: `python _run_stage2.py --limit-cusips 200`.

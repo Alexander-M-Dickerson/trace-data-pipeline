@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Found by reproducing the published 2026 panel from a fresh checkout of the 2026-09-21 WRDS run,
+exactly as a user would. Each fix carries a test.
+
+### Fixed -- Stage 2
+- `--factor-source pinned`, the documented way to reproduce a published panel, refused to start:
+  the configuration check demanded `FACTORS_PINNED_FILE`, so the download of the published
+  factors could never be reached. The dry run now prints which factor file it will use.
+- The pinned factor URL served a file uploaded 2026-09-10 that predates the eight `_bns`/`_cls`
+  twin factors (36 columns, not 44). It now points at the file the vintage was built with, and a
+  copy downloaded from an older URL is fetched again.
+- `make_release.py --what bbw` refused on Linux, macOS and WRDS: the authors' original BBW file was
+  pinned by the sha256 of a Windows checkout's CRLF bytes. It is pinned by content now, and every
+  CSV is checked out with LF.
+- `make_excess_blocks.py --benchmark` never built the benchmark's factor twins, so it failed on a
+  fresh build and silently re-used an older build's twins where one sat in the folder. It rebuilds
+  them every time.
+- A column-contract test failed on every build that skipped the optional excess-blocks step.
+- Reproducing the published 2026 panel this way gives identical values in all but six liquidity
+  columns (`cs_sprd`, `spd_rel`, `spd_abs`, `ar_sprd`, `p_fht`, `vov`), which differ by at most
+  5.7e-14 on 131-213 rows: DuckDB sums across threads in varying order. Documented in
+  `stage2/AGENTS.md`.
+
+### Fixed -- Stage 3
+- A producer was skipped whenever its output existed, so after a Stage 2 rebuild some exhibits
+  were built from the old panel's results (the 2026-09-22 run built Tables 5, 6 and
+  IA.XVII-IA.XIX from uncertainty grids made on 2026-09-12). Each producer records the inputs it
+  read and re-runs, with `--force`, when they change.
+- The INDEX.md test failed after a full run on any data but ours; it now checks the code's map,
+  not the sample each exhibit states.
+
+### Added
+- `AGENTS.md` (read by Codex) and `CLAUDE.md` (read by Claude Code) at the root and in `stage2/`
+  and `stage3/`: how to run the local stages with an AI assistant -- the commands in order, the
+  one choice that changes the numbers (the factor source), what "done" means, and the traps.
+
 ## [3.3.0] - 2026-09-22
 
 **The 2026 vintage, rebuilt on the linker's identity window.** Stages 0 and 1 were re-run on
