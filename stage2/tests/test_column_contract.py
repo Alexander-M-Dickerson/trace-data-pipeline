@@ -135,6 +135,17 @@ def test_the_dictionary_documents_nothing_that_does_not_exist():
     alt = blocks / "returns_alt_final.parquet"
     if alt.exists():
         real |= _columns(alt)
+    # The ten _bns/_cls factor twins are documented as OPTIONAL: they exist only after
+    # `make_excess_blocks.py --benchmark ...`. A build that skipped that step is not missing them.
+    # (Until 2026-09-23 this test failed on every build that followed QUICKSTART_stage2.md.)
+    # When the step has run, the twins are real columns of bbw_factors_<bm>.parquet (upper case
+    # there, lower case in the dictionary).
+    for bm in ("bns", "cls"):
+        twins = blocks / f"bbw_factors_{bm}.parquet"
+        if twins.exists():
+            real |= {c.lower() for c in _columns(twins)}
+        else:
+            real |= {f"{f}_{bm}" for f in ("mktb", "drf", "crf", "lrf", "term")}
 
     orphans = sorted(_dictionary_mnemonics() - real)
     assert not orphans, (
