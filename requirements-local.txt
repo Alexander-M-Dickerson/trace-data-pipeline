@@ -23,3 +23,9 @@
 # requirements.txt installs numba only below Python 3.14, so that the WRDS stages stay as they
 # were run. Stages 2-4 need it on every version; on 3.14, pip picks a release with 3.14 wheels.
 numba>=0.60
+
+# Not optional, although pandas treats it as an accelerator: with numexpr installed pandas
+# computes large float32 arithmetic and comparisons in float64, and the published panels were
+# built that way (see numeric_setup.py for the measured differences). Stages 2-4 refuse to run
+# without it.
+numexpr>=2.14

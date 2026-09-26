@@ -37,7 +37,7 @@ the last month each cache holds.
 | `requirements.txt` | The Python packages for stages 0 and 1, installed on WRDS |
 | `requirements-local.txt` | The packages for stages 2-4, on your own computer: `requirements.txt` plus numba. PyBondLab goes in on a second line, as the file explains |
 | `pybondlab_pin.py` | The PyBondLab release stages 2-4 run on, the start-up check that it is the one installed, and its fingerprint for manifests |
-| `numeric_setup.py` | Stops pandas handing work to `numexpr` or `bottleneck` when they happen to be installed, so stages 2-4 compute the same numbers in any environment |
+| `numeric_setup.py` | Makes pandas use `numexpr` (required: it changes float32 results, and the published panels were built with it) and not `bottleneck`, so stages 2-4 compute the same numbers on any machine |
 | `run_pipeline.sh` | Runs stages 0 and 1 on WRDS: downloads the inputs, submits the stage 0 jobs, then the report job and stage 1, each waiting on the jobs it needs |
 | `download_inputs.sh` | Fetches the files stage 1 needs from the internet. Login node only: WRDS compute nodes have no internet |
 | `check_disk_space.sh` | Checks there is room in your WRDS home quota before a run. Called by `run_pipeline.sh` |

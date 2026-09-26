@@ -14,7 +14,8 @@ PyBondLab 0.3.0 declares `numpy<2`. This repository installs numpy 2, so pip wou
 to install the two together. PyBondLab's code runs on numpy 2 -- its test suite passes on
 numpy 2.5.3 -- and everything else it needs is already in `requirements-local.txt`.
 
-    check()        None when the environment can run Stages 2-4, else what is wrong and the fix
+    check()        None when the environment can run Stages 2-4 (this PyBondLab, and numba and
+                   numexpr installed), else what is wrong and the fix
     fingerprint()  the version and a content hash of the installed package, for manifests
 """
 from __future__ import annotations
@@ -38,15 +39,18 @@ def installed_version() -> str | None:
 
 
 def check() -> str | None:
-    """None when PyBondLab is the pinned release and numba is present; else the fix."""
+    """None when PyBondLab is the pinned release and numba and numexpr are present; else the fix.
+
+    numexpr changes numbers, not just speed: see numeric_setup.py."""
     problems = []
     got = installed_version()
     if got is None:
         problems.append("PyBondLab is not installed")
     elif got != VERSION:
         problems.append(f"PyBondLab {got} is installed, and this repository runs on {VERSION}")
-    if importlib.util.find_spec("numba") is None:
-        problems.append("numba is not installed")
+    for pkg in ("numba", "numexpr"):
+        if importlib.util.find_spec(pkg) is None:
+            problems.append(f"{pkg} is not installed")
     if not problems:
         return None
     return ("; ".join(problems) + ". From the repository root:\n\n    "

@@ -132,11 +132,13 @@ A full audit of every guide against the code and the 2026-09-21 run followed. Wh
   which declares `numpy<2`, so pip refused the whole file, on WRDS and locally. Environments that
   already existed were not affected.
 - `stage3/tools/build_index.py` read `stage3/data` whatever `STAGE3_DATA` said.
-- A result could depend on whether the optional package `numexpr` was installed: pandas hands it
-  large comparisons, and it compares a float32 column in float64 where numpy uses float32. On
-  the 2026-09-21 panel Table IA.V counted 6,186 returns below -20% with it and 6,181 without.
-  `numeric_setup.py` turns it (and `bottleneck`) off in Stages 2-4, so the numbers do not depend
-  on what else is installed.
+- Results depended on whether the optional package `numexpr` was installed: pandas hands it
+  large float32 arithmetic and comparisons, and it computes them in float64 where numpy stays in
+  float32. On the 2026-09-21 run, without it, Stage 2's `ilq` moved by up to 5.1e-4, `pi` by
+  4.1e-5 and `roll` by 1.5e-5, and Table IA.V counted 6,181 returns below -20% instead of 6,186.
+  The published panels were built with numexpr, so `requirements-local.txt` now installs it,
+  Stages 2-4 refuse to run without it, and `numeric_setup.py` tells pandas to use it (and not
+  `bottleneck`).
 
 ### Removed
 - Stage 3's second sort path, with the two flags and the environment variable that chose between

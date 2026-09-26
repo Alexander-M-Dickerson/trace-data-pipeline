@@ -1,21 +1,25 @@
-"""numeric_setup.py -- make pandas compute the same way whatever else is installed.
+"""numeric_setup.py -- make pandas compute the same way on every machine.
 
-pandas hands large comparisons and arithmetic to `numexpr`, and some sums to `bottleneck`,
-when those OPTIONAL packages happen to be installed, and they do not always compute as numpy
-does. numexpr compares a float32 column with a number like 0.2 in float64, where numpy compares
-in float32: a return stored as float32(-0.2) is "below -20%" one way and not the other.
-Measured on the 2026-09-21 panel: Table IA.V counted 6,186 returns below -20% with numexpr
-installed and 6,181 without, from the same code and the same file.
+pandas hands large arithmetic and comparisons (over a million elements) to `numexpr` when it is
+installed, and some sums to `bottleneck`, and neither computes exactly as numpy does. numexpr
+evaluates float32 columns against a Python number in float64 where numpy stays in float32, and
+Stage 2's illiquidity measures do their arithmetic in pandas on float32 daily data. Measured on
+the 2026-09-21 run, the same code and inputs gave, with numexpr and without:
 
-`requirements-local.txt` installs neither package, but many Python distributions ship both.
-Stages 2, 3 and 4 call `apply()` when their settings load, so the numbers do not depend on it.
+    ilq  up to 5.1e-4 apart     pi  4.1e-5     roll  1.5e-5
+    Table IA.V: 6,186 returns below -20% against 6,181
+
+The published panels were built with numexpr, so it is REQUIRED (`requirements-local.txt`
+installs it, and the start-up check in `pybondlab_pin.py` refuses to run without it), and pandas
+is told to use it. bottleneck was not installed in the build that produced the published files,
+so pandas is told not to use it. Stages 2, 3 and 4 call `apply()` when their settings load.
 """
 from __future__ import annotations
 
 
 def apply() -> None:
     import pandas as pd
-    pd.set_option("compute.use_numexpr", False)
+    pd.set_option("compute.use_numexpr", True)
     pd.set_option("compute.use_bottleneck", False)
 
 
