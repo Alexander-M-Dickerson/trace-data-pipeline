@@ -3,15 +3,16 @@
 A comprehensive pipeline for processing Enhanced, Standard and 144A TRACE (Trade Reporting and Compliance Engine) corporate bond transaction data. 
 It is a part of the [Open Bond Asset Pricing project](https://openbondassetpricing.com/).
 This pipeline implements cleaning procedures and error-correction algorithms to produce *high-quality, reproducible* daily and monthly corporate bond panels from raw TRACE transaction data.
-The companion repository is [PyBondLab](https://github.com/GiulioRossetti94/PyBondLab/tree/main/examples) which can be used to form corporate bond asset pricing factors.
+The companion library is [PyBondLab](https://pypi.org/project/pybondlab/), which forms corporate bond asset pricing factors; Stages 2-4 run on it.
 
 [![Website](https://img.shields.io/badge/Website-Visit-blue?logo=google-chrome&logoColor=white)](https://openbondassetpricing.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Stage 0](https://img.shields.io/badge/Stage%200-Public%20Beta-green)](stage0/)
 [![Stage 1](https://img.shields.io/badge/Stage%201-Public%20Beta-green)](stage1/)
 [![Stage 2](https://img.shields.io/badge/Stage%202-Public%20Beta-green)](stage2/)
 [![Stage 3](https://img.shields.io/badge/Stage%203-Public%20Beta-green)](stage3/)
+[![Stage 4](https://img.shields.io/badge/Stage%204-Public%20Beta-green)](stage4/)
 
 [📄 Link to paper](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4575879)
 
@@ -28,6 +29,7 @@ Getting this straight first will save you an afternoon.
 | **2** | **In between** | You zip the output on WRDS and copy it down to your own computer | ~15 min for ~5 GB |
 | **3** | **Your own computer** | Stage 2 turns that daily panel into the monthly asset-pricing panel | ~8-18 minutes |
 | **4** | **Your own computer** | Stage 3 turns the monthly panel into sorted portfolios and the paper's exhibits | ~15-20 minutes |
+| **5** | **Your own computer** | Stage 4 builds the TRACE-only bond factors openbondassetpricing.com publishes, and checks yours against them | ~8 minutes |
 
 **Why the split?** Stages 0 and 1 read the raw TRACE transaction tape, which is a WRDS
 database — so they have to run where the data is, submitted to the WRDS job grid. Stage 2
@@ -58,10 +60,12 @@ your WRDS login; later runs read the cache.
 
 **On your own computer:**
 
-8. Install the same requirements (`pip install -r requirements.txt`) in a Python 3.10+
-   environment (on Python 3.14 also `pip install "numba>=0.63"`: `requirements.txt` installs
-   numba only below 3.14). Stage 2's first run fetches a few series from WRDS, so set your
-   username in `config.py` or `export WRDS_USERNAME=...`.
+8. In a Python 3.11+ environment, install the requirements for stages 2-4 with two lines:
+   `python -m pip install -r requirements-local.txt`, then
+   `python -m pip install --no-deps pybondlab==0.3.0`. PyBondLab 0.3.0 declares `numpy<2` and
+   this repository installs numpy 2, so it goes in without its dependency list
+   (`requirements-local.txt` says why that is safe). Stage 2's first run fetches a few series
+   from WRDS, so set your username in `config.py` or `export WRDS_USERNAME=...`.
 9. `cd stage2 && python _run_stage2.py` (add `--factor-source pinned` to reproduce a
    published panel exactly; see [stage2/QUICKSTART_stage2.md](stage2/QUICKSTART_stage2.md))
 10. You now have `stage2/output/panel/main_panel_<mode>.parquet` — 145 columns per bond-month.
@@ -70,20 +74,23 @@ your WRDS login; later runs read the cache.
 
 11. `cd stage3 && python tools/check_inputs.py` — confirms Stage 3 can see what Stage 2 made.
 12. `bash run_stage3.sh` — portfolio sorts, the uncertainty grids, and 33 tables and
-    11 figures into `stage3/reports/`. The two uncertainty grids need a PyBondLab build
-    with the fast kernels (`PYBONDLAB_DIR`, see [stage3/QUICKSTART_stage3.md](stage3/QUICKSTART_stage3.md));
-    without one the run leaves them out and says so.
+    11 figures into `stage3/reports/`.
+13. `cd ../stage4 && bash run_stage4.sh` — the TRACE-only bond factors that
+    openbondassetpricing.com publishes, into `stage4/output/`, then a cell-by-cell comparison
+    with the published files.
 
 Stages 0-2 build the DATA. Stage 3 is what the data was built for: it reproduces every
 exhibit of *The Corporate Bond Factor Replication Crisis* from the panel you just made.
-It is optional — the panel is useful on its own.
+Stage 4 builds the TRACE-only bond factors from the same panel. Both are optional — the
+panel is useful on its own.
 
 Full detail: [QUICKSTART.md](QUICKSTART.md) for stages 0-1,
 [stage2/QUICKSTART_stage2.md](stage2/QUICKSTART_stage2.md) for stage 2,
-[stage3/QUICKSTART_stage3.md](stage3/QUICKSTART_stage3.md) for stage 3.
+[stage3/QUICKSTART_stage3.md](stage3/QUICKSTART_stage3.md) for stage 3,
+[stage4/README_stage4.md](stage4/README_stage4.md) for stage 4.
 
-Running stages 2 and 3 with Claude Code or Codex? The repository carries instructions they
-read by themselves: [AGENTS.md](AGENTS.md) here and in `stage2/` and `stage3/` (Codex), and a
+Running stages 2-4 with Claude Code or Codex? The repository carries instructions they read by
+themselves: [AGENTS.md](AGENTS.md) here and in `stage2/`, `stage3/` and `stage4/` (Codex), and a
 `CLAUDE.md` beside each that points to it (Claude Code).
 
 > ❗**You cannot skip stages 0 and 1 by downloading the published Stage 1 file.** The public
@@ -96,7 +103,7 @@ read by themselves: [AGENTS.md](AGENTS.md) here and in `stage2/` and `stage3/` (
 
 ## Overview
 
-This is a **four-stage pipeline** for building *clean, reliable and reproducible* TRACE corporate bond datasets. Stages 0 and 1 run on WRDS, Stages 2 and 3 on your own computer.
+This is a **five-stage pipeline** for building *clean, reliable and reproducible* TRACE corporate bond datasets. Stages 0 and 1 run on WRDS, Stages 2, 3 and 4 on your own computer.
 
 ### Stage 0: Intraday to Daily Processing  **PUBLIC BETA**
 Processes raw intraday TRACE transaction data to clean daily panels. Handles three types of TRACE data:
@@ -130,7 +137,7 @@ Produces a clean, error-corrected monthly panel with dozens of corporate bond si
 - Liquidity measures
 - Momentum and reversal signals
 - Carry and value signals
-- Ready-to-use for monthly portfolio construction -- see [PyBondLab](https://github.com/GiulioRossetti94/PyBondLab/tree/main/examples)
+- Ready-to-use for monthly portfolio construction -- see [PyBondLab](https://pypi.org/project/pybondlab/)
 
 **Status:** Complete -- builds, tested, gated, and released
 **Release:** Published vintages at [openbondassetpricing.com](https://openbondassetpricing.com)
@@ -143,6 +150,16 @@ Turns the Stage 2 panel into portfolio sorts, two uncertainty grids, and the 33 
 **Execution:** Your own machine, and it opens no WRDS connection
 **Documentation:** See [stage3/README_stage3.md](stage3/README_stage3.md) and [stage3/INDEX.md](stage3/INDEX.md)
 
+### Stage 4: The TRACE-only Bond Factors
+Turns the Stage 2 panel into the TRACE-only bond factors published on
+[openbondassetpricing.com](https://openbondassetpricing.com): 108 signals as single sorts and
+within-firm sorts, for four return types (excess, and duration-adjusted against three Treasury
+benchmarks) and three rating bands. `compare_published.py` then checks your factors against the
+published files, cell by cell. Optional.
+
+**Execution:** Your own machine, and it opens no WRDS connection
+**Documentation:** See [stage4/README_stage4.md](stage4/README_stage4.md)
+
 ---
 
 ## Project Status & Timeline
@@ -151,6 +168,7 @@ Turns the Stage 2 panel into portfolio sorts, two uncertainty grids, and the 33 
 - **Stage 1**: ✅ **Now available** - Public beta, ready for testing
 - **Stage 2**: ✅ **Released** - Builds the monthly panel from your Stage 1 output; published vintages are on [openbondassetpricing.com](https://openbondassetpricing.com)
 - **Stage 3**: 🔨 **Code available** - Turns that monthly panel into portfolio sorts, uncertainty grids and the paper's 33 tables and 11 figures
+- **Stage 4**: 🔨 **Code available** - Builds the TRACE-only bond factors published on openbondassetpricing.com from that monthly panel, and checks them against the published files
 
 **This project is under active development and any feedback is greatly appreciated.**
 Please reach out to `alexander.dickerson1@unsw.edu.au` if you would like to collaborate.
@@ -202,7 +220,7 @@ Please reach out to `alexander.dickerson1@unsw.edu.au` if you would like to coll
 
 ### Prerequisites
 - WRDS subscription with access to TRACE, FISD, and ratings data
-- Python 3.10 or higher (the 2026-09-10 production run used Python 3.14.5 on the WRDS Cloud)
+- Python 3.10 or higher on WRDS (the 2026-09-21 production run used Python 3.14.5 there), and 3.11 or higher on your own computer for Stages 2-4
 - SSH access to WRDS Cloud (or local Python environment)
 - `.pgpass` configured for passwordless WRDS authentication
 
@@ -366,12 +384,15 @@ trace-data-pipeline/
 ├── config.py               # settings shared by stages 0-2
 ├── run_pipeline.sh         # runs stages 0 and 1 on WRDS
 ├── download_inputs.sh  check_disk_space.sh  run_smoke_test.sh
-├── requirements.txt
+├── requirements.txt        # stages 0 and 1, on WRDS
+├── requirements-local.txt  # stages 2-4, on your computer
+├── pybondlab_pin.py        # the PyBondLab release stages 2-4 run on
 ├── tests/                  # repo-wide tests, including the docs against the code
 ├── stage0/                 # WRDS: raw TRACE to daily panels
 ├── stage1/                 # WRDS: daily bond analytics
 ├── stage2/                 # your computer: the monthly panel
-└── stage3/                 # your computer: the paper's tables and figures
+├── stage3/                 # your computer: the paper's tables and figures
+└── stage4/                 # your computer: the TRACE-only bond factors
 ```
 
 Every file, what it does, and what each stage reads and writes: [CODE_MAP.md](CODE_MAP.md).

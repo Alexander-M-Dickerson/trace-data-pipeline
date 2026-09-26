@@ -4,8 +4,8 @@
 #   bash run_stage3.sh                 # everything
 #   bash run_stage3.sh --section lib   # one section (any _run_stage3.py flag passes through)
 #
-# PY overrides the interpreter. PYBONDLAB_DIR points at the build to use -- the
-# uncertainty grids need one carrying the fast kernels; see README_stage3.md.
+# PY overrides the interpreter: the Python where requirements-local.txt and PyBondLab are
+# installed.
 set -euo pipefail
 cd "$(dirname "$0")"
 PY=${PY:-python}

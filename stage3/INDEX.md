@@ -16,7 +16,7 @@ One row per exhibit the report prints: the paper's number, the LaTeX label, the 
 | `s3_nse` | Section 5 | non-standard errors across the two uncertainty grids |
 | `s4_zoo` | Factor zoo | the 108-signal census and its cluster tables |
 
-Shared code sits at the top level: `drrlib.py` (statistics, sample provenance, result manifests), `captions.py` (every caption title), `bench.py` (the timing/check ledger), `paths.py`, `fastrun.py` (process parallelism), `pblenv.py` (which PyBondLab build is active), `_stage3_settings.py` (paths and constants) and `_run_stage3.py` (the orchestrator). `make_report.py` assembles the PDF.
+Shared code sits at the top level: `drrlib.py` (statistics, sample provenance, result manifests), `captions.py` (every caption title), `bench.py` (the timing/check ledger), `paths.py`, `fastrun.py` (process parallelism), `pblenv.py` (checks and records the PyBondLab release), `_stage3_settings.py` (paths and constants) and `_run_stage3.py` (the orchestrator). `make_report.py` assembles the PDF.
 
 ## Reading a row
 

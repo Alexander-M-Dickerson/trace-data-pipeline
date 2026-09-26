@@ -46,11 +46,37 @@ def test_every_module_parses():
 
 
 # --------------------------------------------------------- the public boundary
+# Names a public user cannot have: private repositories and folders, and the modules and
+# constants of the private copy Stage 3 was built from. SHA-256 of each lower-cased name, so
+# this file does not spell them out; matched by the root boundary test's `word_candidates`
+# (every token, every run of its parts, every pair of adjacent tokens).
+sys.path.insert(0, str(STAGE3.parent / "tests"))
+from test_public_boundary import word_candidates  # noqa: E402
+
 PRIVATE_MARKERS = [
-    "Dropbox", "DRR_MUA", "drr_replication", "trace_duckdb", "monthly_data",
-    "lehman", "lhm_ice", "STAGE3_RESULTS", "GOLD_PANEL", "GOLD_MMN", "GOLD_BBW",
-    "OURS_PANEL", "probelib", "verifylib", "texparse", "MAIN_TEX",
+    "0d3ebae1b4569eb46493fbaf3a909e0ae54a095c95607df3a5439812ad128dc4",
+    "185057174192674a1740e51717b60ed31952ec4201aff6997d3a93284a84052d",
+    "3747e91bff7caa14f53f7783a065c8ab77dded44c56b86b6726d5b01274b4059",
+    "467fa5743d6929b3e6142af02f29aa97bbeee70bc291f734f6ab1f19164e0672",
+    "70309e6767a8a987d6ea3be3ade50fa7ec7613eac82217526106851e3c487938",
+    "75170593d559f227f37d422056e701a9748849b661f92f74a8ffee3c977c1bb9",
+    "800fdc67907b6c6e92ae580b2c8e8d896dd83f8b6e58113f4ba3be792df42889",
+    "80310b6fd6db19af8bfaf526e82a481a1283e2fe85bd48089012311a3fa39f1a",
+    "8f839dd5cea4375f2500294b434c75f58ff20dfab50e72a14ce35f1146b497ca",
+    "93f07f3b257e6d0daed9f6cdb326c0dc29e0f32c2845dc87459f685cae14214c",
+    "95103220ffc3da6d4c641260968a1b143549baceb3d7d589af1151089d9efcd4",
+    "a6e76a03220d9ffc7949ea4a6f953206d5e53c243db104e729f76faa72efa80b",
+    "afbff2a4d6d3cca5f81e0d99668ba7268d9b06d1dc98278f621ad2999c844bf6",
+    "d4451d427afd69cb02579633dea7e2e90661fd5501352138b801ef07929d9e23",
+    "e964e7189f8e5e51ce76f3029780b2aac3ab1676c7b96f33eaea5b895168b3ab",
+    "ecce767b3f4dc8c4f002d6aa4f7612e45b43a166aa4d05c2791b9507c46388b4",
 ]
+
+
+def _names(line: str, digest: str) -> bool:
+    import hashlib
+    return any(hashlib.sha256(c.encode()).hexdigest() == digest
+               for c in word_candidates(line))
 # A LaTeX label is not a path: `tab:monthly_data_availability` is the paper's own name
 # for an exhibit and has nothing to do with any repository.
 MARKER_EXEMPT = re.compile(r"(?:tab|fig):[a-z0-9_]*")
@@ -99,7 +125,7 @@ def test_produced_artifacts_carry_no_private_references(marker):
     for p in _artifacts():
         for i, line in enumerate(p.read_text(encoding="utf-8",
                                              errors="replace").splitlines(), 1):
-            if marker.lower() in MARKER_EXEMPT.sub("", line).lower():
+            if _names(MARKER_EXEMPT.sub("", line), marker):
                 hits.append(f"{p.relative_to(STAGE3)}:{i}: {line.strip()[:100]}")
     assert not hits, (f"{marker!r} in produced artifacts:\n" + "\n".join(hits[:20]))
 
@@ -112,7 +138,7 @@ def test_no_private_artifact_references(marker):
         if not p.exists():
             continue
         for i, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
-            if marker.lower() in MARKER_EXEMPT.sub("", line).lower():
+            if _names(MARKER_EXEMPT.sub("", line), marker):
                 hits.append(f"{p.relative_to(STAGE3)}:{i}: {line.strip()[:90]}")
     assert not hits, f"references to {marker!r}:\n" + "\n".join(hits)
 
@@ -729,9 +755,6 @@ def test_the_orchestrator_only_passes_flags_that_exist():
     for script, flag in R.TAKES_WINDOW.items():
         if flag not in _declared_flags(script):
             bad.append(f"{script} has no {flag}")
-    for script in R.ACCEPTS_FAST:
-        if "--fast" not in _declared_flags(script):
-            bad.append(f"{script} has no --fast")
     for script in R.ACCEPTS_FORCE:
         if "--force" not in _declared_flags(script):
             bad.append(f"{script} has no --force")
@@ -830,14 +853,28 @@ def test_the_input_records_live_under_stage3_data(tmp_path, monkeypatch):
     assert R._inputs_marker("s3_nse/run_mua_grid.py", []).parent == tmp_path / "elsewhere" / "_inputs"
 
 
-def test_without_the_fast_kernels_section_5_is_left_out_and_the_rest_runs():
-    """A refused grid is a failed producer, and a failed producer stops the run, so until
-    2026-09-24 a build without the kernels also lost the zoo and the PDF."""
+def test_every_sort_takes_the_one_path():
+    """Stage 3 runs every sort through the pinned PyBondLab, one way. Until 2026-09-26 the
+    runner chose between two paths with a flag and dropped Section 5 when one was missing;
+    no step may declare such a flag again, and the runner may not drop a section."""
     import _run_stage3 as R
-    steps = list(R.STEPS)
-    kept, dropped = R.without_kernels(steps, {"ok": True, "fast": False})
-    assert dropped and kept and all(s[0] != "nse" for s in kept)
-    assert {s[0] for s in kept} == {s[0] for s in steps} - {"nse"}
-    assert R.without_kernels(steps, {"ok": True, "fast": True}) == (steps, False)
-    only_nse = [s for s in steps if s[0] == "nse"]
-    assert R.without_kernels(only_nse, {"ok": True, "fast": False}) == ([], True)
+    bad = sorted(f"{script} declares {flag}"
+                 for script in {s[2] for s in R.STEPS} | {"_run_stage3.py"}
+                 for flag in _declared_flags(script) if "fast" in flag)
+    assert not bad, "; ".join(bad)
+
+
+def test_a_wrong_pybondlab_stops_stage3_with_the_install_lines(monkeypatch):
+    """A missing or different PyBondLab is refused before any sort, and the message is the
+    fix: the two install lines from requirements-local.txt."""
+    import _run_stage3 as R
+    import pblenv
+    pin = pblenv.pybondlab_pin
+    monkeypatch.setattr(pblenv, "_ACTIVE", None)
+    for got in (None, "0.2.0"):
+        monkeypatch.setattr(pin, "installed_version", lambda got=got: got)
+        with pytest.raises(SystemExit) as e:
+            pblenv.use(quiet=True)
+        assert f"--no-deps pybondlab=={pin.VERSION}" in str(e.value)
+        status = R.engine_status()
+        assert not status["ok"] and "requirements-local.txt" in status["why"]

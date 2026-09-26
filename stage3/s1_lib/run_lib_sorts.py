@@ -18,7 +18,7 @@ The conventions, each one different from `run_sorts.py` and each one deliberate:
 
 One (sort, timing) per invocation, so the four can run concurrently:
 
-    python s1_lib/run_lib_sorts.py --sort single --timing end --n-jobs 6
+    python s1_lib/run_lib_sorts.py --sort single --timing end
 """
 from __future__ import annotations
 
@@ -109,9 +109,9 @@ def prepare(verbose: bool = True) -> tuple[pd.DataFrame, list[str]]:
     return data, signal_cols
 
 
-def run_one(sort: str, timing: str, n_jobs: int, *, fast: bool = False) -> tuple[Path, dict]:
-    from PyBondLab import (BatchStrategyFormation, BatchWithinFirmSortFormation,
-                           NamingConfig, extract_panel)
+def run_one(sort: str, timing: str) -> tuple[Path, dict]:
+    from PyBondLab import NamingConfig, extract_panel
+    from PyBondLab.fast_sorts import fast_single_sorts, fast_within_firm_sorts
 
     data, signal_cols = prepare()
     ret_col = "ret_vw_bgn" if timing == "bgn" else "ret_vw"
@@ -119,48 +119,25 @@ def run_one(sort: str, timing: str, n_jobs: int, *, fast: bool = False) -> tuple
     cols = {"ID": "cusip", "ret": ret_col, "VW": "mcap_e", "RATING_NUM": "spc_rat"}
 
     t0 = time.perf_counter()
-    if fast and sort == "single":
-        from PyBondLab.fast_sorts import fast_single_sorts
+    if sort == "single":
         res = fast_single_sorts(data, signal_cols, columns=cols, num_portfolios=10,
                                 dynamic_weights=True)
-        panel = extract_panel(res, naming=NamingConfig(sign_correct=True))
-        how = "kernel"
-    elif fast and sort == "wf":
-        from PyBondLab.fast_sorts import fast_within_firm_sorts
+    else:
         res = fast_within_firm_sorts(data, signal_cols, columns=cols,
                                      firm_id_col=S.FIRM_ID_COL)
-        panel = extract_panel(res, naming=NamingConfig(sign_correct=True))
-        how = "kernel"
-    else:
-        if sort == "single":
-            batch = BatchStrategyFormation(
-                data=data, columns=cols, signals=signal_cols,
-                holding_period=S.HOLDING_PERIOD, num_portfolios=10,
-                turnover=True, n_jobs=n_jobs, chunk_size="auto", verbose=False)
-        else:
-            batch = BatchWithinFirmSortFormation(
-                data=data, signals=signal_cols, firm_id_col=S.FIRM_ID_COL,
-                columns={"ID": "cusip", "VW": "mcap_e", "RATING_NUM": "spc_rat",
-                         "ret": ret_col},
-                min_bonds_per_firm=S.MIN_BONDS_PER_FIRM, turnover=True,
-                n_jobs=n_jobs, chunk_size="auto", verbose=False)
-        panel = extract_panel(batch.fit(), naming=NamingConfig(sign_correct=True))
-        how = f"n_jobs={n_jobs}"
+    panel = extract_panel(res, naming=NamingConfig(sign_correct=True))
 
     D.write_atomic(panel, out, index=False)
     wall = time.perf_counter() - t0
-    print(f"[done] {out.name}  {len(panel):,} rows  {wall:.0f}s  {how}")
+    print(f"[done] {out.name}  {len(panel):,} rows  {wall:.0f}s")
     return out, {"rows": len(panel), "n_signals": len(signal_cols),
-                 "wall_s": round(wall, 1), "how": how}
+                 "wall_s": round(wall, 1)}
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--sort", required=True, choices=["single", "wf"])
     ap.add_argument("--timing", required=True, choices=["end", "bgn"])
-    ap.add_argument("--n-jobs", type=int, default=6)
-    ap.add_argument("--fast", action="store_true",
-                    help="use PyBondLab's sort kernels (needs a build that has them)")
     ap.add_argument("--force", action="store_true",
                     help="accepted for symmetry with the other producers. This one has "
                          "no skip-if-exists branch, so it always recomputes anyway")
@@ -168,12 +145,10 @@ def main() -> int:
 
     sys.stdout.reconfigure(encoding="utf-8")
     prov = pblenv.use()
-    if args.fast:
-        pblenv.require_fast("--fast")
     tag = f"lib-sorts-{args.sort}-{args.timing}"
     with Bench(tag, section="s1_lib", echo=True) as b:
         with b.phase(f"{args.sort}.{args.timing}"):
-            out, rep = run_one(args.sort, args.timing, args.n_jobs, fast=args.fast)
+            out, rep = run_one(args.sort, args.timing)
         b.note(**rep)
         # Table B.1 counts over the whole signal set; a short run would silently
         # shrink the census rather than fail it.
@@ -181,7 +156,7 @@ def main() -> int:
                      f"{rep['n_signals']} signals sorted into {out.name}")
 
     out.with_suffix(".json").write_text(json.dumps({
-        "sort": args.sort, "timing": args.timing, "n_jobs": args.n_jobs,
+        "sort": args.sort, "timing": args.timing,
         "date_cutoff": DATE_CUTOFF, "result": rep,
         "manifest": {
             "name": tag, "section": "s1_lib",

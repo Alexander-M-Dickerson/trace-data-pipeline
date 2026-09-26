@@ -1,178 +1,70 @@
-"""pblenv.py -- select the PyBondLab build, and prove which one produced the numbers.
+"""pblenv.py -- check the PyBondLab Stage 3 runs on, and record it with every number.
 
-Stage 3 runs every sort through PyBondLab, so which copy of it is on `sys.path` is part of
-the result. This module makes that explicit rather than incidental:
+Stage 3 runs every sort through PyBondLab, so the release that produced a number is part of
+the number. `pybondlab_pin.py`, at the repository root, names that release. This module
+checks that it is the one installed, and records it:
 
     from pblenv import use
-    prov = use()                 # BEFORE importing PyBondLab
-    import PyBondLab as pbl      # now guaranteed to be the build `prov` describes
+    prov = use()                 # stops, with the install lines, if it is not the pinned one
+    import PyBondLab as pbl
 
-`prov` goes into every manifest Stage 3 writes, so any number can be traced back to the
-engine that made it.
-
-Two ways to point it at a build:
-
-  * `PYBONDLAB_DIR` (or `_stage3_settings.PYBONDLAB_DIR`) names a checkout. It is put at
-    the FRONT of `sys.path` and the import is then asserted to have resolved inside it --
-    a second PyBondLab installed in the environment can otherwise shadow it silently.
-  * unset: whatever `import PyBondLab` finds. Fine when that install already carries the
-    fast kernels.
-
-❗The uncertainty grids (Section 5) need `PyBondLab.fast_sorts` and `anomaly_assay_fast`.
-Those are not in the 0.2.0 release that Stage 2 pins. `require_fast()` checks for them and
-says what to do, rather than letting a 40-hour run start and fail on an import.
+`prov` -- the version and a content hash of the package, never a path -- goes into every
+manifest Stage 3 writes, so any number can be traced back to the engine that made it.
 """
 from __future__ import annotations
 
-import hashlib
 import json
-import os
-import subprocess
 import sys
 from pathlib import Path
 
 import _stage3_settings as S
 
+import pybondlab_pin  # noqa: E402  (the repository root; _stage3_settings puts it on the path)
+
 _ACTIVE: dict | None = None
 _LOCATION: str | None = None
 
-# Where PyBondLab lives. Named here once so every message that needs it says the same
-# thing.
-#
-# ❗There is deliberately no minimum VERSION here. The released 0.2.0 does not carry the
-# fast kernels, and at the time of writing the build that does also reports 0.2.0 -- so a
-# version test would be wrong in both directions. `has_fast_kernels()` asks the question
-# that actually matters, by looking for the modules. Once a release carrying them is
-# published under its own version, state it here and in README_stage3.md.
-PYBONDLAB_URL = "https://github.com/GiulioRossetti94/PyBondLab"
+
+def problem() -> str | None:
+    """What is wrong with the installed PyBondLab, with the fix; None when it is the pinned one."""
+    return pybondlab_pin.check()
 
 
-def _git(root: Path, *args: str) -> str | None:
-    """A git field for `root`, but only if `root` is itself a repository top-level.
+def use(*, quiet: bool = False) -> dict:
+    """Check the installed PyBondLab against the pin and return its provenance record.
 
-    A checkout nested inside another repository would otherwise report the ENCLOSING
-    repository's HEAD -- provenance for the wrong tree.
+    Idempotent within a process. Stops with the install lines if PyBondLab is missing or a
+    different release, so no number is ever attributed to an engine nobody chose.
     """
-    try:
-        top = subprocess.run(["git", "-C", str(root), "rev-parse", "--show-toplevel"],
-                             capture_output=True, text=True, timeout=15)
-        if top.returncode != 0 or Path(top.stdout.strip()).resolve() != root.resolve():
-            return None
-        r = subprocess.run(["git", "-C", str(root), *args],
-                           capture_output=True, text=True, timeout=30)
-        return r.stdout.strip() or None if r.returncode == 0 else None
-    except Exception:
-        return None
-
-
-def tree_sha256(pkg: Path) -> str:
-    """Content hash of the package source -- catches an edited build that git alone misses."""
-    h = hashlib.sha256()
-    for p in sorted(pkg.rglob("*")):
-        if p.is_file() and p.suffix in (".py", ".csv", ".json") and "__pycache__" not in p.parts:
-            h.update(str(p.relative_to(pkg)).replace("\\", "/").encode())
-            h.update(p.read_bytes())
-    return h.hexdigest()
-
-
-def use(build_dir: str | Path | None = None, *, quiet: bool = False) -> dict:
-    """Import PyBondLab from `build_dir` (or the configured one) and return its provenance.
-
-    Idempotent within a process. Raises if PyBondLab was already imported by something
-    else, because Python cannot swap a loaded package and a silent no-op here would
-    attribute numbers to the wrong engine.
-    """
-    global _ACTIVE
+    global _ACTIVE, _LOCATION
     if _ACTIVE is not None:
         return dict(_ACTIVE)
+    why = problem()
+    if why:
+        raise SystemExit("Stage 3 cannot start: " + why)
 
-    root = build_dir or os.environ.get("PYBONDLAB_DIR") or S.PYBONDLAB_DIR
-    root = Path(root).resolve() if root else None
+    import PyBondLab as pbl
 
-    if root is not None:
-        if not (root / "PyBondLab" / "__init__.py").exists():
-            raise FileNotFoundError(
-                f"PYBONDLAB_DIR={root} does not contain a PyBondLab package.\n"
-                "  Point it at the checkout root -- the directory that HOLDS PyBondLab/,\n"
-                "  not at PyBondLab/ itself.")
-        if "PyBondLab" in sys.modules:
-            raise RuntimeError(
-                "PyBondLab was imported before pblenv.use(), so the build cannot be\n"
-                "  guaranteed. Import pblenv and call use() first.")
-        sys.path.insert(0, str(root))
-
-    import PyBondLab as pbl  # noqa: E402  (deliberate: after the path insert)
-
-    resolved = Path(pbl.__file__).resolve()
-    if root is not None and root not in resolved.parents:
-        raise RuntimeError(
-            f"PyBondLab resolved to {resolved}, which is OUTSIDE {root}.\n"
-            "  Something else on sys.path is shadowing the requested build.")
-
-    pkg = resolved.parent
-    # ❗The RECORD is the build's identity -- version, git sha, content hash -- and
-    # deliberately not where it happens to sit on this disk. A manifest travels; a
-    # local path in it names someone's home directory and tells a reader nothing they
-    # can act on. `_LOCATION` keeps the path for the console line and for error
-    # messages, where it is exactly what you want, and never reaches a manifest.
-    _ACTIVE = {
-        "version": getattr(pbl, "__version__", "?"),
-        "pinned": root is not None,
-        "git_branch": _git(root, "rev-parse", "--abbrev-ref", "HEAD") if root else None,
-        "git_sha": _git(root, "rev-parse", "HEAD") if root else None,
-        "git_dirty": bool(_git(root, "status", "--porcelain")) if root else None,
-        "tree_sha256": tree_sha256(pkg)[:16],
-        "has_fast_kernels": has_fast_kernels(),
-    }
-    global _LOCATION
-    _LOCATION = str(root) if root else str(pkg.parent)
+    _ACTIVE = pybondlab_pin.fingerprint()
+    # A manifest travels; a local path in it names someone's home directory and tells a
+    # reader nothing they can act on. `_LOCATION` is for the console line and error messages.
+    _LOCATION = str(Path(pbl.__file__).resolve().parent.parent)
     if not quiet:
-        a = _ACTIVE
-        git = (f" {a['git_branch']}@{(a['git_sha'] or '')[:7]}"
-               f"{'+dirty' if a['git_dirty'] else ''}") if a["git_sha"] else ""
-        fast = "fast kernels: yes" if a["has_fast_kernels"] else "fast kernels: NO"
-        print(f"[pblenv] PyBondLab v{a['version']} tree={a['tree_sha256']}{git}"
-              f"  {fast}  <- {_LOCATION}", flush=True)
+        print(f"[pblenv] PyBondLab v{_ACTIVE['version']} tree={_ACTIVE['tree_sha256']}"
+              f"  <- {_LOCATION}", flush=True)
     return dict(_ACTIVE)
 
 
 def location() -> str:
-    """Where the active build was loaded from. For humans, never for a manifest."""
-    return _LOCATION or "(not selected)"
+    """Where the active PyBondLab was loaded from. For humans, never for a manifest."""
+    return _LOCATION or "(not checked yet)"
 
 
 def active() -> dict:
-    """The provenance record of the build in use. Raises if `use()` has not been called."""
+    """The provenance record of the PyBondLab in use. Raises if `use()` has not been called."""
     if _ACTIVE is None:
-        raise RuntimeError("no PyBondLab build selected -- call pblenv.use() first")
+        raise RuntimeError("PyBondLab has not been checked -- call pblenv.use() first")
     return dict(_ACTIVE)
-
-
-def has_fast_kernels() -> bool:
-    """Whether this build carries the kernels the uncertainty grids need."""
-    import importlib.util
-    try:
-        return all(importlib.util.find_spec(m) is not None
-                   for m in ("PyBondLab.fast_sorts", "PyBondLab.anomaly_assay_fast"))
-    except (ImportError, ValueError):
-        return False
-
-
-def require_fast(what: str) -> None:
-    """Refuse to start a run that needs the fast kernels on a build without them."""
-    if has_fast_kernels():
-        return
-    raise SystemExit(
-        f"{what} needs PyBondLab's fast kernels (PyBondLab.fast_sorts and\n"
-        "  PyBondLab.anomaly_assay_fast), and the build on sys.path does not have them.\n"
-        f"  Active build: {location()}"
-        + (f" (v{_ACTIVE['version']})" if _ACTIVE else "") + "\n"
-        "  The 0.2.0 release (PyPI, and " + PYBONDLAB_URL + ") carries only the\n"
-        "  second. Point PYBONDLAB_DIR at a PyBondLab checkout that has both.\n"
-        "\n"
-        "  Only the uncertainty grids (--section nse) need them. `bash run_stage3.sh`\n"
-        "  detects their absence, leaves Section 5 out, and runs Sections 3 and 4, the\n"
-        "  zoo and the PDF on the slow path.")
 
 
 if __name__ == "__main__":

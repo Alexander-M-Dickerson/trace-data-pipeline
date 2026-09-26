@@ -5,18 +5,22 @@ It runs **on your own computer** and opens no WRDS connection.
 
 If you have just finished Stage 2, everything below should work with no configuration.
 
-**You need two things beyond Stage 2's requirements:**
+**You need one thing beyond Stage 2's requirements:**
 
-- **PyBondLab** — the portfolio-sorting library every sort runs through. The
-  repository's own `requirements.txt` installs it
-  (`python -m pip install -r ../requirements.txt`); the source is at
-  [github.com/GiulioRossetti94/PyBondLab](https://github.com/GiulioRossetti94/PyBondLab).
 - **pdflatex** — only for the last step, which compiles the exhibits into one PDF. TeX
   Live or MiKTeX. Without it you still get every table and figure as a file; you just do not
   get `exhibits.pdf` (`python make_report.py --no-compile` writes its `.tex` without compiling).
 
 `python tools/check_inputs.py` warns if pdflatex is missing rather than failing, because
 running without the PDF is legitimate.
+
+Every sort runs through [PyBondLab](https://pypi.org/project/pybondlab/) 0.3.0, which the two
+install lines for stages 2-4 already put in place:
+
+```bash
+python -m pip install -r requirements-local.txt
+python -m pip install --no-deps pybondlab==0.3.0
+```
 
 ---
 
@@ -56,9 +60,8 @@ alternative to exporting any of them.
 | `STAGE0_DIR`, `STAGE1_DIR`, `STAGE2_DIR` | the sibling folders | where the earlier stages live |
 | `STAGE2_PANEL`, `STAGE2_MMN`, `STAGE2_BBW`, `STAGE2_FACTORS`, `STAGE1_DAILY` | derived from the above | one input file each, when the layout is not standard |
 | `STAGE3_MODE` | `stage1` | which panel to read: Stage 2 writes `main_panel_<mode>.parquet` |
-| `STAGE3_DATA` | `stage3/data` | where intermediate results are written. Point it at a fast disk, or at a scratch area (the small input records under `stage3/data/_inputs/` stay in the repo either way) |
+| `STAGE3_DATA` | `stage3/data` | where intermediate results are written, including the small input records under `_inputs/`. Point it at a fast disk, or at a scratch area |
 | `STAGE3_REPORTS` | `stage3/reports` | where tables, figures, `timings.jsonl` and the PDF go |
-| `PYBONDLAB_DIR` | the installed package | a PyBondLab checkout to use instead. Section 5 needs one with the fast kernels; everything else falls back on its own |
 | `STAGE3_WORKERS` | cores, clamped | processes for the two grids. `--workers` overrides per run |
 | `STAGE3_MEMORY_LIMIT` | 60% of free RAM (`4GB` without `psutil`) | DuckDB's memory cap in the data appendix |
 | `STAGE3_WORKER_THREADS` | set by `fastrun.pmap` | internal: how many threads one worker may use. Set by the parent, read by the child; you do not set this |
@@ -75,30 +78,21 @@ apart. The fix is almost always `python s3_nse/mua_summarize.py`. Set the variab
 when you know the exhibits will describe a grid that is no longer on disk and you want
 them anyway.
 
-## 2. Point at a PyBondLab build
+## 2. Check PyBondLab
 
 ```bash
-export PYBONDLAB_DIR=/path/to/PyBondLab
+python pblenv.py
 ```
 
-Leave it unset to use whatever `import PyBondLab` finds. Either way Stage 3 prints which
-build it resolved, and records it in every manifest:
+prints the PyBondLab version and a hash of its code. Every run prints the same line and
+records it in every manifest:
 
 ```
-[pblenv] PyBondLab v0.2.0 tree=2f2dfb0d7cdd443e  fast kernels: yes  <- /path/to/PyBondLab
+[pblenv] PyBondLab v0.3.0 tree=dc7cd72b739db21f  <- /path/to/site-packages
 ```
 
-> ❗`fast kernels: NO` means **only Section 5 is blocked** — the two uncertainty grids
-> need `PyBondLab.fast_sorts` and `PyBondLab.anomaly_assay_fast`, and the 0.2.0 release
-> does not carry them. `run_stage3.sh` then leaves Section 5 out, says so, runs everything
-> else and exits non-zero. The rest runs on the slow path automatically, with the
-> same numbers: `_run_stage3.py` asks once at startup and prints which path it took.
-> Expect roughly fourteen times the sort time there (43.8 s against 3.2 s, measured on
-> one sort).
->
-> There is no minimum version to give you: at the time of writing the build with the
-> kernels and the release without them both report `0.2.0`, so `pblenv` looks for the
-> modules rather than comparing version strings.
+If PyBondLab is missing or a different version, Stage 3 stops before any sort and prints the
+two install lines above.
 
 ## 3. Smoke run
 
@@ -114,7 +108,7 @@ statistics layer, tables and figures:
 python _run_stage3.py --section lib
 ```
 
-About four and a half minutes on 24 cores with the kernels — 242 s of benched work in
+About four and a half minutes on 24 cores — 242 s of benched work in
 the cold run of 2026-09-12, most of it the four 108-signal sorts. You should end up with
 `reports/tables/table01.tex` and `reports/figures/fig03_cumret.pdf`.
 
@@ -124,7 +118,7 @@ the cold run of 2026-09-12, most of it the four 108-signal sorts. You should end
 bash run_stage3.sh
 ```
 
-**906 s — about 15 minutes** on 24 cores with the fast kernels, measured on a cold
+**906 s — about 15 minutes** on 24 cores, measured on a cold
 run (`data/` and `reports/` wiped first) on 2026-09-12, all 41 steps. The two
 uncertainty grids are 55% of it. See **What it costs** in
 [README_stage3.md](README_stage3.md) for the per-section split, the disk and memory
@@ -222,7 +216,7 @@ its own numbers as it goes — each driver records a PASS/FAIL line in
 | `the DUA statistics layer is not at ...` | run `s3_nse/run_dua_grid.py`, then the same file with `--stats` |
 | `the MUA summary is not at ...` | run `s3_nse/run_mua_grid.py`, then `s3_nse/mua_summarize.py` |
 | `this exhibit needs sort CSVs under ...` | the message names the missing files and the command that makes them |
-| `needs PyBondLab's fast kernels` | set `PYBONDLAB_DIR` to a build that has them |
+| `Stage 3 cannot start: PyBondLab ...` | PyBondLab is missing or not 0.3.0: run the two install lines at the top of this page |
 | `--stats with a --signals subset` | refused on purpose: it would overwrite the full statistics with subset-only frames, and no exhibit downstream could tell |
 | `the MUA status ledger is not at ...` | run `s3_nse/mua_summarize.py`; it writes the ledger beside the summary |
 | `the MUA status ledger is OLDER than the grid it describes` | the grid was rebuilt and the summary was not. Re-run `s3_nse/mua_summarize.py`. `STAGE3_ALLOW_STALE_LEDGER=1` proceeds anyway |

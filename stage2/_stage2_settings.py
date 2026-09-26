@@ -30,6 +30,7 @@ import sys
 # Stage 2 can also be run from a folder that has no config.py (e.g. a stand-alone
 # extract), so fall back to environment variables rather than failing at import.
 sys.path.insert(0, str(Path(__file__).parent.parent))
+import numeric_setup  # noqa: E402,F401  (pandas computes the same whatever else is installed)
 try:
     from config import WRDS_USERNAME, AUTHOR
 except ImportError:  # pragma: no cover - only hit outside the pipeline tree
@@ -578,15 +579,13 @@ def validate_config(config: dict) -> None:
     if creds:
         problems.append(creds)
 
-    # --- numba --------------------------------------------------------------
-    # Stage 2's rolling kernels are numba. requirements.txt installs it only below Python 3.14,
-    # to leave the WRDS stages (which run 3.14 and use numba only if present) as they were run.
-    import importlib.util
-    if importlib.util.find_spec("numba") is None:
-        problems.append(
-            "numba is not installed, and Stage 2's kernels need it.\n"
-            "    requirements.txt installs it only below Python 3.14. On 3.14 install it\n"
-            "    yourself (python -m pip install \"numba>=0.63\"), or use Python 3.10-3.13.")
+    # --- PyBondLab and numba ------------------------------------------------
+    # Step 3's BBW factors are PyBondLab sorts and the rolling kernels are numba. Both come from
+    # requirements-local.txt and its second install line; pybondlab_pin says what is wrong.
+    import pybondlab_pin
+    engine = pybondlab_pin.check()
+    if engine:
+        problems.append(engine.rstrip().replace("\n", "\n    "))
 
     if problems:
         raise FileNotFoundError(

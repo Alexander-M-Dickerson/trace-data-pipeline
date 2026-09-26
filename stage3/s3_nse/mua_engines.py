@@ -1,4 +1,4 @@
-"""mua_engines.py -- the method-uncertainty (MUA) grid, in both engines.
+"""mua_engines.py -- the method-uncertainty (MUA) grid.
 
 Section 5 asks how much of a published bond-factor premium is a choice rather than a
 finding. The MUA grid answers it by re-running one signal under every defensible
@@ -14,23 +14,15 @@ combination of method choices and reading off the spread of premia:
 times 108 signals -- ignoring the 24 infeasible cells per signal where an
 investment-grade breakpoint universe is crossed with a high-yield rating filter.
 
-Two engines produce it:
-
-  `run_fast`  assay_anomaly_fast over the grid: per breakpoint universe,
-              AssayAnomalyRunner, save_idx=True, turnover=True,
-              dynamic_weights=True. Correct, and slow enough that the full grid
-              is a multi-hour job.
-  `run_fast`  `assay_anomaly_fast` handed the identical grid, which returns the
-              same surface in seconds.
-
-Both emit CANONICAL spec coordinates (weighting, nport, bp_universe, rating,
-maturity), so the two are comparable without either grammar leaking outward.
+`run_fast` produces it: PyBondLab's `assay_anomaly_fast`, handed the whole grid for one
+signal, with dynamic_weights=True. It emits CANONICAL spec coordinates (weighting,
+nport, bp_universe, rating, maturity), so the engine's own column grammar never leaks
+into the exhibits.
 
 Three rules are enforced here rather than assumed:
-  * `pblenv.use()` runs BEFORE any PyBondLab import, so the engine is known;
+  * `pblenv.use()` runs BEFORE any PyBondLab import, so the engine is checked and recorded;
   * `spc_rat` is cast to float64 -- a nullable Int breaks numba;
-  * (date, cusip) uniqueness is checked before any fit -- a duplicate silently
-    corrupts the fast path instead of raising.
+  * (date, cusip) uniqueness is checked before any fit, so the message names the panel.
 """
 from __future__ import annotations
 
@@ -84,7 +76,7 @@ def load_panel(signals: list[str], end: str | None = None) -> pd.DataFrame:
         where += f" AND date <= DATE '{end}'"
     # ❗ORDER BY is not cosmetic. DuckDB scans parquet in parallel and guarantees NO
     # row order without one -- three consecutive loads of this panel come back in three
-    # different orders. PyBondLab's fast path takes the frame positionally, so an
+    # different orders. PyBondLab takes the frame positionally, so an
     # unordered panel makes the grid differ run to run.
     df = duckdb.sql(
         f"SELECT {cols} FROM read_parquet('{p}') {where} "
@@ -94,9 +86,8 @@ def load_panel(signals: list[str], end: str | None = None) -> pd.DataFrame:
     dup = df.duplicated(["date", "cusip"]).sum()
     if dup:
         raise AssertionError(
-            f"{dup} duplicate (date, cusip) rows. The fast sort path indexes the\n"
-            "  panel positionally, so a duplicate key does not raise -- it pairs one\n"
-            "  bond's return with another's signal and returns a plausible number.")
+            f"{dup} duplicate (date, cusip) rows. Every sort needs one row per\n"
+            "  bond-month; checked here so the message names the panel.")
     return df
 
 

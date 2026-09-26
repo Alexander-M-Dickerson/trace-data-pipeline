@@ -6,8 +6,8 @@ Two steps, matching the paper:
           (cusip, date), with the risk-free rate taken from the factor file -- giving
           ret_vw_exc / ret_vw_bgn_exc (and the duration-adjusted twins) -- then cut to
           dates on or after the formation start.
-  step 2  per result set: BatchStrategyFormation (single sorts, deciles for the whole
-          universe and quintiles for a rating split) or BatchWithinFirmSortFormation
+  step 2  per result set: PyBondLab's fast_single_sorts (single sorts, deciles for the
+          whole universe and quintiles for a rating split) or fast_within_firm_sorts
           (within-firm, at least 2 bonds per firm), holding_period=1, turnover on, then
           extract_panel with sign correction. The month-begin set also carries the `lib`
           and `ilq` portfolio characteristics, which Table 2's decomposition needs.
@@ -109,9 +109,8 @@ def prepare_data(signals: list[str], *, ret_types: tuple[str, ...] = ("exc",),
         data["spc_rat"] = data["spc_rat"].astype("float64")
     dup = data.duplicated(["cusip", "date"]).sum()
     assert dup == 0, (
-        f"{dup} duplicate (cusip,date) rows. PyBondLab indexes the panel\n"
-        "  positionally, so a duplicate key does not raise -- it puts one bond's\n"
-        "  return against another's signal, silently.")
+        f"{dup} duplicate (cusip,date) rows. Every sort needs one row per bond-month;\n"
+        "  checked here so the message names the panel.")
 
     if verbose:
         print(f"[data] {len(data):,} rows  {data['date'].min():%Y-%m-%d}"
@@ -123,11 +122,10 @@ def prepare_data(signals: list[str], *, ret_types: tuple[str, ...] = ("exc",),
 # step 2 -- one result set through PyBondLab
 # --------------------------------------------------------------------------
 def run_set(data: pd.DataFrame, *, sort: str, set_name: str, signals: list[str],
-            ret_type: str = "exc", rating: str | None = None, n_jobs: int = 1,
-            fast: bool = False) -> pd.DataFrame:
+            ret_type: str = "exc", rating: str | None = None) -> pd.DataFrame:
     """One (sort, result-set) batch -> the extract_panel frame (sign_correct=True)."""
-    from PyBondLab import (BatchStrategyFormation, BatchWithinFirmSortFormation,
-                           NamingConfig, extract_panel)
+    from PyBondLab import NamingConfig, extract_panel
+    from PyBondLab.fast_sorts import fast_single_sorts, fast_within_firm_sorts
 
     cfg = SETS[set_name]
     sig_cols = [f"{s}_mmn" for s in signals] if cfg["mmn"] else list(signals)
@@ -138,10 +136,8 @@ def run_set(data: pd.DataFrame, *, sort: str, set_name: str, signals: list[str],
     keep += cfg["chars"] or []
     df = data[list(dict.fromkeys(keep))]
 
-    if fast and sort == "single":
-        # the kernelized single sort -- the same output as the batch path, over one
-        # shared set of panel arrays instead of one set per signal
-        from PyBondLab.fast_sorts import fast_single_sorts
+    if sort == "single":
+        # one shared set of panel arrays for every signal
         res = fast_single_sorts(
             df, sig_cols,
             columns={"ID": "cusip", "ret": ret_col, "VW": "mcap_e",
@@ -151,11 +147,10 @@ def run_set(data: pd.DataFrame, *, sort: str, set_name: str, signals: list[str],
             rating=rating, dynamic_weights=True, chars=cfg["chars"])
         return extract_panel(res, naming=NamingConfig(sign_correct=True))
 
-    if fast and sort == "wf":
-        # the kernelized within-firm pipeline. The rating filter restricts the FORMATION
-        # universe INSIDE the engine -- never by subsetting the panel first, which would
-        # change which bonds each firm has and so change the sort itself.
-        from PyBondLab.fast_sorts import fast_within_firm_sorts
+    if sort == "wf":
+        # The rating filter restricts the FORMATION universe INSIDE the engine -- never by
+        # subsetting the panel first, which would change which bonds each firm has and so
+        # change the sort itself.
         res = fast_within_firm_sorts(
             df, sig_cols,
             columns={"ID": "cusip", "ret": ret_col, "VW": "mcap_e",
@@ -163,29 +158,7 @@ def run_set(data: pd.DataFrame, *, sort: str, set_name: str, signals: list[str],
             firm_id_col=S.FIRM_ID_COL, chars=cfg["chars"], rating=rating)
         return extract_panel(res, naming=NamingConfig(sign_correct=True))
 
-    kw: dict = dict(signals=sig_cols, turnover=True, n_jobs=n_jobs)
-    if rating is not None:
-        kw["rating"] = rating
-    if cfg["chars"] is not None:
-        kw["chars"] = cfg["chars"]
-
-    if sort == "single":
-        num_ports = E.n_portfolios("single", "all" if rating is None else rating.lower())
-        batch = BatchStrategyFormation(
-            data=df, columns={"ID": "cusip", "ret": ret_col, "VW": "mcap_e",
-                              "RATING_NUM": "spc_rat"},
-            holding_period=S.HOLDING_PERIOD, num_portfolios=num_ports,
-            verbose=False, **kw)
-    elif sort == "wf":
-        batch = BatchWithinFirmSortFormation(
-            data=df, firm_id_col=S.FIRM_ID_COL,
-            columns={"ID": "cusip", "VW": "mcap_e", "RATING_NUM": "spc_rat", "ret": ret_col},
-            min_bonds_per_firm=S.MIN_BONDS_PER_FIRM, verbose=False, **kw)
-    else:
-        raise ValueError(f"sort={sort!r}")
-
-    results = batch.fit()
-    return extract_panel(results, naming=NamingConfig(sign_correct=True))
+    raise ValueError(f"sort={sort!r}")
 
 
 def out_name(*, ret_type: str, sort: str, rating: str | None, set_name: str) -> str:
@@ -207,16 +180,11 @@ def main() -> int:
                     help="exc = in excess of the one-month bill; dur = duration-adjusted")
     ap.add_argument("--rating", default=None, choices=[None, "IG", "NIG"],
                     help="restrict the formation universe to one rating class")
-    ap.add_argument("--n-jobs", type=int, default=1)
-    ap.add_argument("--fast", action="store_true",
-                    help="use PyBondLab's sort kernels (needs a build that has them)")
     ap.add_argument("--force", action="store_true", help="recompute even if the CSV exists")
     args = ap.parse_args()
 
     sys.stdout.reconfigure(encoding="utf-8")
     prov = pblenv.use()
-    if args.fast:
-        pblenv.require_fast("--fast")
     root = sorts_root()
     tag = "sorts" + (f"-{args.rating.lower()}" if args.rating else "")
 
@@ -240,14 +208,13 @@ def main() -> int:
                     t0 = time.perf_counter()
                     panel = run_set(data, sort=sort, set_name=set_name,
                                     signals=args.signals, ret_type=args.ret,
-                                    rating=args.rating, n_jobs=args.n_jobs,
-                                    fast=args.fast)
+                                    rating=args.rating)
                     D.write_atomic(panel, out, index=False)
                     written.append(name)
                     print(f"[done] {name}  {len(panel):,} rows  "
                           f"{time.perf_counter() - t0:.1f}s")
         bench.note(signals=args.signals, ret=args.ret, rating=args.rating,
-                   sets=args.sets, sorts=args.sorts, fast=args.fast,
+                   sets=args.sets, sorts=args.sorts,
                    n_written=len(written))
         # The run's own check, on TWO things. Every (sort, set) asked for must exist
         # afterwards, whether this run made it or a previous one did.

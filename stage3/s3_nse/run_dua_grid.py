@@ -23,10 +23,10 @@ leaves it untruncated -- with MKTB from Stage 2's factor file. It writes
 dua_{premia,alpha,baselines}_{window}.parquet + dua_config_locations.parquet, which is
 what every Section-5 exhibit reads.
 
-❗Needs a PyBondLab build with the fast path. Two passes, in this order:
+Two passes, in this order:
 
     python s3_nse/run_dua_grid.py --signals cs      # one signal, to smoke it
-    python s3_nse/run_dua_grid.py                   # the grid (hours)
+    python s3_nse/run_dua_grid.py                   # the grid
     python s3_nse/run_dua_grid.py --stats           # the statistics layer
 """
 from __future__ import annotations
@@ -145,8 +145,8 @@ def run_one(item) -> dict:
     p = Path(paths.PANEL).as_posix()
     cols = ", ".join(f'"{c}"' for c in PANEL_BASE_COLS + list(signals))
     # ❗ORDER BY, for the same reason as in mua_engines.load_panel: DuckDB scans
-    # parquet in parallel and guarantees no row order without one, and PyBondLab's
-    # fast path consumes the frame positionally.
+    # parquet in parallel and guarantees no row order without one, and PyBondLab
+    # consumes the frame positionally.
     data = duckdb.sql(
         f"SELECT {cols} FROM read_parquet('{p}') ORDER BY date, cusip").df()
     data["date"] = pd.to_datetime(data["date"])
@@ -379,7 +379,6 @@ def main() -> int:
 
     import pblenv
     prov = pblenv.use()
-    pblenv.require_fast("the DUA grid")
 
     import drrlib as D          # noqa: E402
     from bench import Bench     # noqa: E402

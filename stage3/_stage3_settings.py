@@ -22,10 +22,16 @@ MKTB lives in the first, the risk-free rate in the second.
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 PIPELINE = HERE.parent                       # the trace-data-pipeline root
+# The root's shared modules (numeric_setup, pybondlab_pin). Appended, so nothing there can
+# shadow a Stage 3 module.
+if str(PIPELINE) not in sys.path:
+    sys.path.append(str(PIPELINE))
+import numeric_setup  # noqa: E402,F401  (pandas computes the same whatever else is installed)
 STAGE0_DIR = Path(os.environ.get("STAGE0_DIR", PIPELINE / "stage0"))
 STAGE1_DIR = Path(os.environ.get("STAGE1_DIR", PIPELINE / "stage1"))
 STAGE2_DIR = Path(os.environ.get("STAGE2_DIR", PIPELINE / "stage2"))
@@ -72,12 +78,8 @@ INPUTS = {
 }
 
 # --- PyBondLab --------------------------------------------------------------
-# Stage 3 runs through PyBondLab. The fast kernels the uncertainty grids need
-# (`PyBondLab.fast_sorts`, `anomaly_assay_fast`) are not in the 0.2.0 release that
-# Stage 2 pins, so point this at a checkout that has them -- see README_stage3.md.
-# Unset means "whatever `import PyBondLab` finds", which is fine if that install
-# already carries the kernels.
-PYBONDLAB_DIR = os.environ.get("PYBONDLAB_DIR") or None
+# Stage 3 runs through the PyBondLab release `pybondlab_pin.py` (at the repository root)
+# names, installed from requirements-local.txt. `pblenv.py` checks it before any sort.
 
 # --- Sample conventions ------------------------------------------------------
 # Both windows give floor(T**0.25) = 4. Assert the length before trusting a t-statistic:

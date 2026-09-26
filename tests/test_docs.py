@@ -74,6 +74,7 @@ DOC_FILES = [
     # The maps and the instructions an AI assistant reads (CLAUDE.md files only import these).
     "INDEX.md", "CODE_MAP.md",
     "AGENTS.md", "stage2/AGENTS.md", "stage3/AGENTS.md",
+    "stage4/README_stage4.md", "stage4/DATA_DICTIONARY.md", "stage4/AGENTS.md",
 ]
 
 # Named in prose but produced at runtime or shipped inside a download, so they are
@@ -327,6 +328,25 @@ def check_code_map(docs):
           f"{len(missing)} missing: {missing}" if missing else f"{len(tracked)} files")
 
 
+def check_pybondlab_pin(docs):
+    """Every PyBondLab version and install line a doc quotes is the one pybondlab_pin.py holds.
+
+    The version is exact because Stage 2's BBW factors and every sort in Stages 3 and 4 come
+    out of it, and the docs quote it in a dozen places: a release bump that missed one would
+    send a user to a different engine than the code checks for.
+    """
+    import pybondlab_pin as pin
+    texts = dict(docs)
+    texts["requirements-local.txt"] = (ROOT / "requirements-local.txt").read_text(encoding="utf-8")
+    quoted = re.compile(r"pybondlab==([0-9][0-9a-z.]*)|PyBondLab (\d+\.\d+\.\d+)", re.I)
+    bad = [f"{f}: {m.group(0)}" for f, t in texts.items() for m in quoted.finditer(t)
+           if (m.group(1) or m.group(2)) != pin.VERSION]
+    check("every PyBondLab version the docs quote is pybondlab_pin.VERSION", not bad, str(bad))
+    want = f"pip install --no-deps pybondlab=={pin.VERSION}"
+    other = [f for f, t in texts.items() if "pybondlab==" in t.lower() and want not in t]
+    check("every doc that installs PyBondLab gives the --no-deps line", not other, str(other))
+
+
 def check_links(docs):
     """Every relative link resolves, and every `other.md#anchor` names a real heading.
 
@@ -416,6 +436,7 @@ def main():
         and not (ROOT / "stage1" / f).exists()
         and not (ROOT / "stage2" / f).exists()
         and not (ROOT / "stage3" / f).exists()
+        and not (ROOT / "stage4" / f).exists()
         and not (ROOT / "tests" / f).exists()
     )
     check("every file named in the docs exists", not missing, str(missing))
@@ -438,6 +459,7 @@ def main():
     check_stage2_wrds(docs_all)
     check_quoted_counts(docs_all)
     check_code_map(docs)
+    check_pybondlab_pin(docs_all)
     check_links(docs_all)
 
     print()

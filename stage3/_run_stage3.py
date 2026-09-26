@@ -15,14 +15,9 @@ crash picks up where it stopped; `--force` recomputes from scratch.
     python _run_stage3.py --list                # the step list, with what each needs
     python _run_stage3.py                       # everything
 
-PyBondLab's sort kernels are DETECTED, not assumed. The runner asks the installed
-engine once and passes `--fast` to the producers only if they are there, so a plain
-`pip install -r requirements.txt` runs the whole of Sections 3, 4 and the zoo on the
-released PyBondLab -- slower, same numbers. `--no-fast` forces the slow path even when
-the kernels are present.
-
-❗The uncertainty grids (`--section nse`) are the exception: they cannot run without the
-kernels and will say so rather than starting. See README_stage3.md.
+Every sort runs through PyBondLab, the release `pybondlab_pin.py` names, installed with
+the two lines in requirements-local.txt. The runner checks it once, before any step starts,
+and stops with those two lines if it is missing or a different version.
 
 Only the inputs a SECTION reads are required, so `--section nse` does not need Stage 1's
 daily panel and `--section report` needs nothing at all.
@@ -132,9 +127,6 @@ STEPS = [
 ]
 
 
-# Producers that accept `--fast` (PyBondLab's sort kernels) and `--force`. The runner
-# appends these itself rather than baking them into STEPS: whether the kernels are
-# available is a property of the installed engine, not of the step.
 # How each section spells "end the sample here". One switch at the top; the drivers
 # keep their own flags, so running one by hand is unchanged.
 #
@@ -233,8 +225,8 @@ def window_is_stale(script: str, want_end: str) -> bool:
     return str(got)[:10] != str(want_end)[:10]
 
 
-ACCEPTS_FAST = {"s1_lib/run_sorts.py", "s1_lib/run_lib_sorts.py",
-                "s4_zoo/run_zoo_sorts.py"}
+# Producers that accept `--force`. The runner appends it itself rather than baking it into
+# STEPS, because whether to recompute is a property of the run, not of the step.
 ACCEPTS_FORCE = {"s1_lib/run_sorts.py", "s1_lib/run_lib_sorts.py", "s2_lab/run_lab.py",
                  "s3_nse/run_mua_grid.py", "s3_nse/run_dua_grid.py",
                  "s4_zoo/run_zoo_sorts.py"}
@@ -262,36 +254,17 @@ def _label(script: str, args: list[str]) -> str:
 
 
 def engine_status() -> dict:
-    """Is PyBondLab importable, and does it carry the fast sort kernels?
+    """Is the pinned PyBondLab installed?
 
-    Resolved ONCE, here, so every step gets the same answer and a missing engine is
-    reported before 40 subprocesses each discover it separately.
+    Resolved ONCE, here, so every step gets the same answer and a missing or wrong engine
+    is reported before 40 subprocesses each discover it separately.
     """
-    try:
-        import pblenv
-        prov = pblenv.use(quiet=True)
-    except ModuleNotFoundError:
-        return {"ok": False, "fast": False,
-                "why": "PyBondLab is not installed. `pip install -r requirements.txt`, "
-                       "or see README_stage3.md."}
-    except Exception as e:                       # noqa: BLE001 -- reported, not raised
-        return {"ok": False, "fast": False, "why": str(e)}
-    return {"ok": True, "fast": bool(prov.get("has_fast_kernels")),
-            "version": prov.get("version"), "tree": prov.get("tree_sha256"), "why": ""}
-
-
-def without_kernels(steps, eng: dict) -> tuple[list, bool]:
-    """Leave Section 5 out when PyBondLab's fast kernels are absent. Returns (steps, dropped).
-
-    Its two uncertainty grids refuse to start without them (`pblenv.require_fast`), and a
-    refused grid is a failed producer, which stops the run. Until 2026-09-24 that also skipped
-    the zoo and the PDF, while every guide said the rest ran on the slow path. Now Section 5 is
-    left out before the run starts, everything else runs, and the run exits non-zero.
-    """
-    if eng.get("fast") or not eng.get("ok"):
-        return steps, False
-    kept = [s for s in steps if s[0] != "nse"]
-    return kept, len(kept) != len(steps)
+    import pblenv
+    problem = pblenv.problem()
+    if problem:
+        return {"ok": False, "why": problem}
+    prov = pblenv.use(quiet=True)
+    return {"ok": True, "version": prov["version"], "tree": prov["tree_sha256"], "why": ""}
 
 
 def _inputs_marker(script: str, sargs) -> Path:
@@ -372,11 +345,9 @@ def print_config(args, eng: dict, missing: list[str], sample_end: str) -> None:
         mark = "  " if v and Path(v).exists() else "??"
         print(f"  {mark} {name:15s}{v if v else unset}")
     if eng["ok"]:
-        where = S.PYBONDLAB_DIR or "(installed)"
-        print(f"  PyBondLab      v{eng['version']} tree={eng['tree']}  {where}")
-        print(f"  sort kernels   {'yes' if eng['fast'] else 'NO -- the slow path'}")
+        print(f"  PyBondLab      v{eng['version']} tree={eng['tree']}")
     else:
-        print(f"  PyBondLab      UNAVAILABLE -- {eng['why']}")
+        print(f"  PyBondLab      UNAVAILABLE -- {eng['why'].splitlines()[0]}")
     # the pinned S.SAMPLE is the PAPER window and is not necessarily this run's.
     # Printing it under `--sample frontier` told the operator 2024-12 while every
     # exhibit was in fact being built to the panel's own end.
@@ -403,9 +374,6 @@ def main() -> int:
                     help="resolve and print the configuration, compute nothing")
     ap.add_argument("--force", action="store_true",
                     help="rerun producers whose output already exists")
-    ap.add_argument("--no-fast", action="store_true",
-                    help="never use PyBondLab's sort kernels, even when available. "
-                         "Much slower; useful for checking the two paths agree")
     ap.add_argument("--sample", choices=("frontier", "paper"), default="frontier",
                     help="how far the exhibits run. `frontier` (default) uses whatever "
                          "the Stage-2 panel reaches; `paper` reproduces the published "
@@ -427,13 +395,6 @@ def main() -> int:
         return 0
 
     eng = engine_status()
-    steps, nse_dropped = without_kernels(steps, eng)
-    if nse_dropped and not steps:
-        print("\nABORT: Section 5's two uncertainty grids need PyBondLab's fast kernels\n"
-              "  (PyBondLab.fast_sorts and PyBondLab.anomaly_assay_fast), and the build in use\n"
-              "  does not have them. Point PYBONDLAB_DIR at a build that does.")
-        return 1
-    use_fast = eng["fast"] and not args.no_fast
     import drrlib as _D
     sample_end = _D.resolve_sample_end(args.sample)
     missing = needed_inputs(steps)
@@ -444,28 +405,16 @@ def main() -> int:
         print(f"\n{len(will_run)} step(s) would run, {len(will_skip)} skipped "
               "(their output already exists).")
         if not eng["ok"]:
-            print("  ...but PyBondLab is unavailable, so every producer would fail.")
-        elif not eng["fast"]:
-            print("  Sort kernels are absent: the producers would take the slow path -- same "
-                  "numbers, longer." + ("\n  Section 5 would be skipped: its uncertainty grids "
-                                        "need the kernels." if nse_dropped else ""))
+            print("  ...but PyBondLab is unavailable, so every producer would fail:\n"
+                  f"  {eng['why']}")
         return 0
     if missing:
         return 1
     if not eng["ok"] and any(k == "producer" for _, k, *_ in will_run):
         print(f"\nABORT: {eng['why']}")
         return 1
-    if not eng["fast"] and not args.no_fast:
-        print("\n❗PyBondLab's sort kernels are not available, so the producers will\n"
-              "  take the slow path -- considerably longer."
-              + ("\n  Section 5 (Tables 5, 6, IA.XVII-IA.XIX, Figures IA.3-IA.6) is SKIPPED:\n"
-                 "  its uncertainty grids need the kernels. Everything else runs, and the run\n"
-                 "  exits non-zero because Section 5 is missing. Point PYBONDLAB_DIR at a\n"
-                 "  build with the kernels to include it. See README_stage3.md."
-                 if nse_dropped else ""))
 
-    print(f"\nrunning {len(steps)} step(s), "
-          f"{'with' if use_fast else 'WITHOUT'} the sort kernels\n")
+    print(f"\nrunning {len(steps)} step(s)\n")
     t0 = time.perf_counter()
     ran, skipped, failed = [], [], []
     for section, kind, script, sargs, target in steps:
@@ -484,8 +433,6 @@ def main() -> int:
             print(f"[rebuild] {label}  "
                   "(it was built from different Stage 2 inputs, or nothing records which)")
         argv = [sys.executable, script, *sargs]
-        if use_fast and script in ACCEPTS_FAST:
-            argv.append("--fast")
         # ❗A producer re-run because its inputs changed must not reuse its own old files: the MUA
         # and DUA grids skip every per-signal parquet that exists unless told --force, so without
         # this the runner printed [rebuild] and the grid re-used the old panel's series anyway.
@@ -535,11 +482,9 @@ def main() -> int:
             print(f"  slowest: {dt:7.1f}s  {label}")
     for label, code in failed:
         print(f"  FAILED exit {code}: {label}")
-    if nse_dropped:
-        print("  SKIPPED: Section 5 -- its uncertainty grids need PyBondLab's fast kernels")
     print(f"\ntables  -> {S.REPORTS / 'tables'}"
           f"\nfigures -> {S.REPORTS / 'figures'}")
-    return 1 if failed or nse_dropped else 0
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

@@ -16,8 +16,8 @@ windows.
 
 It runs on your own computer and opens no WRDS connection.
 
-**Beyond Stage 2's requirements it needs two things:** `PyBondLab`, installed by the
-repository's `requirements.txt`, and **pdflatex** (TeX Live or MiKTeX) for the last step.
+**Beyond Stage 2's requirements it needs one thing:** **pdflatex** (TeX Live or MiKTeX) for the
+last step. PyBondLab is already there: Stage 2 needs it too.
 `tools/check_inputs.py` warns if pdflatex is missing rather than failing -- without it
 every table and figure is still written, you just do not get the assembled PDF.
 
@@ -83,31 +83,18 @@ new column will not appear there until someone adds it.
 
 ## PyBondLab
 
-[PyBondLab](https://github.com/GiulioRossetti94/PyBondLab) is the portfolio-sorting
-library the paper is built on. `requirements.txt` installs it. Stage 3 runs every sort
-through it, so **which copy is on `sys.path` is part of the result**: `pblenv.py` puts
-the chosen build first, asserts the import resolved there (a second install in the
-environment can otherwise shadow it silently), and records the build's version, git state
-and a content hash in every manifest Stage 3 writes.
+[PyBondLab](https://pypi.org/project/pybondlab/) is the portfolio-sorting library the paper
+is built on. Stage 3 runs every sort through it, so **the release is part of the result**.
+Stages 2-4 run on PyBondLab 0.3.0, installed with the second of the two install lines:
 
 ```bash
-export PYBONDLAB_DIR=/path/to/PyBondLab     # a checkout; unset = whatever is installed
+python -m pip install -r requirements-local.txt
+python -m pip install --no-deps pybondlab==0.3.0
 ```
 
-> ❗**Only the uncertainty grids (`--section nse`) need the fast kernels** —
-> `PyBondLab.fast_sorts` and `PyBondLab.anomaly_assay_fast`. The 0.2.0 release that
-> Stage 2 pins does not carry them, and `pblenv.require_fast()` says so before the
-> fan-out starts rather than letting each of the 108 signal tasks fail on an import.
->
-> **Everything else genuinely runs without them.** `run_stage3.sh` leaves Section 5 out,
-> says so, and exits non-zero because it is missing. `_run_stage3.py` asks the installed
-> engine once and takes the slow path automatically — same numbers, longer. Measured on
-> one sort: 43.8 s without the kernels against 3.2 s with them. `--no-fast` forces the
-> slow path even when they are available, which is how you check the two agree.
->
-> At the time of writing, the build carrying the kernels and the released 0.2.0 report
-> the **same version string**, so there is no version test to give you — `pblenv` looks
-> for the modules themselves. Check what you have with `python pblenv.py`.
+`pblenv.py` checks the installed version against `pybondlab_pin.py` before any sort, stops
+with those two lines if it is missing or different, and records the version and a content
+hash in every manifest Stage 3 writes. `python pblenv.py` shows what you have.
 
 ---
 
@@ -137,7 +124,7 @@ now** (each run records what it read under `data/_inputs/`), so re-running after
 resumes rather than restarting, and a new Stage 2 build re-runs the producers that read
 it. `--force` recomputes everything.
 
-Measured on the cold run of 2026-09-12, 24 cores with the kernels:
+Measured on the cold run of 2026-09-12, 24 cores:
 
 | section | producer | cost |
 |---|---|---|
@@ -169,17 +156,12 @@ that computes each signal. The rows that differ from the printed table each reco
 was printed and why it changed. `RECONCILIATION_ia08.md` has the full account, and
 `python s4_zoo/t_ia08.py --diffs` prints them.
 
-Those timings are with the fast kernels, on 24 cores. Without them a sort takes roughly
-fourteen times as long (43.8 s against 3.2 s, measured on one), which is what turns the
-grids from minutes into hours — and is what the kernels are for.
-
 ---
 
 ## The flags that change the answer
 
-Most flags only change speed or scope. These four are worth understanding before you use
-them: three change what the exhibits say, and `--no-fast` is the check that the fast and slow
-engines agree.
+Most flags only change speed or scope. These three change what the exhibits say, so they
+are worth understanding before you use them.
 
 ### `--sample {frontier,paper}` on `_run_stage3.py`
 
@@ -194,13 +176,6 @@ Every caption states which one produced it -- "Sample: 2002-09 to 2025-11, T=279
 ❗Three of the 108 signals stop before the frontier because their data does. That is
 coverage, not degeneracy: the status ledger judges each strategy inside its own signal's
 span, so extending the window does not manufacture degenerate strategies.
-
-### `--no-fast`
-
-Force the slow PyBondLab path even when the fast kernels are present. **Same numbers,
-roughly fourteen times the sort time** (43.8 s against 3.2 s, measured on one sort). It
-exists so the two paths can be checked against each other; it is not a fallback, because
-the fallback is automatic.
 
 ### `--twin {feb,mar14}` on the Section-5 exhibits
 
@@ -232,7 +207,7 @@ drops that row so Table 3 prints 15 and the two tables agree.
 
 ## What it costs
 
-Measured on a **cold run** — `data/` and `reports/` wiped first — on 24 cores / 128 GB, Windows, with a PyBondLab build carrying the fast kernels, 2026-09-12. All 41 steps ran; none was skipped.
+Measured on a **cold run** — `data/` and `reports/` wiped first — on 24 cores / 128 GB, Windows, 2026-09-12. All 41 steps ran; none was skipped.
 
 **906 s = 15.1 minutes** end to end, `tools/check_inputs.py` through `reports/exhibits.pdf`.
 
@@ -271,9 +246,7 @@ Two more knobs worth knowing:
 - `STAGE3_MEMORY_LIMIT` caps DuckDB in the data appendix, which is the step that scans the 31-million-row daily panel. Left unset it takes a share of free RAM; set it (`STAGE3_MEMORY_LIMIT=8GB`) if something else on the machine needs the memory.
 - `STAGE3_WORKERS` sets the default worker count for every fan-out at once, without touching a flag.
 
-**On 16 GB**, run section by section (`--section lib`, then `lab`, and so on) rather than the whole chain, and pin `--workers 4 --threads 2` on both grids. Section 5 is the one that will hurt; it is also the only section that needs the fast kernels.
-
-Without the fast kernels every sort takes roughly fourteen times as long (43.8 s against 3.2 s, measured on one), so the two grids become hours rather than minutes — which is why Stage 3 refuses to start them rather than letting you find out.
+**On 16 GB**, run section by section (`--section lib`, then `lab`, and so on) rather than the whole chain, and pin `--workers 4 --threads 2` on both grids. Section 5 is the one that will hurt.
 
 ---
 
@@ -374,7 +347,7 @@ stage3/
   _run_stage3.py          the entry point: 41 steps, producers then exhibits then the report
   run_stage3.sh           contract check, then the above
   paths.py                paths derived from the settings
-  pblenv.py               which PyBondLab, asserted and fingerprinted
+  pblenv.py               checks PyBondLab against the pin, and fingerprints it
   drrlib.py               loading, Newey-West, CAPM_B alpha, paired difference, manifests
   helper_functions.py     the four small conventions, in one place
   captions.py             every table caption, keyed by LaTeX label

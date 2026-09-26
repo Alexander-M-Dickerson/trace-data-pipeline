@@ -10,7 +10,7 @@ works. Every field here comes from something the code already holds --
   * `make_report.EXHIBITS`   the paper's exhibit numbers, in the order the PDF prints
   * `captions.CAPTIONS`      the caption title, keyed by LaTeX label
   * `_run_stage3.STEPS`      which driver the orchestrator runs, and with which flags
-  * `data/<section>/*.json`  each result's own manifest: driver, label, sample, inputs
+  * `$STAGE3_DATA/<section>/*.json`  each result's own manifest: driver, label, sample, inputs
 
 -- so the only way for a row to be wrong is for the run itself to be wrong.
 
@@ -50,7 +50,8 @@ SECTION_OF = {
 def manifests() -> dict[str, dict]:
     """{result name: manifest block}, over every section's result JSONs."""
     out = {}
-    for p in sorted((STAGE3 / "data").glob("*/*.json")):
+    # STAGE3_DATA, like every producer (until 2026-09-26 this read stage3/data whatever it said)
+    for p in sorted(Path(R.S.DATA).glob("*/*.json")):
         try:
             doc = json.loads(p.read_text(encoding="utf-8"))
         except Exception:
@@ -212,7 +213,7 @@ def render(rs: list[dict]) -> str:
         "Shared code sits at the top level: `drrlib.py` (statistics, sample "
         "provenance, result manifests), `captions.py` (every caption title), "
         "`bench.py` (the timing/check ledger), `paths.py`, `fastrun.py` (process "
-        "parallelism), `pblenv.py` (which PyBondLab build is active), "
+        "parallelism), `pblenv.py` (checks and records the PyBondLab release), "
         "`_stage3_settings.py` (paths and constants) and `_run_stage3.py` (the "
         "orchestrator). `make_report.py` assembles the PDF.",
         "",

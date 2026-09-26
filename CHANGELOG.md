@@ -99,10 +99,6 @@ A full audit of every guide against the code and the 2026-09-21 run followed. Wh
   bundle, says so and exits 1.
 - `stage2/run_build_data_reports.sh` was committed without the executable bit, while Stage 2
   tells users to run it as `./run_build_data_reports.sh`.
-- Stage 3 without PyBondLab's fast kernels stopped at the first uncertainty grid, and so also
-  skipped the zoo and the PDF, while every guide said the rest ran. It now leaves Section 5 out,
-  runs everything else, and exits non-zero. The refusal message no longer sends users to a
-  release that lacks the kernels.
 - Stage 3 wrote its input records to `stage3/data/_inputs/` whatever `STAGE3_DATA` said.
 - The exhibits PDF's title page said Table IA.VIII was absent; Stage 3 has produced it since
   2026-09-12.
@@ -118,7 +114,43 @@ A full audit of every guide against the code and the 2026-09-21 run followed. Wh
   inputs `download_inputs.sh` fetches say what the code does. A live check of a private
   database is gone from `stage2/check_external_data.py`.
 
+### Changed -- PyBondLab 0.3.0 from PyPI
+- Stages 2-4 run on PyBondLab 0.3.0 from PyPI, named once in `pybondlab_pin.py`. Checked on the
+  2026-09-21 run on 2026-09-26: Stage 2's eleven BBW factors and their `_bns`/`_cls` twins are
+  byte-identical to 0.2.0's; every Stage 3 data file and table is identical to the run before;
+  and PyBondLab's own test suite passes on numpy 2.5.3.
+- The requirements are split. `requirements.txt` is what Stages 0 and 1 install on WRDS;
+  `requirements-local.txt` adds numba for Stages 2-4, and PyBondLab goes in on a second line,
+  `python -m pip install --no-deps pybondlab==0.3.0`, because PyBondLab declares `numpy<2` and
+  this repository installs numpy 2. Stages 2-4 need Python 3.11 or newer.
+- Stages 2, 3 and 4 check the installed PyBondLab at start-up and stop, printing the two install
+  lines, if it is missing or a different version. Manifests record its version and a content
+  hash.
+
+### Fixed -- installation
+- `requirements.txt` could not be installed: it asked for `numpy>=2.0` and `PyBondLab==0.2.0`,
+  which declares `numpy<2`, so pip refused the whole file, on WRDS and locally. Environments that
+  already existed were not affected.
+- `stage3/tools/build_index.py` read `stage3/data` whatever `STAGE3_DATA` said.
+- A result could depend on whether the optional package `numexpr` was installed: pandas hands it
+  large comparisons, and it compares a float32 column in float64 where numpy uses float32. On
+  the 2026-09-21 panel Table IA.V counted 6,186 returns below -20% with it and 6,181 without.
+  `numeric_setup.py` turns it (and `bottleneck`) off in Stages 2-4, so the numbers do not depend
+  on what else is installed.
+
+### Removed
+- Stage 3's second sort path, with the two flags and the environment variable that chose between
+  paths, and the batch fallback in the three sort producers. Every sort runs on PyBondLab's
+  kernels, the path every published run took, and removing the other one moved no number
+  (checked on every Stage 3 data file).
+
 ### Added
+- **Stage 4: the TRACE-only bond factors** published on openbondassetpricing.com, built from the
+  Stage 2 panel: 108 signals as single and within-firm sorts, four return types (excess, and
+  duration-adjusted against `tret`, `tret_bns` and `tret_cls`), three rating bands, unflipped,
+  with the flip set, a manifest and the wide CSVs. `compare_published.py` downloads the published
+  files and compares them cell by cell. On the 2026-09-21 run every one of 4,354,560 rows matches
+  the OSBAP build of that run (`stage4/README_stage4.md`).
 - `AGENTS.md` (read by Codex) and `CLAUDE.md` (read by Claude Code) at the root and in `stage2/`
   and `stage3/`: how to run the local stages with an AI assistant -- the commands in order, the
   one choice that changes the numbers (the factor source), what "done" means, and the traps.
@@ -471,7 +503,7 @@ the same PDF had been computed to 2025-11 and printed a 2025 row.
 ### Measured again
 
 A cold run on 2026-09-12, all 40 steps, `data/` and `reports/` wiped first, 24 cores /
-128 GB with the fast kernels: **906 s (15.1 minutes)** -- Section 5 472 s (55%),
+128 GB: **906 s (15.1 minutes)** -- Section 5 472 s (55%),
 Section 3 242 s, the zoo 62 s, the data appendix 60 s, Section 4 21 s; 856 s of that
 benched. Inputs 3.9 GB, outputs 395 MB (279 MB of it the two grids), peak 0.7 GB per
 grid worker. 33 tables, 11 figures, a 0.8 MB PDF.
@@ -557,7 +589,7 @@ needs no WRDS connection.
   printed numbers and that nothing in the document compares them -- a PDF of tables under
   familiar captions is exactly the kind of artifact that gets mistaken for the original.
   It also lists **every distinct PyBondLab build that contributed**, with what each
-  produced and whether it carried the fast kernels: a producer is skipped when its output
+  produced: a producer is skipped when its output
   exists, so re-rendering exhibits later under a different build is normal, and naming
   only one engine would misdescribe most of the document.
 
@@ -614,7 +646,7 @@ printing a number as though nothing had happened. On the 2026-09-11 cold run, 39
 ### What it costs
 
 A cold run -- `data/` and `reports/` wiped first -- took **833 s (13.9 minutes)** on
-24 cores / 128 GB with a build carrying the fast kernels, 2026-09-11: Section 5 438 s
+24 cores / 128 GB, 2026-09-11: Section 5 438 s
 (56%), Section 3 215 s, the data appendix 57 s, the zoo 55 s, Section 4 23 s. Inputs
 3.9 GB, outputs 348 MB, peak 0.7 GB per grid worker. `README_stage3.md` carries the
 per-step table, the recommended minimum (8 cores / 32 GB / ~5 GB disk, **derived from
@@ -638,19 +670,8 @@ every run, on the machine the defaults were chosen for.
   made from the full-sample mean of **the sample that was sorted**. Two runs over different
   windows can legitimately disagree about which factors are starred. Compare flip *sets*, and
   never difference a starred series against an unstarred one without re-orienting both.
-- ❗**Only Section 5 needs a PyBondLab build carrying the fast kernels** (`fast_sorts`,
-  `anomaly_assay_fast`), which the pinned 0.2.0 release does not have. Point `PYBONDLAB_DIR`
-  at one; `pblenv.require_fast()` checks before the fan-out starts rather than letting 108
-  workers each fail on an import.
-
-  Everything else genuinely runs on the pinned release: `_run_stage3.py` asks the installed
-  engine once at startup and takes the slow path automatically, with the same numbers --
-  roughly fourteen times the sort time (43.8 s against 3.2 s, measured on one sort).
-  `--no-fast` forces the slow path even when the kernels are there, which is how you check
-  the two agree. The pin is NOT floated to fix any of this -- Stage 2's factor series depend
-  on it exactly. There is also no minimum version to quote: at the time of writing the build
-  with the kernels and the release without them both report `0.2.0`, so `pblenv` looks for
-  the modules rather than comparing version strings.
+- Section 5's uncertainty grids need PyBondLab's sort kernels, which were not yet in a
+  PyBondLab release (they are in 0.3.0; see Unreleased).
 
 ### Changed
 

@@ -31,14 +31,17 @@ All three are found automatically — newest date stamp wins.
 FISD coupon terms the `tret_*` benchmarks need. These are fetched once and cached under
 `stage2/data/`.
 
-**3. Python packages.**
+**3. Python packages**, in Python 3.11 or newer, from the repository root:
 
 ```bash
-python3 -m pip install -r requirements.txt
+python3 -m pip install -r requirements-local.txt
+python3 -m pip install --no-deps pybondlab==0.3.0
 ```
 
-DuckDB is the engine and `PyBondLab==0.2.0` builds the bond factors — that version is
-pinned deliberately, see the comment in `requirements.txt`.
+DuckDB is the engine and PyBondLab 0.3.0 builds the BBW bond factors. PyBondLab declares
+`numpy<2` and this repository installs numpy 2, so it goes in without its dependency list;
+`requirements-local.txt` says why that is safe. Stage 2 stops at start-up and prints these two
+lines if PyBondLab is missing or a different version.
 
 ---
 

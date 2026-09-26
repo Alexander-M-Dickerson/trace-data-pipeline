@@ -17,9 +17,11 @@ needs git, and is skipped without it.
 | 1 | the WRDS grid, after stage 0 | the stage 0 panels and Enhanced FISD file; WRDS: `fisd.fisd_ratings`, `fisd.fisd_mergedissue`, `fisd.fisd_mergedredemption`, `fisd.fisd_amt_out_hist`; the files `download_inputs.sh` fetched | `stage1/data/stage1_<stamp>.parquet` (44 columns), `call_dummy_<stamp>.parquet`, `sp_ratings_<stamp>.parquet`, `moodys_ratings_<stamp>.parquet`, `ultra_distressed_cusips_<stamp>.csv`, `stage1/data_reports/` | `config.py`, `stage1/_stage1_settings.py` |
 | 2 | your own computer | `stage1_<stamp>.parquet`, `trace_enhanced_fisd_<stamp>.parquet`, `call_dummy_<stamp>.parquet`; on the first run, WRDS (`crsp.tfz_idx`, `crsp.tfz_mth_ft`, `ff.factors_monthly`, `ff.fivefactors_monthly`, `cboe.cboe`, `fisd.fisd_mergedissue`), read with `WRDS_USERNAME` (`config.py` or the environment), and public downloads, all cached in `stage2/data/` | `stage2/output/panel/main_panel_<mode>.parquet` (145 columns), `stage2/output/blocks/<mode>/`, `stage2/manifests/`, and with `make_release.py` the shareable `stage2/release/` | `stage2/_stage2_settings.py` |
 | 3 | your own computer | the stage 2 panel, its blocks and factor file, and the stage 1 daily panel | `stage3/data/` (sort results, grids, statistics), `stage3/reports/tables/`, `stage3/reports/figures/`, `stage3/reports/exhibits.pdf`, `stage3/reports/timings.jsonl` | `stage3/_stage3_settings.py` |
+| 4 | your own computer | the stage 2 panel; its blocks `betas_x`, `mom_retx`, `betas_bns`, `mom_retx_bns`, `betas_cls`, `mom_retx_cls`; the risk-free rate in its factor file; for the check, the published TRACE-only factors (downloaded) | `stage4/output/<sort>_sort_panel_trace_<vintage>/` (the long factor panel, `flip_set.json`, `MANIFEST.json`) and `stage4/output/<sort>_sort_trace_<vintage>_csv/` (24 CSV files) | `stage4/_stage4_settings.py`, `stage4/spec/factors.json` |
 
 `<stamp>` is the run date, `YYYYMMDD`. `<member>` is `enhanced`, `144a` or `standard`. `<mode>`
-is `stage1` unless you set another.
+is `stage1` unless you set another. `<sort>` is `single` or `within_firm`; `<vintage>` is the
+release year, taken from the stage 1 file's stamp.
 
 **Downloads.** Stage 1's come from `download_inputs.sh`, run on the WRDS login node: the Liu-Wu
 Treasury yields, the bond-firm linker, and the Fama-French industry files. Stage 2 fetches its
@@ -32,6 +34,10 @@ the last month each cache holds.
 | file | what it does |
 |---|---|
 | `config.py` | Settings shared by stages 0-2: `WRDS_USERNAME`, `AUTHOR`, `TRACE_MEMBERS`, `OUTPUT_FORMAT`, `STAGE0_OUTPUT_FIGURES` |
+| `requirements.txt` | The Python packages for stages 0 and 1, installed on WRDS |
+| `requirements-local.txt` | The packages for stages 2-4, on your own computer: `requirements.txt` plus numba. PyBondLab goes in on a second line, as the file explains |
+| `pybondlab_pin.py` | The PyBondLab release stages 2-4 run on, the start-up check that it is the one installed, and its fingerprint for manifests |
+| `numeric_setup.py` | Stops pandas handing work to `numexpr` or `bottleneck` when they happen to be installed, so stages 2-4 compute the same numbers in any environment |
 | `run_pipeline.sh` | Runs stages 0 and 1 on WRDS: downloads the inputs, submits the stage 0 jobs, then the report job and stage 1, each waiting on the jobs it needs |
 | `download_inputs.sh` | Fetches the files stage 1 needs from the internet. Login node only: WRDS compute nodes have no internet |
 | `check_disk_space.sh` | Checks there is room in your WRDS home quota before a run. Called by `run_pipeline.sh` |
@@ -132,7 +138,7 @@ paper section: `s1_lib` is the paper's Section 3, `s2_lab` Section 4, `s3_nse` S
 | `stage3/_run_stage3.py` | Entry point: section by section, the producers (sorts and grids) then their exhibits, then the PDF |
 | `stage3/_stage3_settings.py` | Every path and constant. Inputs can be moved with environment variables |
 | `stage3/paths.py` | The paths, derived from the settings |
-| `stage3/pblenv.py` | Chooses the PyBondLab build (`PYBONDLAB_DIR`) and records which one produced the numbers |
+| `stage3/pblenv.py` | Checks the installed PyBondLab against `pybondlab_pin.py` before any sort, and records its version and content hash with every result |
 | `stage3/drrlib.py` | Shared loading, statistics (Newey-West, CAPM_B alpha, paired differences) and result manifests |
 | `stage3/fastrun.py` | Runs the grids one signal per fresh process |
 | `stage3/bench.py` | Times each run and records its own checks in `reports/timings.jsonl` |
@@ -146,7 +152,7 @@ paper section: `s1_lib` is the paper's Section 3, `s2_lab` Section 4, `s3_nse` S
 | `stage3/s2_lab/lab_engine.py` | Statistics for every Section 4 exhibit |
 | `stage3/s2_lab/lab_exhibit.py` | The table layout shared by the Section 4 tables |
 | `stage3/s3_nse/nse_engine.py` | Statistics for every Section 5 exhibit |
-| `stage3/s3_nse/mua_engines.py` | The method-uncertainty grid: its 216 specifications, in the fast and the slow engine |
+| `stage3/s3_nse/mua_engines.py` | The method-uncertainty grid: its 216 specifications, through PyBondLab's `assay_anomaly_fast` |
 | `stage3/s3_nse/clusters.py` | The 108 signals' nine clusters, and the grid definitions |
 | `stage3/s3_nse/cluster_table.py` | The table layout shared by Tables 5 and 6 |
 | `stage3/s4_zoo/zoo_engine.py` | Statistics for the factor-zoo exhibits |
@@ -156,6 +162,20 @@ paper section: `s1_lib` is the paper's Section 3, `s2_lab` Section 4, `s3_nse` S
 | `stage3/spec/inputs.json` | The five inputs and their expected shape |
 | `stage3/spec/signal_definitions.json` | What each of the 145 panel columns means, with its citation |
 
+## Stage 4: the TRACE-only bond factors (your computer)
+
+| file | what it does |
+|---|---|
+| `stage4/run_stage4.sh` | Runs everything: `build_factors.py`, then `compare_published.py` |
+| `stage4/build_factors.py` | Entry point: loads each return type's panel once, sorts it both ways over the three rating bands, and writes the factors, the flip set and a manifest |
+| `stage4/compare_published.py` | Downloads the TRACE-only factors openbondassetpricing.com serves and compares them with yours, cell by cell |
+| `stage4/_stage4_settings.py` | The paths (movable with environment variables) and the release year |
+| `stage4/spec/factors.json` | The grid: the 108 signals, the four return types, the rating bands, the portfolio counts and the 68 columns a duration-adjusted return type swaps |
+| `stage4/factorlib/inputs.py` | The panel for each return type: excess of the T-bill, or duration-adjusted with its own betas and momentum |
+| `stage4/factorlib/sorts.py` | One return type through PyBondLab for every band, unflipped, and the flip set |
+| `stage4/factorlib/release.py` | Writes the files in the published archives' layout, and the wide CSVs |
+| `stage4/conftest.py` | Lets the tests import the stage 4 modules |
+
 ## Tests
 
 | folder | what it covers |
@@ -163,5 +183,6 @@ paper section: `s1_lib` is the paper's Section 3, `s2_lab` Section 4, `s3_nse` S
 | `tests/` | The whole repo: stage 0 chunking and scheduling, the disk-space check, one row per key on every lookup, the stage 1 linker window and sample-end rule, no private paths in tracked files, the docs against the code (`test_docs.py`), the smoke test's checks (`smoke_assertions.py`), and a probe of your WRDS connection limit (`probe_wrds_connections.py`, needs WRDS) |
 | `stage2/tests/` | Stage 2: the column contract and order, the `_mmn` twin rule, the release redaction, the factor sources, the calendar and month boundaries, the data dictionary against the code, and parity with a reference build (skipped when there is none) |
 | `stage3/tests/` | Stage 3: the input contract, the runner and its steps, the exhibit index, no absolute or private paths, the Section 5 counting rules, the signal definitions, and the skip-and-rebuild rule |
+| `stage4/tests/` | Stage 4, on small synthetic panels: the grid in the spec, the duration swap, the flip set, the CSV pivot, and one run through PyBondLab |
 
-Run `python -m pytest stage2/tests tests stage3/tests -q`. Nothing in it needs WRDS or the network.
+Run `python -m pytest stage2/tests tests stage3/tests stage4/tests -q`. Nothing in it needs WRDS or the network.

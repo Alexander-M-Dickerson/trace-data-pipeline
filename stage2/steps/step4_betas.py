@@ -26,8 +26,8 @@ from lib.phase_timer import PhaseTimer
 
 # Pre-2002-08-31 backfill: BBW factor column -> its extended-series name. Upstream fills these from
 # the lowercase LHM/ICE columns inside factors.parquet (in the reference implementation); we fill them from
-# the PUBLISHED extended series (== those columns at max|d|=0), which removes the
-# private-pin dependency for the BBW piece. Post-cutoff stays the pure-TRACE build.
+# the PUBLISHED extended series (== those columns at max|d|=0), so the BBW backfill needs only
+# public inputs. Post-cutoff stays the pure-TRACE build.
 ICE_MAP = {"MKTB": "mktb", "DRF": "drf", "CRF": "crf",
            "MKTBx": "mktbx", "DRFx": "drfx", "CRFx": "crfx", "TERM": "term",
            # DEFB/TERMB are spliced the same way. They were added to the published extended

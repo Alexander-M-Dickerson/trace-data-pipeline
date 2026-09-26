@@ -323,7 +323,7 @@ Every result carries one, written by `drrlib.write_result`:
 | `name`, `section` | which result, and which section wrote it |
 | `written_utc`, `wall_s` | when, and how long |
 | `git_commit`, `git_branch`, `code_dirty` | the code that produced it |
-| `pybondlab` | version, git state, content hash, whether the fast kernels were present — **no path**; `null` for a step that runs no sort |
+| `pybondlab` | version and a content hash of the installed package — **no path**; `null` for a step that runs no sort |
 | `inputs` | each input's path, size and sha256 prefix |
 | `python` | interpreter version |
 

@@ -65,9 +65,17 @@ agency rating — so that file yields an empty panel. Stage 2 detects this and r
 start. Run Stages 0 and 1 yourself on WRDS and use their output.
 
 Python packages beyond Stage 1's: `duckdb`, `numba`, `scipy`, `statsmodels`,
-`pandas_market_calendars` and `PyBondLab` (pinned at 0.2.0). `requirements.txt` installs them all,
-except `numba` on Python 3.14: there, `pip install "numba>=0.63"` yourself. The dry run says if
-it is missing.
+`pandas_market_calendars` and PyBondLab 0.3.0, in Python 3.11 or newer. Two lines install them
+all:
+
+```bash
+python -m pip install -r requirements-local.txt
+python -m pip install --no-deps pybondlab==0.3.0
+```
+
+PyBondLab declares `numpy<2` and this repository installs numpy 2, so it goes in without its
+dependency list; `requirements-local.txt` says why that is safe. The dry run says if anything is
+missing.
 
 ---
 

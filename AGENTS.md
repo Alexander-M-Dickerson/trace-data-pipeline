@@ -7,8 +7,9 @@ People should start at [README.md](README.md) and [QUICKSTART.md](QUICKSTART.md)
 ## What this repository does
 
 It turns the WRDS TRACE corporate bond tape into a monthly bond asset pricing panel, then
-reproduces the exhibits of *The Corporate Bond Factor Replication Crisis*. It runs in four stages
-on two machines:
+reproduces the exhibits of *The Corporate Bond Factor Replication Crisis* and builds the
+TRACE-only bond factors published on openbondassetpricing.com. It runs in five stages on two
+machines:
 
 | stage | where it runs | what it does | time |
 |---|---|---|---|
@@ -16,9 +17,11 @@ on two machines:
 | hand-off | the user | zip the folder on WRDS, copy it to their own computer | -- |
 | 2 | **the user's computer** | build the monthly panel (145 columns per bond-month) | about 8-18 min (the first run also downloads its inputs) |
 | 3 | **the user's computer** | portfolio sorts and the paper's exhibits (tex tables, figures) | about 15-20 min |
+| 4 | **the user's computer** | the TRACE-only bond factors, checked against the published files | about 8 min |
 
-Stages 2 and 3 are what most users run locally with an assistant. Each has its own instructions:
-[stage2/AGENTS.md](stage2/AGENTS.md) and [stage3/AGENTS.md](stage3/AGENTS.md).
+Stages 2, 3 and 4 are what most users run locally with an assistant. Each has its own
+instructions: [stage2/AGENTS.md](stage2/AGENTS.md), [stage3/AGENTS.md](stage3/AGENTS.md) and
+[stage4/AGENTS.md](stage4/AGENTS.md).
 
 ## Where to look
 
@@ -29,11 +32,13 @@ Stages 2 and 3 are what most users run locally with an assistant. Each has its o
 ## Rules for the assistant
 
 1. **Read the stage's QUICKSTART before running anything**: `stage2/QUICKSTART_stage2.md`,
-   `stage3/QUICKSTART_stage3.md`. They hold the exact commands and the expected run times.
-2. **Always dry-run first.** `python _run_stage2.py --dry-run` and `python _run_stage3.py --dry-run`
-   print every input they resolved. Show the user that list before building.
+   `stage3/QUICKSTART_stage3.md`, `stage4/README_stage4.md`. They hold the exact commands and the
+   expected run times.
+2. **Always dry-run first.** `python _run_stage2.py --dry-run`, `python _run_stage3.py --dry-run`
+   and `python build_factors.py --dry-run` print every input they resolved. Show the user that
+   list before building.
 3. **Settings live in one file per stage**: `stage2/_stage2_settings.py`,
-   `stage3/_stage3_settings.py`. Change settings there, or with the documented command-line
+   `stage3/_stage3_settings.py`, `stage4/_stage4_settings.py`. Change settings there, or with the documented command-line
    flags and environment variables. Do not edit any other code to get past a check.
 4. **A failing check is the answer, not an obstacle.** The stages check their own inputs and
    outputs (column contracts, coverage, redaction). If one fails, stop, show the message, and
@@ -82,9 +87,14 @@ If the user runs you on the WRDS Cloud, these are the rules that cost people a d
 - A WRDS account (`WRDS_USERNAME`, in `config.py` or the environment) for stage 2's first run,
   which fetches and caches Treasury returns, Fama-French factors, VIX and FISD coupon terms.
   Later runs use the cache.
-- Python 3.10+ with `python -m pip install -r requirements.txt`. Stages 2 and 3 need `numba`; `requirements.txt` installs it below Python 3.14, and on 3.14 you install it yourself (`pip install "numba>=0.63"`). Stage 2 stops at start-up if it is missing.
-- For stage 3's two uncertainty grids, a PyBondLab build with the fast kernels
-  (`PYBONDLAB_DIR`); see [stage3/AGENTS.md](stage3/AGENTS.md).
+- Python 3.11 or newer on their computer, and two install lines, in this order:
+  ```
+  python -m pip install -r requirements-local.txt
+  python -m pip install --no-deps pybondlab==0.3.0
+  ```
+  PyBondLab 0.3.0 declares `numpy<2` and this repository installs numpy 2, so it goes in
+  without its dependency list; `requirements-local.txt` says why that is safe. Stages 2-4 stop
+  at start-up and print these two lines if PyBondLab is missing or a different version.
 
 ## Traps that have caught people
 
@@ -100,6 +110,6 @@ If the user runs you on the WRDS Cloud, these are the rules that cost people a d
 
 ## Before changing code
 
-Run `python -m pytest stage2/tests tests stage3/tests -q`. It needs no WRDS or network, takes
+Run `python -m pytest stage2/tests tests stage3/tests stage4/tests -q`. It needs no WRDS or network, takes
 seconds, and includes `tests/test_docs.py`, which fails when a doc stops matching the code. If you
 add or rename a code file, add it to [CODE_MAP.md](CODE_MAP.md).

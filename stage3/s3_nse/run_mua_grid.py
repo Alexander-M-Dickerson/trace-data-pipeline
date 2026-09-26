@@ -11,8 +11,8 @@ twelve times costs far more than the parallelism returns.
 Output: `data/grids/mua/<signal>.parquet`, long format --
 (date, signal, spec_id, leg L/S/LS, return, nbonds).
 
-❗Needs a PyBondLab build carrying `anomaly_assay_fast`; `pblenv.require_fast` checks
-before the fan-out starts rather than letting 108 workers each fail on an import.
+`pblenv.use()` checks the installed PyBondLab before the fan-out starts, rather than
+letting 108 workers each discover a missing or wrong one.
 
     python s3_nse/run_mua_grid.py                       # all 108 signals
     python s3_nse/run_mua_grid.py --signals cs mom6_1   # two, for a smoke run
@@ -198,7 +198,6 @@ def main() -> int:
 
     import pblenv
     prov = pblenv.use()
-    pblenv.require_fast("the MUA grid")
 
     import drrlib as D          # noqa: E402  (after pblenv)
     from bench import Bench     # noqa: E402

@@ -8,8 +8,8 @@ how many bond factors survive, and which ones, is counted off these two CSVs.
           RAW `ret_vw`, not excess: every printed statistic is on the LONG-SHORT leg,
           which the risk-free rate cancels out of. `--excess` subtracts it anyway if
           you want the legs on an excess basis; the long-short series does not move.
-  step 2  single sort: BatchStrategyFormation, deciles, holding_period=1, turnover on.
-  step 3  within-firm: BatchWithinFirmSortFormation, high/low, at least 2 bonds/firm.
+  step 2  single sort: PyBondLab's fast_single_sorts, deciles, holding_period=1, turnover on.
+  step 3  within-firm: fast_within_firm_sorts, high/low, at least 2 bonds/firm.
   both    extract_panel(NamingConfig(sign_correct=True)).
 
 ❗Sign correction is decided on THE SAMPLE THAT WAS SORTED. Run to a different end date
@@ -24,7 +24,7 @@ the statistics layer.
 
 Run it as a file -- on Windows the entry module is re-imported in every worker:
 
-    python s4_zoo/run_zoo_sorts.py --n-jobs 6
+    python s4_zoo/run_zoo_sorts.py
 """
 from __future__ import annotations
 
@@ -106,41 +106,18 @@ def prepare_data(*, end: str | None = None,
     return data, signals
 
 
-def run_batch(data: pd.DataFrame, signals: list[str], *, sort: str,
-              n_jobs: int = 1, fast: bool = False) -> pd.DataFrame:
-    from PyBondLab import (BatchStrategyFormation, BatchWithinFirmSortFormation,
-                           NamingConfig, extract_panel)
+def run_batch(data: pd.DataFrame, signals: list[str], *, sort: str) -> pd.DataFrame:
+    from PyBondLab import NamingConfig, extract_panel
+    from PyBondLab.fast_sorts import fast_single_sorts, fast_within_firm_sorts
 
     cols = {"ID": "cusip", "ret": "ret_vw", "VW": "mcap_e", "RATING_NUM": "spc_rat"}
-
-    if fast and sort == "single":
-        from PyBondLab.fast_sorts import fast_single_sorts
+    if sort == "single":
         res = fast_single_sorts(data, signals, columns=cols, num_portfolios=10,
                                 dynamic_weights=True)
-        return extract_panel(res, naming=NamingConfig(sign_correct=True))
-
-    if fast and sort == "wf":
-        from PyBondLab.fast_sorts import fast_within_firm_sorts
+    else:
         res = fast_within_firm_sorts(data, signals, columns=cols,
                                      firm_id_col=S.FIRM_ID_COL)
-        return extract_panel(res, naming=NamingConfig(sign_correct=True))
-
-    keep = ["cusip", "date", "mcap_e", "spc_rat", S.FIRM_ID_COL, "ret_vw"] + signals
-    df = data[list(dict.fromkeys(keep))]
-    kw: dict = dict(signals=signals, turnover=True)
-    if n_jobs > 1:
-        kw["n_jobs"] = n_jobs
-    if sort == "single":
-        batch = BatchStrategyFormation(
-            data=df, columns=cols, holding_period=S.HOLDING_PERIOD,
-            num_portfolios=10, verbose=False, **kw)
-    else:
-        batch = BatchWithinFirmSortFormation(
-            data=df, firm_id_col=S.FIRM_ID_COL,
-            columns={"ID": "cusip", "VW": "mcap_e", "RATING_NUM": "spc_rat",
-                     "ret": "ret_vw"},
-            min_bonds_per_firm=S.MIN_BONDS_PER_FIRM, verbose=False, **kw)
-    return extract_panel(batch.fit(), naming=NamingConfig(sign_correct=True))
+    return extract_panel(res, naming=NamingConfig(sign_correct=True))
 
 
 def main() -> int:
@@ -153,16 +130,11 @@ def main() -> int:
     ap.add_argument("--excess", action="store_true",
                     help="subtract the factor file's rf from ret_vw (the long-short "
                          "series does not move; the legs do)")
-    ap.add_argument("--n-jobs", type=int, default=6)
-    ap.add_argument("--fast", action="store_true",
-                    help="use PyBondLab's sort kernels (needs a build that has them)")
     ap.add_argument("--force", action="store_true")
     args = ap.parse_args()
 
     sys.stdout.reconfigure(encoding="utf-8")
     prov = pblenv.use()
-    if args.fast:
-        pblenv.require_fast("--fast")
     root = sorts_root()
     tag = "zoo-sorts"
 
@@ -178,13 +150,12 @@ def main() -> int:
                     with bench.phase("load"):
                         data, signals = prepare_data(end=args.end, excess=args.excess)
                 t0 = time.perf_counter()
-                panel = run_batch(data, signals, sort=sort, n_jobs=args.n_jobs,
-                                  fast=args.fast)
+                panel = run_batch(data, signals, sort=sort)
                 D.write_atomic(panel, out, index=False)
                 print(f"[done] {out.name}  {len(panel):,} rows  "
                       f"{time.perf_counter() - t0:.1f}s")
         bench.note(sorts=args.sorts, end=args.end, excess=args.excess,
-                   n_signals=len(signals or []), fast=args.fast)
+                   n_signals=len(signals or []))
         have = [s_ for s_ in args.sorts if (root / Z.CSV[s_]).exists()]
         ok = bench.check(len(have) == len(args.sorts),
                          f"{len(have)}/{len(args.sorts)} zoo sort CSVs present")

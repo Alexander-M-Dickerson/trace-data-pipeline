@@ -8,8 +8,9 @@ human guide is [QUICKSTART_stage3.md](QUICKSTART_stage3.md).
 
 - Stage 2 must have finished: stage 3 reads `stage2/output/panel/main_panel_stage1.parquet` and the
   blocks beside it. Another panel name: `export STAGE3_MODE=<mode>`.
-- Stage 3 sorts portfolios with PyBondLab. Section 5 needs a PyBondLab build with the fast kernels;
-  point at one with `export PYBONDLAB_DIR=/path/to/PyBondLab`. Stage 3 prints which build it used.
+- Stage 3 sorts portfolios with PyBondLab 0.3.0, installed with the two lines in
+  `requirements-local.txt`. It stops and prints them if PyBondLab is missing or a different
+  version, and prints the version it used.
 - Ask the user which sample they want: the full panel (default) or the paper's sample
   (`--sample paper`, 2002-09 to 2024-12).
 

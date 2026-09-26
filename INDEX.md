@@ -17,6 +17,8 @@ A task-by-task guide to the docs, for people and for AI assistants. What each co
 | share a panel you built | [stage2/README_stage2.md](stage2/README_stage2.md) | `python stage2/make_release.py --what panel` |
 | rebuild the betas on another Treasury benchmark | [README_stage2: Alternative Treasury benchmarks](stage2/README_stage2.md#alternative-treasury-benchmarks-rebuilding-the-betas) | `python stage2/make_excess_blocks.py` |
 | reproduce the paper's tables and figures | [stage3/QUICKSTART_stage3.md](stage3/QUICKSTART_stage3.md) | `bash stage3/run_stage3.sh` |
+| build the TRACE-only bond factors, and check them against the published ones | [stage4/README_stage4.md](stage4/README_stage4.md) | `bash stage4/run_stage4.sh` |
+| install what stages 2-4 need | [requirements-local.txt](requirements-local.txt) | `pip install -r requirements-local.txt`, then `pip install --no-deps pybondlab==0.3.0` |
 | run a stage with Claude Code or Codex | [AGENTS.md](AGENTS.md) | |
 
 ## Understanding the data
@@ -27,6 +29,7 @@ A task-by-task guide to the docs, for people and for AI assistants. What each co
 | look up a stage 1 column (the daily bond panel) | [stage1/DATA_DICTIONARY.md](stage1/DATA_DICTIONARY.md) |
 | look up a monthly panel column or a factor model | [stage2/DATA_DICTIONARY.md](stage2/DATA_DICTIONARY.md) |
 | look up a stage 3 output file | [stage3/DATA_DICTIONARY.md](stage3/DATA_DICTIONARY.md) |
+| look up a column of the TRACE-only factor files | [stage4/DATA_DICTIONARY.md](stage4/DATA_DICTIONARY.md) |
 | find the code behind a table or figure of the paper | [stage3/INDEX.md](stage3/INDEX.md) |
 | understand the decimal-shift corrector | [stage0/README_decimal_shift_corrector.md](stage0/README_decimal_shift_corrector.md) |
 | understand the bounce-back filter | [stage0/README_bounce_back_filter.md](stage0/README_bounce_back_filter.md) |
@@ -45,6 +48,7 @@ A task-by-task guide to the docs, for people and for AI assistants. What each co
 | stage 2's settings | `stage2/_stage2_settings.py` | [README_stage2: Configuration](stage2/README_stage2.md#configuration) |
 | stage 3's inputs | `stage3/_stage3_settings.py` or environment variables | [QUICKSTART_stage3: environment variables](stage3/QUICKSTART_stage3.md#every-environment-variable-stage-3-reads) |
 | stage 3's sample (full panel or the paper's window) | `--sample` on `_run_stage3.py` | [QUICKSTART_stage3: Which sample](stage3/QUICKSTART_stage3.md#which-sample) |
+| stage 4's inputs and output folder | environment variables | [README_stage4: Settings](stage4/README_stage4.md#settings) |
 
 ## When something fails
 
@@ -54,6 +58,7 @@ A task-by-task guide to the docs, for people and for AI assistants. What each co
 | 1 | [README_stage1: Troubleshooting](stage1/README_stage1.md#troubleshooting), [FAQ: Troubleshooting](FAQ.md#troubleshooting) |
 | 2 | [QUICKSTART_stage2: If something goes wrong](stage2/QUICKSTART_stage2.md#if-something-goes-wrong) |
 | 3 | [QUICKSTART_stage3: If something goes wrong](stage3/QUICKSTART_stage3.md#if-something-goes-wrong) |
+| 4 | [README_stage4: If something goes wrong](stage4/README_stage4.md#if-something-goes-wrong) |
 
 ## Working on the code
 

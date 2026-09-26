@@ -279,19 +279,16 @@ def title_page(window: str, prov: dict) -> str:
                      r"re-rendered later can carry a different engine from the one that "
                      r"made the sorts and grids. Each build is listed with what it "
                      r"produced." + "\n")
-        L.append(r"{\footnotesize\begin{tabular}{llcl}\toprule")
-        L.append(r"Version & Tree & Fast kernels & Produced \\ \midrule")
+        L.append(r"{\footnotesize\begin{tabular}{lll}\toprule")
+        L.append(r"Version & Tree & Produced \\ \midrule")
         for rec in builds:
             b = rec["build"]
             v = f"v{b.get('version', '?')}"
-            if b.get("git_branch"):
-                v += f" ({b['git_branch']}@{(b.get('git_sha') or '')[:7]})"
             names = ", ".join(sorted(rec["results"])[:4])
             if len(rec["results"]) > 4:
                 names += f", +{len(rec['results']) - 4} more"
             L.append(latex_escape(v) + r" & \texttt{" + str(b.get("tree_sha256", "?"))
-                     + r"} & " + ("yes" if b.get("has_fast_kernels") else "no")
-                     + r" & " + latex_escape(names) + r" \\")
+                     + r"} & " + latex_escape(names) + r" \\")
         L.append(r"\bottomrule\end{tabular}}")
 
     if prov["inputs"]:

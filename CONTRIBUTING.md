@@ -34,7 +34,7 @@ We welcome suggestions for new features or improvements! Please create an issue 
 ## Development Setup
 
 ### Prerequisites
-- Python 3.10 or higher
+- Python 3.10 or higher for stages 0-1 (WRDS), 3.11 or higher for stages 2-4
 - Access to WRDS (for testing)
 - Git
 
@@ -72,6 +72,7 @@ pytest:
 ```bash
 python -m pytest stage2/tests tests -q      # Stage 2 and the whole repo, no WRDS, no network
 python -m pytest stage3/tests -q            # the exhibit package
+python -m pytest stage4/tests -q            # the TRACE-only factors
 ```
 
 That covers the frozen 145-column contract and its order, the `_mmn` twin rule, the release

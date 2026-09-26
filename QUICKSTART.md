@@ -40,6 +40,7 @@ Before you start, know where you will be:
 | The hand-off | you | zip it on WRDS, `scp` it to your own computer (~5 GB) |
 | Stage 2 | **your own computer** | build the monthly panel from that file (~8-18 min) |
 | Stage 3 | **your own computer** | sorts, uncertainty grids and the paper's exhibits (~15-20 min, optional) |
+| Stage 4 | **your own computer** | the TRACE-only bond factors openbondassetpricing.com publishes, checked against the published files (~8 min, optional) |
 
 Steps 1-3 below are all **on WRDS**. The switch to your own computer happens at
 [Download Results](#download-results-to-your-local-machine), and Stage 2 follows it.
@@ -354,12 +355,17 @@ files you just downloaded. Its first run connects to WRDS once, to fetch and cac
 series (CRSP Treasury returns, Fama-French factors, VIX and FISD coupon terms), so it needs
 your WRDS username, in `config.py` or `export WRDS_USERNAME=...`; later runs read the cache.
 
-First install the requirements there, in a Python 3.10+ environment. Stages 2 and 3 need `numba`; `requirements.txt` installs it below Python 3.14, and on 3.14 you install it yourself (`pip install "numba>=0.63"`). Stage 2 stops at start-up if it is missing.
+First install the requirements for stages 2-4 there, in Python 3.11 or newer, with two lines:
 
 ```bash
 cd trace-data-pipeline          # the folder you just unzipped
-python -m pip install -r requirements.txt
+python -m pip install -r requirements-local.txt
+python -m pip install --no-deps pybondlab==0.3.0
 ```
+
+PyBondLab 0.3.0 declares `numpy<2` and this repository installs numpy 2, so it goes in without
+its dependency list; `requirements-local.txt` says why that is safe. Stages 2-4 stop at start-up
+and print these two lines if PyBondLab is missing or a different version.
 
 Then build the panel:
 
@@ -389,6 +395,20 @@ python make_release.py              # the stage1 build; --mode <mode> for anothe
 
 which redacts the proprietary identifiers and licensed ratings, and refuses to write a bundle
 that still carries them. See [stage2/QUICKSTART_stage2.md](stage2/QUICKSTART_stage2.md).
+
+## Optional: Stages 3 and 4
+
+Both run on your own computer and read only the files Stage 2 wrote. Neither of them connects
+to WRDS.
+
+```bash
+cd ../stage3 && bash run_stage3.sh   # the paper's 33 tables and 11 figures, ~15-20 min
+cd ../stage4 && bash run_stage4.sh   # the TRACE-only bond factors, then the check against
+                                     # the published files, ~8 min
+```
+
+See [stage3/QUICKSTART_stage3.md](stage3/QUICKSTART_stage3.md) and
+[stage4/README_stage4.md](stage4/README_stage4.md).
 
 
 ## Troubleshooting

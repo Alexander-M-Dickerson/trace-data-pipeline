@@ -55,9 +55,7 @@ Using `./run_pipeline.sh` (complete automated pipeline):
 **End to end: about 5 hours.** The 2026-09-21 run took 5.3 h.
 
 Then, on your own machine: **Stage 2 about 8-18 minutes** (the first run also downloads its
-inputs), and **Stage 3 about 15-20 minutes** on 24 cores with a PyBondLab build carrying the
-fast kernels. Without those kernels Stage 3's two uncertainty grids refuse to start; see
-[Why does Stage 3 refuse to run Section 5?](#why-does-stage-3-refuse-to-run-section-5)
+inputs), **Stage 3 about 15-20 minutes** on 24 cores, and **Stage 4 about 8 minutes**.
 
 ### What if I only want Enhanced TRACE?
 Set which datasets to process in `config.py` (read by `run_pipeline.sh`, the report job and
@@ -72,7 +70,15 @@ repository root) skips the cores and memory `run_pipeline.sh` requests for it, s
 line above.
 
 ### What Python version do I need?
-Python 3.10 or higher (the WRDS Cloud runs 3.14). Stages 2 and 3 need `numba`; `requirements.txt` installs it below Python 3.14, and on 3.14 you install it yourself (`pip install "numba>=0.63"`). Stage 2 stops at start-up if it is missing.
+Python 3.10 or higher on WRDS for Stages 0 and 1 (the WRDS Cloud runs 3.14), and 3.11 or higher
+on your own computer for Stages 2-4, which install with two lines:
+```bash
+python -m pip install -r requirements-local.txt
+python -m pip install --no-deps pybondlab==0.3.0
+```
+PyBondLab 0.3.0 declares `numpy<2` and this repository installs numpy 2, so it goes in without
+its dependency list; `requirements-local.txt` says why that is safe. Stages 2-4 stop at start-up
+and print these two lines if PyBondLab is missing or a different version.
 Check your version:
 ```bash
 python --version
@@ -802,17 +808,27 @@ Two exhibits ship in **two variants**, because the published table and the paper
 definitions differ -- Table B.1 and Table IA.IX. Both are produced; neither is silently
 corrected.
 
-### Why does Stage 3 refuse to run Section 5?
-Section 5's two uncertainty grids need a PyBondLab build carrying `fast_sorts` and
-`anomaly_assay_fast`. The 0.2.0 release the repository pins does not have them, and Stage
-3 says so before fanning out rather than letting each of the 108 signal tasks fail on an
-import. Point `PYBONDLAB_DIR` at a build that has them.
+### What is Stage 4, and do I need it?
+Stage 4 builds the **TRACE-only bond factors** that openbondassetpricing.com publishes: 108
+signals as single sorts and within-firm sorts, for four return types and three rating bands.
+It is optional, like Stage 3, and it reads only Stage 2's output.
 
-Without the kernels `bash run_stage3.sh` leaves Section 5 out, says so, runs everything
-else and builds the PDF, and exits non-zero because Section 5 is missing. Everything else
-runs on the pinned release: Stage 3 asks the installed engine once at startup and takes the
-slow path automatically, with the same numbers. The pin is not
-floated to fix this -- Stage 2's factor series depend on it exactly.
+```bash
+cd stage4
+bash run_stage4.sh      # build both sorts, then compare them with the published files
+```
+
+`compare_published.py` downloads the published files and compares them with yours, cell by
+cell. On the 2026-09-21 run, every one of its 4,354,560 rows matches the OSBAP build of that
+run. See
+[stage4/README_stage4.md](stage4/README_stage4.md).
+
+### Why is a within-firm factor's `ls` not `l` minus `s`?
+Because the factor is formed inside each firm. For within-firm sorts, `ls` is each firm's
+high-signal bonds minus its low-signal bonds, averaged across firms and rating terciles; `l` and
+`s` pool every firm's high and low bonds into one portfolio each, which mixes in the differences
+between firms that the factor removes. For single sorts `ls` is exactly `l` minus `s`. See
+[stage4/DATA_DICTIONARY.md](stage4/DATA_DICTIONARY.md).
 
 ### What is redacted in the published panel?
 `permco` and `gvkey` are set to null, and `spc_rat`/`mdc_rat` are collapsed to investment

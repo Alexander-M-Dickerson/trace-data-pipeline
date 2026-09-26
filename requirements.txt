@@ -1,17 +1,19 @@
 # TRACE Data Pipeline - Python Requirements
-# Stage 0-2: TRACE Processing
-# Stages 0-1: the 2026-09-10 production run used Python 3.14.5 on the WRDS Cloud.
-# Stages 2-3: built and tested on Python 3.13 on a local machine.
-# Install with: python -m pip install -r requirements.txt
+#
+# Stages 0 and 1 run on the WRDS Cloud and install this file:
+#     python -m pip install -r requirements.txt
+# The 2026-09-21 production run used Python 3.14.5 there.
+#
+# Stages 2, 3 and 4 run on your own computer and install requirements-local.txt, which
+# includes this file, and then PyBondLab. That file says how.
 
 # Core data processing
 pandas>=2.2.3
 numpy>=2.0
 pyarrow>=20.0.0
 # Not installed on Python 3.14, which the WRDS Cloud runs, so the WRDS stages stay as they were
-# run (stage 1 falls back to plain Python without it). Stages 2 and 3 need it: on your own
-# computer on 3.14, `pip install "numba>=0.63"` (the first release with 3.14 wheels). Stage 2
-# stops at start-up with that instruction if numba is missing.
+# run (stage 1 falls back to plain Python without it). Stages 2-4 need it on every Python
+# version, and requirements-local.txt installs it.
 numba>=0.60; python_version<"3.14"
 
 # WRDS database access
@@ -43,13 +45,8 @@ requests
 # The Stage 2 engine. Every step is DuckDB SQL; nothing in Stage 2 runs without it.
 duckdb>=1.5.0
 
-# Portfolio sorts behind the BBW bond factors (steps/step3_bbw.py).
-# PINNED, and the pin matters: the factor series -- and therefore roughly forty
-# beta columns -- come out of these double sorts. Verified 2026-09-10 that the published
-# 0.2.0 reproduces the factors this repository ships, bit for bit (max|d| = 0 on all
-# eleven BBW factors over 281 months). Do not float this to a newer release without
-# re-running that comparison.
-PyBondLab==0.2.0
+# PyBondLab (the BBW factors in steps/step3_bbw.py, and every sort in Stages 3 and 4) is not
+# listed here: see requirements-local.txt.
 
 # Statistics: the illiquidity kernels (norm.ppf) and the report's Newey-West regressions.
 scipy>=1.11
@@ -68,23 +65,7 @@ psutil>=5.9
 # --- Stage 3: sorts, uncertainty grids, and the paper's exhibits -------------
 # Stage 3 runs on your own machine, like Stage 2, and adds nothing to the list above:
 # pandas, numpy, pyarrow, duckdb, scipy, statsmodels and matplotlib are all already
-# required. One thing about PyBondLab needs saying, though.
-#
-# The pin above is Stage 2's, and it is exact for a reason. Stage 3's two UNCERTAINTY
-# GRIDS (Section 5) need `PyBondLab.fast_sorts` and `PyBondLab.anomaly_assay_fast`,
-# which the 0.2.0 release does not carry -- without them those grids are hours rather
-# than minutes, and Stage 3 refuses to start them rather than letting each of the 108
-# signal tasks fail on an import. Without them `run_stage3.sh` leaves Section 5 out and
-# runs everything else.
-#
-# Do NOT float the pin to fix that: Stage 2's factor series, and the ~40 beta columns
-# behind them, depend on it. Instead point Stage 3 at a checkout that has the kernels:
-#
-#     export PYBONDLAB_DIR=/path/to/PyBondLab
-#
-# `stage3/pblenv.py` puts that build FIRST on sys.path, asserts the import resolved
-# inside it, and records its version, git state and a content hash in every manifest.
-# Everything in Stage 3 except Section 5 runs on the pinned 0.2.0.
+# required.
 
 # ONE NON-PYTHON DEPENDENCY, Stage 3 only: **pdflatex** (TeX Live or MiKTeX).
 # The last Stage-3 step compiles every exhibit into reports/exhibits.pdf, which is

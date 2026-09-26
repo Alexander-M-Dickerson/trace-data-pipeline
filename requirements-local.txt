@@ -1,0 +1,25 @@
+# TRACE Data Pipeline - Python requirements for Stages 2, 3 and 4
+#
+# These stages run on your own computer, not on the WRDS Cloud, on Python 3.11 or newer
+# (PyBondLab's minimum). They were built and tested on Python 3.13. Install in two steps,
+# from the repository root:
+#
+#     python -m pip install -r requirements-local.txt
+#     python -m pip install --no-deps pybondlab==0.3.0
+#
+# Why the second step is separate: PyBondLab 0.3.0 declares numpy<2, while this repository
+# installs numpy 2, so pip would refuse to install the two together. PyBondLab's code runs on
+# numpy 2 (its test suite passes on numpy 2.5.3), and everything else it needs is installed by
+# the first line. `--no-deps` installs it without that one cap. `pip check` will report the
+# cap afterwards; that is expected.
+#
+# The PyBondLab version is exact because Stage 2's BBW factors and every sort in Stages 3 and
+# 4 come out of it. `pybondlab_pin.py` holds it, and Stages 2-4 stop at start-up, printing the
+# two lines above, if a different version is installed.
+
+# Everything Stages 0 and 1 use, which Stages 2-4 use too.
+-r requirements.txt
+
+# requirements.txt installs numba only below Python 3.14, so that the WRDS stages stay as they
+# were run. Stages 2-4 need it on every version; on 3.14, pip picks a release with 3.14 wheels.
+numba>=0.60
