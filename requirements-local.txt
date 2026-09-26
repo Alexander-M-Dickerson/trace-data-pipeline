@@ -17,6 +17,9 @@
 # 4 come out of it. `pybondlab_pin.py` holds it, and Stages 2-4 stop at start-up, printing the
 # two lines above, if a different version is installed.
 
+# To reproduce the published files to the last digit, add `-c constraints-2026.txt` to the first
+# line: it pins the exact versions they were built with.
+
 # Everything Stages 0 and 1 use, which Stages 2-4 use too.
 -r requirements.txt
 

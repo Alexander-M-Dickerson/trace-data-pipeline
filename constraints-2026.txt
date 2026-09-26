@@ -1,0 +1,25 @@
+# The exact numerical packages the published 2026 vintage (Stages 2-4) was built with, on
+# Python 3.13. Optional: use it only to reproduce the published files to the last digit.
+#
+#     python -m pip install -r requirements-local.txt -c constraints-2026.txt
+#     python -m pip install --no-deps pybondlab==0.3.0
+#
+# Measured on the 2026-09-21 run (2026-09-26): with these versions, a rebuilt Stage 2 panel
+# equals the published one exactly in 139 of its 145 columns. The other six (spd_abs, spd_rel,
+# cs_sprd, ar_sprd, p_fht, vov) differ by at most 4.3e-14, because DuckDB adds within-group
+# sums in parallel in no fixed order; two builds on the same machine differ the same way.
+# Without this file, newer versions move a few more columns by at most 3e-8 (one float32
+# step), and every printed Stage 3 table and every Stage 4 factor stays the same.
+numpy==2.3.5
+pandas==2.2.3
+pyarrow==23.0.0
+duckdb==1.5.2
+scipy==1.17.1
+statsmodels==0.14.6
+numba==0.63.1
+llvmlite==0.46.0
+numexpr==2.14.1
+patsy==1.0.2
+pandas_market_calendars==5.3.2
+exchange_calendars==4.13.2
+matplotlib==3.10.8

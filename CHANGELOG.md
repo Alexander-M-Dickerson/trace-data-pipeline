@@ -147,6 +147,10 @@ A full audit of every guide against the code and the 2026-09-21 run followed. Wh
   (checked on every Stage 3 data file).
 
 ### Added
+- `constraints-2026.txt`: the exact package versions the published 2026 vintage was built with.
+  Installed alongside `requirements-local.txt`, a pinned Stage 2 build then equals the published
+  panel exactly in 139 of 145 columns; the other six differ in the 14th digit, as two builds on
+  one machine do.
 - **Stage 4: the TRACE-only bond factors** published on openbondassetpricing.com, built from the
   Stage 2 panel: 108 signals as single and within-firm sorts, four return types (excess, and
   duration-adjusted against `tret`, `tret_bns` and `tret_cls`), three rating bands, unflipped,

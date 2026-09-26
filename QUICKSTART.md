@@ -377,7 +377,9 @@ python _run_stage2.py               # the full build, ~8-18 minutes on 24 cores
 
 To reproduce a published panel exactly, add `--factor-source pinned`: it uses the factor file
 published with your vintage instead of rebuilding it from public sources that revise their
-history. See [stage2/QUICKSTART_stage2.md](stage2/QUICKSTART_stage2.md).
+history. See [stage2/QUICKSTART_stage2.md](stage2/QUICKSTART_stage2.md). To match it to the last digit, also install the exact package versions it was built with:
+`python -m pip install -r requirements-local.txt -c constraints-2026.txt`, which the file
+explains.
 
 It writes `output/panel/main_panel_<mode>.parquet` -- 145 columns per bond-month -- plus the
 unadjusted `_mmn` twins, the factor series, and the beta and momentum blocks. Every column is

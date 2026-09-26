@@ -36,6 +36,7 @@ the last month each cache holds.
 | `config.py` | Settings shared by stages 0-2: `WRDS_USERNAME`, `AUTHOR`, `TRACE_MEMBERS`, `OUTPUT_FORMAT`, `STAGE0_OUTPUT_FIGURES` |
 | `requirements.txt` | The Python packages for stages 0 and 1, installed on WRDS |
 | `requirements-local.txt` | The packages for stages 2-4, on your own computer: `requirements.txt` plus numba. PyBondLab goes in on a second line, as the file explains |
+| `constraints-2026.txt` | Optional: the exact package versions the published 2026 vintage was built with, for a build that matches it to the last digit |
 | `pybondlab_pin.py` | The PyBondLab release stages 2-4 run on, the start-up check that it is the one installed, and its fingerprint for manifests |
 | `numeric_setup.py` | Makes pandas use `numexpr` (required: it changes float32 results, and the published panels were built with it) and not `bottleneck`, so stages 2-4 compute the same numbers on any machine |
 | `run_pipeline.sh` | Runs stages 0 and 1 on WRDS: downloads the inputs, submits the stage 0 jobs, then the report job and stage 1, each waiting on the jobs it needs |

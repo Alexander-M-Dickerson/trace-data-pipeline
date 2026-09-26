@@ -13,7 +13,7 @@ A task-by-task guide to the docs, for people and for AI assistants. What each co
 | check the chain works before a 5-hour run | [CONTRIBUTING: Testing](CONTRIBUTING.md#testing) | `qsub run_smoke_test.sh` |
 | copy the results to your own computer | [QUICKSTART: Download Results](QUICKSTART.md#download-results-to-your-local-machine) | `zip` on WRDS, then `scp` |
 | build the monthly panel | [stage2/QUICKSTART_stage2.md](stage2/QUICKSTART_stage2.md) | `python stage2/_run_stage2.py` |
-| reproduce a published panel exactly | [stage2/AGENTS.md](stage2/AGENTS.md) | `_run_stage2.py --factor-source pinned` |
+| reproduce a published panel exactly | [stage2/AGENTS.md](stage2/AGENTS.md), [constraints-2026.txt](constraints-2026.txt) | `_run_stage2.py --factor-source pinned`, in an environment installed with `-c constraints-2026.txt` |
 | share a panel you built | [stage2/README_stage2.md](stage2/README_stage2.md) | `python stage2/make_release.py --what panel` |
 | rebuild the betas on another Treasury benchmark | [README_stage2: Alternative Treasury benchmarks](stage2/README_stage2.md#alternative-treasury-benchmarks-rebuilding-the-betas) | `python stage2/make_excess_blocks.py` |
 | reproduce the paper's tables and figures | [stage3/QUICKSTART_stage3.md](stage3/QUICKSTART_stage3.md) | `bash stage3/run_stage3.sh` |

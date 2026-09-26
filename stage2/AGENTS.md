@@ -16,7 +16,10 @@ factors). There are two sources, and they give different numbers:
 
 The public sources revise their history (Ken French restates factors, FRED re-adjusts CPI,
 Ludvigson re-estimates uncertainty), so a `public` build will not match a published release
-bit for bit. That is expected, not a bug.
+bit for bit. That is expected, not a bug. For a `pinned` build to match to the last digit, the
+environment also needs the package versions in `constraints-2026.txt`
+(`pip install -r requirements-local.txt -c constraints-2026.txt`); six columns still differ in
+the 14th digit, as two builds on one machine do.
 
 ## The commands, in order
 
