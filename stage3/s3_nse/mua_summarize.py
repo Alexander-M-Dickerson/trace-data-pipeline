@@ -55,7 +55,7 @@ SUMMARY_COLS = ["mean_ret", "t_stat", "p_value", "alpha", "tstat_alpha", "n_obs"
 
 # The ledger's vocabulary, in PRECEDENCE order -- first match wins, so the counts are
 # disjoint and sum to the full 23,328-cell grid. The first, second and fifth are the
-# paper's own words (main.tex, the MUA grid paragraph):
+# paper's own words (its paragraph on the MUA grid):
 #
 #   "Not all are admissible. Breakpoints computed on IG bonds cannot sort NIG bonds
 #    (the universes do not overlap). This eliminates 24 specifications per signal.

@@ -9,7 +9,9 @@ If you have just finished Stage 2, everything below should work with no configur
 
 - **pdflatex** — only for the last step, which compiles the exhibits into one PDF. TeX
   Live or MiKTeX. Without it you still get every table and figure as a file; you just do not
-  get `exhibits.pdf` (`python make_report.py --no-compile` writes its `.tex` without compiling).
+  get `exhibits.pdf`, and that last step exits with code 2 (`python make_report.py --window full
+  --no-compile` writes its `.tex` without compiling; use `--window paper` after a
+  `--sample paper` run).
 
 `python tools/check_inputs.py` warns if pdflatex is missing rather than failing, because
 running without the PDF is legitimate.
@@ -108,8 +110,8 @@ statistics layer, tables and figures:
 python _run_stage3.py --section lib
 ```
 
-About four and a half minutes on 24 cores — 242 s of benched work in
-the cold run of 2026-09-12, most of it the four 108-signal sorts. You should end up with
+About five and a half minutes on 24 cores — 307 s of benched work in
+the run of 2026-09-26, most of it the four 108-signal sorts. You should end up with
 `reports/tables/table01.tex` and `reports/figures/fig03_cumret.pdf`.
 
 ## 4. Everything
@@ -118,9 +120,8 @@ the cold run of 2026-09-12, most of it the four 108-signal sorts. You should end
 bash run_stage3.sh
 ```
 
-**906 s — about 15 minutes** on 24 cores, measured on a cold
-run (`data/` and `reports/` wiped first) on 2026-09-12, all 41 steps. The two
-uncertainty grids are 55% of it. See **What it costs** in
+**About 16 minutes** on 24 cores (15.7 on 2026-09-26, a cold run with `data/` and
+`reports/` empty, all 41 steps). The two uncertainty grids are about half of it. See **What it costs** in
 [README_stage3.md](README_stage3.md) for the per-section split, the disk and memory
 figures, and what to lower first on a smaller machine.
 

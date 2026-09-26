@@ -194,7 +194,8 @@ def test_every_corrected_row_is_in_the_reconciliation():
     words = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
              "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen",
              "eighteen", "nineteen", "twenty"]
-    said = re.search(r"\. (\w+) rows there differ from the printed table", rec)
+    words += [f"twenty-{w}" for w in words[1:10]]
+    said = re.search(r"\. ([\w-]+) rows there differ from the printed table", rec)
     assert said, "RECONCILIATION_ia08.md no longer says how many rows differ from the printed table"
     assert said.group(1).lower() == words[len(fixed)], (
         f"RECONCILIATION_ia08.md says {said.group(1)} rows differ, the spec corrects {len(fixed)}")

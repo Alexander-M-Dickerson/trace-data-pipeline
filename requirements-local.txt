@@ -1,8 +1,10 @@
 # TRACE Data Pipeline - Python requirements for Stages 2, 3 and 4
 #
-# These stages run on your own computer, not on the WRDS Cloud, on Python 3.11 or newer
-# (PyBondLab's minimum). They were built and tested on Python 3.13. Install in two steps,
-# from the repository root:
+# These stages run on your own computer, not on the WRDS Cloud, on Python 3.11 to 3.13.
+# 3.11 is PyBondLab's minimum. 3.14 cannot install yet: the `wrds` package, which Stage 2
+# uses for a few series, caps pandas below 2.3, and pandas 2.2 has no build for Python 3.14.
+# (The WRDS Cloud runs 3.14 with its own pandas 2.2, which is why Stages 0-1 work there.)
+# They were built and tested on Python 3.13. Install in two steps, from the repository root:
 #
 #     python -m pip install -r requirements-local.txt
 #     python -m pip install --no-deps pybondlab==0.3.0
@@ -17,14 +19,15 @@
 # 4 come out of it. `pybondlab_pin.py` holds it, and Stages 2-4 stop at start-up, printing the
 # two lines above, if a different version is installed.
 
-# To reproduce the published files to the last digit, add `-c constraints-2026.txt` to the first
+# To reproduce the published files as closely as they can be (139 of 145 panel columns exactly,
+# the other six within 1e-13), add `-c constraints-2026.txt` to the first
 # line: it pins the exact versions they were built with.
 
 # Everything Stages 0 and 1 use, which Stages 2-4 use too.
 -r requirements.txt
 
 # requirements.txt installs numba only below Python 3.14, so that the WRDS stages stay as they
-# were run. Stages 2-4 need it on every version; on 3.14, pip picks a release with 3.14 wheels.
+# were run. Stages 2-4 always need it.
 numba>=0.60
 
 # Not optional, although pandas treats it as an accelerator: with numexpr installed pandas
@@ -32,3 +35,6 @@ numba>=0.60
 # built that way (see numeric_setup.py for the measured differences). Stages 2-4 refuse to run
 # without it.
 numexpr>=2.14
+
+# The test suites: `python -m pytest stage2/tests tests stage3/tests stage4/tests -q`.
+pytest>=8.0

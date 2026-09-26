@@ -1,11 +1,11 @@
-"""build_monthly_panel.py -- THE single entry point: rebuild the monthly asset-pricing panel from
-the daily input with one command, driven only by _stage2_settings.
+"""build_panel.py -- the Stage 2 orchestrator: the monthly asset-pricing panel from the daily
+input, driven by _stage2_settings. Users run `_run_stage2.py`, which calls `run_stage2` here;
+running this file directly is for development.
 
-    python build_monthly_panel.py                       # full golden-mode build, all steps
-    python build_monthly_panel.py --input-mode ours     # Phase B on stage1_combined
-    python build_monthly_panel.py --from-step 4         # resume (earlier blocks reused from disk)
-    python build_monthly_panel.py --limit-cusips 200    # small-panel dev build
-    python build_monthly_panel.py --validate            # run the golden validation sweep afterwards
+    python build_panel.py                       # full build, all steps
+    python build_panel.py --from-step 4         # resume (earlier blocks reused from disk)
+    python build_panel.py --limit-cusips 200    # small-panel dev build
+    python build_panel.py --validate            # coverage check on the finished panel
 
 Steps (each writes its blocks under output/blocks/<mode>/ and is independently re-runnable):
   1 returns  2 illiquidity  3 bbw  4 betas  5 value  6 momentum  7 final merge -> panel/
@@ -41,8 +41,7 @@ STEPS: list[tuple[int, str, str, bool]] = [
 PARALLEL_CHAINS: tuple[tuple[int, int], ...] = ((3, 4), (5, 6))
 
 # Fresh-process orchestration for FULL builds: DuckDB's parallelism collapses in a
-# long-lived process that already ran a heavy unit (the repo's
-# rule #2). Measured: step 2's SQL phase is ~25 s in a fresh process but ~91 s in-process after
+# long-lived process that already ran a heavy unit. Measured: step 2's SQL phase is ~25 s in a fresh process but ~91 s in-process after
 # step 1. So a full build runs each STAGE as child orchestrator processes: the DuckDB steps as
 # sequential singletons, the {3,4}/{5,6} chains concurrently, the final merge last.
 FULL_PLAN: tuple[tuple[tuple[int, int], ...], ...] = (
@@ -105,13 +104,14 @@ def run(input_mode: str, from_step: int, to_step: int, limit_cusips: int | None,
             manifest.add_input(role, path)
 
     # materialize the factor-panel seam (blocks/<mode>/factors.parquet) BEFORE the steps that read
-    # it (4 and 7): pinned golden vintage by default, or the public create_factors port (A10)
+    # it (4 and 7): fetched fresh from the public sources by default, or the published file
+    # with --factor-source pinned
     from steps import compute_factors
     factors_path = compute_factors.ensure(input_mode, force_fetch=refresh_factors)
     manifest.add_input(f"factors_{cfg.FACTOR_SOURCE}", factors_path)
 
     if not sequential and from_step == 1 and to_step == 7:
-        # FULL build: staged fresh-process plan (speed_up/04) -- DuckDB steps in their own
+        # FULL build: staged fresh-process plan -- DuckDB steps in their own
         # processes, the {3,4}/{5,6} chains concurrent, final merge last
         for stage in FULL_PLAN:
             _run_stage(stage, input_mode, limit_cusips, manifest)
@@ -142,10 +142,9 @@ def run(input_mode: str, from_step: int, to_step: int, limit_cusips: int | None,
             manifest.add_gate(f"step{num}_{mod_name}", status="BUILT", wall_s=wall,
                               output={n: str(p) for n, p in blocks.items()})
 
-    # --validate. Until 2026-09-23 it acted only in "golden" mode, which a public build never
-    # uses, and that branch imported a `validate_monthly` module that does not exist here (the
-    # file is validate_stage2.py). A public build has no reference to diff against, so it runs
-    # the check that does apply: every column reaches the panel's last month.
+    # --validate. A public build has no reference panel to diff against, so it runs the check
+    # that does apply: every column reaches the panel's last month. The "golden" branch diffs
+    # against a reference build and runs only when one is configured (GOLDEN_OUTPUTS).
     if validate and input_mode == "golden":
         import validate_stage2
         all_pass = True
@@ -203,15 +202,17 @@ def main() -> None:
     ap.add_argument("--limit-cusips", type=int, default=None,
                     help="dev universe: first N cusips (deterministic)")
     ap.add_argument("--validate", action="store_true",
-                    help="run golden validators after the build (golden mode only)")
+                    help="after the build, check that every column reaches the panel's last "
+                         "month")
     ap.add_argument("--factor-source", choices=["pinned", "public"], default=None,
-                    help="factor panel source; default resolves per input-mode via "
-                         "_stage2_settings.MODE_PINS (both modes 'pinned' today). 'public' = fresh "
-                         "fetches, vintage drift (the divergence report written by this step)")
+                    help="where the factor panel comes from. 'public' (the default) fetches "
+                         "every source fresh; 'pinned' uses the file published for the vintage, "
+                         "which reproduces a published panel exactly")
     ap.add_argument("--refresh-factors", action="store_true",
                     help="with --factor-source public: force re-fetch of every source")
     ap.add_argument("--sequential", action="store_true",
-                    help="disable the {3,4}/{5,6} parallel-chain overlap (speed_up/03)")
+                    help="run the {3,4} and {5,6} step chains one after the other, not side by "
+                         "side")
     args = ap.parse_args()
     run(args.input_mode, args.from_step, args.to_step, args.limit_cusips, args.validate,
         factor_source=args.factor_source, refresh_factors=args.refresh_factors,

@@ -1,5 +1,5 @@
-"""wrangle.py -- VERBATIM final-wrangle machinery from the reference implementation
-(lines 3022-3286, 6566-7478): extend_and_ffill_linker, load_linker, wrangle_returns, wrangle_signals,
+"""wrangle.py -- VERBATIM final-wrangle machinery from the reference implementation:
+extend_and_ffill_linker, load_linker, wrangle_returns, wrangle_signals,
 build_main_panel, swap_adj_signals, reorder_panel_cols. Arbitrated by the final-wrangle validator
 (main_panel 1,859,546 x 140). load_bond_data_from_url is shimmed to the LOCAL fingerprinted
 OSBAP linker (cfg.AUX[linker]) -- same published artifact upstream downloads."""
@@ -16,7 +16,7 @@ import _stage2_settings as cfg
 
 
 def save_parquet(df, path, cusip_col='cusip', compress=True):
-    """Upstream pbd.save_parquet (lines 50-80): cusip -> category, zstd parquet. The compression
+    """Upstream pbd.save_parquet: cusip -> category, zstd parquet. The compression
     LEVEL is ours (cfg.PANEL_ZSTD_LEVEL; upstream hardcoded 9) -- an encoding knob, values identical
    ."""
     if cusip_col in df.columns and df[cusip_col].dtype != 'category':

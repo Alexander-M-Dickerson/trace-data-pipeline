@@ -9,9 +9,9 @@ panel, or before an extension to know what will (and won't) advance.
     check_external_data.py --live          # ALSO probe WRDS/DB for the current upstream frontier
     check_external_data.py --json-out inventory.json
 
-The human-readable index (with provenance notes + refresh recipe) is the inventory printed by this script -- inventory.md;
-this script is what keeps its "last available" column honest. See _stage2_settings.MODE_PINS for how these
-vintages become the panel's date frontier.
+The human-readable index (with provenance notes + refresh recipe) is the inventory this script prints,
+which keeps its "last available" column honest. `TRET_MAX_DATE` and `FACTOR_SOURCE`
+in _stage2_settings.py decide how these vintages set the panel's date frontier.
 """
 from __future__ import annotations
 

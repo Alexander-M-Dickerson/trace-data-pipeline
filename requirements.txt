@@ -71,7 +71,7 @@ psutil>=5.9
 # The last Stage-3 step compiles every exhibit into reports/exhibits.pdf, which is
 # how a LaTeX fragment that will not compile gets caught -- a broken fragment looks
 # perfectly fine sitting on disk. It is not needed for anything else: run
-# `make_report.py --no-compile` and you still get every table and figure as a file.
+# `make_report.py --window full --no-compile` and you still get every table and figure as a file.
 # `stage3/tools/check_inputs.py` warns when it is missing rather than failing.
 
 # Development only, to run the test suites:

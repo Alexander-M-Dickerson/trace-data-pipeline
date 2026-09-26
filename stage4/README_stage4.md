@@ -11,7 +11,7 @@ published files, cell by cell. It runs on your own computer, and nothing in it c
 - **single sorts**: deciles over all bonds, quintiles within the investment-grade band and
   within the non-investment-grade band;
 - **within-firm sorts**: high minus low within each firm (`permno`), for firms with at least
-  two bonds.
+  two bonds in a rating group that month.
 
 Each for four return types and three rating bands (all, IG, non-IG):
 
@@ -40,7 +40,7 @@ The series are **unflipped**: a factor whose long-short mean is negative stays n
    cd ../stage2 && python make_excess_blocks.py --mode stage1 --benchmark all
    ```
 
-3. The requirements for stages 2-4 are installed, in Python 3.11 or newer:
+3. The requirements for stages 2-4 are installed, in Python 3.11 to 3.13:
 
    ```bash
    python -m pip install -r requirements-local.txt

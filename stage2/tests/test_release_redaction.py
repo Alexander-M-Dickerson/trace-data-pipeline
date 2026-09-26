@@ -118,10 +118,10 @@ def test_a_frame_without_the_columns_is_accepted():
 # =============================================================================================
 # THE DAILY PANEL
 #
-# On 2026-09-18 Stage 1's daily file was uploaded as it stood: 44 columns, the agency ratings
-# on about 30 million rows, permco and gvkey. It was copied with SELECT * by a step that had
-# no notion of a public layout. `make_release.py --what daily` is that notion, and these tests
-# are what stands between the raw file and a public link.
+# Stage 1's daily file has 44 columns, among them the agency ratings, permco and gvkey, which
+# are licensed. A copy made with SELECT * carries all of them. `make_release.py --what daily`
+# writes the public layout, and these tests are what stands between the raw file and a
+# public link.
 # =============================================================================================
 
 STAGE1_COLUMNS = (

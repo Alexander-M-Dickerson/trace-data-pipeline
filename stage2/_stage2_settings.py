@@ -106,7 +106,7 @@ BUSINESS_DAY_GAP = 5       # max NYSE-session gap for contiguous returns
 ADJ_WINDOW = 10            # max days back within the month for the adjusted month-end signal
 CALENDAR_NAME = "NYSE"     # market calendar for business-day math
 SWAP_ADJ_SIGNALS = True    # replace month-end signals with adjusted versions in the final panel
-START_DATE = "2002-07-31"  # first month-end of the panel
+START_DATE = "2002-07-31"  # first month-end priced; returns, and so the panel, start a month later
 SIGNALS = ("ytm", "mod_dur", "convexity", "credit_spread")   # step-1 signals (lagged by IMP_GAP)
 
 # Three things that are NOT settings, so nobody edits a constant and expects an effect:
@@ -514,9 +514,11 @@ REQUIRED_DAILY_COLUMNS = (
 )
 
 # Stage 2 selects bond-days that carry at least one agency rating. The public DOWNLOAD of
-# the Stage 1 panel has these columns blanked for licensing reasons, which would silently
-# select zero rows -- so an all-null ratings column is a hard error, not an empty panel.
+# the Stage 1 panel does not carry the licensed columns, and a panel whose rating columns are
+# all null would silently select zero rows -- so both are hard errors, not an empty panel.
 RATING_COLUMNS = ("sp_rating", "mdy_rating")
+# Licensed, so the published Stage 1 download does not carry them.
+LICENSED_DAILY_COLUMNS = {"sp_rating", "mdy_rating", "spc_rating", "mdc_rating", "permco", "gvkey"}
 
 
 def validate_config(config: dict) -> None:
@@ -613,6 +615,17 @@ def _validate_daily_panel(daily: Path) -> None:
             ).fetchall()
         }
         missing = [c for c in REQUIRED_DAILY_COLUMNS if c not in present]
+        withheld = sorted(set(missing) & LICENSED_DAILY_COLUMNS)
+        if withheld:
+            # The public download withholds exactly these. Say so, rather than send the user
+            # looking for an older release.
+            raise ValueError(
+                f"The Stage 1 panel at {daily} has no {', '.join(withheld)}.\n"
+                f"    It looks like the Stage 1 file published for download, which withholds\n"
+                f"    the licensed columns (the agency ratings, permco and gvkey). Stage 2 keeps\n"
+                f"    only bond-days carrying a rating, so it cannot use that file.\n"
+                f"    Run Stage 0 and Stage 1 yourself on WRDS and use that output."
+            )
         if missing:
             raise ValueError(
                 f"The Stage 1 panel at {daily} is missing {len(missing)} column(s) "
@@ -634,9 +647,7 @@ def _validate_daily_panel(daily: Path) -> None:
                 f"({', '.join(RATING_COLUMNS)} are all NULL).\n"
                 f"    Stage 2 keeps only bond-days carrying at least one agency rating, "
                 f"so this input would produce an EMPTY panel.\n"
-                f"    The Stage 1 file published for download has ratings removed for "
-                f"licensing reasons and cannot drive Stage 2.\n"
-                f"    Run Stage 0 and Stage 1 yourself on WRDS and use that output."
+                f"    Re-run Stage 1 with the current code on WRDS and use that output."
             )
     finally:
         con.close()

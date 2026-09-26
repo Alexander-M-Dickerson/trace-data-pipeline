@@ -442,7 +442,7 @@ def release_panel(mode: str, out_dir: Path, vintage: str,
     """Package the panel artifacts: redact, rename to the vintage, describe, zip."""
     panel_src = cfg.PANEL_DIR / f"main_panel_{mode}.parquet"
     if not panel_src.exists():
-        print(f"ERROR: no panel at {panel_src}. Build with --input-mode {mode} first.")
+        print(f"ERROR: no panel at {panel_src}. Build it first: python _run_stage2.py")
         return 1
     blocks = cfg.BLOCKS_DIR / mode
     stage = out_dir / f"osbap_panel_{vintage}"
@@ -565,7 +565,7 @@ def release_panel(mode: str, out_dir: Path, vintage: str,
 def release_factors(mode: str, out_dir: Path, vintage: str) -> int:
     src = cfg.BLOCKS_DIR / mode / "factors.parquet"
     if not src.exists():
-        print(f"ERROR: no factor panel at {src}. Run a build with --input-mode {mode} first.")
+        print(f"ERROR: no factor panel at {src}. Build it first: python _run_stage2.py")
         return 1
 
     stage = out_dir / f"osbap_stage2_factors_{vintage}"
@@ -651,8 +651,8 @@ def _bbw_trace(blocks: Path) -> pd.DataFrame:
     for name in ("bbw_factors.parquet", "bbw_factors_bns.parquet", "bbw_factors_cls.parquet"):
         p = blocks / name
         if not p.exists():
-            raise FileNotFoundError(f"no {p}; run step 3 (and make_excess_blocks for the "
-                                    f"benchmark twins) with --input-mode {blocks.name} first")
+            raise FileNotFoundError(f"no {p}; run python _run_stage2.py, then "
+                                    f"make_excess_blocks.py for the benchmark twins")
         b = pd.read_parquet(p)
         if "date" not in b.columns:
             b = b.reset_index()
@@ -681,7 +681,7 @@ def _bbw_extended(blocks: Path) -> pd.DataFrame:
     the macro columns' longer frontier does not pad the file with empty rows."""
     p = blocks / "factors_merged.parquet"
     if not p.exists():
-        raise FileNotFoundError(f"no {p}; run step 4 with --input-mode {blocks.name} first")
+        raise FileNotFoundError(f"no {p}; build it first: python _run_stage2.py")
     fm = pd.read_parquet(p)
     if any(ext_col not in fm.columns for _, _, ext_col in bbw_columns()):
         # Step 4 writes factors_merged before make_excess_blocks.py builds the _bns/_cls twins,
@@ -759,17 +759,17 @@ included beside them so the correction can be measured.
 | `bbw_factors_extended_{vintage}.parquet` / `.csv` | {ext_span} ({ext_n}) | Lehman and ICE quote data before 2002-08, TRACE from 2002-08 |
 | `bbw_factors_original_2004_2021.csv` | 2004-08 to 2021-12 (209) | the authors' original series, unchanged |
 | `PROVENANCE.json` | | which build the series came from, with hashes |
-| `MANIFEST.json` | | every file with its sha256, checked by `verify_release.py` |
+| `MANIFEST.json` | | every file with its sha256, checked by `verify_release.py` |{ext_gaps}
 
-Both of our tables have the same 16 columns: `date` (calendar month-end), then each factor
-for each return definition, named `<factor>_<return definition>`. Values are decimal monthly
+Both of our tables have the same {n_cols} columns: `date` (calendar month-end), then the
+{n_series} series, one per factor and return definition, named `<factor>_<return definition>`. Values are decimal monthly
 returns, 0.01 = 1%.
 
 | column stem | factor |
 |---|---|
 | `mktb` | The bond market factor. The value-weighted return of every bond in the panel, weights the previous month-end market value, over the benchmark named by the suffix. |
 | `drf` | Downside risk. Bonds are sorted 5 x 5 on credit rating and on 5% value-at-risk measured over the previous 36 months (at least 12). The factor is the high-VaR minus low-VaR return, averaged across the rating quintiles. |
-| `crf` | Credit risk. The same 5 x 5 sorts read the other way, the lowest-rated minus the highest-rated return, averaged across the quintiles of the other sort variable and across the three sorts (value-at-risk, illiquidity and short-term reversal). |
+| `crf` | Credit risk. The same 5 x 5 sorts read the other way, the lowest-rated minus the highest-rated return, averaged across the quintiles of the other sort variable and across the three sorts (value-at-risk, illiquidity and short-term reversal). Before 2002-08 the extended table averages two, value-at-risk and short-term reversal: the illiquidity sort needs transaction prices. |
 | `lrf` | Liquidity risk. The 5 x 5 sort on rating and on the Bao, Pan and Wang (2011) illiquidity measure, the negative autocovariance of consecutive daily log price changes. The factor is the illiquid minus liquid return, averaged across the rating quintiles. |
 
 | suffix | the return each leg is measured on |
@@ -813,7 +813,8 @@ measure the difference.
 ## Checking a download
 
 Every file is listed in `MANIFEST.json` with its sha256. `verify_release.py`, published on the
-same release page, re-hashes what is in the zip and compares.
+same release page, re-hashes what is in the zip and compares:
+`python verify_release.py osbap_bbw_factors_{vintage}.zip`.
 
 ## Citation
 
@@ -821,7 +822,9 @@ Dickerson, A., Mueller, P., & Robotti, C. (2023). Priced risk in corporate bonds
 of Financial Economics*, 150(2), 103707.
 
 Bai, J., Bali, T. G., & Wen, Q. (2019). Common risk factors in the cross-section of corporate
-bond returns. *Journal of Financial Economics*, 131(3), 619-642. (Retracted.)
+bond returns. *Journal of Financial Economics*, 131(3), 619-642. Retracted at the authors'
+request: retraction notice, *Journal of Financial Economics* 150(3), 2023,
+https://www.sciencedirect.com/science/article/pii/S0304405X23001617.
 """
 
 
@@ -850,6 +853,16 @@ def release_bbw(mode: str, out_dir: Path, vintage: str) -> int:
 
     def span(df: pd.DataFrame) -> str:
         return f"{str(df['date'].min())[:7]} to {str(df['date'].max())[:7]}"
+
+    def gaps(df: pd.DataFrame) -> str:
+        """The month-ends inside the span the table has no row for, read from the table."""
+        d = pd.to_datetime(df["date"])
+        grid = pd.date_range(d.min(), d.max(), freq="ME")
+        missing = [x.strftime("%Y-%m") for x in grid.difference(pd.DatetimeIndex(d))]
+        if not missing:
+            return ""
+        return (f"\n\nThe extended table has no row for {len(missing)} month-ends inside its "
+                f"span, around two gaps in the Lehman data: {', '.join(missing)}.")
 
     written = {}
     for name, df in (("trace", trace), ("extended", ext)):
@@ -887,7 +900,9 @@ def release_bbw(mode: str, out_dir: Path, vintage: str) -> int:
                               "cache": _public_path(cfg.BBW_EXTENDED_CACHE),
                               "sha256": _sha256(cfg.BBW_EXTENDED_CACHE)
                               if cfg.BBW_EXTENDED_CACHE.exists() else None},
-        "original": {"file": BBW_ORIGINAL.name, "sha256": BBW_ORIGINAL_SHA256,
+        "original": {"file": BBW_ORIGINAL.name, "sha256_lf": BBW_ORIGINAL_SHA256,
+                     "sha256_lf_note": "sha256 of the content with line endings as LF, the same "
+                                       "on every checkout; MANIFEST.json hashes the bytes shipped",
                      "rows": 209, "span": ["2004-08-31", "2021-12-31"], "source": "see README"},
         "tables": written,
         "column_last_month": last,
@@ -895,8 +910,9 @@ def release_bbw(mode: str, out_dir: Path, vintage: str) -> int:
     (stage / "PROVENANCE.json").write_text(json.dumps(prov, indent=1), encoding="utf-8")
     (stage / "README.md").write_text(
         BBW_README.format(vintage=vintage, trace_span=span(trace), trace_n=len(trace),
-                          ext_span=span(ext), ext_n=len(ext),
-                          last_months=_last_months_table(trace, ext)),
+                          ext_span=span(ext), ext_n=len(ext), ext_gaps=gaps(ext),
+                          last_months=_last_months_table(trace, ext),
+                          n_cols=len(trace.columns), n_series=len(trace.columns) - 1),
         encoding="utf-8", newline="\n")
 
     members = {f.name: {"bytes": f.stat().st_size, "sha256": _sha256(f)}
@@ -927,9 +943,8 @@ def release_bbw(mode: str, out_dir: Path, vintage: str) -> int:
 # THE DAILY PANEL
 #
 # Stage 1's bond-day panel, in the layout we publish. The file Stage 1 BUILDS carries the
-# agency ratings and two proprietary identifiers, and is not ours to redistribute. On
-# 2026-09-18 it was uploaded as it stood, because the website copied it with SELECT * and no
-# release step existed for it. This is that step.
+# agency ratings and two proprietary identifiers, and is not ours to redistribute, so a copy
+# made with SELECT * is never publishable. This step is the only way a public copy is made.
 #
 # The public layout is a WHITELIST. A column Stage 1 gains later is withheld until someone
 # decides it is public, and the release refuses to run until they have decided.

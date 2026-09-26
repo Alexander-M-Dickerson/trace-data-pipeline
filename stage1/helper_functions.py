@@ -3578,7 +3578,7 @@ def make_data_availability_table(df: pd.DataFrame, min_date: str, max_date: str)
         r"percentage of missing values. "
         r"Panel A includes all bonds in the sample. "
         r"Panel B includes investment grade bonds (S\&P ratings 1--10, AAA to BBB$-$). "
-        r"Panel C includes non-investment grade bonds (S\&P ratings 11--21, BB+ to CCC$-$). "
+        r"Panel C includes non-investment grade bonds (S\&P ratings 11--21, BB+ to C). "
         r"Panel D includes defaulted bonds (S\&P rating 22, D). "
         r"The sample spans the period " + min_date + r" to " + max_date + r". "
         r"All other variables in the dataset (not shown) have zero missing observations. "

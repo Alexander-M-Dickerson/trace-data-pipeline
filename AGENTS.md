@@ -44,12 +44,12 @@ instructions: [stage2/AGENTS.md](stage2/AGENTS.md), [stage3/AGENTS.md](stage3/AG
    outputs (column contracts, coverage, redaction). If one fails, stop, show the message, and
    explain its cause. Never weaken or skip a check to make a run finish.
 5. **Run long builds in the background with a log file**, and report progress from the log. Use
-   the runners (`_run_stage2.py`, `run_stage3.sh`): they start each step in a fresh process,
-   which the pipeline relies on for speed.
+   the runners (`_run_stage2.py`, `run_stage3.sh`, `run_stage4.sh`). Stages 2 and 3 start each
+   step in a fresh process, which the pipeline relies on for speed.
 6. **Ask the user, don't guess**, when a choice changes the numbers: the factor source for
    stage 2 (see stage2/AGENTS.md) and the sample for stage 3.
-7. **Outputs are not committed.** `stage2/data/`, `stage2/output/`, `stage3/data/` and
-   `stage3/reports/` are gitignored. Do not add them to git.
+7. **Outputs are not committed.** `stage2/data/`, `stage2/output/`, `stage2/release/`,
+   `stage3/data/`, `stage3/reports/` and `stage4/output/` are gitignored. Do not add them to git.
 
 ## Stages 0 and 1 on WRDS
 
@@ -87,7 +87,7 @@ If the user runs you on the WRDS Cloud, these are the rules that cost people a d
 - A WRDS account (`WRDS_USERNAME`, in `config.py` or the environment) for stage 2's first run,
   which fetches and caches Treasury returns, Fama-French factors, VIX and FISD coupon terms.
   Later runs use the cache.
-- Python 3.11 or newer on their computer, and two install lines, in this order:
+- Python 3.11 to 3.13 on their computer (3.14 cannot install yet), and two install lines, in this order:
   ```
   python -m pip install -r requirements-local.txt
   python -m pip install --no-deps pybondlab==0.3.0

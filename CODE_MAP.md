@@ -4,8 +4,8 @@ What each stage reads and writes, and what every code file does. For "where do I
 see [INDEX.md](INDEX.md). For which file makes each table and figure of the paper, see
 [stage3/INDEX.md](stage3/INDEX.md).
 
-`tests/test_docs.py` fails if a tracked `.py` or `.sh` file is missing from this page, so the
-map cannot fall behind the code. Exempt: files inside `tests/` folders (described per folder
+`tests/test_docs.py` fails if a tracked `.py` or `.sh` file is missing from this page, so
+every code file is listed. It does not check that a description is still true. Exempt: files inside `tests/` folders (described per folder
 below) and package `__init__` files; stage 3's drivers may be listed in `stage3/INDEX.md` instead. The check
 needs git, and is skipped without it.
 
@@ -35,8 +35,8 @@ the last month each cache holds.
 |---|---|
 | `config.py` | Settings shared by stages 0-2: `WRDS_USERNAME`, `AUTHOR`, `TRACE_MEMBERS`, `OUTPUT_FORMAT`, `STAGE0_OUTPUT_FIGURES` |
 | `requirements.txt` | The Python packages for stages 0 and 1, installed on WRDS |
-| `requirements-local.txt` | The packages for stages 2-4, on your own computer: `requirements.txt` plus numba. PyBondLab goes in on a second line, as the file explains |
-| `constraints-2026.txt` | Optional: the exact package versions the published 2026 vintage was built with, for a build that matches it to the last digit |
+| `requirements-local.txt` | The packages for stages 2-4, on your own computer: `requirements.txt` plus numba, numexpr and pytest. PyBondLab goes in on a second line, as the file explains |
+| `constraints-2026.txt` | Optional: the exact package versions the published 2026 vintage was built with, for a build that matches it exactly in 139 of 145 columns, the other six within 1e-13 |
 | `pybondlab_pin.py` | The PyBondLab release stages 2-4 run on, the start-up check that it is the one installed, and its fingerprint for manifests |
 | `numeric_setup.py` | Makes pandas use `numexpr` (required: it changes float32 results, and the published panels were built with it) and not `bottleneck`, so stages 2-4 compute the same numbers on any machine |
 | `run_pipeline.sh` | Runs stages 0 and 1 on WRDS: downloads the inputs, submits the stage 0 jobs, then the report job and stage 1, each waiting on the jobs it needs |
@@ -112,7 +112,7 @@ the last month each cache holds.
 | `stage2/lib/wrangle.py` | The final merge and column order |
 | `stage2/lib/pin.py` | The daily panel projection every step reads, built once |
 | `stage2/lib/treasury.py` | Duration-matched Treasury returns (`tret`), from CRSP via WRDS, fetched once and cached |
-| `stage2/lib/duration_adjusted.py` | The five Treasury benchmarks built from each bond's own cash flows (`tret_bns`, `tret_cls`, ...) |
+| `stage2/lib/duration_adjusted.py` | The five alternative Treasury benchmarks: four priced from each bond's own cash flows on the GSW curve (`tret_bns`, `tret_cfm`, `tret_gprs`, `tret_cls`), and `tret_mat`, the `tret` method at the bond's maturity instead of its duration |
 | `stage2/lib/ff5.py` | Fama-French five factors from WRDS, fetched once and cached |
 | `stage2/lib/vix.py` | Daily VIX from WRDS, fetched once and cached |
 | `stage2/lib/factor_fetch.py` | The sources for `--factor-source public` (Ken French, FRED, He-Kelly-Manela, Ludvigson, EPU, and monthly VIX from WRDS), fetched once and cached |

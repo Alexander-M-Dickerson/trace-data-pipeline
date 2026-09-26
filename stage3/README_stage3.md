@@ -124,17 +124,17 @@ now** (each run records what it read under `data/_inputs/`), so re-running after
 resumes rather than restarting, and a new Stage 2 build re-runs the producers that read
 it. `--force` recomputes everything.
 
-Measured on the cold run of 2026-09-12, 24 cores:
+Measured on the run of 2026-09-26 (PyBondLab 0.3.0, the 2026-09-21 data), 24 cores:
 
 | section | producer | cost |
 |---|---|---|
 | `lib` | the three approaches, all bonds and both rating splits | 21–29 s each |
-| `lib` | the 108-signal month-end/month-begin sorts, x4 | 30–36 s each |
-| `lab` | the winsorization sweep, 2 tails x 3 ratings | 12 s |
-| `nse` | the **MUA grid** — 108 signals x 216 method choices | 158 s |
-| `nse` | the **status ledger** — one row per grid cell, read by every Section-5 denominator | 13 s |
-| `nse` | the **DUA grid** — 108 signals x 108 filters x 3 ratings | 264 s, then 33 s for its statistics |
-| `zoo` | all 108 signals, single and within-firm | 56 s |
+| `lib` | the 108-signal month-end/month-begin sorts, x4 | 25–26 s single, 72–73 s within-firm |
+| `lab` | the winsorization sweep, 2 tails x 3 ratings | 17 s |
+| `nse` | the **MUA grid** — 108 signals x 216 method choices | 145 s |
+| `nse` | the **status ledger** — one row per grid cell, read by every Section-5 denominator | 11 s |
+| `nse` | the **DUA grid** — 108 signals x 108 filters x 3 ratings | 264 s, then 31 s for its statistics |
+| `zoo` | all 108 signals, single and within-firm | 45 s |
 
 **Exhibits** read those series and render. Seconds each, always re-rendered. The final
 step compiles them all into one PDF.
@@ -207,25 +207,25 @@ drops that row so Table 3 prints 15 and the two tables agree.
 
 ## What it costs
 
-Measured on a **cold run** — `data/` and `reports/` wiped first — on 24 cores / 128 GB, Windows, 2026-09-12. All 41 steps ran; none was skipped.
+Measured on a **cold run** — `data/` and `reports/` empty — on 24 cores / 128 GB, Windows, 2026-09-26, with PyBondLab 0.3.0 on the 2026-09-21 data. All 41 steps ran; none was skipped, none failed.
 
-**906 s = 15.1 minutes** end to end, `tools/check_inputs.py` through `reports/exhibits.pdf`.
+**15.7 minutes** end to end, `tools/check_inputs.py` through `reports/exhibits.pdf`.
 
-| section | `--section` | wall | share |
+| section | `--section` | benched | share |
 |---|---|---|---|
-| Section 5 -- the two uncertainty grids | `nse` | 472 s | 55% |
-| Section 3 -- latent implementation bias | `lib` | 242 s | 28% |
-| the factor zoo | `zoo` | 62 s | 7% |
-| data appendix | `data` | 60 s | 7% |
-| Section 4 -- look-ahead bias | `lab` | 21 s | 2% |
+| Section 5 -- the two uncertainty grids | `nse` | 456 s | 51% |
+| Section 3 -- latent implementation bias | `lib` | 307 s | 34% |
+| data appendix | `data` | 57 s | 6% |
+| the factor zoo | `zoo` | 51 s | 6% |
+| Section 4 -- look-ahead bias | `lab` | 26 s | 3% |
 
-Those are the benched steps (856 s of the 906 s); the rest is process start-up across the 41 steps and the LaTeX compile. `reports/timings.jsonl` carries one line per step, and the run prints its own five slowest at the end.
+Those are the benched steps (896 s); the rest is process start-up across the 41 steps and the LaTeX compile. `reports/timings.jsonl` carries one line per step, and the run prints its own five slowest at the end.
 
-That run **exited non-zero**, as it should have: its grid had 54 of the sort engine's unstable empty cells, so `s3_nse/t06_mua_nse.py`'s twin-invariance check was red. Every other step passed, and the PDF was produced -- a failed exhibit does not abandon the run. The defect does not bite every run: the 2026-09-23 run on the 2026-09-21 data had none, and every step passed.
+A run can exit non-zero with every table written: the cold run of 2026-09-12 did, because its grid had 54 of the sort engine's unstable empty cells, so `s3_nse/t06_mua_nse.py`'s twin-invariance check was red. Every other step passed, and the PDF was produced -- a failed exhibit does not abandon the run. The runs of 2026-09-23 and 2026-09-26 on the 2026-09-21 data had none.
 
 ### Disk and memory
 
-- **Inputs**: 3.9 GB, of which the Stage-1 daily panel is most. They are read, never copied.
+- **Inputs**: 4.4 GB, of which the Stage-1 daily panel is 2.7 GB. They are read, never copied.
 - **Outputs**: about **400 MB** under `data/` and `reports/` together, almost all of it the two uncertainty grids (`data/grids/` is 279 MB of the 395 MB measured on the 2026-09-12 cold run; `reports/` is 1.4 MB). Both are gitignored.
 - **Peak per grid worker**: 0.7 GB, recorded by the grid itself as `max_worker_rss_gb` (needs `psutil`, which `requirements.txt` installs). The grids are bounded by cores, not by memory.
 
@@ -246,7 +246,7 @@ Two more knobs worth knowing:
 - `STAGE3_MEMORY_LIMIT` caps DuckDB in the data appendix, which is the step that scans the 31-million-row daily panel. Left unset it takes a share of free RAM; set it (`STAGE3_MEMORY_LIMIT=8GB`) if something else on the machine needs the memory.
 - `STAGE3_WORKERS` sets the default worker count for every fan-out at once, without touching a flag.
 
-**On 16 GB**, run section by section (`--section lib`, then `lab`, and so on) rather than the whole chain, and pin `--workers 4 --threads 2` on both grids. Section 5 is the one that will hurt.
+**On 16 GB**, run section by section (`--section lib`, then `lab`, and so on) rather than the whole chain, with `STAGE3_WORKERS=4`, which sets the worker count of both grids. Section 5 is the one that will hurt.
 
 ---
 

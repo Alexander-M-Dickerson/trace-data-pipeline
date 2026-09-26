@@ -2,7 +2,7 @@
 mechanically from the reference implementation (read-only). Do not edit the
 kernel bodies; faithfulness is arbitrated by the beta validator. Orchestrators live in steps/step4.
 
-W5 (speed_up/01): `nogil=True` added to every decorator so lib/betas can fan the independent
+`nogil=True` is on every decorator so lib/betas can fan the independent
 per-model calls out on a thread pool. nogil changes GIL handling only -- the generated machine code
 and numerics are untouched (validator-arbitrated)."""
 import numpy as np

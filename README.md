@@ -1,20 +1,20 @@
 # TRACE Data Pipeline
 
 A comprehensive pipeline for processing Enhanced, Standard and 144A TRACE (Trade Reporting and Compliance Engine) corporate bond transaction data. 
-It is a part of the [Open Bond Asset Pricing project](https://openbondassetpricing.com/).
+It is a part of the [Open Source Bond Asset Pricing project](https://openbondassetpricing.com/).
 This pipeline implements cleaning procedures and error-correction algorithms to produce *high-quality, reproducible* daily and monthly corporate bond panels from raw TRACE transaction data.
 The companion library is [PyBondLab](https://pypi.org/project/pybondlab/), which forms corporate bond asset pricing factors; Stages 2-4 run on it.
 
 [![Website](https://img.shields.io/badge/Website-Visit-blue?logo=google-chrome&logoColor=white)](https://openbondassetpricing.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.11-3.13](https://img.shields.io/badge/python-3.11--3.13-blue.svg)](https://www.python.org/downloads/)
 [![Stage 0](https://img.shields.io/badge/Stage%200-Public%20Beta-green)](stage0/)
 [![Stage 1](https://img.shields.io/badge/Stage%201-Public%20Beta-green)](stage1/)
 [![Stage 2](https://img.shields.io/badge/Stage%202-Public%20Beta-green)](stage2/)
 [![Stage 3](https://img.shields.io/badge/Stage%203-Public%20Beta-green)](stage3/)
 [![Stage 4](https://img.shields.io/badge/Stage%204-Public%20Beta-green)](stage4/)
 
-[📄 Link to paper](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4575879)
+[📄 Link to paper](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=6088966)
 
 ---
 
@@ -60,7 +60,8 @@ your WRDS login; later runs read the cache.
 
 **On your own computer:**
 
-8. In a Python 3.11+ environment, install the requirements for stages 2-4 with two lines:
+8. In a Python 3.11 to 3.13 environment (3.14 cannot install yet; `requirements-local.txt` says why),
+   install the requirements for stages 2-4 with two lines:
    `python -m pip install -r requirements-local.txt`, then
    `python -m pip install --no-deps pybondlab==0.3.0`. PyBondLab 0.3.0 declares `numpy<2` and
    this repository installs numpy 2, so it goes in without its dependency list
@@ -72,12 +73,18 @@ your WRDS login; later runs read the cache.
 
 **Still on your own computer, if you want the research output too:**
 
-11. `cd stage3 && python tools/check_inputs.py` — confirms Stage 3 can see what Stage 2 made.
+11. `cd ../stage3 && python tools/check_inputs.py` — confirms Stage 3 can see what Stage 2 made.
 12. `bash run_stage3.sh` — portfolio sorts, the uncertainty grids, and 33 tables and
     11 figures into `stage3/reports/`.
-13. `cd ../stage4 && bash run_stage4.sh` — the TRACE-only bond factors that
+13. `cd ../stage2 && python make_excess_blocks.py --mode stage1 --benchmark all`, then
+    `cd ../stage4 && bash run_stage4.sh` — the TRACE-only bond factors that
     openbondassetpricing.com publishes, into `stage4/output/`, then a cell-by-cell comparison
     with the published files.
+
+On Windows, run the `bash` lines in Git Bash. Each wrapper only calls Python scripts, which
+work from any terminal: `run_stage3.sh` is `python tools/check_inputs.py` then
+`python _run_stage3.py`, and `run_stage4.sh` is `python build_factors.py` then
+`python compare_published.py`.
 
 Stages 0-2 build the DATA. Stage 3 is what the data was built for: it reproduces every
 exhibit of *The Corporate Bond Factor Replication Crisis* from the panel you just made.
@@ -95,9 +102,9 @@ themselves: [AGENTS.md](AGENTS.md) here and in `stage2/`, `stage3/` and `stage4/
 
 > ❗**You cannot skip stages 0 and 1 by downloading the published Stage 1 file.** The public
 > download has its rating columns removed, because agency ratings are licensed. Stage 2 keeps
-> only bond-months that carry a rating, so it would silently produce an empty panel. Stage 2
-> detects this and refuses to start. Run stages 0 and 1 yourself — that is what the WRDS
-> subscription is for.
+> only bond-months that carry a rating, so it cannot use that file: pointed at it, Stage 2
+> refuses it at start-up, saying so. Run stages 0 and 1 yourself — that is what the WRDS subscription is
+> for.
 
 ---
 
@@ -220,7 +227,7 @@ Please reach out to `alexander.dickerson1@unsw.edu.au` if you would like to coll
 
 ### Prerequisites
 - WRDS subscription with access to TRACE, FISD, and ratings data
-- Python 3.10 or higher on WRDS (the 2026-09-21 production run used Python 3.14.5 there), and 3.11 or higher on your own computer for Stages 2-4
+- Python 3.10 or higher on WRDS (the 2026-09-21 production run used Python 3.14.5 there), and 3.11 to 3.13 on your own computer for Stages 2-4
 - SSH access to WRDS Cloud (or local Python environment)
 - `.pgpass` configured for passwordless WRDS authentication
 
@@ -263,7 +270,7 @@ bash download_inputs.sh     # LOGIN NODE ONLY -- compute nodes have no internet
 qsub run_smoke_test.sh      # ~10 min; output lands in smoke_test.out
 ```
 This runs the real Stage 0 → Stage 1 code on a handful of CUSIP chunks and asserts
-28 cross-stage invariants. It writes to `smoke/` and never touches production output.
+the cross-stage invariants in `tests/smoke_assertions.py`. It writes to `smoke/` and never touches production output.
 
 4. **Run the complete pipeline:**
 ```bash
@@ -331,7 +338,7 @@ Using Claude Code or Codex? It reads [AGENTS.md](AGENTS.md) by itself.
 - **[Stage 3 Data Dictionary](stage3/DATA_DICTIONARY.md)**: Every artifact and column
 - **[Stage 3 Exhibit Index](stage3/INDEX.md)**: Every table and figure the report prints,
   mapped to the file that produces it, its LaTeX label and the sample it states.
-  Generated, and gated so it cannot go stale
+  Generated; `tools/build_index.py --check` fails when the exhibits or their files change
 
 ---
 
@@ -441,7 +448,7 @@ Stage 0 produces daily panels in dataset-specific subfolders with the following 
 | `bid_count` | Number of dealer buys (= customer sells) |
 | `ask_count` | Number of dealer sells (= customer buys) |
 
-**Expected output size** (the 2026-09-10 run):
+**Expected output size** (the 2026-09-21 run):
 - Enhanced TRACE (2002-07 to the data frontier): ~31 million rows, about 2.2 GB
 - Standard TRACE (from 2024-10): opt-in, not part of the default run
 - Rule 144A (first trade 2003-10): ~3.8 million rows, about 250 MB
@@ -459,7 +466,7 @@ Stage 0 produces daily panels in dataset-specific subfolders with the following 
 
 **Output size:** about 2.7 GB for the full sample with Enhanced and 144A (2.68 GB on the 2026-09-21 run)
 
-**Data download:** Available in zipped parquet format on [Open Bond Asset Pricing](https://openbondassetpricing.com/data)
+**Data download:** Available in zipped parquet format on [Open Source Bond Asset Pricing](https://openbondassetpricing.com/data)
 
 **Column structure (44 columns):**
 
@@ -691,4 +698,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Last Updated:** September 2026
-**Version:** 3.3.0 — see [CHANGELOG.md](CHANGELOG.md) for what each release changed.
+**Version:** 4.0.0 — see [CHANGELOG.md](CHANGELOG.md) for what each release changed.

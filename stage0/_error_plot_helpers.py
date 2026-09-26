@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-error_filters.py
-========================
+_error_plot_helpers.py
+======================
 Shared plotting utilities and error-filter functions for TRACE panels.
 
 Author : Alex Dickerson

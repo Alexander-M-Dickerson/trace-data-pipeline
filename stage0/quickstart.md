@@ -28,7 +28,9 @@ and `stage1/` are both directly beneath the working directory.
 ### Option A — `venv` (default)
 
 ```bash
-python3 -m venv ~/wrds_env
+# --system-site-packages keeps the WRDS Cloud's own pandas 2.2 visible: pip has no build of it
+# for the Cloud's Python 3.14.
+python3 -m venv --system-site-packages ~/wrds_env
 source ~/wrds_env/bin/activate
 python -m pip install -U pip
 python -m pip install -r requirements.txt      # do NOT add --user

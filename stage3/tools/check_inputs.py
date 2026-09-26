@@ -9,6 +9,7 @@ a grid.
 
     python tools/check_inputs.py
     python tools/check_inputs.py --verbose     # every declared column, present or not
+    python tools/check_inputs.py --section nse # only the inputs one section reads
 
 The contract lives in `spec/inputs.json`, beside this file. Editing that file changes
 what is required; editing this one changes how it is checked.
@@ -96,10 +97,19 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--verbose", action="store_true")
     ap.add_argument("--json", action="store_true", help="machine-readable output")
+    ap.add_argument("--section", default=None,
+                    help="check only the inputs this section of _run_stage3.py reads")
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
 
     results, ok = check(verbose=args.verbose)
+    if args.section:
+        # The runner's own map, so the two cannot disagree about what a section reads.
+        from _run_stage3 import SECTION_INPUTS
+        if args.section not in SECTION_INPUTS:
+            ap.error(f"--section must be one of {', '.join(SECTION_INPUTS)}")
+        results = [r for r in results if r["input"] in SECTION_INPUTS[args.section]]
+        ok = all(not r["problems"] for r in results)
     if args.json:
         print(json.dumps({"ok": ok, "inputs": results}, indent=2, default=str))
         return 0 if ok else 1
@@ -125,10 +135,14 @@ def main() -> int:
     if shutil.which("pdflatex") is None:
         print("\nWARN pdflatex not found on PATH.")
         print("       Everything runs; the final step cannot compile reports/exhibits.pdf.")
-        print("       Install TeX Live or MiKTeX, or run make_report.py --no-compile.")
+        print("       Install TeX Live or MiKTeX, or run make_report.py --window full --no-compile.")
     if not ok:
+        stage1 = any(r["input"].startswith("STAGE1") and r["problems"] for r in results)
         print("\nStage 3 will not produce correct exhibits until these are fixed.\n"
-              "  Run Stage 2 first, or point STAGE2_* at where its output lives.")
+              + ("  STAGE1_DAILY is Stage 1's daily panel: set STAGE1_DIR to the folder that\n"
+                 "  holds its data/ directory, or STAGE1_DAILY to the file itself.\n"
+                 if stage1 else "")
+              + "  For the Stage 2 files, run Stage 2 first, or set STAGE2_DIR to where it ran.")
     return 0 if ok else 1
 
 

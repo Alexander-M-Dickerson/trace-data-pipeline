@@ -126,7 +126,7 @@ def test_every_twinned_signal_is_a_real_panel_column():
 
 
 def test_an_undeclared_twin_in_the_sidecar_fails():
-    """D25: a NEW price-based signal nobody added to MMN_TWINNED must not slip past.
+    """A NEW price-based signal nobody added to MMN_TWINNED must not slip past.
 
     The twin gate iterates the declared set, so a name outside it is invisible to it. This is
     the other direction: the sidecar is checked against the set, not only the set against the
@@ -152,7 +152,7 @@ def _mmn_pair(panel_values, sidecar_values, col="cs"):
 
 
 def test_the_unadjusted_form_in_the_main_panel_fails():
-    """D20: `assert_mmn_twins` passes happily when the WRONG form is in the panel.
+    """`assert_mmn_twins` passes happily when the WRONG form is in the panel.
 
     This is the basrev v1 failure -- AR(1) -0.05 adjusted vs -0.22 unadjusted, four fifths of
     the raw reversal being bid-ask bounce -- and it produces a complete, normal-looking panel.

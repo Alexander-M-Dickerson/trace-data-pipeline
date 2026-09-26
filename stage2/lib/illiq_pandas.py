@@ -34,7 +34,7 @@ def _is_sorted_by(df: pd.DataFrame, id_col: str, date_col: str) -> bool:
 
 
 # ----------------------------------------------------------------------------------------------
-# monthly_pi_fast (upstream lines 232-355)
+# monthly_pi_fast
 # ----------------------------------------------------------------------------------------------
 def monthly_pi_fast(df, id_col="cusip_id", date_col="trd_exctn_dt", month_col="month_year",
                     ret_col="ret_c", lag_ret_col="ret_c_lag", vol_col="dvol_lag",
@@ -96,7 +96,7 @@ def monthly_pi_fast(df, id_col="cusip_id", date_col="trd_exctn_dt", month_col="m
 
 
 # ----------------------------------------------------------------------------------------------
-# compute_monthly_amihud (upstream lines 358-469)
+# compute_monthly_amihud
 # ----------------------------------------------------------------------------------------------
 def compute_monthly_amihud(df, id_col="cusip_id", month_col="month_year", ret_col="ret_d",
                            vol_col="dvol", prc_lst_col="prc_lst", prc_hi_col="prc_hi",
@@ -136,7 +136,7 @@ def compute_monthly_amihud(df, id_col="cusip_id", month_col="month_year", ret_co
 
 
 # ----------------------------------------------------------------------------------------------
-# compute_monthly_illiq_roll_fast (upstream lines 472-580)
+# compute_monthly_illiq_roll_fast
 # ----------------------------------------------------------------------------------------------
 def compute_monthly_illiq_roll_fast(df, id_col="cusip_id", month_col="month_year",
                                     ret_col="ret_c", ret_lag_col="ret_c_lag",
@@ -187,7 +187,7 @@ def compute_monthly_illiq_roll_fast(df, id_col="cusip_id", month_col="month_year
 
 
 # ----------------------------------------------------------------------------------------------
-# compute_within_month_risk + numba kernel (upstream lines 698-1115)
+# compute_within_month_risk + numba kernel
 # ----------------------------------------------------------------------------------------------
 @njit(cache=True, fastmath=True)
 def _group_stats_realized_vix_numba(y, f, vix, dvix, g, n_groups, min_obs):

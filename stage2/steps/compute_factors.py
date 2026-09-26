@@ -1,4 +1,4 @@
-"""compute_factors.py -- the `create_factors.py` port: materialize the factor time-series panel
+"""compute_factors.py -- materialize the factor time-series panel
 (`blocks/<mode>/factors.parquet`, the seam steps 4 and 7 read).
 
 Two sources (cfg.FACTOR_SOURCE / --factor-source):
@@ -6,11 +6,11 @@ Two sources (cfg.FACTOR_SOURCE / --factor-source):
             FACTORS_PINNED_FILE. The route that reproduces a published panel exactly.
   public -- assemble fresh from the public fetchers (lib/factor_fetch) + the published extended BBW
             series (lib/extended_factors). Runs with NO private input, anywhere -- but does NOT
-            bit-match the pinned vintage (FRED/EPU/HKM/Ludvigson back-revise history; A10). The
+            bit-match the pinned vintage (FRED/EPU/HKM/Ludvigson back-revise history). The
             per-column divergence is documented in the divergence report written by this step.
 
-Ground truth: `stage2/create_factors.py` (fetch order, the cptlt-rf subtraction, start-date
-truncation, date dedup, then the extended-BBW lowercase outer merge -- lines 677-973).
+Order of assembly: fetch each source, subtract rf from cptlt, truncate at the start date,
+drop duplicate dates, then outer-merge the extended BBW series (lower-cased names).
 
 CLI (the divergence reporter; run from stage2/):
     python -m steps.compute_factors [--refresh] [--report]

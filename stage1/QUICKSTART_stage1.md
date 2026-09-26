@@ -46,8 +46,9 @@ python -m pip install --user -r requirements.txt
 
 **Alternative — Virtual environment (optional):**
 ```bash
-# Create virtual environment in project root
-python3 -m venv venv
+# Create virtual environment in project root. --system-site-packages keeps the WRDS Cloud's own pandas 2.2 visible: pip has no build of it
+# for the Cloud's Python 3.14.
+python3 -m venv --system-site-packages venv
 source venv/bin/activate
 python -m pip install -r requirements.txt
 ```

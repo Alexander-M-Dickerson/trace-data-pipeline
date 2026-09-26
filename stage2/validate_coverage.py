@@ -1,4 +1,4 @@
-"""validate_coverage.py -- guard against silent column staleness in the EXTEND-mode (ours) panel.
+"""validate_coverage.py -- guard against silent column staleness in the built panel.
 
 The golden-vintage pins (the treasury cutoff, the pinned factor panel, the frozen AUX merges) can
 silently cap a column several months before the panel end. The `TRET_MAX_DATE` pin once did exactly
@@ -13,7 +13,7 @@ month. A column empty >= max_lag+1 months early, despite being populated earlier
 
     validate_coverage.py                                   # the configured build, max_lag=1
     validate_coverage.py --panel <path> --max-lag 1 --json-out report.json
-    validate_coverage.py --panel output/panel/main_panel_ours_plus.parquet
+    validate_coverage.py --panel output/panel/main_panel_stage1.parquet
 
 Why max_lag=1 by default: forward-difference columns (`lib`, `libd`, and the *_bgn terminal returns)
 legitimately cannot compute the panel's FINAL month (they need month t+1), so they lose exactly one

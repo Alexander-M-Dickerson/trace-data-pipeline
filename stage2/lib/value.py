@@ -1,5 +1,5 @@
-"""value.py -- VERBATIM value-signal machinery from the reference implementation
-(lines 5002-5700, 5906-6051): _apply_dts_quintile_overlay, compute_value, within_firm_demean,
+"""value.py -- VERBATIM value-signal machinery from the reference implementation:
+_apply_dts_quintile_overlay, compute_value, within_firm_demean,
 compute_lagged_values, make_value_signals, build_d_spreads. Arbitrated by the value and wrangle validators."""
 import gc
 import logging

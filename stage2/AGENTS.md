@@ -16,7 +16,7 @@ factors). There are two sources, and they give different numbers:
 
 The public sources revise their history (Ken French restates factors, FRED re-adjusts CPI,
 Ludvigson re-estimates uncertainty), so a `public` build will not match a published release
-bit for bit. That is expected, not a bug. For a `pinned` build to match to the last digit, the
+bit for bit. That is expected, not a bug. For a `pinned` build to match as closely as it can, the
 environment also needs the package versions in `constraints-2026.txt`
 (`pip install -r requirements-local.txt -c constraints-2026.txt`); six columns still differ in
 the 14th digit, as two builds on one machine do.
@@ -65,7 +65,7 @@ python make_release.py --what panel                        # 6. optional: the re
 With `--factor-source pinned`, a build from the same WRDS run reproduces the published panel
 once the release redaction is applied (`permco`, `gvkey`, `spc_rat`, `mdc_rat`; step 6):
 same rows, same columns, and identical values in all but six liquidity columns (`cs_sprd`,
-`spd_rel`, `spd_abs`, `ar_sprd`, `p_fht`, `vov`). Those six can differ by less than 1e-12 on a
+`spd_rel`, `spd_abs`, `ar_sprd`, `p_fht`, `vov`). Those six can differ by less than 1e-13 on a
 few hundred rows, because DuckDB adds numbers across threads in whatever order the threads
 finish. That is floating-point rounding, not a different result.
 

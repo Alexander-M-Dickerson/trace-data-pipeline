@@ -27,7 +27,10 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "check_disk_space.sh"
 BASH = shutil.which("bash")
-pytestmark = pytest.mark.skipif(BASH is None, reason="bash is not available")
+# On Windows, `bash` may be WSL's launcher, which runs Linux programs and not this PATH's fakes.
+_WSL = BASH is not None and ("windowsapps" in BASH.lower()
+                             or BASH.lower().endswith(r"system32\bash.exe"))
+pytestmark = pytest.mark.skipif(BASH is None or _WSL, reason="bash (not WSL's launcher) is needed")
 
 GB = 1024 * 1024          # KB in a GB, the unit `du -sk` prints
 

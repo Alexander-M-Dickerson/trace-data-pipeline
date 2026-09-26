@@ -137,6 +137,7 @@ def main() -> int:
                     help="run the TRET path instead and require bit-identity with the shipped "
                          "betas_x / mom_retx. Writes nothing.")
     ap.add_argument("--quiet", action="store_true")
+    sys.stdout.reconfigure(encoding="utf-8")   # --help prints the docstring, which is UTF-8
     a = ap.parse_args()
 
     mode = a.mode or cfg.INPUT_MODE

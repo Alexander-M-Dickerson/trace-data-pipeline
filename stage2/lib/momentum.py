@@ -1,5 +1,5 @@
-"""momentum.py -- VERBATIM momentum/LTR machinery from the reference implementation
-(lines 6227-6356, 6360-6559): numba window helpers + build_mom_ltr_and_industry. Arbitrated by G6."""
+"""momentum.py -- VERBATIM momentum/LTR machinery from the reference implementation: numba
+window helpers + build_mom_ltr_and_industry. Arbitrated by the momentum validator."""
 import logging
 from typing import Iterable, List, Optional, Sequence, Tuple, Union
 

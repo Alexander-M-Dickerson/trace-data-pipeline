@@ -25,7 +25,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-PYTHON="${PYTHON:-python3}"
-command -v "$PYTHON" >/dev/null 2>&1 || PYTHON=python
+# PY overrides the interpreter, as in run_stage2.sh; PYTHON is read too. The default is
+# `python`: a Windows venv has no `python3`, and the one on PATH is a Store shortcut.
+PY="${PY:-${PYTHON:-python}}"
 
-exec "$PYTHON" _build_data_report.py "$@"
+exec "$PY" _build_data_report.py "$@"

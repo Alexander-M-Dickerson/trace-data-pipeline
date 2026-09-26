@@ -88,8 +88,8 @@ def main() -> int:
                          "table's own footnote, and nse_engine.twin_asymmetry "
                          "names the pairs.")
     ap.add_argument("--no-bench", action="store_true")
+    sys.stdout.reconfigure(encoding="utf-8")   # before --help prints UTF-8 text
     args = ap.parse_args()
-    sys.stdout.reconfigure(encoding="utf-8")
     t0 = time.perf_counter()
 
     with Bench(f"table-ia18-{args.window}", section="s3_nse",

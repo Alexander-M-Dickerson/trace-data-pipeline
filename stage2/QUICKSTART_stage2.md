@@ -24,18 +24,18 @@ All three are found automatically — newest date stamp wins.
 
 > ❗**The OSBAP download will not work here.** The public Stage 1 file has its rating
 > columns removed (they are proprietary), and Stage 2 selects only bond-months with at
-> least one rating. Fed the download, it would produce an **empty panel with no error**.
-> Stage 2 checks for this and refuses to start. Run Stage 0 and Stage 1 yourself.
+> least one rating. Stage 2 recognises the download and refuses it at start-up. Run Stage 0
+> and Stage 1 yourself.
 
 **2. A WRDS account.** Stage 2 pulls Treasury returns, the Fama-French factors, VIX and the
 FISD coupon terms the `tret_*` benchmarks need. These are fetched once and cached under
 `stage2/data/`.
 
-**3. Python packages**, in Python 3.11 or newer, from the repository root:
+**3. Python packages**, in Python 3.11 to 3.13 (3.14 cannot install yet), from the repository root:
 
 ```bash
-python3 -m pip install -r requirements-local.txt
-python3 -m pip install --no-deps pybondlab==0.3.0
+python -m pip install -r requirements-local.txt
+python -m pip install --no-deps pybondlab==0.3.0
 ```
 
 DuckDB is the engine and PyBondLab 0.3.0 builds the BBW bond factors. PyBondLab declares
@@ -51,7 +51,7 @@ lines if PyBondLab is missing or a different version.
 
 ```bash
 cd stage2
-python3 _run_stage2.py --dry-run
+python _run_stage2.py --dry-run
 ```
 
 This resolves every input, prints what it found, and exits. If a file is missing it says
@@ -67,7 +67,7 @@ setx WRDS_USERNAME your_username          # Windows, then reopen the shell
 ### 2. Build
 
 ```bash
-python3 _run_stage2.py
+python _run_stage2.py
 ```
 
 or, equivalently, `bash run_stage2.sh`.
@@ -89,9 +89,9 @@ its own log under `output/logs/`.
 Useful flags:
 
 ```bash
-python3 _run_stage2.py --limit-cusips 200      # a fast smoke build (replaces output/ -- see below)
-python3 _run_stage2.py --from-step 4           # resume after a failure
-python3 _run_stage2.py --factor-source pinned  # reproduce a published vintage exactly
+python _run_stage2.py --limit-cusips 200      # a fast smoke build (replaces output/ -- see below)
+python _run_stage2.py --from-step 4           # resume after a failure
+python _run_stage2.py --factor-source pinned  # reproduce a published vintage exactly
 ```
 
 ❗`--limit-cusips` writes to the same `output/` as a full build, so it replaces that build's
@@ -100,7 +100,7 @@ panel and blocks. Run it before a full build, not after.
 ### 3. Check what you built
 
 ```bash
-python3 validate_coverage.py
+python validate_coverage.py
 ```
 
 Every column should reach within a month of the panel's last date. On the 2026 data the gate
@@ -142,7 +142,7 @@ so a panel that builds is a panel you can read positionally.
 
 | symptom | cause |
 |---|---|
-| "Every agency rating column is empty in ..." | you pointed it at the public Stage 1 file; ratings are stripped from it |
+| "It looks like the Stage 1 file published for download" | you pointed it at the public Stage 1 file; the licensed columns are removed from it |
 | a missing-input box at start-up | Stage 0/1 output is absent; `--dry-run` shows where it looked (each input is the newest file of its kind, so check that the three come from the same run) |
 | `FileNotFoundError` on a factor | first run with no cache and no internet; the fetchers need one online run |
 | WRDS asks for a password on every step | no `.pgpass`; create one, or run `wrds.Connection()` once interactively |

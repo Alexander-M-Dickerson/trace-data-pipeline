@@ -171,7 +171,7 @@ SELECT cusip_id, month_start, avg(cs) AS cs_sprd, avg(ar) AS ar_sprd, count(cl) 
 FROM (
   SELECT *,
     2.0 * (exp(alpha) - 1.0) / (1.0 + exp(alpha)) AS cs,
-    -- explicit NULL guard: DuckDB greatest() IGNORES NULLs (perf_learnings_carryover), so a NULL
+    -- explicit NULL guard: DuckDB greatest() IGNORES NULLs, so a NULL
     -- eta_lag would silently clip to 0 instead of propagating NaN like pandas
     CASE WHEN eta_lag IS NULL THEN NULL
          ELSE sqrt(greatest(4.0 * (ln(cl) - 0.5 * (eta + eta_lag)) ^ 2 - (eta - eta_lag) ^ 2, 0.0))
@@ -206,7 +206,7 @@ FROM m_csar_f f LEFT JOIN m_csar_a a USING (cusip_id, month_start)
     pz = con.execute(f"""
 SELECT c.cusip_id, c.month_start,
        -- explicit NULL guards: DuckDB least/greatest IGNORE NULLs, so an unguarded clip turns a
-       -- NULL count into 0.0 (bit us on p_zro_adj for single-trade months -- debug.md M10)
+       -- NULL count into 0.0 (this once broke p_zro_adj for single-trade months)
        CASE WHEN c.npr IS NULL THEN NULL
             ELSE least(greatest((b.bdays - c.npr) / b.bdays::DOUBLE, 0), 1) END AS p_zro,
        CASE WHEN c.npr_adj IS NULL THEN NULL

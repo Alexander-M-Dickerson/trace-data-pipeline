@@ -9,11 +9,11 @@ from WRDS. It needs no TRACE database access.
 
 Usage
 -----
-    python3 _run_stage2.py                      # full build, steps 1-7
-    python3 _run_stage2.py --dry-run            # resolve + validate config, build nothing
-    python3 _run_stage2.py --from-step 4 --to-step 7
-    python3 _run_stage2.py --limit-cusips 200   # fast development build
-    python3 _run_stage2.py --factor-source pinned
+    python _run_stage2.py                      # full build, steps 1-7
+    python _run_stage2.py --dry-run            # resolve + validate config, build nothing
+    python _run_stage2.py --from-step 4 --to-step 7
+    python _run_stage2.py --limit-cusips 200   # fast development build
+    python _run_stage2.py --factor-source pinned
 
 Author: Open Source Bond Asset Pricing
 """
@@ -93,9 +93,10 @@ def main(argv=None) -> int:
     try:
         from build_panel import run_stage2          # noqa: WPS433 - imported after validation
     except ImportError as e:
+        import pybondlab_pin
         _box("PIPELINE ERROR",
-             f"Stage 2's build engine is not installed yet: {e}\n"
-             f"Only the configuration layer is present in this tree.")
+             f"Stage 2 could not import a module it needs: {e}\n"
+             f"Install the requirements, from the repository root:\n{pybondlab_pin.INSTALL}")
         return 1
 
     try:

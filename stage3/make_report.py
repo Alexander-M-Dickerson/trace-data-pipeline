@@ -4,8 +4,9 @@ Stage 3 writes 32 table fragments and 11 figures. On their own they are 43 loose
 this puts them in the paper's own order, under the paper's own exhibit numbers, with a
 provenance page saying which panel and which engine produced them -- and compiles it.
 
-    python make_report.py              # exhibits.tex + exhibits.pdf
-    python make_report.py --no-compile # write the .tex only
+    python make_report.py --window full              # exhibits.tex + exhibits.pdf
+    python make_report.py --window full --no-compile # write the .tex only
+    (--window paper, the default, after a `--sample paper` run)
     python make_report.py --clean      # remove the LaTeX intermediates
 
 ❗The exhibit NUMBERS here are the paper's (Table IA.XII, Figure IA.3), not LaTeX's

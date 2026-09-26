@@ -80,6 +80,9 @@ def main() -> int:
         if unknown:
             ap.error(f"not among the 108 signals: {unknown}")
         signals = [s for s in S.SIGNALS if s in args.signals]
+    subset = bool(args.signals) or rts != list(S.RETURN_TYPES)
+    if subset:
+        # Never over the full product: a partial grid is not what the release compares.
         S.OUTPUT = S.OUTPUT / "_subset"
     vintage = S.vintage()
 
@@ -130,7 +133,7 @@ def main() -> int:
         flips = sorts.flip_set(panel)
         manifest = {
             "product": {"dataset": "trace", "sort": sort,
-                        "subset": bool(args.signals)},
+                        "subset": subset},
             "vintage": vintage,
             "built_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "orientation": "unflipped",

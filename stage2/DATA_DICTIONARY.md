@@ -63,7 +63,7 @@ All data in the panel is sampled at the end of month $t$, with one exception. `l
 
 **Sample start dates:** Most signals have a sample start date of 2002-08, including those that require a rolling estimation period. Signals requiring rolling data use ICE/BofA data to generate observations prior to 2002-08, enabling a consistent start date of 2002-08 for the main panel. Rolling signals that require TRACE-based illiquidity data (e.g., Amihud and Pastor-Stambaugh liquidity betas) start 2003-07.
 
-Several datasets are available on the [Open Bond Asset Pricing](https://openbondassetpricing.com/) website.
+Several datasets are available on the [Open Source Bond Asset Pricing](https://openbondassetpricing.com/) website.
 
 ### Market Microstructure Adjusted Signals and Returns
 
@@ -161,7 +161,7 @@ For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month r
 | `sig_gap` | Signal Gap | Business days between signal observation and month-end price; ranges 1–10 BD. |
 | `rfret` | Risk-Free Rate | Monthly risk-free rate from Fama-French. Used for excess returns: $r^x = r - r^f$. |
 
-**The five benchmarks beyond the fitted curve.** A cash flow later than the longest tenor the Gurkaynak-Sack-Wright curve fitted on that day is priced with the curve's yield held flat from there on: the convention of Gurkaynak, Sack and Wright (2007) and of Ghaderi, Plante, Roussanov and Seo (2026) ("we conservatively apply flat extrapolation when necessary"). A bond whose cash flows all end inside the fitted range is unaffected.
+**The four curve-based benchmarks beyond the fitted curve** (`tret_bns`, `tret_cfm`, `tret_gprs`, `tret_cls`). A cash flow later than the longest tenor the Gurkaynak-Sack-Wright curve fitted on that day is priced with the curve's yield held flat from there on: the convention of Gurkaynak, Sack and Wright (2007) and of Ghaderi, Plante, Roussanov and Seo (2026) ("we conservatively apply flat extrapolation when necessary"). A bond whose cash flows all end inside the fitted range is unaffected.
 
 ---
 
@@ -210,7 +210,7 @@ For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month r
 
 | Mnemonic | Name | Description |
 |----------|------|-------------|
-| `mom3_1` | 3-Month Momentum | Cumulative return months $t-2$ to $t-1$, skipping prior month. |
+| `mom3_1` | 3-Month Momentum | Cumulative return months $t-2$ to $t-1$, skipping month $t$. |
 | `mom6_1` | 6-Month Momentum | Cumulative return months $t-5$ to $t-1$. |
 | `mom9_1` | 9-Month Momentum | Cumulative return months $t-8$ to $t-1$. |
 | `mom12_1` | 12-Month Momentum | Cumulative return months $t-11$ to $t-1$. |
@@ -221,16 +221,16 @@ For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month r
 | `idimom3_1` | Idiosyncratic Momentum (3-1) | Sum of residuals over months $t-2$ to $t-1$ from a 36(12) rolling CAPMB regression. |
 | `idimom6_1` | Idiosyncratic Momentum (6-1) | Sum of residuals over months $t-5$ to $t-1$ from a 36(12) rolling CAPMB regression (bond market factor). |
 | `idimom12_1` | Idiosyncratic Momentum (12-1) | Sum of residuals over months $t-11$ to $t-1$ from a 36(12) rolling CAPMB regression. |
-| `imom1` | Industry Momentum (1) | Equal-weighted average prior-month return of other bonds in the same FF17 industry. |
-| `imom3_1` | Industry Momentum (3-1) | Equal-weighted average 3-1 momentum of other bonds in the same FF17 industry. |
-| `imom12_1` | Industry Momentum (12-1) | Equal-weighted average 12-1 momentum of other bonds in the same FF17 industry. |
+| `imom1` | Industry Momentum (1) | The equal-weighted return in month $t-1$ of all bonds sharing its SIC code (FISD), the bond itself included. |
+| `imom3_1` | Industry Momentum (3-1) | The equal-weighted return of all bonds sharing its SIC code (FISD), the bond itself included, compounded over months $t-2$ to $t-1$. |
+| `imom12_1` | Industry Momentum (12-1) | The equal-weighted return of all bonds sharing its SIC code (FISD), the bond itself included, compounded over months $t-11$ to $t-1$. |
 | `ltr24_3` | Long-Term Reversal (24-3) | Cumulative return months $t-23$ to $t-3$. Uses expanding window starting at 12-3. |
 | `ltr30_6` | Long-Term Reversal (30-6) | Cumulative return months $t-29$ to $t-6$. Uses expanding window starting at 12-3, ramping to 30-6. |
 | `ltr48_12` | Long-Term Reversal (48-12) | Cumulative return months $t-47$ to $t-12$. Uses expanding window starting at 12-3, ramping to 48-12. |
-| `iltr24_3` | Industry LTR (24-3) | Equal-weighted average 24-3 LTR of other bonds in the same FF17 industry. |
-| `iltr30_6` | Industry LTR (30-6) | Equal-weighted average 30-6 LTR of other bonds in the same FF17 industry. |
-| `iltr48_12` | Industry LTR (48-12) | Equal-weighted average 48-12 LTR of other bonds in the same FF17 industry. |
-| `str` | Short-Term Reversal | Prior month return $r_{t-1}$. |
+| `iltr24_3` | Industry LTR (24-3) | The equal-weighted return of all bonds sharing its SIC code (FISD), the bond itself included, compounded over months $t-23$ to $t-3$. Uses expanding window starting at 12-3. |
+| `iltr30_6` | Industry LTR (30-6) | The equal-weighted return of all bonds sharing its SIC code (FISD), the bond itself included, compounded over months $t-29$ to $t-6$. Uses expanding window starting at 12-3, ramping to 30-6. |
+| `iltr48_12` | Industry LTR (48-12) | The equal-weighted return of all bonds sharing its SIC code (FISD), the bond itself included, compounded over months $t-47$ to $t-12$. Uses expanding window starting at 12-3, ramping to 48-12. |
+| `str` | Short-Term Reversal | The return over month $t$, the most recent month and the one the momentum signals skip, measured with the signal gap. The unadjusted twin `str_mmn` is `ret_vw` itself. |
 
 ---
 
@@ -1248,26 +1248,26 @@ write them and nothing downstream requires them.
 
 ### Momentum and Reversal Signals
 
-All momentum and reversal signals are computed from monthly bond returns. Signals follow the L-S convention: sum returns from month $t-L+1$ to $t-S$ (skipping the most recent $S$ months).
+All momentum and reversal signals are computed from monthly bond returns. Signals follow the L-S convention, covering months $t-L+1$ to $t-S$ (skipping the most recent $S$ months). Momentum and long-term reversal are compounded returns over that window. Systematic and idiosyncratic momentum are sums of fitted values and of residuals, as their section says.
 
 #### Standard Momentum
 
 Cumulative past returns over various horizons (Gebhardt, Hvidkjaer & Swaminathan, 2005):
 
-$$\text{mom}_{L,S} = \sum_{s=S}^{L-1} r_{i,t-s}$$
+$$\text{mom}_{L,S} = \prod_{s=S}^{L-1} (1 + r_{i,t-s}) - 1$$
 
 | Variable | Formula | Description |
 |----------|---------|-------------|
-| `mom3_1` | $\sum_{s=1}^{2} r_{t-s}$ | 3-month momentum, skip 1 |
-| `mom6_1` | $\sum_{s=1}^{5} r_{t-s}$ | 6-month momentum, skip 1 |
-| `mom9_1` | $\sum_{s=1}^{8} r_{t-s}$ | 9-month momentum, skip 1 |
-| `mom12_1` | $\sum_{s=1}^{11} r_{t-s}$ | 12-month momentum, skip 1 |
+| `mom3_1` | $\prod_{s=1}^{2} (1 + r_{t-s}) - 1$ | 3-month momentum, skip 1 |
+| `mom6_1` | $\prod_{s=1}^{5} (1 + r_{t-s}) - 1$ | 6-month momentum, skip 1 |
+| `mom9_1` | $\prod_{s=1}^{8} (1 + r_{t-s}) - 1$ | 9-month momentum, skip 1 |
+| `mom12_1` | $\prod_{s=1}^{11} (1 + r_{t-s}) - 1$ | 12-month momentum, skip 1 |
 
 #### Intermediate Momentum
 
 Momentum computed from months 7-12, excluding recent returns (Novy-Marx, 2012):
 
-$$\text{mom12-7}_{i,t} = \sum_{s=7}^{11} r_{i,t-s}$$
+$$\text{mom12-7}_{i,t} = \prod_{s=7}^{11} (1 + r_{i,t-s}) - 1$$
 
 | Variable | Description |
 |----------|-------------|
@@ -1302,21 +1302,21 @@ Cumulative past returns over longer horizons, excluding recent months:
 
 **Primary measure** (Bali, Subrahmanyam & Wen, 2021):
 
-$$\text{ltr48-12}_{i,t} = \sum_{s=12}^{47} r_{i,t-s}$$
+$$\text{ltr48-12}_{i,t} = \prod_{s=12}^{47} (1 + r_{i,t-s}) - 1$$
 
 **Alternative windows** (Subrahmanyam, 2023):
 
 | Variable | Formula | Description |
 |----------|---------|-------------|
-| `ltr48_12` | $\sum_{s=12}^{47} r_{t-s}$ | 48-month LTR, skip 12 |
-| `ltr30_6` | $\sum_{s=6}^{29} r_{t-s}$ | 30-month LTR, skip 6 |
-| `ltr24_3` | $\sum_{s=3}^{23} r_{t-s}$ | 24-month LTR, skip 3 |
+| `ltr48_12` | $\prod_{s=12}^{47} (1 + r_{t-s}) - 1$ | 48-month LTR, skip 12 |
+| `ltr30_6` | $\prod_{s=6}^{29} (1 + r_{t-s}) - 1$ | 30-month LTR, skip 6 |
+| `ltr24_3` | $\prod_{s=3}^{23} (1 + r_{t-s}) - 1$ | 24-month LTR, skip 3 |
 
 #### Industry Momentum and Reversal
 
-Cross-bond momentum spillovers within the same industry (Wang, Wu & Yang, 2024). For each bond, computes the equal-weighted average momentum/reversal of other bonds in the same industry:
+Cross-bond momentum spillovers within the same industry (Wang, Wu & Yang, 2024). The industry is the bond's SIC code in FISD. Each month the industry return $\bar r_{k,t}$ is the equal-weighted return of every bond with SIC code $k$, the bond itself included, and the signal compounds it over the window:
 
-$$\text{imom}_{i,t} = \frac{1}{N_{ind}-1} \sum_{j \in \text{ind}(i), j \neq i} \text{mom}_{j,t}$$
+$$\text{imom}^{L,S}_{i,t} = \prod_{s=S}^{L-1} \left(1 + \bar r_{\text{sic}(i),t-s}\right) - 1$$
 
 | Variable | Description |
 |----------|-------------|
@@ -1336,7 +1336,7 @@ at least 12 months (Bai, Bali & Wen, 2019):
 
 | Variable | Description |
 |----------|-------------|
-| `str` | Short-term reversal (past month return) |
+| `str` | Short-term reversal (the month-$t$ return, measured with the signal gap) |
 
 **Value-at-Risk and Expected Shortfall:**
 

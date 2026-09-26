@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-09-26
+
+**Stages 2-4 run on PyBondLab 0.3.0 from PyPI, and Stage 4 builds the TRACE-only bond factors
+openbondassetpricing.com publishes.** Every sort in Stage 3 runs one way, on the installed
+release. The local stages install in two lines on Python 3.11 to 3.13.
+
 Found by reproducing the published 2026 panel from a fresh checkout of the 2026-09-21 WRDS run,
-exactly as a user would. Each fix carries a test.
+exactly as a user would, and by a final review before release. Each fix carries a test.
 
 ### Fixed -- Stage 2
 - `--factor-source pinned`, the documented way to reproduce a published panel, refused to start:
@@ -25,8 +31,8 @@ exactly as a user would. Each fix carries a test.
   them every time.
 - A column-contract test failed on every build that skipped the optional excess-blocks step.
 - Reproducing the published 2026 panel this way gives identical values in all but six liquidity
-  columns (`cs_sprd`, `spd_rel`, `spd_abs`, `ar_sprd`, `p_fht`, `vov`), which differ by at most
-  5.7e-14 on 131-213 rows: DuckDB sums across threads in varying order. Documented in
+  columns (`cs_sprd`, `spd_rel`, `spd_abs`, `ar_sprd`, `p_fht`, `vov`), which differ by less
+  than 1e-13 on a few hundred rows: DuckDB sums across threads in varying order. Documented in
   `stage2/AGENTS.md`.
 
 ### Fixed -- Stage 3
@@ -104,7 +110,7 @@ A full audit of every guide against the code and the 2026-09-21 run followed. Wh
   2026-09-12.
 - Table IA.VIII described `var_90`, `var_95` and `es_90` as measures of daily returns. They are
   computed from monthly returns, over 36 months with at least 12. The three rows are corrected,
-  with the printed text kept beside them (sixteen corrected rows now).
+  with the printed text kept beside them.
 - `STAGE0_WORKERS` applied to every stage 0 member, but the connection check and the `qsub`
   request ignored it: `STAGE0_WORKERS=4` held 8 connections against a ceiling of 7 and passed.
   Both now see it.
@@ -114,6 +120,63 @@ A full audit of every guide against the code and the 2026-09-21 run followed. Wh
   inputs `download_inputs.sh` fetches say what the code does. A live check of a private
   database is gone from `stage2/check_external_data.py`.
 
+### Fixed -- found by a final review before release
+- `download_inputs.sh` downloaded with `wget -O FILE`, which empties FILE before the download
+  starts, so one failed re-run replaced a good input with an empty one, and its final check
+  asked only whether each file existed. Stage 1 then failed hours later on the grid. Each file
+  now downloads beside its destination and is moved into place only when it arrived whole (a
+  zip must also open); the final check refuses an empty file; a linker that fails its own
+  `verify_release.py` stops the run and shows why. `tests/test_download_inputs.py`, 5 tests.
+- Stage 2 recognises the Stage 1 file published for download, which withholds the licensed
+  columns, and says so. It used to report "missing 6 column(s)", which read as an older release.
+- `run_stage3.sh` checked all five inputs before any run, so `--section nse` stopped without the
+  Stage 1 daily file it never reads, and `--help` and `--list` failed on a fresh clone. It now
+  checks the inputs the run reads (`tools/check_inputs.py --section`), and not at all for
+  `--help`, `--list` or `--dry-run`.
+- `run_stage4.sh --help` went on to run the comparison, and `--sort=single` was not read.
+- `stage4/compare_published.py` re-used its download of the published files for ever. It now
+  re-downloads when the release serves different bytes (GitHub's sha256 for the asset), and says
+  plainly when a vintage has nothing published yet.
+- Stage 2's shell wrappers defaulted to `python3`, which a Windows virtual environment does not
+  have. They now run `python`, or `PY` when it is set, as Stages 3 and 4 do; `PYTHON` is still
+  read. `run_stage2.sh` now reports the exit code of a failed build.
+- `run_smoke_test.sh` deletes the folder `--root` names. It now refuses one holding files an
+  earlier smoke run did not make, and `--help` prints every option.
+- `--help` crashed with `UnicodeEncodeError` on a Windows console when redirected, in
+  `make_excess_blocks.py`, `s2_lab/run_lab.py` and `s3_nse/t18_portfolio_size.py`.
+- `stage2/lib/nyse_calendar.py` built a unit-less `NaT`, which numpy 2 deprecates; the calendar
+  is unchanged.
+- Table IA.VIII: `str` is the return over month $t$, the month the momentum signals skip,
+  measured with the signal gap, not $r_{t-1}$ as printed. On the 2026 panel it correlates 0.90
+  with `ret_vw` on the same row and -0.04 with the row before.
+- Table IA.VIII: the six industry signals (`imom1`, `imom3_1`, `imom12_1`, `iltr24_3`,
+  `iltr30_6`, `iltr48_12`) are the equal-weighted return of every bond sharing the bond's FISD
+  SIC code, the bond itself included, compounded over the window. The printed rows said the
+  average signal of OTHER bonds in the same FF17 industry. With `str` and `mom3_1`'s wording,
+  23 rows now differ from the printed table (`stage3/RECONCILIATION_ia08.md`). `stage2/DATA_DICTIONARY.md` now also gives the momentum
+  signals as compounded returns, as the code computes them.
+- `requirements-local.txt` installs pytest, so the documented test command runs after the
+  documented install.
+- Stages 2-4 need Python 3.11 to 3.13: on 3.14 the `wrds` package's cap on pandas cannot be met.
+  The documentation said "3.11 or newer".
+- The Stage 2 data report was titled "The Corporate Bond Factor Replication Crisis: New
+  Protocols", the paper's title. It is now "Stage 2 TRACE Monthly Data Report", like the others.
+- `stage4/build_factors.py --return-types` with fewer than the four types wrote a partial grid over
+  the full product, which `run_stage4.sh` then compared with the published files and reported as
+  different. A partial grid now goes to `output/_subset`, like `--signals`, and is not compared.
+- `stage4/compare_published.py` now says plainly when it cannot reach the release, and reports a
+  missing vintage only on a 404.
+- `download_inputs.sh` checks that the Liu-Wu `.xlsx` opens as the zip an `.xlsx` is, so an error
+  page answered with 200 no longer replaces a good file.
+- The BBW bundle's README names the six month-ends its extended table has no row for, says that
+  before 2002-08 its credit risk factor averages two sorts (the illiquidity sort needs
+  transaction prices), and gives the command that checks the bundle. Its `PROVENANCE.json`
+  labels the original series' hash as taken over LF line endings.
+- The Stage 2 data report's Table 1 note gives the non-investment-grade range as BB+ to C (it
+  said CCC-).
+- `run_smoke_test.sh --root` compares real paths, so `--root smoke` is the default folder; it
+  refuses a file, and it refuses before it creates anything.
+
 ### Changed -- PyBondLab 0.3.0 from PyPI
 - Stages 2-4 run on PyBondLab 0.3.0 from PyPI, named once in `pybondlab_pin.py`. Checked on the
   2026-09-21 run on 2026-09-26: Stage 2's eleven BBW factors and their `_bns`/`_cls` twins are
@@ -122,7 +185,7 @@ A full audit of every guide against the code and the 2026-09-21 run followed. Wh
 - The requirements are split. `requirements.txt` is what Stages 0 and 1 install on WRDS;
   `requirements-local.txt` adds numba for Stages 2-4, and PyBondLab goes in on a second line,
   `python -m pip install --no-deps pybondlab==0.3.0`, because PyBondLab declares `numpy<2` and
-  this repository installs numpy 2. Stages 2-4 need Python 3.11 or newer.
+  this repository installs numpy 2. Stages 2-4 need Python 3.11 to 3.13.
 - Stages 2, 3 and 4 check the installed PyBondLab at start-up and stop, printing the two install
   lines, if it is missing or a different version. Manifests record its version and a content
   hash.
@@ -148,17 +211,17 @@ A full audit of every guide against the code and the 2026-09-21 run followed. Wh
 
 ### Added
 - `constraints-2026.txt`: the exact package versions the published 2026 vintage was built with.
-  Installed alongside `requirements-local.txt`, a pinned Stage 2 build then equals the published
-  panel exactly in 139 of 145 columns; the other six differ in the 14th digit, as two builds on
-  one machine do.
+  Installed alongside `requirements-local.txt`, a pinned Stage 2 build, redacted as the
+  published panel was, then equals it exactly in 139 of 145 columns; the other six differ in the
+  14th digit, as two builds on one machine do.
 - **Stage 4: the TRACE-only bond factors** published on openbondassetpricing.com, built from the
   Stage 2 panel: 108 signals as single and within-firm sorts, four return types (excess, and
   duration-adjusted against `tret`, `tret_bns` and `tret_cls`), three rating bands, unflipped,
   with the flip set, a manifest and the wide CSVs. `compare_published.py` downloads the published
   files and compares them cell by cell. On the 2026-09-21 run every one of 4,354,560 rows matches
   the OSBAP build of that run (`stage4/README_stage4.md`).
-- `AGENTS.md` (read by Codex) and `CLAUDE.md` (read by Claude Code) at the root and in `stage2/`
-  and `stage3/`: how to run the local stages with an AI assistant -- the commands in order, the
+- `AGENTS.md` (read by Codex) and `CLAUDE.md` (read by Claude Code) at the root and in `stage2/`,
+  `stage3/` and `stage4/`: how to run the local stages with an AI assistant -- the commands in order, the
   one choice that changes the numbers (the factor source), what "done" means, and the traps.
   The root file also covers stages 0 and 1 on WRDS.
 - `INDEX.md`, which doc answers which question, and `CODE_MAP.md`, what each stage reads and
@@ -694,8 +757,8 @@ every run, on the machine the defaults were chosen for.
 ## [3.1.0] - 2026-09-11
 
 **Public-readiness.** Stages 0-2 were complete but the repository was not something to hand a
-stranger: it named a private repository, carried a personal WRDS account, cited three dozen
-documents that do not exist here, and shipped two scripts that fail on a fresh clone. This
+stranger: it pointed at material that is not distributed, cited three dozen documents that
+do not exist here, and shipped two scripts that fail on a fresh clone. This
 release is that clean-up, plus the sample-end fix the 2026 vintage needed.
 
 ### Added
@@ -779,10 +842,10 @@ release is that clean-up, plus the sample-end fix the 2026 vintage needed.
   repository cannot build -- their external filenames, a frontier pin and a pre-2002 coverage
   gate with no code path here. What replaced it is more useful to a public reader: the
   column-input classification above.
-- **Pointers a reader cannot follow** -- a private repository and two files inside it, an
-  internal handover document, an assumptions ledger, a debug log, line-number citations into a
-  reference implementation that is not distributed, and the internal gate IDs. The substance
-  stays; the coordinates do not. Also a personal WRDS account and login hostname.
+- **Pointers a reader cannot follow** -- files outside this repository, an internal handover
+  document, an assumptions ledger, a debug log, line-number citations into a reference
+  implementation that is not distributed, and the internal gate IDs. The substance stays; the
+  coordinates do not.
 
 ---
 
@@ -1229,8 +1292,8 @@ than run locally, which is the only way it is meant to be used on WRDS:
 
 ### Documentation
 - Repository structure listings in `README.md` and `QUICKSTART.md` rebuilt against the
-  actual file list. They had drifted: both showed `stage0/QUICKSTART_stage0.md` and
-  `stage1/requirements.txt`, neither of which exists, and neither listed `config.py`,
+  actual file list. They had drifted: both showed a Stage 0 quickstart named `QUICKSTART_stage0`
+  and a `requirements.txt` in `stage1/`, neither of which exists, and neither listed `config.py`,
   `FAQ.md`, `stage1/stage1_pipeline.py` or `stage1/DATA_DICTIONARY.md`.
 - **`run_all_trace.sh` no longer exists but was still referenced 23 times** across the
   FAQ and both stage-0 guides. Replaced with `run_pipeline.sh` throughout.

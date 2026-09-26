@@ -21,6 +21,7 @@ import argparse
 import io
 import json
 import sys
+import urllib.error
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -38,19 +39,88 @@ KEYS = ["date", "factor", "leg", "weighting", "rating_type", "return_type"]
 VALUES = ["return", "turnover", "count"]
 
 
+def _served_digest(url: str) -> tuple[str, str] | None:
+    """What the release serves now: ("sha256", hex) from GitHub's release API, else
+    ("bytes", size) from the download itself, else None when neither can be asked (offline).
+
+    Size alone is weak -- a rebuilt file can come out the same length -- so the API's digest
+    is asked first."""
+    import re
+    m = re.match(r"https://github\.com/([^/]+)/([^/]+)/releases/download/([^/]+)/(.+)$", url)
+    if m:
+        owner, repo, tag, name = m.groups()
+        api = f"https://api.github.com/repos/{owner}/{repo}/releases/tags/{tag}"
+        try:
+            with urllib.request.urlopen(api, timeout=60) as r:
+                for a in json.load(r).get("assets", []):
+                    if a.get("name") == name and str(a.get("digest", "")).startswith("sha256:"):
+                        return "sha256", a["digest"].split(":", 1)[1]
+        except (urllib.error.URLError, OSError, ValueError):
+            pass
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, method="HEAD"), timeout=60) as r:
+            n = r.headers.get("Content-Length")
+            return ("bytes", n) if n else None
+    except (urllib.error.URLError, OSError, ValueError):
+        return None
+
+
+def _local_digest(p: Path, kind: str) -> str:
+    if kind == "bytes":
+        return str(p.stat().st_size)
+    import hashlib
+    h = hashlib.sha256()
+    with p.open("rb") as f:
+        for chunk in iter(lambda: f.read(1 << 22), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
 def fetch(sort: str, vintage: str, refresh: bool) -> Path:
+    """The published archive, from the cache when it is still what the release serves.
+
+    ❗A cached copy is re-used only while it matches what the release serves. The release is
+    replaced when a vintage is republished, and a cache kept for ever compared a build with
+    files that were no longer online: a run on 2026-09-26 reported DIFFERS against a copy
+    downloaded before the release was refreshed.
+    """
     url = S.SPEC["published"][sort].format(vintage=vintage)
     cache = S.OUTPUT / "_published" / url.rsplit("/", 1)[1]
     if cache.exists() and not refresh:
-        return cache
+        served = _served_digest(url)
+        if served is None:
+            print(f"  using the copy downloaded {_mtime(cache)} (could not reach the release "
+                  "to check it is current)")
+            return cache
+        if _local_digest(cache, served[0]) == served[1]:
+            return cache
+        print("  the release has changed since the cached copy was downloaded")
     cache.parent.mkdir(parents=True, exist_ok=True)
     print(f"  downloading {url}", flush=True)
     tmp = cache.with_suffix(".part")
-    with urllib.request.urlopen(url, timeout=300) as r, open(tmp, "wb") as fh:
-        while chunk := r.read(1 << 20):
-            fh.write(chunk)
+    try:
+        with urllib.request.urlopen(url, timeout=300) as r, open(tmp, "wb") as fh:
+            while chunk := r.read(1 << 20):
+                fh.write(chunk)
+    except urllib.error.HTTPError as e:
+        tmp.unlink(missing_ok=True)
+        if e.code == 404:
+            raise SystemExit(
+                f"ERROR: {url} is not there.\n"
+                f"  Nothing is published for vintage {vintage} yet, so there is nothing to "
+                "compare with. Pass --published <file> to compare with a local copy.") from None
+        raise SystemExit(f"ERROR: {url} answered {e.code}. Try again later.") from None
+    except (urllib.error.URLError, OSError) as e:
+        tmp.unlink(missing_ok=True)
+        raise SystemExit(f"ERROR: could not download {url} ({e}).\n"
+                         "  Check the connection, or pass --published <file>.") from None
     tmp.replace(cache)
     return cache
+
+
+def _mtime(p: Path) -> str:
+    import datetime as _dt
+    return _dt.datetime.fromtimestamp(p.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
 
 
 def read_published(path: Path, sort: str) -> tuple[pd.DataFrame, dict | None]:

@@ -103,8 +103,9 @@ python -m pip install --user -r requirements.txt
 
 **Alternative - Virtual environment (optional):**
 ```bash
-# Create virtual environment in project root
-python3 -m venv venv
+# Create virtual environment in project root. --system-site-packages keeps the WRDS
+# Cloud's own pandas 2.2 visible: pip has no build of it for the Cloud's Python 3.14.
+python3 -m venv --system-site-packages venv
 source venv/bin/activate
 python -m pip install -r requirements.txt
 ```
@@ -355,7 +356,7 @@ files you just downloaded. Its first run connects to WRDS once, to fetch and cac
 series (CRSP Treasury returns, Fama-French factors, VIX and FISD coupon terms), so it needs
 your WRDS username, in `config.py` or `export WRDS_USERNAME=...`; later runs read the cache.
 
-First install the requirements for stages 2-4 there, in Python 3.11 or newer, with two lines:
+First install the requirements for stages 2-4 there, in Python 3.11 to 3.13, with two lines:
 
 ```bash
 cd trace-data-pipeline          # the folder you just unzipped
@@ -377,7 +378,8 @@ python _run_stage2.py               # the full build, ~8-18 minutes on 24 cores
 
 To reproduce a published panel exactly, add `--factor-source pinned`: it uses the factor file
 published with your vintage instead of rebuilding it from public sources that revise their
-history. See [stage2/QUICKSTART_stage2.md](stage2/QUICKSTART_stage2.md). To match it to the last digit, also install the exact package versions it was built with:
+history. See [stage2/QUICKSTART_stage2.md](stage2/QUICKSTART_stage2.md). To match it exactly in 139 of 145 columns, the other six within 1e-13, also install the exact
+package versions it was built with:
 `python -m pip install -r requirements-local.txt -c constraints-2026.txt`, which the file
 explains.
 
@@ -392,6 +394,7 @@ published file.
 To package a vintage for distribution:
 
 ```bash
+python make_excess_blocks.py --mode stage1 --benchmark all   # the blocks the release packs
 python make_release.py              # the stage1 build; --mode <mode> for another
 ```
 
@@ -405,6 +408,7 @@ to WRDS.
 
 ```bash
 cd ../stage3 && bash run_stage3.sh   # the paper's 33 tables and 11 figures, ~15-20 min
+cd ../stage2 && python make_excess_blocks.py --mode stage1 --benchmark all   # Stage 4 reads these
 cd ../stage4 && bash run_stage4.sh   # the TRACE-only bond factors, then the check against
                                      # the published files, ~8 min
 ```
@@ -534,7 +538,7 @@ git clone https://github.com/Alexander-M-Dickerson/trace-data-pipeline.git
 cd trace-data-pipeline
 nano config.py  # Set WRDS_USERNAME
 
-# Install dependencies (Stage 1 only)
+# Install dependencies (Stages 0 and 1)
 python -m pip install --user -r requirements.txt
 
 # Fetch stage 1's external inputs (login node) and check the chain end to end

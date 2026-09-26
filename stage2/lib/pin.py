@@ -31,7 +31,7 @@ from lib import nyse_calendar
 # v2: + prc_vw_par, prc_ew (step-1 return types ret_vwp / ret_ew)
 # v3: + frn (input file_row_number) carried through, and ALL per-cusip windows tie-break on it --
 #     needed for the one bond whose whole tape is duplicated (dup (cusip,date) twins): pandas'
-#     near-sorted sorts preserve raw file order on ties, so window lags/lst_txn must too (debug M10)
+#     near-sorted sorts preserve raw file order on ties, so window lags/lst_txn must too
 PIN_VERSION = 3
 
 

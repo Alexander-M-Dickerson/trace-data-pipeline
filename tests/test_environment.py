@@ -26,11 +26,11 @@ def test_a_wrong_or_missing_pybondlab_gets_the_two_install_lines(monkeypatch):
 
 
 def test_the_pinned_pybondlab_passes(monkeypatch):
+    """In an environment installed as documented. A missing numba or numexpr FAILS here, with
+    the message a user would see: an environment that lacks them is not the documented one."""
     monkeypatch.setattr(pybondlab_pin, "installed_version", lambda: pybondlab_pin.VERSION)
-    import importlib.util
-    if any(importlib.util.find_spec(p) is None for p in ("numba", "numexpr")):
-        return                     # the missing-package branch is the message's job, tested above
-    assert pybondlab_pin.check() is None
+    msg = pybondlab_pin.check()
+    assert msg is None, msg
 
 
 def test_pandas_computes_as_the_published_build_did():

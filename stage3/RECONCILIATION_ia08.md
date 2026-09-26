@@ -10,9 +10,9 @@ does not describe what the code does is wrong however carefully it was written, 
 only way to find out is to open the function.
 
 Stage 3 now generates the table from `spec/signal_definitions.json`
-(`s4_zoo/t_ia08.py`). Sixteen rows there differ from the printed table; each carries
-`paper_prints` and `why_corrected`, is marked `†` in the rendered table, and is listed
-below. `python s4_zoo/t_ia08.py --diffs` prints them.
+(`s4_zoo/t_ia08.py`). Twenty-three rows there differ from the printed table; each carries
+`why_corrected` and what was printed (`paper_prints`, or `paper_prints_citation` where only
+the citation changed), is marked `†` in the rendered table, and is listed below. `python s4_zoo/t_ia08.py --diffs` prints them.
 
 ---
 
@@ -26,14 +26,12 @@ below. `python s4_zoo/t_ia08.py --diffs` prints them.
 | in the contract but not in IA.VIII | **none** |
 | Stage 3's 108 sorted signals missing a definition | **none** |
 | of the 145, undocumented in `stage2/DATA_DICTIONARY.md` | **none** |
-| citation keys in IA.VIII not resolvable in the paper's `references.bib` | **none** |
+| citation keys in IA.VIII without an entry in the reference list (`stage2/_report_helpers.get_references_bib`) | **none** |
 | cluster memberships, paper vs `zoo_engine.CLUSTERS` vs `s3_nse/clusters.py` | **identical** |
 
 145 = 108 sorted signals + 37 identifiers, returns and characteristics. Every signal
-Stage 3 sorts has a definition, and a test asserts it. The count was 140 when this
-reconciliation was first run (2026-09-12); the five alternative Treasury benchmarks
-(`tret_bns`, `tret_cfm`, `tret_gprs`, `tret_cls`, `tret_mat`) joined the panel on 2026-09-14
-and carry no citation.
+Stage 3 sorts has a definition, and a test asserts it. The five alternative Treasury
+benchmarks (`tret_bns`, `tret_cfm`, `tret_gprs`, `tret_cls`, `tret_mat`) carry no citation.
 
 **The discrepancies are all in prose, definitions and citations.** None is a missing or
 extra variable, and none changes which signals are sorted.
@@ -62,16 +60,11 @@ Both add to 108, which is why nothing caught it: −1 −1 −1 +3 = 0. Any chec
 total would have passed. The *table* is the one Stage 3 and Stage 2 agree with, and it is
 the one the sorts actually use.
 
-**Fixed in the paper on 2026-09-12** — four digits in each of `main.tex` (lines 2062,
-2065, 2077, 2080) and `internet-appendix.tex` (547, 550, 562, 565), which carry the same
-nine sentences. Nothing else changed, and all three PDFs rebuild at their expected page
-counts (main-ms 53, internet-appendix 38, main 94).
-
-Only the digits needed changing. The prose descriptions are **compressed throughout**,
-not enumerations — cluster II describes 5 signals in 2 clauses, V covers 16 in 11, IX
-covers 18 in 7 — so although cluster IV's sentence names twelve things for thirteen
-members (`ilq`, Roll Autocovariance, goes unnamed), that is the same house style as
-every other cluster and not a second defect.
+Only the counts are wrong. The prose descriptions are **compressed throughout**, not
+enumerations — cluster II describes 5 signals in 2 clauses, V covers 16 in 11, IX covers
+18 in 7 — so although cluster IV's sentence names twelve things for thirteen members
+(`ilq`, Roll Autocovariance, goes unnamed), that is the same house style as every other
+cluster and not a second defect.
 
 ---
 
@@ -82,16 +75,16 @@ This is the one that matters. `dcs6` is an FDR survivor.
 | source | says |
 |---|---|
 | the paper | "±2 month band, with **+** favored over **−**" |
-| `stage2/DATA_DICTIONARY.md`, Cluster I table | "searches with **±1** month bandwidth" (no tie-break stated, as first read) |
+| `stage2/DATA_DICTIONARY.md`, Cluster I table | "searches with **±1** month bandwidth", with no tie-break stated |
 | **the code** | `DSPREAD_BANDWIDTH = 1`; `offsets = [0, -1, +1]` |
 
-`DSPREAD_BANDWIDTH` in `_stage2_settings.py` sets the bandwidth to 1. `lib/value.py:779-781` builds the
-search order as `[0]` then `[-j, +j]` for `j` in `1..bandwidth`, and `lib/value.py:816`
-takes the first hit. So the search is **one month either side**, and when both are
-available it takes the **earlier** month — the longer lag — not the later one.
+`DSPREAD_BANDWIDTH` in `_stage2_settings.py` sets the bandwidth to 1. `lib/value.py` builds
+the search order as `[0]` then `[-j, +j]` for `j` in `1..bandwidth`, and takes the first
+hit. So the search is **one month either side**, and when both are available it takes the
+**earlier** month — the longer lag — not the later one.
 
 The paper is wrong in the width *and* backwards in the direction. Stage 2's dictionary
-has the width right and is silent on the tie-break.
+had the width right and was silent on the tie-break.
 
 **Fixed here**: the spec states ±1, earlier month first. Stage 2's dictionary now states
 the tie-break too ("taking the EARLIER month first"), since a reader who needs the band
@@ -113,8 +106,7 @@ contradicts itself within two lines; 21/22 is the scale the data uses.
 
 **Fixed here.**
 
-❗**Both rows also mislabel rating 21 as CCC−** (corrected 2026-09-21, which makes
-`spc_rat` the seventh corrected row; sections 5, 9, 10 and 11 add six more). On the numeric scale Stage 1 builds
+❗**Both rows also mislabel rating 21 as CCC−.** On the numeric scale Stage 1 builds
 (`stage1/helper_functions.convert_sp_to_numeric`), CCC− is 19, CC is 20, C is 21 and
 D is 22; on Moody's side Caa3 is 19, Ca is 20 and C is 21. The range was right and
 only the label on its last non-default grade was wrong. Stage 2's dictionary and report
@@ -129,9 +121,7 @@ Hvidkjaer and Swaminathan (2005), *The cross-section of expected corporate bond 
 betas or characteristics?*
 
 Bond momentum is the **other** GHS 2005 paper: *Stock and bond market interaction: does
-momentum spill over?*, same three authors, same year, same journal. It is already in
-`references.bib` as `gebhardt2005stock` — **and is cited nowhere in the paper**, which is
-the tell.
+momentum spill over?*, same three authors, same year, same journal (`gebhardt2005stock`).
 
 `ytm`, `b_termb` and `b_defb` cite `gebhardt2005cross` correctly; that paper is about
 betas and characteristics.
@@ -142,9 +132,7 @@ betas and characteristics.
 
 ## 5. `lib` looks forward and `igap_bgn` looks back, on the same row
 
-Read on 2026-09-12 as one object under two indexing conventions, and left alone. Checked
-against the data on 2026-09-21, that reading was wrong about `igap_bgn`, and the two rows
-now say exactly what each column holds.
+Checked against the data, the two rows now say exactly what each column holds.
 
 | | the paper prints | what the panel holds on the row for month $t$ | rows that match |
 |---|---|---|---|
@@ -172,24 +160,15 @@ lag. Both are corrected.
 Every one of the 145 mnemonics has an entry in `stage2/DATA_DICTIONARY.md`, and every
 column of `contract.PANEL_COLUMNS` does too. No gaps either way.
 
-Worth recording how nearly this was reported as a gap: the first pass matched dictionary
-rows with `` `([A-Za-z_][A-Za-z_0-9]*)` ``, which cannot match `` `144a` `` because the
-mnemonic starts with a digit. The checker reported one missing row and the row was
-there all along, in the Bond Characteristics table. A coverage check that is wrong about its
-own alphabet reports a clean bill of health for 139 names and invents a defect in the
-140th.
-
 ---
 
 ## 7. Stage 2's dictionary has no citation column
 
-78 of the 145 rows in IA.VIII carry a citation, drawing on 37 distinct works (35 when
-first counted; the momentum correction in section 4 brought in `gebhardt2005stock`, and
-section 11 `dickerson-bayesian`).
+78 of the 145 rows in IA.VIII carry a citation, drawing on 37 distinct works.
 `stage2/DATA_DICTIONARY.md` carries none, so a reader there cannot find where a signal
 comes from without opening the paper.
 
-Not fixed — adding 36 references to a data dictionary is a judgement call about what
+Not fixed — adding the references to a data dictionary is a judgement call about what
 that document is for. Noted so the choice is deliberate.
 
 ---
@@ -216,10 +195,10 @@ cannot drift between them unnoticed.
 | source | says |
 |---|---|
 | the paper, both rows | holding period "in calendar days" |
-| `stage2/DATA_DICTIONARY.md`, the table rows | the same |
+| `stage2/DATA_DICTIONARY.md` before 3.3.0, the table rows | the same |
 | `stage2/DATA_DICTIONARY.md`, the Bond Returns section | business days between `dt_s` and `dt_e` |
-| **the code, until 2026-09-21** | NYSE sessions from `dt_s` to the CALENDAR month-end |
-| **the code, now** | NYSE sessions from `dt_s` to `dt_e` |
+| **the code before 3.3.0** | NYSE sessions from `dt_s` to the CALENDAR month-end |
+| **the code** | NYSE sessions from `dt_s` to `dt_e` |
 
 Two defects in one row. The unit was wrong everywhere it was written down: the column is
 a count of NYSE sessions, taken from the calendar lookup. And the end point was wrong in
@@ -240,7 +219,7 @@ trade follows the start trade on every one.
 observed 10 to 22. Only its text was wrong.
 
 **Fixed here**, in the code, the dictionary and the spec. The paper's Table IA.II reports
-`hprd`, so that row is recomputed with the manuscript.
+`hprd`, and Stage 3 computes that row from the corrected column.
 
 ---
 
@@ -261,18 +240,15 @@ decided here.
 
 The paper's row cites Dickerson, Mueller and Robotti (2023), *Priced risk in corporate
 bonds*. The credit spread level beta comes from Dickerson, Julliard and Mueller (2026),
-*The co-pricing factor zoo*, Journal of Financial Economics 182, 104295. Corrected by the
-author on 2026-09-21.
+*The co-pricing factor zoo*, Journal of Financial Economics 182, 104295.
 
-The Stage 2 data report cited the right paper all along. It was found when the report was
-moved onto this spec and its citation cells were diffed against the old ones: of 78 cited
-rows, this was the only one where the two documents named different work, apart from the
-four momentum rows of section 4.
+The Stage 2 data report cited the right paper all along. Of 78 cited rows, this is the
+only one where the report and the printed table named different work, apart from the four
+momentum rows of section 4.
 
-`dickerson-bayesian` was already in the paper's `references.bib`, as a 2024 working paper,
-and cited nowhere.
+**Fixed here.**
 
-**Fixed here**, and the manuscript row and its bibliography entry are corrected with it.
+---
 
 ## 12. VaR and expected shortfall are monthly, not daily
 
@@ -281,7 +257,42 @@ them from monthly ones: `stage2/steps/step6_momentum.py` passes `lib/var_es.py` 
 return panel, and the window is 36 months with at least 12 -- the "36(12)" the same sentence
 already printed.
 
-**Fixed here** (2026-09-24), in `stage2/DATA_DICTIONARY.md`, and in the manuscript rows.
+**Fixed here**, and in `stage2/DATA_DICTIONARY.md`.
+
+---
+
+## 13. `str` is the month the momentum signals skip, not the one before it
+
+| source | says |
+|---|---|
+| the paper, and `stage2/DATA_DICTIONARY.md` before 4.0.0 | prior month return, $r_{t-1}$ |
+| **the panel**, the row for month $t$ | the return over month $t$, measured with the signal gap |
+
+On the 2026 panel `str` correlates 0.90 with `ret_vw` on the same row and −0.04 with
+`ret_vw` on the row before. `mom3_1` on the same row compounds months $t-2$ and $t-1$, so
+`str` is the month the momentum signals skip, which is what a short-term reversal signal
+is. It is not identical to `ret_vw` because it is measured with the signal gap, as every
+price-based signal in the main panel is. Its unadjusted twin, `str_mmn` in the sidecar, is
+`ret_vw` itself.
+
+**Fixed here**, and in `stage2/DATA_DICTIONARY.md`, whose momentum formulas now compound
+returns as the code does. `mom3_1`'s printed "skipping prior month" now says the month it
+skips, $t$.
+
+---
+
+## 14. The industry signals average every bond in the SIC code, the bond included
+
+| source | says |
+|---|---|
+| the paper, six rows (`imom1`, `imom3_1`, `imom12_1`, `iltr24_3`, `iltr30_6`, `iltr48_12`) | the equal-weighted average signal of OTHER bonds in the same FF17 industry |
+| **the code** | the equal-weighted return of every bond sharing the FISD `sic_code` that month, the bond itself included, compounded over the signal's window |
+
+`stage2/lib/momentum.py` groups returns by (`sic_code`, month), averages them, and compounds
+that industry return over the same windows as `mom` and `ltr`. It never groups by FF17, and it
+never leaves the bond out. So every bond in a (`sic_code`, month) group carries the same value.
+
+**Fixed here**, and in `stage2/DATA_DICTIONARY.md`.
 
 ---
 
@@ -289,11 +300,11 @@ already printed.
 
 ```bash
 cd stage3
-python s4_zoo/t_ia08.py --diffs     # the sixteen corrected rows and what settled each
+python s4_zoo/t_ia08.py --diffs     # the twenty-three corrected rows and what settled each
 python s4_zoo/t_ia08.py             # -> reports/tables/table_ia08.tex
-python -m pytest tests/ -k ia08 -q  # every sorted signal has a definition
+python -m pytest tests/ -k definition -q  # every sorted signal has a definition
 ```
 
-The spec is `spec/signal_definitions.json`. It is the paper's text with sixteen rows
+The spec is `spec/signal_definitions.json`. It is the paper's text with twenty-three rows
 corrected, each recording what was printed and why it changed — so the printed table can
 always be reconstructed from it, and no correction is silent.

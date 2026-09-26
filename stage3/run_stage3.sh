@@ -10,8 +10,28 @@ set -euo pipefail
 cd "$(dirname "$0")"
 PY=${PY:-python}
 
-echo "== checking the input contract =="
-"$PY" tools/check_inputs.py
+# The input contract, for the inputs THIS run reads: one section's with --section, all five
+# otherwise. --help, --list and --dry-run build nothing, so they go straight to the runner,
+# which still says what is missing. No arrays: bash 3.2 (macOS) and `set -u` disagree on them.
+check=1
+section=""
+prev=""
+for a in "$@"; do
+  case "$a" in
+    -h|--help|--list|--dry-run) check=0 ;;
+    --section=*) section="${a#--section=}" ;;
+  esac
+  if [[ "$prev" == "--section" ]]; then section="$a"; fi
+  prev="$a"
+done
+if [[ $check -eq 1 ]]; then
+  echo "== checking the input contract =="
+  if [[ -n "$section" ]]; then
+    "$PY" tools/check_inputs.py --section "$section"
+  else
+    "$PY" tools/check_inputs.py
+  fi
+fi
 
 echo
 echo "== running Stage 3 =="

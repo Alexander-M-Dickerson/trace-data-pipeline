@@ -47,7 +47,7 @@ def test_every_module_parses():
 
 # --------------------------------------------------------- the public boundary
 # Names a public user cannot have: private repositories and folders, and the modules and
-# constants of the private copy Stage 3 was built from. SHA-256 of each lower-cased name, so
+# constants of the code Stage 3 was ported from. SHA-256 of each lower-cased name, so
 # this file does not spell them out; matched by the root boundary test's `word_candidates`
 # (every token, every run of its parts, every pair of adjacent tokens).
 sys.path.insert(0, str(STAGE3.parent / "tests"))

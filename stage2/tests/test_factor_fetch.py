@@ -1,4 +1,4 @@
-"""test_factor_fetch.py -- the fetch-once framework behind the public factor build (W3, offline).
+"""test_factor_fetch.py -- the fetch-once framework behind the public factor build (offline).
 
 Covers lib/factor_fetch._cached: cache hit/miss/force semantics, lazy URL resolution (rotating
 vintages), the sidecar meta fingerprint, and the date-seam checks (null dates fail loudly; duplicate

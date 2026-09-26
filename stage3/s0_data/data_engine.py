@@ -96,7 +96,7 @@ def _bucket_mask(df: pd.DataFrame, col: str) -> dict[str, pd.Series]:
 
 # ---------------------------------------------------------------------------
 # Daily (IA.I, IA.II) -- all heavy lifting in DuckDB against the parquet.
-# ❗Shape matters (measured, learnings L13): 95 separate ungrouped
+# ❗Shape matters (measured): 95 separate ungrouped
 # quantile_cont aggregates in one query ran at ~2 cores and breached the
 # watchdog; ONE list-parameter quantile per variable, one query per variable,
 # runs the whole table in ~40 s (grouped 0.6 s / pooled 1.4 s per variable).

@@ -64,9 +64,11 @@ PLACEHOLDERS = {
 # Folders a reader may legitimately NAME but that must not appear as a PATH.
 PRIVATE_TREES = ("lehman-ice", "monthly_data", "Dropbox", "OneDrive")
 
-# Words that must not appear at all: private repositories and builds, and the second
-# PyBondLab path Stage 3 used to have (its flags, environment variable and helpers). SHA-256 of
-# the lower-cased word. To add one: hashlib.sha256(word.lower().encode()).hexdigest().
+# Words that must not appear at all: private repositories, builds and datasets, the author's
+# WRDS login, the paper's source files, and the second PyBondLab path Stage 3 used to have (its
+# flags, environment variable and helpers). SHA-256 of the lower-cased word. A hyphen and an
+# underscore count as the same letter, so either spelling is caught. To add one:
+# hashlib.sha256(word.lower().encode()).hexdigest().
 BANNED_WORD_DIGESTS = frozenset({
     "04ba0ac9de0f44dee32f7cd36e0e9152709854d78d5599ccad50fade36319284",
     "2adafe2386fed30974135c2860ed7b7284d63f15544f1d13fc3c200b30cdc7ba",
@@ -87,6 +89,14 @@ BANNED_WORD_DIGESTS = frozenset({
     "cffb7f6824d4d2620a4c1ef65046db58b877ac08ffbd55aef0f4f92caa3ed488",
     "d9bfd0382658b4bdc9d9728223f50cccf2aad0c4dd82fd6b4a236316910bcd4d",
     "ecce767b3f4dc8c4f002d6aa4f7612e45b43a166aa4d05c2791b9507c46388b4",
+    # added 2026-09-26, from what an adversarial read got past this list
+    "d898e36222543a96537ac800fb8304b73102c81deb27155c5fd345bcd302a224",
+    "bc9afd4d92878a2608dca20fdb6eb882649c35cba2e109358fee2cb9d056803f",
+    "5c11fe1bd5a7f2ed5c2b13dd18d9fc668891588bd071f12efe2418b5b68c33ce",
+    "cb81cbc1d9c6ac7acd52879e6ac8e57bf4e9042fe2b0ddb7a65fa06c6a1a1714",
+    "f67098301b6788c19af2853a0e5ad776fda05572b1b1224df46c42d1ad323cbb",
+    "37e964e4dcf4743b3bf941d41a527921d6068173184df92406fe1039675c5279",
+    "c483466bcf4be5925ad6f868c6706e507ce9ef8aec9470a6f4ba91816ba15ef0",
 })
 
 _TOKEN = re.compile(r"[a-z0-9_./-]+")
@@ -112,12 +122,24 @@ def word_candidates(line: str):
 
 
 def banned_words_in(line: str, digests=BANNED_WORD_DIGESTS) -> bool:
-    return any(hashlib.sha256(c.encode()).hexdigest() in digests for c in word_candidates(line))
+    """True if any candidate, or the same candidate with its hyphens read as underscores or as
+    spaces, hashes to a banned word. A digest stores ONE spelling; this catches the others."""
+    for c in word_candidates(line):
+        for v in {c, c.replace("-", "_"), c.replace("_", "-"), c.replace("-", " "),
+                  c.replace("_", " ")}:
+            if hashlib.sha256(v.encode()).hexdigest() in digests:
+                return True
+    return False
 
 # `C:\Users\<name>`, `/home/<name>`, `/Users/<name>` -- the name is captured so a
 # placeholder can be let through.
 ABS_USER = re.compile(
     r"(?:[A-Za-z]:[\\/]+Users[\\/]+|/home/|/Users/)([A-Za-z0-9._{}<>$-]+)")
+
+# A path on a lettered drive. `C:\Users\<name>` is ABS_USER's to judge (placeholders pass);
+# any other drive path -- E:\work\..., F:/data -- is the author's disk layout. The letter must
+# start a token, so `https://` is not a drive.
+DRIVE_PATH = re.compile(r"(?<![A-Za-z0-9])[A-Za-z]:[\\/]{1,2}(?!Users[\\/])[A-Za-z]")
 
 # A private tree with a path separator on one side of it.
 PRIVATE_PATH = re.compile(
@@ -142,17 +164,18 @@ PUBLIC_EMAIL_OK = re.compile(
              + [re.escape(a) for a in PUBLISHED_CONTACT]), re.I)
 
 
+def tracked_paths() -> list[str]:
+    # --others --exclude-standard: a new file is checked before `git add`, not after.
+    out = subprocess.run(["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+                         cwd=ROOT, capture_output=True, text=True, check=True).stdout
+    return sorted({r for r in out.split("\0") if r})
+
+
 def tracked_text_files() -> list[Path]:
-    out = subprocess.run(["git", "ls-files", "-z"], cwd=ROOT, capture_output=True,
-                         text=True, check=True).stdout
-    files = []
-    for rel in out.split("\0"):
-        if not rel or rel in SELF:
-            continue
-        p = ROOT / rel
-        if p.suffix.lower() in TEXT_SUFFIXES and p.is_file():
-            files.append(p)
-    return sorted(files)
+    """EVERY tracked file, whatever its suffix: `.gitignore` and `LICENSE` have none, and a
+    notebook or a spreadsheet added later would not be on any list of text suffixes. Binary
+    content is decoded with replacement, so a name inside it is still read."""
+    return [ROOT / rel for rel in tracked_paths() if rel not in SELF and (ROOT / rel).is_file()]
 
 
 def _scan(text: str) -> list[tuple[int, str, str]]:
@@ -164,6 +187,8 @@ def _scan(text: str) -> list[tuple[int, str, str]]:
                 hits.append((i, f"absolute home directory ({m.group(1)})", line))
         if PRIVATE_PATH.search(line):
             hits.append((i, "a path into a private sibling repository", line))
+        if DRIVE_PATH.search(line):
+            hits.append((i, "a path on the author's drive", line))
         for m in IDENTITY.finditer(line):
             if not PUBLIC_EMAIL_OK.search(m.group(0)):
                 hits.append((i, f"a personal identity ({m.group(0)})", line))
@@ -178,10 +203,7 @@ def test_no_private_paths_or_identities_anywhere_tracked():
 
     bad = []
     for p in files:
-        try:
-            text = p.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
-            continue
+        text = p.read_bytes().decode("utf-8", errors="replace")
         for ln, why, line in _scan(text):
             bad.append(f"{p.relative_to(ROOT).as_posix()}:{ln}: {why}\n      {line.strip()[:110]}")
 
@@ -190,7 +212,82 @@ def test_no_private_paths_or_identities_anywhere_tracked():
         + "\n  ".join(bad))
 
 
+def test_no_tracked_file_or_folder_is_named_for_something_private():
+    """The contents are scanned above. A NAME is published too, in every listing of the repo."""
+    bad = [rel for rel in tracked_paths()
+           if rel not in SELF and (banned_words_in(rel) or PRIVATE_PATH.search("/" + rel))]
+    assert not bad, f"tracked paths named for something private: {bad}"
+
+
+# ---------------------------------------------------------------- pointers a reader cannot follow
+# A file name in this repository must name a file IN it. The exceptions live elsewhere by
+# design, and say where. Found three times before this existed: a private linker contract, the
+# paper's LaTeX sources, and notes files from the private build.
+FILES_THAT_LIVE_ELSEWHERE = {
+    "verify_release.py": "ships inside each published release archive",
+    "SCHEMA.md": "ships inside the bond-firm linker bundle",
+    "extract.py": "PyBondLab's own module",
+    "illiq_helper_functions.py": "in the reference build a maintainer points STAGE2_REFERENCE_ROOT at",
+    "resource_tracker.py": "Python's own module, quoted in a traceback",
+}
+# A bare name or one written as a path (`docs/CONTRACTS.md`); the last part is what is checked.
+_FILE_REF = re.compile(r"(?<![\w/.*-])((?:[\w.-]+/)*[A-Za-z_][\w-]*\.(?:py|md))\b")
+# Item codes of private notes: "debug M10", "learnings L13", "upstream lines 232-355".
+_NOTE_CODE = re.compile(r"\b(?:debug(?:\.md)?|learnings)\s+[A-Z]\d+\b|perf_learnings\w*"
+                        r"|\bupstream lines\s+\d+|\(lines\s+\d{3,}-\d{3,}", re.I)
+
+
+def unfollowable(text: str, present: set[str]) -> list[tuple[int, str]]:
+    """(line, what) for every file name that is not in the repository, and every note code."""
+    hits = []
+    # LaTeX writes _ as \_, and inside a Python string as \\_: either way it is an underscore.
+    for i, line in enumerate(re.sub(r"\\+_", "_", text).splitlines(), 1):
+        for m in _FILE_REF.finditer(line):
+            name = m.group(1).rsplit("/", 1)[-1]
+            if name not in present and name not in FILES_THAT_LIVE_ELSEWHERE:
+                hits.append((i, f"names {m.group(1)}, which is not in this repository"))
+        for m in _NOTE_CODE.finditer(line):
+            hits.append((i, f"a private note's code ({m.group(0)})"))
+    return hits
+
+
+def test_every_file_a_tracked_file_names_is_in_the_repository():
+    present = {Path(r).name for r in tracked_paths()}
+    bad = []
+    for rel in tracked_paths():
+        if rel in SELF or not rel.endswith((".py", ".md", ".sh", ".txt", ".json")):
+            continue
+        text = (ROOT / rel).read_text(encoding="utf-8", errors="replace")
+        bad += [f"{rel}:{i}: {why}" for i, why in unfollowable(text, present)]
+    assert not bad, "pointers a public reader cannot follow:\n  " + "\n  ".join(bad)
+
+
+@pytest.mark.parametrize("line", [
+    "#   cfg.LINKER_WINDOW; its authority is the linker's own contract (CONTRACTS.md s4).",
+    "# monthly_pi_fast (upstream lines 232-355)",
+    "       -- NULL count into 0.0 (bit us on p_zro_adj -- debug.md M10)",
+    "# Shape matters (measured, learnings L13): 95 separate ungrouped",
+    '"""momentum.py -- from the reference implementation (lines 6227-6356)."""',
+    "see docs/CONTRACTS.md s4",
+    "as recorded in lewellen/LEARNINGS.md",
+])
+def test_the_pointer_guard_fires_on_what_it_was_built_from(line):
+    assert unfollowable(line, {"momentum.py"}), f"not caught: {line}"
+
+
+@pytest.mark.parametrize("line", [
+    "see stage2/README_stage2.md and _run_stage2.py",
+    r"set in the \texttt{\_trace\_settings.py} script",
+    "- **`_run_*_trace.py` had no `__main__` guard**",
+    "the linker bundle's own SCHEMA.md, which ships inside the zip",
+])
+def test_the_pointer_guard_leaves_real_files_alone(line):
+    present = {"README_stage2.md", "_run_stage2.py", "_trace_settings.py"}
+    assert not unfollowable(line, present), unfollowable(line, present)
+
+
 @pytest.mark.parametrize("line,why", [
+    (r"SRC = r'E:\work\build-2030-01-01\stage2'", "a path on another drive"),
     (r'PANEL = r"C:\Users\jsmith\Documents\panel.parquet"', "a real home directory"),
     ('PANEL = "/home/jsmith/data/panel.parquet"', "a real home directory"),
     (r'SRC = r"..\..\lehman-ice\unified-panel\outputs"', "a private sibling repo path"),
@@ -217,8 +314,19 @@ def test_the_word_guard_actually_fires(line):
     assert banned_words_in(line, stand_ins), f"the word guard did NOT catch: {line}"
 
 
+@pytest.mark.parametrize("line", [
+    "see the xyzzy_quux build",              # the other spelling of a hyphenated word
+    "the zork-plugh tree",                   # stored with neither separator: still a token
+    "the frob-route option",                 # a two-word phrase written with a hyphen
+])
+def test_the_word_guard_reads_a_hyphen_and_an_underscore_as_one(line):
+    stand_ins = {hashlib.sha256(w.encode()).hexdigest()
+                 for w in ("xyzzy-quux", "zork", "frob route")}
+    assert banned_words_in(line, stand_ins), f"the word guard did NOT catch: {line}"
+
+
 def test_every_banned_word_is_a_sha256_digest():
-    assert len(BANNED_WORD_DIGESTS) >= 19
+    assert len(BANNED_WORD_DIGESTS) >= 26
     assert all(re.fullmatch(r"[0-9a-f]{64}", d) for d in BANNED_WORD_DIGESTS)
 
 

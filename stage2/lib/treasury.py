@@ -65,10 +65,9 @@ def fetch_treasury_returns(wrds_username: str | None = None) -> pd.DataFrame:
 def load_tret_wide(force_fetch: bool = False, mode: str | None = None) -> pd.DataFrame:
     """The wide (date x term) Treasury return frame, from cache or a one-time WRDS fetch.
 
-    Truncated at the mode-aware cutoff cfg.tret_max_date(mode): golden freezes to '2024-12-31' to
-    reproduce the golden run's data vintage (its Dec-2025 WRDS fetch had CRSP tfz_mth_ft only through
-    2024-12; golden tret is NULL after); ours resolves to None -> no cap -> use every cached/WRDS
-    month (the cache holds terms through 2025-12 as of 2026-07). See _stage2_settings.MODE_PINS.
+    Truncated at cfg.tret_max_date(): None (the default) uses every cached or WRDS month, and a
+    date (TRET_MAX_DATE, or the STAGE2_TRET_MAX_DATE environment variable) caps the series there,
+    which is how a vintage built against an older Treasury pull is reproduced exactly.
     """
     if TREASURY_CACHE.exists() and not force_fetch:
         long = pd.read_parquet(TREASURY_CACHE)

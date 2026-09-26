@@ -5,7 +5,7 @@ Ground truth: the reference implementation's return/risk step -- FISD sic_code m
 build_mom_ltr_and_industry (verbatim in lib/momentum), compute_rolling_var_es on ret_vw (-> mom_ret)
 and ret_vwx (-> mom_retx), keeping var_90/es_90/var_95.
 
-Outputs under blocks/<mode>/: mom_retx (the momentum validation target, 2,317,538 x 19) + mom_ret (G7 input).
+Outputs under blocks/<mode>/: mom_retx (the momentum validation target, 2,317,538 x 19) + mom_ret (read by step 7).
 """
 from __future__ import annotations
 

@@ -34,7 +34,7 @@ We welcome suggestions for new features or improvements! Please create an issue 
 ## Development Setup
 
 ### Prerequisites
-- Python 3.10 or higher for stages 0-1 (WRDS), 3.11 or higher for stages 2-4
+- Python 3.10 or higher for stages 0-1 (WRDS), 3.11 to 3.13 for stages 2-4
 - Access to WRDS (for testing)
 - Git
 
@@ -52,9 +52,11 @@ python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-3. Install dependencies (no `--user` -- pip refuses it inside an active virtualenv):
+3. Install dependencies (no `--user` -- pip refuses it inside an active virtualenv). For the
+   local stages and the tests, `requirements-local.txt` includes `requirements.txt`:
 ```bash
-python -m pip install -r requirements.txt
+python -m pip install -r requirements-local.txt
+python -m pip install --no-deps pybondlab==0.3.0
 ```
 
 4. Create a branch for your changes:
@@ -79,7 +81,7 @@ That covers the frozen 145-column contract and its order, the `_mmn` twin rule, 
 redaction gate, the frontier guard, the `auto:complete` cut-off rule, the golden-diff engine,
 the NYSE calendar, month boundaries, the factor fetchers and the published extended series.
 
-❗**Some of it skips on a fresh clone, and a skip is not a pass.** Six of the seven
+❗**Some of it skips on a fresh clone, and a skip is not a pass.** Most of the
 `stage2/tests/test_column_contract.py` tests need a built panel under `stage2/output/panel/`, so the
 panel = report = dictionary gate passes *vacuously* until you have run a build. The parity
 tests skip unless `STAGE2_REFERENCE_OUTPUT` / `STAGE2_REFERENCE_ROOT` point at a reference
@@ -96,7 +98,7 @@ python tests/test_merge_keys.py         # one row per key on every lookup
 ```
 
 **Whole chain, WRDS needed** -- ~10 minutes. Runs the real Stage 0 and Stage 1 code on a
-handful of CUSIP chunks and asserts 28 cross-stage invariants. Writes to `smoke/` and
+handful of CUSIP chunks and asserts the cross-stage invariants in `tests/smoke_assertions.py`. Writes to `smoke/` and
 never touches production output:
 
 ```bash

@@ -27,6 +27,7 @@ This is a **two-machine pipeline**, and the hand-off is a file you copy yourself
 | the hand-off | you | zip on WRDS, `scp` down (~5 GB) |
 | Stage 2 | **your own computer** | it reads Stage 1's output; its first run connects to WRDS once to fetch and cache a few series |
 | Stage 3 | **your own computer** | it reads Stage 2's panel and Stage 1's daily file; optional, and no WRDS connection needed |
+| Stage 4 | **your own computer** | it reads Stage 2's panel and blocks; optional, and no WRDS connection needed |
 
 ### Can I run Stages 0 and 1 on my own machine?
 Technically yes, with a working WRDS connection -- but you would be pulling hundreds of
@@ -35,9 +36,9 @@ so you would be invoking the stage scripts directly instead. Use WRDS Cloud.
 
 ### Can I skip Stages 0 and 1 and just download the Stage 1 file?
 No, not for Stage 2. The published Stage 1 download has its rating columns removed, because
-agency ratings are licensed. Stage 2 keeps only bond-months carrying a rating, so it would
-produce an **empty panel with no error**. Stage 2 checks for exactly this and refuses to
-start. The download is there for people who want the daily panel itself.
+agency ratings are licensed. Stage 2 keeps only bond-months carrying a rating, so it cannot
+use that file: pointed at it, Stage 2 refuses it at start-up, saying so. The download is there for people who
+want the daily panel itself.
 
 ### How long does processing take?
 Using `./run_pipeline.sh` (complete automated pipeline):
@@ -70,7 +71,7 @@ repository root) skips the cores and memory `run_pipeline.sh` requests for it, s
 line above.
 
 ### What Python version do I need?
-Python 3.10 or higher on WRDS for Stages 0 and 1 (the WRDS Cloud runs 3.14), and 3.11 or higher
+Python 3.10 or higher on WRDS for Stages 0 and 1 (the WRDS Cloud runs 3.14), and 3.11 to 3.13
 on your own computer for Stages 2-4, which install with two lines:
 ```bash
 python -m pip install -r requirements-local.txt
@@ -174,8 +175,8 @@ not affect Stage 0 memory.)
 
 **Worker count** — each worker holds one chunk, so this multiplies the above. Lower
 `CONCURRENCY` in `stage0/_trace_settings.py`. (`STAGE0_WORKERS=N ./run_pipeline.sh` sets
-the count for one run, but for every member at once, 144A's included, and neither the
-connection check nor the `qsub` request sees it: keep 2 x N at 6 or below.)
+the count for one run, for every member at once, 144A's included. The connection check and
+the `qsub` request both use it.)
 
 **Requesting more memory** is not done in the job scripts. `run_pipeline.sh` computes the
 request per member and passes it on the `qsub` command line, which overrides anything in
@@ -716,7 +717,7 @@ Workflow:
 2. **PyBondLab**: monthly panel → sorted portfolios and factors (Stage 3 calls it for the paper's exhibits)
 
 ### Is this part of a larger project?
-Yes! This is part of the [Open Bond Asset Pricing](https://openbondassetpricing.com/) project, which aims to provide open-source tools for corporate bond research.
+Yes! This is part of the [Open Source Bond Asset Pricing](https://openbondassetpricing.com/) project, which aims to provide open-source tools for corporate bond research.
 
 ---
 
@@ -795,8 +796,8 @@ python tools/check_inputs.py     # are the five inputs there and the right shape
 bash run_stage3.sh               # everything, ending in reports/exhibits.pdf
 ```
 
-It runs on your own machine and opens no WRDS connection. 906 s -- about 15 minutes -- on 24
-cores, measured on a cold run on 2026-09-12; 18 minutes on 2026-09-23. See [stage3/QUICKSTART_stage3.md](stage3/QUICKSTART_stage3.md).
+It runs on your own machine and opens no WRDS connection. About 16 minutes on 24 cores:
+15.7 minutes on a cold run on 2026-09-26. See [stage3/QUICKSTART_stage3.md](stage3/QUICKSTART_stage3.md).
 
 ### Are Stage 3's numbers the paper's printed numbers?
 **No, and nothing in Stage 3 compares them to the paper's.** It produces exhibits from
@@ -825,7 +826,7 @@ run. See
 
 ### Why is a within-firm factor's `ls` not `l` minus `s`?
 Because the factor is formed inside each firm. For within-firm sorts, `ls` is each firm's
-high-signal bonds minus its low-signal bonds, averaged across firms and rating terciles; `l` and
+high-signal bonds minus its low-signal bonds, averaged across firms and three rating groups; `l` and
 `s` pool every firm's high and low bonds into one portfolio each, which mixes in the differences
 between firms that the factor removes. For single sorts `ls` is exactly `l` minus `s`. See
 [stage4/DATA_DICTIONARY.md](stage4/DATA_DICTIONARY.md).

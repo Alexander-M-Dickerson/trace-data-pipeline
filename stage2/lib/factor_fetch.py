@@ -1,7 +1,7 @@
-"""factor_fetch.py -- the PUBLIC factor fetchers behind steps/compute_factors ( A10).
+"""factor_fetch.py -- the PUBLIC factor fetchers behind steps/compute_factors.
 
-Each fetcher ports its upstream `stage2/create_factors.py` counterpart verbatim (same source, same
-transforms, same output columns) and is fetch-once: the normalized frame is cached under
+Each fetcher reproduces the transforms the published factor panel was built with (same source,
+same transforms, same output columns) and is fetch-once: the normalized frame is cached under
 `cfg.FACTOR_CACHE_DIR/<name>.parquet` with a sidecar `<name>.meta.json` (url, fetched_utc, rows,
 span, sha256) so any manifest can prove which vintage a build consumed. `force=True` re-pulls --
 that is how a repo user updates factors; bump the vintage URLs in `_stage2_settings` for sources that
@@ -29,13 +29,13 @@ import _stage2_settings as cfg
 
 REQUEST_TIMEOUT_S = 300
 
-# Ludvigson zip member stem -> output column (create_factors.py:523-527)
+# Ludvigson zip member stem -> output column
 _LUDVIGSON_FILE_MAP = {
     "FinancialUncertaintyToCirculate": "uncf",
     "MacroUncertaintyToCirculate": "unc",
     "RealUncertaintyToCirculate": "uncr",
 }
-# EPU "Indices" sheet column -> output column (create_factors.py:636-640)
+# EPU "Indices" sheet column -> output column
 _EPU_COL_MAP = {
     "1. Economic Policy Uncertainty": "epu",
     "2. Monetary policy": "epum",
@@ -64,8 +64,8 @@ def _cached(name: str, url: str | Callable[[], str], builder: Callable[[str], pd
     assert "date" in df.columns and df["date"].notna().all(), \
         f"{name}: fetched frame must be non-null on 'date'"
     if not df["date"].is_unique:
-        # e.g. the 2026 HKM vintage ships 2025-01 twice; upstream keeps the frame verbatim and the
-        # panel-level drop_duplicates(keep='first') resolves it (create_factors.py:876)
+        # e.g. the 2026 HKM vintage ships 2025-01 twice; the frame is kept verbatim and the
+        # panel-level drop_duplicates(keep='first') resolves it
         n_dup = int(df["date"].duplicated().sum())
         print(f"[factor_fetch] {name}: {n_dup} duplicate month(s) kept verbatim "
               "(panel dedup keep-first resolves)")
@@ -96,7 +96,7 @@ def _fred_csv(series: tuple[str, ...], start: str) -> pd.DataFrame:
 
 def fetch_ff5(force: bool = False) -> pd.DataFrame:
     """['date','mktrf','smb','hml','rf'] decimal, month-end -- Ken French 5-factor monthly table
-    (create_factors.fetch_ff5_factors; rmw/cma dropped, /100)."""
+    (rmw/cma dropped, /100)."""
     def build(url: str) -> pd.DataFrame:
         raw = _get(url)
         with zipfile.ZipFile(io.BytesIO(raw)) as zf:
@@ -118,7 +118,7 @@ def fetch_ff5(force: bool = False) -> pd.DataFrame:
 
 def fetch_vix_monthly(force: bool = False) -> pd.DataFrame:
     """['date','vix','dvix','dvixlag'] -- EOM VIX (VXO fallback pre-1990) scaled /100/sqrt(12);
-    dvix = first diff (first month: intra-month last-first) (create_factors.fetch_vix_monthly)."""
+    dvix = first diff (first month: intra-month last-first)."""
     def build(url: str) -> pd.DataFrame:
 
         import wrds
@@ -153,7 +153,7 @@ def fetch_vix_monthly(force: bool = False) -> pd.DataFrame:
 
 def fetch_cpi_credit(force: bool = False) -> pd.DataFrame:
     """['date','dcpi','cpi_vol6','credit','dcredit','lvl','ysp'] -- FRED CPIAUCSL + AAA/BAA + DGS
-    curve (create_factors.fetch_cpi_credit: CPI lag-then-diff + 6m vol; (BAA-AAA)/12; EW lvl; 5y-1y)."""
+    curve (CPI lag-then-diff + 6m vol; (BAA-AAA)/12; EW lvl; 5y-1y)."""
     def build(url: str) -> pd.DataFrame:
         cpi = _fred_csv(("CPIAUCSL",), "1947-01-01").rename(columns={"CPIAUCSL": "cpi"})
         cpi["date"] = cpi["date"] + MonthEnd(0)
@@ -185,7 +185,7 @@ def fetch_cpi_credit(force: bool = False) -> pd.DataFrame:
 
 def fetch_intermediary_capital(force: bool = False) -> pd.DataFrame:
     """['date','cptl','cptlt'] -- He-Kelly-Manela intermediary capital factors
-    (create_factors.fetch_intermediary_capital; cptlt has RF subtracted later, at the merge)."""
+    (cptlt has RF subtracted later, at the merge)."""
     def build(url: str) -> pd.DataFrame:
         df = pd.read_csv(io.BytesIO(_get(url)))
         df["date"] = pd.to_datetime(df["yyyymm"].astype(str), format="%Y%m") + MonthEnd(0)
@@ -250,7 +250,7 @@ def _ludvigson_url() -> str:
 
 def fetch_uncertainty(force: bool = False) -> pd.DataFrame:
     """['date','uncf','unc','uncr','duncf','dunc','duncr','dunc3','dunc6'] -- Ludvigson macro/
-    financial/real uncertainty + first differences + 3/6-month changes (create_factors.fetch_uncertainty)."""
+    financial/real uncertainty + first differences + 3/6-month changes."""
     def build(url: str) -> pd.DataFrame:
         frames = []
         with zipfile.ZipFile(io.BytesIO(_get(url))) as zf:
@@ -275,7 +275,7 @@ def fetch_uncertainty(force: bool = False) -> pd.DataFrame:
 
 def fetch_epu(force: bool = False) -> pd.DataFrame:
     """['date','epu','epum','eput'] -- policyuncertainty.com categorical EPU indices, /1000
-    (create_factors.fetch_epu; last sheet row is a text footnote, dropped)."""
+    (last sheet row is a text footnote, dropped)."""
     def build(url: str) -> pd.DataFrame:
         df = pd.read_excel(io.BytesIO(_get(url)), sheet_name="Indices")
         df = df.iloc[:-1].copy()                        # trailing text footnote row

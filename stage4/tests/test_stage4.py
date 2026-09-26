@@ -124,3 +124,27 @@ def test_a_small_panel_runs_through_pybondlab_unflipped():
         assert set(out["rating_type"]) == {"all", "ig", "nig"}
         assert set(out["return_type"]) == {"dur"}
         assert out["factor"].str.contains("[*]").sum() == 0      # never sign-corrected
+
+
+def test_each_return_type_sorts_its_own_return_column():
+    """`dur` sorts `ret_vwx`, `exc` sorts `ret_vw`. A build that sorted the same column for both
+    passed every other test here: shape and labels are the same either way. With the Treasury
+    return set to zero the two must agree exactly, and with a real one they must not."""
+    import pybondlab_pin
+    if pybondlab_pin.check():
+        pytest.skip("needs the pinned PyBondLab (requirements-local.txt)")
+
+    def ls(df, rt):
+        out = pd.concat(sorts.run_bands(df, ["sig_a"], sort="single", return_type=rt),
+                        ignore_index=True)
+        keep = (out["leg"] == "ls") & (out["weighting"] == "vw") & (out["rating_type"] == "all")
+        return out[keep].sort_values("date")["return"].to_numpy()
+
+    df = _panel()
+    df["ret_vwx"] = df["ret_vw"]                       # tret = 0: the two returns are the same
+    np.testing.assert_array_equal(ls(df, "exc"), ls(df, "dur"))
+    df["ret_vwx"] = df["ret_vw"] - df["tret"].astype("float64")
+    exc, dur = ls(df, "exc"), ls(df, "dur")
+    ok = ~(np.isnan(exc) | np.isnan(dur))
+    assert ok.sum() > 10 and np.abs(exc[ok] - dur[ok]).max() > 1e-6, \
+        "the duration-adjusted factor is the excess-return factor: it sorted the wrong column"

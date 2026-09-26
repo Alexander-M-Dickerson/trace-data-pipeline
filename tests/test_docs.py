@@ -7,8 +7,8 @@ Catch documentation that has drifted away from the code.
 This exists because a single audit found, in docs that all read plausibly:
 
   * `run_all_trace.sh` referenced 23 times. It had not existed for some time.
-  * Two repository trees listing `stage0/QUICKSTART_stage0.md` and
-    `stage1/requirements.txt`, neither of which exists, while omitting `config.py`,
+  * Two repository trees listing a Stage 0 quickstart named `QUICKSTART_stage0` and a
+    `requirements.txt` in `stage1/`, neither of which exists, while omitting `config.py`,
     `FAQ.md` and `stage1/stage1_pipeline.py`, which do.
   * "Edit `_trace_settings.py` and change `WRDS_USERNAME`" -- an instruction that
     silently does nothing, because that module imports the value from `config.py`.
@@ -348,7 +348,8 @@ def check_pybondlab_pin(docs):
 
 
 def check_links(docs):
-    """Every relative link resolves, and every `other.md#anchor` names a real heading.
+    """Every relative link resolves, and every anchor in a link to another page names a
+    real heading.
 
     check_toc covers anchors inside one page; this covers links between files, which is what
     a moved or renamed doc breaks.

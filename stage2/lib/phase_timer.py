@@ -6,8 +6,8 @@ Usage:
         ...
     meta["phases"] = pt.phases          # {"pandas_ports": 12.34, ...} in call order
 
-Phases land in each step's meta JSON so every build leaves a profile behind -- the speed_up/ pass
-(and any future regression hunt) reads them instead of re-instrumenting.
+Phases land in each step's meta JSON so every build leaves a profile behind, and a slowdown
+can be traced to a phase without re-instrumenting.
 """
 from __future__ import annotations
 

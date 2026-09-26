@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-stage2_data_report_helpers.py
-=============================
+_report_helpers.py
+==================
 Helper functions for generating Stage 2 data reports.
 
 Includes plotting utilities, LaTeX document generation, and table formatting
@@ -140,7 +140,7 @@ This section describes the construction of monthly corporate bond returns from t
 
 All data in the panel is sampled at the end of month $t$; no variables have a lead or a lag.
 
-Several datasets are available on the \href{https://openbondassetpricing.com/}{Open Bond Asset Pricing} website.
+Several datasets are available on the \href{https://openbondassetpricing.com/}{Open Source Bond Asset Pricing} website.
 
 \subsubsection{Market Microstructure Adjusted Signals and Returns}
 
@@ -415,7 +415,7 @@ Table~\ref{tab:monthly_data_availability} reports the overall data availability 
 \usepackage{array}
 \usetikzlibrary{arrows.meta,positioning,decorations.pathreplacing,calc}
 \geometry{margin=1in}
-\title{The Corporate Bond Factor Replication Crisis:\\ New Protocols}
+\title{Stage 2 TRACE Monthly Data Report}
 \author{\href{https://openbondassetpricing.com/}{Open Source Bond Asset Pricing}}
 \date{""" + timestamp + r"""}
 \begin{document}
@@ -989,7 +989,7 @@ def _cite(row: dict, known: set) -> str:
         raise KeyError(
             f"{row['mnemonic']}: the spec cites {missing}, which get_references_bib() does not "
             "define. LaTeX would print a question mark and carry on. Add the entry, copied from "
-            "the paper's references.bib, under the same key.")
+            "its source, under the same key.")
     return r"\citet{" + ",".join(keys) + "}"
 
 
@@ -2186,7 +2186,7 @@ def make_data_availability_table(
         r"percentage of missing values after resampling each bond to a contiguous monthly time-series. "
         r"Panel A includes all bonds in the sample. "
         r"Panel B includes investment grade bonds (S\&P ratings 1--10, AAA to BBB$-$). "
-        r"Panel C includes non-investment grade bonds (S\&P ratings 11--21, BB+ to CCC$-$). "
+        r"Panel C includes non-investment grade bonds (S\&P ratings 11--21, BB+ to C). "
         r"Panel D includes defaulted bonds (S\&P rating 22, D). "
         r"The sample spans the period " + min_date + r" to " + max_date + r"."
     )

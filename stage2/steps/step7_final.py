@@ -104,7 +104,8 @@ def build(con=None, mode: str | None = None, limit_cusips: int | None = None) ->
             spreads_value_adj=spreads_value_adj, illiq_signals=illiq_signals,
             illiq_signals_adj=illiq_signals_adj, betas_std=betas_std, mom_ret=mom_ret, verbose=True)
 
-    # runner: str = prior-month return signal; deprecated column drops; str1_adj -> str_adj
+    # runner: str = the month-t return (the gap-adjusted twin replaces it below); deprecated
+    # column drops; str1_adj -> str_adj
     main_panel["str"] = main_panel["ret_vw"]
     for col in RUNNER_DROP_COLS:
         if col in main_panel.columns:
@@ -172,7 +173,7 @@ def build(con=None, mode: str | None = None, limit_cusips: int | None = None) ->
     # final month was the packager, possibly weeks later.
     #
     # Measured before this was wired in, so it cannot fail a legitimate build: both current
-    # panels have ZERO degenerate tail months. Acceptance item A4 fires on the RAW stage-1
+    # panels have ZERO degenerate tail months. The frontier check fires on the RAW stage-1
     # input, which is why this vintage was truncated to 2025-11 before the panel was built.
     if not getattr(cfg, "ALLOW_DEGENERATE_FRONTIER", False):
         from lib import frontier as _frontier

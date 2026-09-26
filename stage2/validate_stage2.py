@@ -1,9 +1,12 @@
-"""validate_monthly.py -- the golden validation CLI: one step (or all), same rules as the gate sweep.
+"""validate_stage2.py -- compare a build against a reference build, one step or all.
 
-Usage:
-    validate_monthly.py --step main             # the 140-col panel
-    validate_monthly.py --step all              # every gate target
-    validate_monthly.py --step betas --json-out report.json
+Development only: it needs GOLDEN_OUTPUTS in _stage2_settings.py, which a public clone leaves
+empty, and then says so and exits.
+
+Usage (the step names exist only once GOLDEN_OUTPUTS is configured):
+    validate_stage2.py --step main             # the main panel
+    validate_stage2.py --step all              # every gate target
+    validate_stage2.py --step betas --json-out report.json
 
 Tolerances:
   - default float tol 1e-6; RATE_TOL=1e-4 for the beta/ivol/iskew/sysmom/idimom families and ytm/cs
@@ -83,7 +86,8 @@ def _require_specs() -> dict[str, StepSpec]:
             "no golden outputs are configured, so there is nothing to validate against.\n"
             "GOLDEN_OUTPUTS in _stage2_settings.py is empty -- this is normal for a public\n"
             "clone. Golden validation is an internal reproduction check; a public build is\n"
-            "checked by `pytest stage2/tests` and the gates inside run_stage2.py."
+            "checked by `python -m pytest stage2/tests` from the repository root and the gates\n"
+            "inside _run_stage2.py."
         )
     return specs
 

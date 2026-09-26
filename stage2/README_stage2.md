@@ -59,13 +59,14 @@ trace-data-pipeline/
 └── stage2/
 ```
 
-❗**The Stage 1 file published for download will not work.** It has the agency ratings
-blanked for licensing reasons, and Stage 2 keeps only bond-days carrying at least one
-agency rating — so that file yields an empty panel. Stage 2 detects this and refuses to
-start. Run Stages 0 and 1 yourself on WRDS and use their output.
+❗**The Stage 1 file published for download will not work.** It has the agency ratings,
+`permco` and `gvkey` removed for licensing reasons, and Stage 2 keeps only bond-days carrying
+at least one agency rating. Stage 2 recognises that file and refuses it at start-up. Run
+Stages 0 and 1 yourself on WRDS and use their output.
 
-Python packages beyond Stage 1's: `duckdb`, `numba`, `scipy`, `statsmodels`,
-`pandas_market_calendars` and PyBondLab 0.3.0, in Python 3.11 or newer. Two lines install them
+Python packages beyond Stage 1's: `duckdb`, `numba`, `numexpr`, `scipy`, `statsmodels`,
+`pandas_market_calendars` and PyBondLab 0.3.0, in Python 3.11 to 3.13 (3.14 cannot install yet;
+`requirements-local.txt` says why). Two lines install them
 all:
 
 ```bash
@@ -113,7 +114,7 @@ Everything lives in `_stage2_settings.py`. The values you are most likely to tou
 | `DAILY_INPUT` | `None` | Pin a specific Stage 1 panel; otherwise the newest is used |
 | `FACTOR_SOURCE` | `"public"` | Build the factor matrix from public sources |
 | `WORKERS` × `THREADS_PER` | 6 × 2 | Keep the product at or below your core count |
-| `START_DATE` | `2002-07-31` | First month-end in the panel |
+| `START_DATE` | `2002-07-31` | First month-end priced. A return needs the month before, so the panel starts a month later, 2002-08-31 |
 | `BETA_WINDOW` / `BETA_MIN_OBS` | 36 / 12 | Rolling beta window |
 | `DEF_CORP_MIN_MATURITY` / `DEF_GOVT_TENOR` | 10y / 20y | The default-premium factor's two legs |
 
@@ -121,8 +122,9 @@ The processing parameters below those are carried over verbatim from the referen
 implementation and define the published panel. Changing one changes your results — which
 is fine, as long as it is deliberate.
 
-`STAGE2_DAILY_INPUT` overrides the input path from the environment, which is handy for
-testing without editing the file.
+The environment can override the inputs without editing the file: `STAGE2_DAILY_INPUT`
+(the Stage 1 panel), `STAGE2_FISD_FILE` and `STAGE2_CALL_FILE` (Stage 0's FISD file and Stage
+1's call flags), and `STAGE2_ROOT` (the folder holding `stage0/`, `stage1/` and `stage2/`).
 
 ---
 
@@ -240,8 +242,11 @@ so only the first run needs your credentials.
 downloaded `stage0/` and `stage1/` yet. Run `./run_stage2.sh --dry-run` to see every path
 Stage 2 resolved.
 
-**"Every agency rating column is empty"** — you are pointing at the published Stage 1
+**"It looks like the Stage 1 file published for download"** — you are pointing at the public
 download rather than your own run. See [Prerequisites](#prerequisites).
+
+**"Every agency rating column is empty"** — the Stage 1 panel carries the rating columns but no
+ratings. Re-run Stage 1 with the current code.
 
 **"is missing N column(s) Stage 2 needs"** — the Stage 1 panel is from an older release.
 Re-run Stage 1 with the current code.

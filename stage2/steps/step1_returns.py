@@ -91,7 +91,7 @@ SELECT s.cusip_id, s.dt, s.month_start,
        s.sp_rating, s.mdy_rating, s.spc_rating, s.mdc_rating, s.ff17num, s.ff30num,
        {', '.join(fp_defs)},
        -- mcap is a FLOAT32 chain end-to-end: the golden's ao was float32 in memory, so every op
-       -- rounds to float32 (empirically arbitrated -- f64 math lands 1 ulp off on 35% of rows, M10)
+       -- rounds to float32 (measured: f64 math lands 1 ulp off on 35% of rows)
        CAST(s.ao AS FLOAT) * (s.pr + s.acclast) * CAST(10 AS FLOAT) / CAST(1e6 AS FLOAT) AS mcap,
        s.frn,
        mb.impl_floor, mb.cut_off_begin, mb.cut_off_end, mb.date_end_bus_lag, mb.month_end_cal
@@ -446,7 +446,7 @@ SELECT cusip, date, ret_vw, tret, tret_bns, tret_cls, ret_std, ret_type FROM (
     #   since 2026-09-21. Stage 2 still makes its own join rather than inheriting stage 1's ids, so
     #   the monthly panel's firm labels never depend on which stage 1 run it was built from: they
     #   come from the linker, at the month-end date this block keys on. The rule is
-    #   cfg.LINKER_WINDOW; its authority is the linker's own contract (CONTRACTS.md s4).
+    #   cfg.LINKER_WINDOW; its authority is the linker bundle's own README.md and SCHEMA.md.
     #   History: until 2026-09-21 stage 1 joined the EVIDENCE window (w0/w1), and inheriting those
     #   ids made the panels disagree about firm membership on 2.14% of bond-months (lib/linker.py).
     lo, hi = linker.register(con, "_linker")

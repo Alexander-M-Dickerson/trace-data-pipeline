@@ -23,9 +23,14 @@ in every month: a month in which a factor cannot be formed has an empty `return`
 | `num_portfolios` | int | single sorts only: 10 for `all`, 5 within a band |
 
 **Within-firm sorts.** The factor is the `ls` leg. Each month, inside each firm and each of
-three rating terciles, it is the return of the firm's high-signal bonds minus its low-signal
+three rating groups (AAA to A-, BBB, below investment grade), it is the return of the firm's high-signal bonds minus its low-signal
 bonds, each weighted equally (`ew`) or by market value (`vw`); those differences are averaged across firms (equally for `ew`, by the firm's bond market
-value for `vw`), then across the three terciles. The `l` and `s` legs pool every firm's high and
+value for `vw`), then across the rating groups that have a firm that month. A firm counts in a
+rating group when it has at least two bonds there with a signal and a market value, at least
+two distinct signal values, and a bond in each leg. Its bonds strictly above the two-thirds
+point of its distinct signal values form its long leg, those strictly below the one-third point
+its short leg; firms are weighted by the market value of the bonds in their two legs for `vw`.
+The `l` and `s` legs pool every firm's high and
 low bonds into one portfolio each, so they include the differences between firms that the
 factor removes, and `ls` is not `l` minus `s`. This is PyBondLab's definition, and the
 published files have always been built this way.

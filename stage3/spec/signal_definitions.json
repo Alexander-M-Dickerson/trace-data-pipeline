@@ -504,14 +504,15 @@
       "mnemonic": "mom3_1",
       "group": "Cluster III: Momentum & Reversal",
       "name": "3-Month Momentum",
-      "description": "Cumulative return months $t{-}2$ to $t{-}1$, skipping prior month.",
+      "description": "Cumulative return months $t{-}2$ to $t{-}1$, skipping month $t$.",
       "citation": "\\citet{gebhardt2005stock}",
       "citation_keys": [
         "gebhardt2005stock"
       ],
       "paper_prints_citation": "\\citet{gebhardt2005cross}",
-      "why_corrected": "The printed row cites `gebhardt2005cross` -- Gebhardt, Hvidkjaer and Swaminathan (2005), *The cross-section of expected corporate bond returns: betas or characteristics?*. Bond momentum is the OTHER GHS 2005 paper, *Stock and bond market interaction: does momentum spill over?*, which is in references.bib as `gebhardt2005stock` and is cited nowhere else. Same authors, same year, same journal, different result.",
-      "citation_text": "Gebhardt, Hvidkjaer and Swaminathan (2005)"
+      "why_corrected": "The printed row cites `gebhardt2005cross` -- Gebhardt, Hvidkjaer and Swaminathan (2005), *The cross-section of expected corporate bond returns: betas or characteristics?*. Bond momentum is the OTHER GHS 2005 paper, *Stock and bond market interaction: does momentum spill over?*, `gebhardt2005stock`. Same authors, same year, same journal, different result. The printed description says it skips the prior month; the month it skips is t, the row's own month, which is what `str` holds.",
+      "citation_text": "Gebhardt, Hvidkjaer and Swaminathan (2005)",
+      "paper_prints": "Cumulative return months $t{-}2$ to $t{-}1$, skipping prior month."
     },
     {
       "mnemonic": "mom6_1",
@@ -523,7 +524,7 @@
         "gebhardt2005stock"
       ],
       "paper_prints_citation": "\\citet{gebhardt2005cross}",
-      "why_corrected": "The printed row cites `gebhardt2005cross` -- Gebhardt, Hvidkjaer and Swaminathan (2005), *The cross-section of expected corporate bond returns: betas or characteristics?*. Bond momentum is the OTHER GHS 2005 paper, *Stock and bond market interaction: does momentum spill over?*, which is in references.bib as `gebhardt2005stock` and is cited nowhere else. Same authors, same year, same journal, different result.",
+      "why_corrected": "The printed row cites `gebhardt2005cross` -- Gebhardt, Hvidkjaer and Swaminathan (2005), *The cross-section of expected corporate bond returns: betas or characteristics?*. Bond momentum is the OTHER GHS 2005 paper, *Stock and bond market interaction: does momentum spill over?*, `gebhardt2005stock`. Same authors, same year, same journal, different result.",
       "citation_text": "Gebhardt, Hvidkjaer and Swaminathan (2005)"
     },
     {
@@ -536,7 +537,7 @@
         "gebhardt2005stock"
       ],
       "paper_prints_citation": "\\citet{gebhardt2005cross}",
-      "why_corrected": "The printed row cites `gebhardt2005cross` -- Gebhardt, Hvidkjaer and Swaminathan (2005), *The cross-section of expected corporate bond returns: betas or characteristics?*. Bond momentum is the OTHER GHS 2005 paper, *Stock and bond market interaction: does momentum spill over?*, which is in references.bib as `gebhardt2005stock` and is cited nowhere else. Same authors, same year, same journal, different result.",
+      "why_corrected": "The printed row cites `gebhardt2005cross` -- Gebhardt, Hvidkjaer and Swaminathan (2005), *The cross-section of expected corporate bond returns: betas or characteristics?*. Bond momentum is the OTHER GHS 2005 paper, *Stock and bond market interaction: does momentum spill over?*, `gebhardt2005stock`. Same authors, same year, same journal, different result.",
       "citation_text": "Gebhardt, Hvidkjaer and Swaminathan (2005)"
     },
     {
@@ -574,12 +575,14 @@
       "mnemonic": "imom12_1",
       "group": "Cluster III: Momentum & Reversal",
       "name": "Industry Momentum (12-1)",
-      "description": "Equal-weighted average 12-1 momentum of other bonds in the same FF17 industry.",
+      "description": "The equal-weighted return of all bonds sharing its SIC code (FISD), the bond itself included, compounded over months $t{-}11$ to $t{-}1$.",
       "citation": "\\citet{wang2024industry}",
       "citation_keys": [
         "wang2024industry"
       ],
-      "citation_text": "Wang, Wu and Yang (2024)"
+      "citation_text": "Wang, Wu and Yang (2024)",
+      "paper_prints": "Equal-weighted average 12-1 momentum of other bonds in the same FF17 industry.",
+      "why_corrected": "The printed row says the average signal of OTHER bonds in the same FF17 industry. stage2/lib/momentum.py averages the returns of every bond sharing the FISD sic_code in a month, the bond itself included, and compounds that industry return over the window; there is no FF17 grouping and no exclusion. Every (sic_code, month) group carries one value."
     },
     {
       "mnemonic": "ltr48_12",
@@ -607,21 +610,25 @@
       "mnemonic": "iltr48_12",
       "group": "Cluster III: Momentum & Reversal",
       "name": "Industry LTR (48-12)",
-      "description": "Equal-weighted average 48-12 LTR of other bonds in the same FF17 industry.",
+      "description": "The equal-weighted return of all bonds sharing its SIC code (FISD), the bond itself included, compounded over months $t{-}47$ to $t{-}12$. Uses expanding window starting at 12-3, ramping to 48-12.",
       "citation": "--",
       "citation_keys": [],
-      "citation_text": "--"
+      "citation_text": "--",
+      "paper_prints": "Equal-weighted average 48-12 LTR of other bonds in the same FF17 industry.",
+      "why_corrected": "The printed row says the average signal of OTHER bonds in the same FF17 industry. stage2/lib/momentum.py averages the returns of every bond sharing the FISD sic_code in a month, the bond itself included, and compounds that industry return over the window; there is no FF17 grouping and no exclusion. Every (sic_code, month) group carries one value."
     },
     {
       "mnemonic": "str",
       "group": "Cluster III: Momentum & Reversal",
       "name": "Short-Term Reversal",
-      "description": "Prior month return $r_{t-1}$.",
+      "description": "The return over month $t$, the most recent month and the one the momentum signals skip, measured with the signal gap. The unadjusted twin \\texttt{str\\_mmn} is \\texttt{ret\\_vw} itself.",
       "citation": "\\citet{BaiBaliWen_2019}",
       "citation_keys": [
         "BaiBaliWen_2019"
       ],
-      "citation_text": "Bai, Bali and Wen (2019)"
+      "citation_text": "Bai, Bali and Wen (2019)",
+      "paper_prints": "Prior month return $r_{t-1}$.",
+      "why_corrected": "The printed row says the prior month, r_{t-1}. On the row for month t the column holds the return over month t itself, measured with the signal gap: on the 2026 panel it correlates 0.90 with ret_vw on the same row and -0.04 with the row before. It is the month the momentum signals skip, since mom3_1 on the same row covers t-2 to t-1."
     },
     {
       "mnemonic": "mom9_1",
@@ -633,7 +640,7 @@
         "gebhardt2005stock"
       ],
       "paper_prints_citation": "\\citet{gebhardt2005cross}",
-      "why_corrected": "The printed row cites `gebhardt2005cross` -- Gebhardt, Hvidkjaer and Swaminathan (2005), *The cross-section of expected corporate bond returns: betas or characteristics?*. Bond momentum is the OTHER GHS 2005 paper, *Stock and bond market interaction: does momentum spill over?*, which is in references.bib as `gebhardt2005stock` and is cited nowhere else. Same authors, same year, same journal, different result.",
+      "why_corrected": "The printed row cites `gebhardt2005cross` -- Gebhardt, Hvidkjaer and Swaminathan (2005), *The cross-section of expected corporate bond returns: betas or characteristics?*. Bond momentum is the OTHER GHS 2005 paper, *Stock and bond market interaction: does momentum spill over?*, `gebhardt2005stock`. Same authors, same year, same journal, different result.",
       "citation_text": "Gebhardt, Hvidkjaer and Swaminathan (2005)"
     },
     {
@@ -680,23 +687,27 @@
       "mnemonic": "imom1",
       "group": "Cluster III: Momentum & Reversal",
       "name": "Industry Momentum (1)",
-      "description": "Equal-weighted average prior-month return of other bonds in the same FF17 industry.",
+      "description": "The equal-weighted return in month $t{-}1$ of all bonds sharing its SIC code (FISD), the bond itself included.",
       "citation": "\\citet{wang2024industry}",
       "citation_keys": [
         "wang2024industry"
       ],
-      "citation_text": "Wang, Wu and Yang (2024)"
+      "citation_text": "Wang, Wu and Yang (2024)",
+      "paper_prints": "Equal-weighted average prior-month return of other bonds in the same FF17 industry.",
+      "why_corrected": "The printed row says the average signal of OTHER bonds in the same FF17 industry. stage2/lib/momentum.py averages the returns of every bond sharing the FISD sic_code in a month, the bond itself included, and compounds that industry return over the window; there is no FF17 grouping and no exclusion. Every (sic_code, month) group carries one value."
     },
     {
       "mnemonic": "imom3_1",
       "group": "Cluster III: Momentum & Reversal",
       "name": "Industry Momentum (3-1)",
-      "description": "Equal-weighted average 3-1 momentum of other bonds in the same FF17 industry.",
+      "description": "The equal-weighted return of all bonds sharing its SIC code (FISD), the bond itself included, compounded over months $t{-}2$ to $t{-}1$.",
       "citation": "\\citet{wang2024industry}",
       "citation_keys": [
         "wang2024industry"
       ],
-      "citation_text": "Wang, Wu and Yang (2024)"
+      "citation_text": "Wang, Wu and Yang (2024)",
+      "paper_prints": "Equal-weighted average 3-1 momentum of other bonds in the same FF17 industry.",
+      "why_corrected": "The printed row says the average signal of OTHER bonds in the same FF17 industry. stage2/lib/momentum.py averages the returns of every bond sharing the FISD sic_code in a month, the bond itself included, and compounds that industry return over the window; there is no FF17 grouping and no exclusion. Every (sic_code, month) group carries one value."
     },
     {
       "mnemonic": "ltr24_3",
@@ -711,19 +722,23 @@
       "mnemonic": "iltr30_6",
       "group": "Cluster III: Momentum & Reversal",
       "name": "Industry LTR (30-6)",
-      "description": "Equal-weighted average 30-6 LTR of other bonds in the same FF17 industry.",
+      "description": "The equal-weighted return of all bonds sharing its SIC code (FISD), the bond itself included, compounded over months $t{-}29$ to $t{-}6$. Uses expanding window starting at 12-3, ramping to 30-6.",
       "citation": "--",
       "citation_keys": [],
-      "citation_text": "--"
+      "citation_text": "--",
+      "paper_prints": "Equal-weighted average 30-6 LTR of other bonds in the same FF17 industry.",
+      "why_corrected": "The printed row says the average signal of OTHER bonds in the same FF17 industry. stage2/lib/momentum.py averages the returns of every bond sharing the FISD sic_code in a month, the bond itself included, and compounds that industry return over the window; there is no FF17 grouping and no exclusion. Every (sic_code, month) group carries one value."
     },
     {
       "mnemonic": "iltr24_3",
       "group": "Cluster III: Momentum & Reversal",
       "name": "Industry LTR (24-3)",
-      "description": "Equal-weighted average 24-3 LTR of other bonds in the same FF17 industry.",
+      "description": "The equal-weighted return of all bonds sharing its SIC code (FISD), the bond itself included, compounded over months $t{-}23$ to $t{-}3$. Uses expanding window starting at 12-3.",
       "citation": "--",
       "citation_keys": [],
-      "citation_text": "--"
+      "citation_text": "--",
+      "paper_prints": "Equal-weighted average 24-3 LTR of other bonds in the same FF17 industry.",
+      "why_corrected": "The printed row says the average signal of OTHER bonds in the same FF17 industry. stage2/lib/momentum.py averages the returns of every bond sharing the FISD sic_code in a month, the bond itself included, and compounds that industry return over the window; there is no FF17 grouping and no exclusion. Every (sic_code, month) group carries one value."
     },
     {
       "mnemonic": "pi",
@@ -1405,7 +1420,7 @@
         "dickerson-bayesian"
       ],
       "paper_prints_citation": "\\citet{dickerson2023priced}",
-      "why_corrected": "The printed row cites Dickerson, Mueller and Robotti (2023), Priced risk in corporate bonds. Corrected by the author on 2026-09-21: the credit spread level beta comes from Dickerson, Julliard and Mueller (2026), The co-pricing factor zoo, Journal of Financial Economics 182, 104295. The Stage 2 data report already cited that paper for this row.",
+      "why_corrected": "The printed row cites Dickerson, Mueller and Robotti (2023), Priced risk in corporate bonds. The credit spread level beta comes from Dickerson, Julliard and Mueller (2026), The co-pricing factor zoo, Journal of Financial Economics 182, 104295. The Stage 2 data report already cited that paper for this row.",
       "citation_text": "Dickerson, Julliard and Mueller (2026)"
     },
     {

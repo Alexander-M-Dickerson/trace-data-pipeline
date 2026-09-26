@@ -21,6 +21,13 @@
 #   ./run_smoke_test.sh --members "enhanced 144a"
 #   ./run_smoke_test.sh --with-reports       # also exercise the data-report job
 #   ./run_smoke_test.sh --with-figures       # ...INCLUDING its re-clean and figures
+#   ./run_smoke_test.sh --target-rows 40000  # trade rows packed per chunk (default 40000)
+#   ./run_smoke_test.sh --root DIR           # where the outputs go (default: smoke/ in the repo)
+#
+# The flags set STAGE0_LIMIT_CHUNKS, STAGE0_TARGET_ROWS and STAGE0_OUTPUT_FIGURES for the
+# run; an exported value of those is replaced by the flag's. --root is DELETED and rebuilt
+# on every run, so it must be smoke/, a new or empty folder, or one an earlier smoke run
+# made.
 #
 # On the WRDS Cloud this must be SUBMITTED, not run on the login node -- CPU- and
 # memory-intensive work is not permitted on the head nodes:
@@ -78,7 +85,7 @@ while [[ $# -gt 0 ]]; do
         --members)      MEMBERS="$2"; shift 2 ;;
         --with-reports) WITH_REPORTS=1; shift ;;
         --with-figures) WITH_REPORTS=1; WITH_FIGURES=1; shift ;;
-        -h|--help)      sed -n '13,34p' "${BASH_SOURCE[0]}"; exit 0 ;;
+        -h|--help)      sed -n '13,/^set -uo pipefail/p' "${BASH_SOURCE[0]}" | sed '$d'; exit 0 ;;
         *) echo "[error] unknown option: $1"; exit 2 ;;
     esac
 done
@@ -136,6 +143,21 @@ echo "================================================================"
 # whole source table -- 93 s for Enhanced -- which is nothing against a real run but
 # dominates a smoke run, and re-measuring it on every iteration makes this tool
 # annoying enough that people stop using it.
+# The whole of ROOT is deleted below. Refuse anything but the default smoke/, a folder that
+# does not exist or is empty, and one an earlier smoke run marked as its own. Compared as real
+# paths, so `--root smoke` is the default too.
+_real() { (cd "$1" 2>/dev/null && pwd -P); }
+if [[ -e "${ROOT}" && ! -d "${ROOT}" ]]; then
+    echo "[error] --root ${ROOT} is a file, and this script deletes what --root names."
+    exit 2
+fi
+if [[ -d "${ROOT}" && "$(_real "${ROOT}")" != "$(_real "${REPO}/smoke")" \
+      && -n "$(ls -A "${ROOT}" 2>/dev/null)" && ! -f "${ROOT}/.smoke_root" ]]; then
+    echo "[error] --root ${ROOT} holds files an earlier smoke run did not make, and this"
+    echo "        script deletes the whole folder. Give a new or empty folder."
+    exit 2
+fi
+
 CACHE_KEEP="$(mktemp -d)"
 if compgen -G "${ROOT}/stage0/*/cusip_row_counts_*.parquet" > /dev/null 2>&1; then
     for f in "${ROOT}"/stage0/*/cusip_row_counts_*.parquet; do
@@ -148,6 +170,7 @@ fi
 
 rm -rf "${ROOT}"
 mkdir -p "${ROOT}/stage0/logs" "${ROOT}/stage1/data" "${ROOT}/stage1/logs"
+touch "${ROOT}/.smoke_root"
 
 if compgen -G "${CACHE_KEEP}/*/cusip_row_counts_*.parquet" > /dev/null 2>&1; then
     for f in "${CACHE_KEEP}"/*/cusip_row_counts_*.parquet; do

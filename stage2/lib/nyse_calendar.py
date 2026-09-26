@@ -67,6 +67,8 @@ def cal_lut_frame() -> pd.DataFrame:
     cal = build_calendar_frame()
     sessions = cal.loc[cal["is_session"], "day"].to_numpy()
     idx = np.searchsorted(sessions, cal["day"].to_numpy(), side="left") - 1
-    prev_session = np.where(idx >= 0, sessions[np.maximum(idx, 0)], np.datetime64("NaT"))
+    # NaT in the sessions' own unit: a unit-less NaT is deprecated in numpy 2.x.
+    prev_session = np.where(idx >= 0, sessions[np.maximum(idx, 0)],
+                            np.array("NaT", dtype=sessions.dtype))
     return pd.DataFrame({"cday": cal["day"], "cum_before": cal["cum_before"],
                          "prev_session": prev_session})

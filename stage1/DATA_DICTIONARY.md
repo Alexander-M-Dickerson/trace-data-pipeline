@@ -1,7 +1,7 @@
 # Stage 1 Data Dictionary
 
 Comprehensive documentation for the Stage 1 output dataset. Available in zipped parquet format on
-[Open Bond Asset Pricing](https://openbondassetpricing.com/data).
+[Open Source Bond Asset Pricing](https://openbondassetpricing.com/data).
 
 **The file you build is not the file you download.** A panel you build yourself carries all 44
 columns with every value populated. The published download has **32 columns**: the four agency
@@ -40,7 +40,7 @@ in the schema, and the largest drops 7% of bond-days.
 | **Size** | about 2.7 GB for the full sample as built (2026-09-10 run) |
 | **Rows** | ~31 million (full sample 2002-present; 31,344,732 in the 2026 vintage) |
 | **Columns** | 44 as built; **32 in the public download** (see the note above) |
-| **Download** | Available in zipped parquet format on [Open Bond Asset Pricing](https://openbondassetpricing.com/data) |
+| **Download** | Available in zipped parquet format on [Open Source Bond Asset Pricing](https://openbondassetpricing.com/data) |
 
 ---
 

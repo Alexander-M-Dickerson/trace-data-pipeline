@@ -153,9 +153,9 @@ def main() -> int:
                     help="❗the winsorization threshold is a quantile of THIS window, "
                          "so moving it changes the series -- see the module docstring")
     ap.add_argument("--force", action="store_true")
+    sys.stdout.reconfigure(encoding="utf-8")   # before --help prints UTF-8 text
     args = ap.parse_args()
 
-    sys.stdout.reconfigure(encoding="utf-8")
     prov = pblenv.use()
     root = series_root()
     tag = "lab-series"
