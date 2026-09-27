@@ -8,8 +8,9 @@ The conventions, each one different from `run_sorts.py` and each one deliberate:
 
   * data      the monthly panel from 2002-08-31 -- one month EARLIER than the three-
               approach runs, because this design has no formation-month gap to absorb.
-  * signals   every panel column that is not an identifier, with the unadjusted `_mmn`
-              twin swapped in wherever one exists (30 of the 108).
+  * signals   the 108 signals of `signal_set.py` (the spec's Cluster rows), never a column
+              chosen by leaving others out, with the unadjusted `_mmn` twin swapped in
+              wherever one exists (30 of the 108).
   * returns   RAW `ret_vw` / `ret_vw_bgn` -- NOT excess of the bill. The census compares
               a signal against ITSELF on the other return window, so the risk-free rate
               is common to both sides and cancels; subtracting it would only add a step.
@@ -37,23 +38,11 @@ import _stage3_settings as S   # noqa: E402
 import drrlib as D          # noqa: E402
 import paths                # noqa: E402
 import pblenv               # noqa: E402
+import signal_set as SIG    # noqa: E402
 from bench import Bench     # noqa: E402
 
 DATE_CUTOFF = "2002-08-31"          # one month EARLIER than the three-approach runs
 
-# Everything that identifies a bond-month, prices it, or dates it -- never a signal.
-ID_COLUMNS = [
-    "cusip", "date", "issuer_cusip", "permno", "permco", "gvkey",
-    "144a", "country", "call",
-    "ret_vw", "ret_vw_bgn", "ret_vwx", "ret_vwx_bgn", "ret_type",
-    "hprd", "lib", "libd", "hprd_bgn", "igap_bgn",
-    "dt_s", "dt_e", "dt_s_bgn", "dt_e_bgn",
-    "spc_rat", "mdc_rat",
-    "ff17num", "ff30num",
-    "mcap_s", "mcap_e", "fce_val",
-    "tret", "rfret",
-    "sig_dt", "sig_gap",
-]
 
 
 def lib_csv_name(sort: str, timing: str) -> str:
@@ -90,7 +79,9 @@ def prepare(verbose: bool = True) -> tuple[pd.DataFrame, list[str]]:
     data = data.merge(mmn, on=["cusip", "date"], how="left")
     assert len(data) == n0, f"mmn merge changed rows {n0} -> {len(data)}"
 
-    base = [c for c in data.columns if c not in ID_COLUMNS and not c.endswith("_mmn")]
+    # [ref:rule.signal_set] by inclusion: a list of columns to leave out once let five Treasury
+    # benchmark returns into this census.
+    base = SIG.select(data.columns, what="the Stage 2 panel")
     signal_cols = [f"{c}_mmn" if f"{c}_mmn" in data.columns else c for c in base]
     n_swap = sum(c.endswith("_mmn") for c in signal_cols)
     assert n_swap == len(D.PRICE_BASED), \
@@ -126,6 +117,7 @@ def run_one(sort: str, timing: str) -> tuple[Path, dict]:
         res = fast_within_firm_sorts(data, signal_cols, columns=cols,
                                      firm_id_col=S.FIRM_ID_COL)
     panel = extract_panel(res, naming=NamingConfig(sign_correct=True))
+    SIG.check_census(panel["factor"].unique(), what=out.name)
 
     D.write_atomic(panel, out, index=False)
     wall = time.perf_counter() - t0

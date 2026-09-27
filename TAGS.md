@@ -8,7 +8,7 @@ file for the tag's name with `tag:` or `group:` in front of it. A group is the s
 in several places, which must be kept in step. The syntax is
 [tagref's](https://github.com/stepchowfun/tagref); `tools/tags.py` explains it and checks it.
 
-248 names in 297 places, and 53 references to them from 3 files.
+249 names in 298 places, and 57 references to them from 7 files.
 
 ## entry
 
@@ -51,6 +51,7 @@ A rule the code enforces. The tag sits on the check, or on the one setting that 
 | `rule.parquet_only` | [stage0/_trace_settings.py](stage0/_trace_settings.py) | every stage reads parquet, so any other OUTPUT_FORMAT stops here | `stage0/AGENTS.md` |
 | `rule.pybondlab_pin` | [pybondlab_pin.py](pybondlab_pin.py) | stages 2-4 stop at start-up unless PyBondLab is the pinned release and numba and numexpr are installed | `AGENTS.md` |
 | `rule.redaction` | [stage2/make_release.py](stage2/make_release.py) | the public panel must have permco and gvkey blank and the ratings reduced to 1 (investment grade) or 11 (high yield) | `AGENTS.md` |
+| `rule.signal_set` | [stage3/signal_set.py](stage3/signal_set.py) | the signals are the spec's Cluster rows; everything else is never sorted | `stage3/AGENTS.md`, `stage3/s1_lib/run_lib_sorts.py`, `stage3/s1_lib/tB1_lib_summary.py`, `stage3/s4_zoo/run_zoo_sorts.py` |
 
 ## trap
 

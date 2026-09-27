@@ -46,6 +46,7 @@ _note = ""
 import drrlib as D          # noqa: E402
 import paths                # noqa: E402
 import run_lib_sorts as RL  # noqa: E402
+import signal_set as SIG    # noqa: E402
 from bench import Bench     # noqa: E402
 
 LABEL = "tab:lib_summary"
@@ -85,6 +86,8 @@ def compute_lib(*, undo_flips: bool = False, root: Path | None = None,
                     "--sort {single,wf} --timing {end,bgn}`.")
         df_end = pd.read_csv(_lib_csv(sort, "end", root=root), parse_dates=["date"])
         df_bgn = pd.read_csv(_lib_csv(sort, "bgn", root=root), parse_dates=["date"])
+        for timing, df in (("end", df_end), ("bgn", df_bgn)):     # [ref:rule.signal_set]
+            SIG.check_census(df["factor"].unique(), what=_lib_csv(sort, timing, root=root).name)
         df_end = df_end[df_end["date"] <= pd.Timestamp(cutoff_end)]
         df_bgn = df_bgn[df_bgn["date"] <= pd.Timestamp(cutoff_end)]
         for weighting in ("vw", "ew"):

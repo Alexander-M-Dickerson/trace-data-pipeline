@@ -1,5 +1,5 @@
 {
-  "_doc": "The input contract. tools/check_inputs.py enforces it and fails with the whole list of problems, so a missing column surfaces in a second rather than forty minutes into a grid. Column lists are the ones the code reads: the panel's identifiers come from s4_zoo/run_zoo_sorts.ID_COLUMNS, its signals from zoo_engine.CLUSTERS, and the twin list from drrlib.PRICE_BASED. min_rows and min_end floor a LIVE artifact at a plausible vintage -- raise them deliberately when the pipeline extends, never to make a failing check pass.",
+  "_doc": "The input contract. tools/check_inputs.py enforces it and fails with the whole list of problems, so a missing column surfaces in a second rather than forty minutes into a grid. Column lists are the ones the code reads: the panel's non-signal columns and its signals from signal_set.py (the spec's Cluster rows are the signals), which zoo_engine.CLUSTERS must equal, and the twin list from drrlib.PRICE_BASED. min_rows and min_end floor a LIVE artifact at a plausible vintage -- raise them deliberately when the pipeline extends, never to make a failing check pass.",
   "inputs": {
     "STAGE2_PANEL": {
       "what": "the monthly bond panel -- every section reads it",

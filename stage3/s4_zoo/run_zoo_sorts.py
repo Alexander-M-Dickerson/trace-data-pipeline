@@ -44,20 +44,10 @@ import drrlib as D          # noqa: E402
 import paths                # noqa: E402
 import pblenv               # noqa: E402
 import zoo_engine as Z      # noqa: E402
+import signal_set as SIG    # noqa: E402
 from bench import Bench     # noqa: E402
 
 DATE_CUTOFF = "2002-08-31"
-
-# Everything that identifies a bond-month, prices it, or dates it -- never a signal.
-ID_COLUMNS = [
-    "cusip", "date", "issuer_cusip", "permno", "permco", "gvkey",
-    "144a", "country", "call",
-    "ret_vw", "ret_vw_bgn", "ret_vwx", "ret_vwx_bgn", "ret_type",
-    "hprd", "lib", "libd", "hprd_bgn", "igap_bgn",
-    "dt_s", "dt_e", "dt_s_bgn", "dt_e_bgn",
-    "spc_rat", "mdc_rat", "ff17num", "ff30num",
-    "mcap_s", "mcap_e", "fce_val", "tret", "rfret", "sig_dt", "sig_gap",
-]
 
 
 def sorts_root() -> Path:
@@ -91,16 +81,11 @@ def prepare_data(*, end: str | None = None,
     dup = data.duplicated(["cusip", "date"]).sum()
     assert dup == 0, f"{dup} duplicate (cusip,date) rows would corrupt PyBondLab"
 
-    signals = [c for c in data.columns if c not in ID_COLUMNS]
-    # A panel carrying columns beyond the published 140 would otherwise be sorted as
-    # extra "signals", and every false-discovery threshold in Section IA is computed
-    # over m = the number of factors. Restrict to the cluster map, and say so.
-    extras = sorted(c for c in signals if c not in Z.CLUSTER_OF)
-    if extras:
-        print(f"[data] dropping {len(extras)} columns that are not zoo signals: {extras}")
-        signals = [c for c in signals if c in Z.CLUSTER_OF]
-    assert len(signals) == Z.N_FACTORS, \
-        f"{len(signals)} signals after the cluster-map restriction != {Z.N_FACTORS}"
+    # [ref:rule.signal_set] every false-discovery threshold in Section IA is computed over
+    # m = the number of factors, so a column that is not a signal must never be sorted here.
+    signals = SIG.select(data.columns, what="the Stage 2 panel")
+    assert set(signals) == set(Z.CLUSTER_OF) and len(signals) == Z.N_FACTORS, (
+        "the zoo's cluster map and the spec's signals differ")
     print(f"[data] {len(data):,} rows  {data['date'].min():%Y-%m-%d}"
           f" .. {data['date'].max():%Y-%m-%d}  {len(signals)} signals")
     return data, signals

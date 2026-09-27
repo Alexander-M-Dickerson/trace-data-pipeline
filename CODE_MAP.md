@@ -143,6 +143,7 @@ paper section: `s1_lib` is the paper's Section 3, `s2_lab` Section 4, `s3_nse` S
 | `stage3/paths.py` | The paths, derived from the settings |
 | `stage3/pblenv.py` | Checks the installed PyBondLab against `pybondlab_pin.py` before any sort, and records its version and content hash with every result |
 | `stage3/drrlib.py` | Shared loading, statistics (Newey-West, CAPM_B alpha, paired differences) and result manifests |
+| `stage3/signal_set.py` | Which panel columns are signals: the 108 Cluster rows of the Table IA.VIII spec. Every section sorts these and nothing else |
 | `stage3/fastrun.py` | Runs the grids one signal per fresh process |
 | `stage3/bench.py` | Times each run and records its own checks in `reports/timings.jsonl` |
 | `stage3/captions.py` | Every table caption |
@@ -185,7 +186,7 @@ paper section: `s1_lib` is the paper's Section 3, `s2_lab` Section 4, `s3_nse` S
 |---|---|
 | `tests/` | The whole repo: stage 0 chunking and scheduling, the disk-space check, one row per key on every lookup, the stage 1 linker window and sample-end rule, no private paths in tracked files, the docs against the code (`test_docs.py`), the code tags (`test_tags.py`), the assistant skills (`test_skills.py`), `doctor.py` and `download_inputs.sh`, the smoke test's checks (`smoke_assertions.py`), and a probe of your WRDS connection limit (`probe_wrds_connections.py`, needs WRDS). `tests/AGENTS.md` says what each file guards |
 | `stage2/tests/` | Stage 2: the column contract and order, the `_mmn` twin rule, the release redaction, the factor sources, the calendar and month boundaries, the data dictionary against the code, and parity with a reference build (skipped when there is none) |
-| `stage3/tests/` | Stage 3: the input contract, the runner and its steps, the exhibit index, no absolute or private paths, the Section 5 counting rules, the signal definitions, and the skip-and-rebuild rule |
+| `stage3/tests/` | Stage 3: the input contract, the runner and its steps, the exhibit index, no absolute or private paths, the Section 5 counting rules, the signal definitions, the signal set every section sorts, and the skip-and-rebuild rule |
 | `stage4/tests/` | Stage 4, on small synthetic panels: the grid in the spec, the duration swap, the flip set, the CSV pivot, and one run through PyBondLab |
 
 Run `python -m pytest stage2/tests tests stage3/tests stage4/tests -q`. Nothing in it needs WRDS or the network.

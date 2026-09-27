@@ -38,6 +38,12 @@ unchanged. After a new Stage 2 build, the producers that read it run again by th
 (the runner prints `[rebuild] ... built from different Stage 2 inputs`); `--force` is only
 needed to recompute everything regardless.
 
+Which columns are signals is decided in one place, `signal_set.py`: the 108 Cluster rows of the
+Table IA.VIII spec [ref:rule.signal_set]. Every section sorts those and nothing else, and a panel
+column the spec does not classify stops the run. A Section 3 census built before 4.1.1 holds five
+Treasury benchmark returns as if they were signals; Table B.1 refuses it, and
+`python _run_stage3.py --section lib --force` rebuilds it.
+
 ## What the user ends up with
 
 ```

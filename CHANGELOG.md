@@ -9,11 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [4.1.1] - 2026-09-27
 
-**Definitions that now say what the code computes, and fixes found by a sweep of the docs.**
-Nothing a stage computes has changed: the code that builds data in stages 0 to 4 differs from
-4.1.0 only in docstrings and comments, checked by comparing the parsed code.
+**Stage 3's Table B.1 no longer counts Treasury returns as signals; definitions that now say
+what the code computes; and fixes found by a sweep of the docs.** Table B.1 is the one result
+that changes. Otherwise the code that builds data in stages 0 to 4 differs from 4.1.0 only in
+docstrings, comments and message text, checked by comparing the parsed code.
 
 ### Fixed
+- **Stage 3's Section 3 census sorted five Treasury benchmark returns as if they were signals.**
+  It took every panel column that was not on a list of identifiers, and the list was older than
+  `tret_bns`, `tret_cfm`, `tret_gprs`, `tret_cls` and `tret_mat`. On a 2026 panel it sorted 113
+  columns, not the 108 signals, and Table B.1 counted the five among its non-price-based signals
+  (83 where there are 78). The published paper's Table B.1 was built from a panel without these
+  columns and is not affected. The signals now come from one list, `stage3/signal_set.py`: the
+  108 Cluster rows of the Table IA.VIII spec. Every section sorts those and nothing else, the
+  tests hold the factor zoo, Section 5 and stage 4 to the same list, a panel column the spec does
+  not classify stops the run, and Table B.1 refuses a census that is not exactly the signals.
+  Existing output: `python _run_stage3.py --section lib --force`, from `stage3/`.
 - **Twenty-seven column definitions** in `stage2/DATA_DICTIONARY.md` and the Table IA.VIII spec
   (`stage3/spec/signal_definitions.json`) now say what the code does, each checked against the
   code and, where a number is quoted, measured on the 2026-09-21 panel. Each row that departs
