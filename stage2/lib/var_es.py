@@ -75,6 +75,9 @@ def _rolling_var_es_numba(rets, ids_codes, min_obs, window, alphas):
     return var_res, es_res
 
 
+# [tag:col.var_90] 90% value-at-risk: the 10th-percentile loss of the bond's monthly returns over the last 36 months (12 at least)
+# [tag:col.es_90] 90% expected shortfall: the mean loss beyond the 10th percentile of the bond's monthly returns over the last 36 months (12 at least)
+# [tag:col.var_95] 95% value-at-risk: the 5th-percentile loss of the bond's monthly returns over the last 36 months (12 at least)
 def compute_rolling_var_es(df: pd.DataFrame, *, id_col: str = "cusip_id", date_col: str = "date",
                            ret_col: str = "ret_vw", min_obs: int = 12, window: int = 36,
                            alphas: Sequence[float] = (0.90, 0.95)) -> pd.DataFrame:

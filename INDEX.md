@@ -8,6 +8,7 @@ A task-by-task guide to the docs, for people and for AI assistants. What each co
 
 | to... | read | run |
 |---|---|---|
+| see what is ready and what to run next | [AGENTS.md: Start here](AGENTS.md#start-here) | `python doctor.py` (`--wrds` on WRDS) |
 | see which stage runs where, and why | [README: Which machine am I on?](README.md#which-machine-am-i-on) | |
 | run stages 0 and 1 on WRDS | [QUICKSTART.md](QUICKSTART.md) | `./run_pipeline.sh` |
 | check the chain works before a 5-hour run | [CONTRIBUTING: Testing](CONTRIBUTING.md#testing) | `qsub run_smoke_test.sh` |
@@ -19,7 +20,8 @@ A task-by-task guide to the docs, for people and for AI assistants. What each co
 | reproduce the paper's tables and figures | [stage3/QUICKSTART_stage3.md](stage3/QUICKSTART_stage3.md) | `bash stage3/run_stage3.sh` |
 | build the TRACE-only bond factors, and check them against the published ones | [stage4/README_stage4.md](stage4/README_stage4.md) | `bash stage4/run_stage4.sh` |
 | install what stages 2-4 need | [requirements-local.txt](requirements-local.txt) | `pip install -r requirements-local.txt`, then `pip install --no-deps pybondlab==0.3.0` |
-| run a stage with Claude Code or Codex | [AGENTS.md](AGENTS.md) | |
+| run a stage with Claude Code, Codex or another assistant | [AGENTS.md](AGENTS.md), and the skills it lists | `/build-panel` in Claude Code, `$build-panel` in Codex |
+| see what has been run end to end, and when | [docs/validation/validated_runs.csv](docs/validation/validated_runs.csv) | |
 
 ## Understanding the data
 
@@ -31,6 +33,7 @@ A task-by-task guide to the docs, for people and for AI assistants. What each co
 | look up a stage 3 output file | [stage3/DATA_DICTIONARY.md](stage3/DATA_DICTIONARY.md) |
 | look up a column of the TRACE-only factor files | [stage4/DATA_DICTIONARY.md](stage4/DATA_DICTIONARY.md) |
 | find the code behind a table or figure of the paper | [stage3/INDEX.md](stage3/INDEX.md) |
+| find the line that computes a column, applies a filter or enforces a rule | [TAGS.md](TAGS.md), or `grep -rn "tag:col.<name>" .` |
 | understand the decimal-shift corrector | [stage0/README_decimal_shift_corrector.md](stage0/README_decimal_shift_corrector.md) |
 | understand the bounce-back filter | [stage0/README_bounce_back_filter.md](stage0/README_bounce_back_filter.md) |
 | understand the distressed-bond filter | [stage1/README_distressed_filter.md](stage1/README_distressed_filter.md) |
@@ -65,5 +68,6 @@ A task-by-task guide to the docs, for people and for AI assistants. What each co
 | to... | read |
 |---|---|
 | find what a code file does | [CODE_MAP.md](CODE_MAP.md) |
+| tag a new column or filter, and check the tags | [AGENTS.md: The code tags](AGENTS.md#the-code-tags) |
 | run the tests before a pull request | [CONTRIBUTING: Testing](CONTRIBUTING.md#testing) |
 | see what changed in each release | [CHANGELOG.md](CHANGELOG.md) |

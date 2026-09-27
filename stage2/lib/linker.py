@@ -59,6 +59,7 @@ def _fetch() -> pd.DataFrame:
         return pd.read_parquet(io.BytesIO(zf.read(cfg.LINKER_ZIPKEY)))
 
 
+# [group:trap.stale_cache] a cached download is used whenever it exists, so each loader checks it before trusting it
 def load_linker(force_fetch: bool = False) -> pd.DataFrame:
     """The linker, guaranteed to carry the window this panel joins on.
 

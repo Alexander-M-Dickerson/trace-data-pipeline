@@ -276,6 +276,7 @@ def step2_load_trace_data():
 
         logger.info("Loading %s...", filepath.name)
         df_i = hf.load_and_process_trace_file(filepath)
+        # [tag:daily.db_type] which TRACE database the row came from: 1 Enhanced, 2 Standard, 3 144A
         df_i["db_type"] = DB_TYPE_BY_MEMBER[member]  # by MEMBER, never by position
         trace_parts.append(df_i)
         logger.info("  Loaded %s: %d rows", member, len(df_i))
@@ -520,6 +521,8 @@ def step4_merge_fisd():
     gc.collect()
 
     # Calculate bond_maturity and bond_age without lambda (faster)
+    # [tag:daily.bond_maturity] years to maturity at the trade date
+    # [tag:daily.bond_age] years since issue at the trade date
     traced_pre_filter["bond_maturity"] = (traced_pre_filter["maturity"] - traced_pre_filter["trd_exctn_dt"]).dt.days / 365.25
     traced_pre_filter["bond_age"] = (traced_pre_filter["trd_exctn_dt"] - traced_pre_filter["offering_date"]).dt.days / 365.25
 
@@ -540,6 +543,7 @@ def step4_merge_fisd():
 
     n_before_accrued = len(traced_pre_filter)
 
+    # [tag:filter.accrued_inputs] stage 1 filter 1: keeps rows QuantLib can price (maturity and age positive, dated date present, a usable coupon frequency)
     # Apply valid_accrued_vars filter
     traced = (
         traced_pre_filter
@@ -916,6 +920,7 @@ def step6_merge_ratings():
         direction="backward"
     )
     
+    # [tag:daily.bond_amt_outstanding] amount outstanding in $ thousands: the latest FISD figure on or before the trade date, else the offering amount
     # Fill remaining gaps with the original offering amount.
     #
     # ❗fisd_mergedissue is one row per ISSUE, not per CUSIP, and this frame comes
@@ -1068,6 +1073,8 @@ def step6_merge_ratings():
     sp_ratings = sp_ratings.sort_values(["sp_rating_date"]).reset_index(drop=True)
     moodys_ratings = moodys_ratings.sort_values(["mdy_rating_date"]).reset_index(drop=True)
     
+    # [tag:daily.sp_rating] the latest S&P rating on or before the trade date, 1 (AAA) to 22 (default)
+    # [tag:daily.mdy_rating] the latest Moody's rating on or before the trade date, 1 to 21
     # --- Merge S&P ratings ---
     logger.info("Merging S&P ratings with asof...")
     final_df = pd.merge_asof(
@@ -1106,6 +1113,8 @@ def step6_merge_ratings():
     if "cusip_id" in final_df.columns:
         final_df['cusip_id'] = final_df['cusip_id'].astype('category')
 
+    # [tag:daily.spc_rating] S&P, filled from Moody's where missing
+    # [tag:daily.mdc_rating] Moody's (21 moved to 22), filled from S&P where missing
     # --- Create composite ratings ---
     final_df["mdy_rating_numeric_adj"] = np.where(
         final_df["mdy_rating_numeric"] >= 21, 22, final_df["mdy_rating_numeric"]
@@ -1222,6 +1231,9 @@ def step7_merge_linker():
     logger.info("Merging linker on cusip_id within [%s, %s] (window-choice: identity)...",
                 *LINKER_WINDOW)
     before = len(final_df)
+    # [tag:daily.permno] the issuer's CRSP PERMNO, from the bond-firm linker's identity window
+    # [tag:daily.permco] the issuer's CRSP PERMCO, from the bond-firm linker's identity window; not in the public download
+    # [tag:daily.gvkey] the issuer's Compustat GVKEY, from the bond-firm linker's identity window; not in the public download
     final_df, n_past = _linker_join.attach_firm_ids(final_df, dfl, LINKER_WINDOW)
     after = len(final_df)
     logger.info("Linker merge: %d -> %d rows", before, after)
@@ -2066,6 +2078,7 @@ def step10a_build_filter_tables():
         filter_records.append(("valid_accrued_vars", n_before, n_after, removed, pct))
         logger.info("Valid accrued vars: -%d rows (%.3f%%)", removed, pct)
     
+    # [tag:filter.rating_present] stage 1 filter 2: keeps rows with an S&P or a Moody's rating
     # Filter 2: Valid rating (spc_rating OR mdc_rating present)
     # FIX: Use n_after from Filter 1 instead of len(final_df)
     n_before = n_after_filter1
@@ -2077,6 +2090,7 @@ def step10a_build_filter_tables():
     filter_records.append(("valid_rating", n_before, n_after, removed, pct))
     logger.info("Valid rating: -%d rows (%.3f%%)", removed, pct)
     
+    # [tag:filter.maturity_one_year] stage 1 filter 3: drops every bond-day within a year of maturity
     # Filter 3: Valid maturity (bond_maturity >= 1)
     n_before = len(final_df)
     final_df = final_df[final_df['bond_maturity'] >= 1.0].copy()
@@ -2086,6 +2100,7 @@ def step10a_build_filter_tables():
     filter_records.append(("valid_maturity", n_before, n_after, removed, pct))
     logger.info("Valid maturity: -%d rows (%.3f%%)", removed, pct)
     
+    # [tag:filter.ultra_distressed] stage 1 filter 4: drops the price errors the ultra-distressed filter flags
     # Filter 4: Distressed errors (flag_refined_any == 1)
     if 'flag_refined_any' in final_df.columns:
         n_before = len(final_df)
@@ -2096,6 +2111,7 @@ def step10a_build_filter_tables():
         filter_records.append(("distressed_errors", n_before, n_after, removed, pct))
         logger.info("Distressed errors: -%d rows (%.3f%%)", removed, pct)
     
+    # [tag:filter.july_2002] stage 1 filter 5: drops a first price change in July 2002 of more than 35 points
     # Filter 5: 2002-07 filter (prc_dip == 1)
     if 'prc_dip' in final_df.columns:
         n_before = len(final_df)
@@ -2106,6 +2122,7 @@ def step10a_build_filter_tables():
         filter_records.append(("2002_07_filter", n_before, n_after, removed, pct))
         logger.info("2002-07 filter: -%d rows (%.3f%%)", removed, pct)
     
+    # [tag:filter.price_above_300] stage 1 filter 6: drops prices above 300 (% of par)
     # Filter 6: High price (prc_high == 1)
     if 'prc_high' in final_df.columns:
         n_before = len(final_df)
@@ -2131,6 +2148,7 @@ def step10a_build_filter_tables():
     # Winsorize within-date for outlier variables
     # ========================================================================
     logger.info("Applying within-date winsorization...")
+    # [tag:filter.winsorize] clips ytm and credit_spread to their 0.5% and 99.5% quantiles within each trade date
     winsor_vars = ['ytm', 'credit_spread']
     
     for var in winsor_vars:

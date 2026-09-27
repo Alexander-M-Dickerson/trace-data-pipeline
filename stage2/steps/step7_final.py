@@ -70,7 +70,7 @@ def build(con=None, mode: str | None = None, limit_cusips: int | None = None) ->
         with pt("attach_stage1_firm_ids"):
             firm_ids = _read(blocks_dir, "firm_ids")
             before = len(returns_main)
-            returns_main["issuer_cusip"] = returns_main["cusip"].astype(str).str[:6]
+            returns_main["issuer_cusip"] = returns_main["cusip"].astype(str).str[:6]  # [tag:col.issuer_cusip] the first six characters of the CUSIP
             returns_main = returns_main.merge(firm_ids, on=["cusip", "date"], how="left",
                                               validate="1:1")
             assert len(returns_main) == before, (
@@ -128,7 +128,7 @@ def build(con=None, mode: str | None = None, limit_cusips: int | None = None) ->
 
     factors = pd.read_parquet(blocks_dir / "factors.parquet", columns=["date", "rf"])
     factors["date"] = pd.to_datetime(factors["date"])
-    factors = factors.rename(columns={"rf": "rfret"})
+    factors = factors.rename(columns={"rf": "rfret"})  # [tag:col.rfret] the one-month risk-free rate, from the factor panel
     main_panel = main_panel.merge(factors, on="date", how="left")
     main_panel_adj = main_panel_adj.merge(factors, on="date", how="left")
 
@@ -140,9 +140,9 @@ def build(con=None, mode: str | None = None, limit_cusips: int | None = None) ->
     fisd = fisd.merge(fisd_call, on="issue_id", how="left")
     fisd["callable"] = np.where(fisd["callable"].isnull(), 0, fisd["callable"])
     fisd = fisd.rename(columns={"callable": "call"}).drop(columns=["issue_id"])
-    fisd["144a"] = (fisd["144a"] == "Y").astype("int8")
-    fisd["country"] = fisd["country"].astype("category")
-    fisd["call"] = fisd["call"].astype("int8")
+    fisd["144a"] = (fisd["144a"] == "Y").astype("int8")  # [tag:col.144a] 1 if FISD marks the bond Rule 144A, else 0
+    fisd["country"] = fisd["country"].astype("category")  # [tag:col.country] the issuer's country of domicile, from FISD
+    fisd["call"] = fisd["call"].astype("int8")  # [tag:col.call] 1 if FISD lists the bond as callable, else 0 (stage 1's call dummy file)
     main_panel = main_panel.merge(fisd, on="cusip", how="left")
     main_panel_adj = main_panel_adj.merge(fisd, on="cusip", how="left")
 

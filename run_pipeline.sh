@@ -1,4 +1,5 @@
 #!/bin/bash
+# [tag:entry.wrds] stages 0 and 1 on WRDS: ./run_pipeline.sh submits every job in order
 # TRACE Data Pipeline Orchestrator
 #
 # This script orchestrates the entire multi-stage TRACE data pipeline:

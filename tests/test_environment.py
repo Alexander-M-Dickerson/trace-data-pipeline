@@ -25,6 +25,15 @@ def test_a_wrong_or_missing_pybondlab_gets_the_two_install_lines(monkeypatch):
         assert f"--no-deps pybondlab=={pybondlab_pin.VERSION}" in msg
 
 
+def test_a_pybondlab_that_cannot_be_imported_gets_the_two_install_lines(monkeypatch):
+    """Installed, but a module it imports (numba) is missing: a message, not a traceback."""
+    def broken():
+        raise ModuleNotFoundError("No module named 'numba'")
+    monkeypatch.setattr(pybondlab_pin, "installed_version", broken)
+    msg = pybondlab_pin.check()
+    assert msg and "cannot be imported" in msg and "-r requirements-local.txt" in msg
+
+
 def test_the_pinned_pybondlab_passes(monkeypatch):
     """In an environment installed as documented. A missing numba or numexpr FAILS here, with
     the message a user would see: an environment that lacks them is not the documented one."""

@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python doctor.py)",
+      "Bash(python doctor.py --wrds)",
+      "Bash(python3 doctor.py --wrds)",
+      "Bash(python -m pytest:*)",
+      "Bash(python tools/tags.py --check)",
+      "Bash(python _run_stage2.py --dry-run:*)",
+      "Bash(python validate_coverage.py)",
+      "Bash(python tools/check_inputs.py:*)",
+      "Bash(python _run_stage3.py --dry-run:*)",
+      "Bash(python build_factors.py --dry-run:*)",
+      "Bash(bash download_inputs.sh --check)",
+      "Bash(qstat:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)"
+    ],
+    "deny": [
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git clean:*)",
+      "Bash(rm -rf:*)",
+      "Bash(rm -fr:*)",
+      "Bash(rm -r -f:*)",
+      "Bash(rm -f -r:*)",
+      "Bash(rm -Rf:*)"
+    ]
+  }
+}

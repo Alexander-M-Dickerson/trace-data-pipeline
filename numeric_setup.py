@@ -19,7 +19,7 @@ from __future__ import annotations
 
 def apply() -> None:
     import pandas as pd
-    pd.set_option("compute.use_numexpr", True)
+    pd.set_option("compute.use_numexpr", True)  # [tag:rule.numexpr] pandas uses numexpr, as the published build did; it changes float32 results
     pd.set_option("compute.use_bottleneck", False)
 
 

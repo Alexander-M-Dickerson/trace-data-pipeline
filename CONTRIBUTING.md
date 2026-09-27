@@ -87,7 +87,11 @@ panel = report = dictionary gate passes *vacuously* until you have run a build. 
 tests skip unless `STAGE2_REFERENCE_OUTPUT` / `STAGE2_REFERENCE_ROOT` point at a reference
 tree. `pytest -rs` lists what skipped and why.
 
-`tests/test_docs.py` checks the documentation against the code, and pytest runs it. Three
+`tests/test_docs.py` checks the documentation against the code, and pytest runs it.
+`tests/test_tags.py` checks the code tags: a new panel column needs a `col.` tag on the line that
+computes it, and a new filter a `filter.` tag (`AGENTS.md` shows how); run `python tools/tags.py`
+afterwards to rewrite `TAGS.md`. `tests/test_skills.py` keeps the two copies of each assistant
+skill identical, so edit one and copy it over the other. Three
 files under `tests/` are scripts rather than pytest modules -- pytest imports them and
 collects nothing -- so run them directly:
 

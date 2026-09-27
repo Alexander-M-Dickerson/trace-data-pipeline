@@ -17,6 +17,7 @@ inputs by sha256 and the PyBondLab release that produced it.
 Then `python compare_published.py` checks the result against the files
 openbondassetpricing.com serves.
 """
+# [tag:entry.stage4_build] builds the TRACE-only factors
 from __future__ import annotations
 
 import argparse

@@ -15,6 +15,7 @@ output/_published/), and compares it with what build_factors.py wrote, cell by c
 
 Exit 0 when everything agrees within --tol (default 0: identical); 1 otherwise.
 """
+# [tag:entry.stage4_compare] compares them with the published files
 from __future__ import annotations
 
 import argparse

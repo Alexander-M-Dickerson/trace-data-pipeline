@@ -115,6 +115,8 @@ FROM t2 ORDER BY cusip_id, dt, frn
             frame["month_start"] = frame["date"].dt.to_period("M").dt.to_timestamp()
             con.register(name, frame.drop(columns=["date"]))
 
+    # [tag:col.spd_abs] the absolute bid-ask spread: the dollar-volume-weighted dealer ask minus bid price, in the month
+    # [tag:col.spd_rel] the relative bid-ask spread: the dollar-volume-weighted dealer ask minus bid, over their midpoint, in the month
     # ---------------- Hong-Warga volume-weighted spreads (no min_obs) -----------------------------
     pt_sql = pt("sql_metrics")
     pt_sql.__enter__()
@@ -144,6 +146,8 @@ FROM (
 )"""
     _both(hws_tpl, con, "m_hws")
 
+    # [tag:col.cs_sprd] the Corwin-Schultz spread from two-day high and low prices, the month's average
+    # [tag:col.ar_sprd] the Abdi-Ranaldo spread from close, high and low prices, the month's average
     # ---------------- Corwin-Schultz + Abdi-Ranaldo spreads ---------------------------------------
     # base: hi/lo/close non-null, clipped >= 1e-12; lags pair within the SUBSET (full vs lst=1)
     for tag, where in (("f", "TRUE"), ("a", "lst_txn = 1")):
@@ -197,6 +201,8 @@ SELECT f.cusip_id, f.month_start,
 FROM m_csar_f f LEFT JOIN m_csar_a a USING (cusip_id, month_start)
 """)
 
+    # [tag:col.p_zro] the share of the month's business days with no price
+    # [tag:col.p_fht] the FHT spread: 2 x daily return volatility x the normal quantile of (1 + the share of no-price days) / 2, that share always counting every day of the month
     # ---------------- p_zro / p_fht (pandas tail for norm.ppf) ------------------------------------
     cal = nyse_calendar.build_calendar_frame()
     sess = cal.loc[cal["is_session"], "day"]
@@ -249,6 +255,7 @@ FROM (
 )"""
     _both(trn_tpl, con, "m_trn")
 
+    # [tag:col.vov] volatility over volume: 2.5 x sigma^0.6 / mean dollar volume^0.25
     # ---------------- vov -------------------------------------------------------------------------
     vov_tpl = f"""
 SELECT cusip_id, month_start,

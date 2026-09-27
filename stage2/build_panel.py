@@ -48,6 +48,7 @@ FULL_PLAN: tuple[tuple[tuple[int, int], ...], ...] = (
     ((1, 1),), ((2, 2),), PARALLEL_CHAINS, ((7, 7),))
 
 
+# [tag:rule.fresh_process] each group of steps runs in a fresh process; a long-lived one makes DuckDB lose its parallelism
 def _run_stage(ranges: tuple[tuple[int, int], ...], input_mode: str,
                limit_cusips: int | None, manifest) -> None:
     """Run one stage's step ranges as concurrent child orchestrator processes (fresh per range)."""

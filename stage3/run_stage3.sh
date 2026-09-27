@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# [tag:entry.stage3] stage 3, the exhibits: bash run_stage3.sh
 # Run every Stage-3 step in order: the input contract first, then produce, then render.
 #
 #   bash run_stage3.sh                 # everything

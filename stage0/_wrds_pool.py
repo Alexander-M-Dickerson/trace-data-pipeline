@@ -100,7 +100,7 @@ def _is_connection_limit(exc: BaseException) -> bool:
 def connect(username: str | None = None, *, attempts: int = 3):
     """Open one connection, with the handshake serialised and staggered."""
     user = username or _USERNAME or os.environ.get("WRDS_USERNAME") or ""
-    if not user or user == PLACEHOLDER_USERNAME:
+    if not user or user == PLACEHOLDER_USERNAME:  # [tag:trap.eof_error] no username makes the wrds package prompt and die with an EOFError that looks like the connection cap
         raise WRDSCredentialsMissing(
             """No WRDS username (got %r). Export it before running:
     export WRDS_USERNAME="your_id"

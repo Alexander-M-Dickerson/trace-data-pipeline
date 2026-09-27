@@ -211,3 +211,6 @@ stage3/reports/
 !stage3/spec/
 !stage3/spec/**
 stage3/**/__pycache__/
+
+# The acceptance prompts and the validation ledgers under docs/ are CSV, and are documents.
+!docs/**/*.csv

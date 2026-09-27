@@ -68,6 +68,7 @@ def _missing_twins(df: pd.DataFrame) -> list[str]:
     return [c for c in cfg.BBW_BENCHMARK_COLS if c not in df.columns]
 
 
+# [group:trap.stale_cache] a cached download is used whenever it exists, so each loader checks it before trusting it
 def load_extended_bbw(force_fetch: bool = False) -> pd.DataFrame:
     """The extended BBW factor series: ['date', MKTB, DRF, CRF, MKTBx, DRFx, CRFx, TERM] plus
     DEFB/TERMB when the published file carries them, one row per month-end (1973-02 .. 2023-01).

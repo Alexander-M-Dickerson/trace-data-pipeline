@@ -407,6 +407,7 @@ def _gprs_statements(ladder: str = "da_lad", steps: int = NEWTON_STEPS) -> list[
     return out
 
 
+# [tag:col.tret_mat] the twin of tret: the same index returns interpolated at maturity, not duration
 def _attach_tret_mat(con, table: str, date_col: str, treasury_mod, mode: str | None) -> None:
     """tret_mat: the incumbent `tret` machinery fed MATURITY instead of modified duration.
 
@@ -457,6 +458,10 @@ def attach(con, table: str, date_col: str, out_table: str, *,
     build_curve(con, Path(gsw_path))
     build_cashflows(con, Path(fisd_path), Path(terms_path))
     con.execute(f"CREATE OR REPLACE TEMP TABLE da_lad AS {_ladder_sql(table, date_col, Path(daily_path or cfg.daily_input()), start_col)}")
+    # [tag:col.tret_bns] the Treasury return of the bond's own cash flows, present-value weighted (van Binsbergen, Nozawa and Schwert)
+    # [tag:col.tret_cfm] the Treasury return of the bond's own cash flows, future-value weighted
+    # [tag:col.tret_gprs] the Treasury return of the bond's own cash flows, reweighted to match its duration exactly (Ghaderi et al.)
+    # [tag:col.tret_cls] the Treasury return of the bond's own cash flows priced on the Treasury zero curve (Cui, Lu and Song)
     for stmt in _gprs_statements():
         con.execute(stmt)
     con.execute("""

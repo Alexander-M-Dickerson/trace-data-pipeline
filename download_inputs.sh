@@ -1,4 +1,5 @@
 #!/bin/bash
+# [tag:entry.download_inputs] fetches stage 1's inputs: bash download_inputs.sh, on the login node
 # download_inputs.sh -- fetch the external files stage 1 needs.
 #
 # Stage 1 needs three things this repo does not ship: the Liu-Wu zero-coupon treasury
@@ -7,6 +8,7 @@
 # the login node, before anything is submitted.
 #
 #   ./download_inputs.sh
+#   ./download_inputs.sh --check    say which of the files are already here; download nothing
 #
 # run_pipeline.sh calls this for you. Run it yourself before ./run_smoke_test.sh,
 # which is submitted straight to the grid and so cannot fetch anything.
@@ -17,7 +19,9 @@
 set -uo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
-mkdir -p stage1/data
+CHECK_ONLY=0
+[[ "${1:-}" == "--check" ]] && CHECK_ONLY=1
+[[ $CHECK_ONLY -eq 1 ]] || mkdir -p stage1/data
 
 # fetch URL DEST [zip]: download to DEST.part, check it is non-empty (and, for a zip -- an
 # .xlsx is one -- that it opens), then move it over DEST. `wget -O DEST` would empty DEST before the download starts,
@@ -53,39 +57,44 @@ fetch_zip() {
     fi
 }
 
-# Download required data files for Stage 1 (WRDS compute nodes have no internet)
-# This must be done on the login node before submitting jobs
-echo ""
-echo "=== PRE-STAGE: Downloading Required Data Files ==="
-echo "[download] Liu-Wu treasury yields..."
-fetch "https://docs.google.com/spreadsheets/d/11HsxLl_u2tBNt3FyN5iXGsIKLwxvVz7t/export?format=xlsx&id=11HsxLl_u2tBNt3FyN5iXGsIKLwxvVz7t" \
-      stage1/data/liu_wu_yields.xlsx zip \
-    && echo "[ok] Liu-Wu yields downloaded" \
-    || echo "[warn] Failed to download Liu-Wu yields; any copy from an earlier run is kept"
+if [[ $CHECK_ONLY -eq 1 ]]; then
+    echo "[check] Downloading nothing; checking the files already here."
+else
+    # [tag:trap.no_internet] WRDS compute nodes have no internet, so this runs on the login node first
+    # Download required data files for Stage 1 (WRDS compute nodes have no internet)
+    # This must be done on the login node before submitting jobs
+    echo ""
+    echo "=== PRE-STAGE: Downloading Required Data Files ==="
+    echo "[download] Liu-Wu treasury yields..."
+    fetch "https://docs.google.com/spreadsheets/d/11HsxLl_u2tBNt3FyN5iXGsIKLwxvVz7t/export?format=xlsx&id=11HsxLl_u2tBNt3FyN5iXGsIKLwxvVz7t" \
+          stage1/data/liu_wu_yields.xlsx zip \
+        && echo "[ok] Liu-Wu yields downloaded" \
+        || echo "[warn] Failed to download Liu-Wu yields; any copy from an earlier run is kept"
 
-fetch_zip "https://openbondassetpricing.com/wp-content/uploads/2026/09/bond_firm_linker_2026.zip" \
-          bond_firm_linker_2026.zip "Bond-firm linker"
+    fetch_zip "https://openbondassetpricing.com/wp-content/uploads/2026/09/bond_firm_linker_2026.zip" \
+              bond_firm_linker_2026.zip "Bond-firm linker"
 
-# The release ships its own checker: it re-derives every count in its docs from the parquets
-# and exits non-zero if anything drifted. One second here beats discovering a damaged linker
-# seven hours into the pipeline, so a failure stops the run.
-if [[ -f "stage1/data/bond_firm_linker_2026/verify_release.py" ]]; then
-    echo "[verify] Checking bond-firm linker release..."
-    if out=$(cd stage1/data/bond_firm_linker_2026 && python3 verify_release.py 2>&1); then
-        echo "[ok] Bond-firm linker release verified"
-    else
-        echo "$out" | tail -20
-        echo "[error] The bond-firm linker failed its own check (above). If it names a"
-        echo "[error] missing package, install requirements.txt; otherwise delete"
-        echo "[error] stage1/data/bond_firm_linker_2026/ and run this script again."
-        exit 1
+    # The release ships its own checker: it re-derives every count in its docs from the parquets
+    # and exits non-zero if anything drifted. One second here beats discovering a damaged linker
+    # seven hours into the pipeline, so a failure stops the run.
+    if [[ -f "stage1/data/bond_firm_linker_2026/verify_release.py" ]]; then
+        echo "[verify] Checking bond-firm linker release..."
+        if out=$(cd stage1/data/bond_firm_linker_2026 && python3 verify_release.py 2>&1); then
+            echo "[ok] Bond-firm linker release verified"
+        else
+            echo "$out" | tail -20
+            echo "[error] The bond-firm linker failed its own check (above). If it names a"
+            echo "[error] missing package, install requirements.txt; otherwise delete"
+            echo "[error] stage1/data/bond_firm_linker_2026/ and run this script again."
+            exit 1
+        fi
     fi
-fi
 
-for n in 12 17 30; do
-    fetch_zip "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/Siccodes${n}.zip" \
-              "Siccodes${n}.zip" "Fama-French ${n} Industry Classification"
-done
+    for n in 12 17 30; do
+        fetch_zip "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/Siccodes${n}.zip" \
+                  "Siccodes${n}.zip" "Fama-French ${n} Industry Classification"
+    done
+fi
 
 echo "[verify] Checking downloaded files..."
 MISSING_FILES=0

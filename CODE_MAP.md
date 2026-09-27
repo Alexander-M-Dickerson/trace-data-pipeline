@@ -43,6 +43,8 @@ the last month each cache holds.
 | `download_inputs.sh` | Fetches the files stage 1 needs from the internet. Login node only: WRDS compute nodes have no internet |
 | `check_disk_space.sh` | Checks there is room in your WRDS home quota before a run. Called by `run_pipeline.sh` |
 | `run_smoke_test.sh` | Runs the real stage 0 and stage 1 code on a few CUSIP chunks and checks the results, in about 10 minutes. Its data goes under `smoke/`, its log to `smoke_test.out` and `smoke_test.err` |
+| `doctor.py` | Says what is ready and what to run next: on your computer for stages 2-4, or with `--wrds` on the login node for stages 0-1. It runs each stage's own check, and downloads, connects and creates nothing |
+| `tools/tags.py` | Checks the code tags (tagref's syntax: a named tag on the line that computes a panel column, applies a filter or enforces a rule) and writes `TAGS.md`, the index of them |
 
 ## Stage 0: raw TRACE to daily panels (WRDS)
 
@@ -181,9 +183,24 @@ paper section: `s1_lib` is the paper's Section 3, `s2_lab` Section 4, `s3_nse` S
 
 | folder | what it covers |
 |---|---|
-| `tests/` | The whole repo: stage 0 chunking and scheduling, the disk-space check, one row per key on every lookup, the stage 1 linker window and sample-end rule, no private paths in tracked files, the docs against the code (`test_docs.py`), the smoke test's checks (`smoke_assertions.py`), and a probe of your WRDS connection limit (`probe_wrds_connections.py`, needs WRDS) |
+| `tests/` | The whole repo: stage 0 chunking and scheduling, the disk-space check, one row per key on every lookup, the stage 1 linker window and sample-end rule, no private paths in tracked files, the docs against the code (`test_docs.py`), the code tags (`test_tags.py`), the assistant skills (`test_skills.py`), `doctor.py` and `download_inputs.sh`, the smoke test's checks (`smoke_assertions.py`), and a probe of your WRDS connection limit (`probe_wrds_connections.py`, needs WRDS). `tests/AGENTS.md` says what each file guards |
 | `stage2/tests/` | Stage 2: the column contract and order, the `_mmn` twin rule, the release redaction, the factor sources, the calendar and month boundaries, the data dictionary against the code, and parity with a reference build (skipped when there is none) |
 | `stage3/tests/` | Stage 3: the input contract, the runner and its steps, the exhibit index, no absolute or private paths, the Section 5 counting rules, the signal definitions, and the skip-and-rebuild rule |
 | `stage4/tests/` | Stage 4, on small synthetic panels: the grid in the spec, the duration swap, the flip set, the CSV pivot, and one run through PyBondLab |
 
 Run `python -m pytest stage2/tests tests stage3/tests stage4/tests -q`. Nothing in it needs WRDS or the network.
+On GitHub, `.github/workflows/tests.yml` runs it on Linux, Windows and macOS with Python 3.11 and
+3.13 on every push, with `tools/tags.py --check`, `doctor.py` and the official tagref.
+
+## For AI assistants
+
+| file | what it is |
+|---|---|
+| `AGENTS.md`, and one in each of `stage0/` to `stage4/` and `tests/` | The instructions every assistant reads: what to run, what to check, the traps. Each `CLAUDE.md` beside one imports it |
+| `.claude/skills/`, `.agents/skills/` | Six step-by-step procedures (`onboard`, `run-wrds`, `build-panel`, `reproduce-exhibits`, `build-factors`, `explain`), the same file twice: Claude Code reads the first folder, Codex, Cursor, Copilot and Gemini the second |
+| `.claude/settings.json` | Lets Claude Code run the read-only checks without asking, and blocks the usual spellings of a force-push and a recursive delete |
+| `.github/copilot-instructions.md` | Points GitHub Copilot at `AGENTS.md` |
+| `TAGS.md` | Every code tag, with its file and what it marks. Written by `tools/tags.py` |
+| `docs/acceptance/prompts.csv` | The questions a new assistant must answer well, with what a good answer uses and says |
+| `docs/validation/validated_runs.csv` | What has been run end to end, when, and where the evidence is |
+| `docs/validation/agent_acceptance_log.csv` | Each run of the acceptance prompts: which assistant, whether it passed, and what it missed |

@@ -8,6 +8,7 @@ The companion library is [PyBondLab](https://pypi.org/project/pybondlab/), which
 [![Website](https://img.shields.io/badge/Website-Visit-blue?logo=google-chrome&logoColor=white)](https://openbondassetpricing.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11-3.13](https://img.shields.io/badge/python-3.11--3.13-blue.svg)](https://www.python.org/downloads/)
+[![tests](https://github.com/Alexander-M-Dickerson/trace-data-pipeline/actions/workflows/tests.yml/badge.svg)](https://github.com/Alexander-M-Dickerson/trace-data-pipeline/actions/workflows/tests.yml)
 [![Stage 0](https://img.shields.io/badge/Stage%200-Public%20Beta-green)](stage0/)
 [![Stage 1](https://img.shields.io/badge/Stage%201-Public%20Beta-green)](stage1/)
 [![Stage 2](https://img.shields.io/badge/Stage%202-Public%20Beta-green)](stage2/)
@@ -306,7 +307,14 @@ the cross-stage invariants in `tests/smoke_assertions.py`. It writes to `smoke/`
 
 **Start here:** [INDEX.md](INDEX.md) says which doc answers which question.
 [CODE_MAP.md](CODE_MAP.md) says what each stage reads and writes and what every code file does.
-Using Claude Code or Codex? It reads [AGENTS.md](AGENTS.md) by itself.
+[TAGS.md](TAGS.md) names the line where each panel column is computed, each filter applied and
+each rule enforced. `python doctor.py` says what is ready and what to run next.
+
+**With an AI assistant.** Claude Code, Codex, Cursor and Copilot read [AGENTS.md](AGENTS.md) by
+themselves: what to run, what to check, and the traps. Six skills walk a stage step by step:
+`/onboard`, `/run-wrds`, `/build-panel`, `/reproduce-exhibits`, `/build-factors` and `/explain`
+in Claude Code (`$onboard` and so on in Codex). Ask it to set the repository up, to build a
+stage, or what a column is and where it is computed.
 
 **Stage 0 - TRACE Data Processing:**
 - **[README](stage0/README_stage0.md)**: Complete guide for intraday to daily TRACE processing
@@ -387,7 +395,11 @@ trace-data-pipeline/
 ├── README.md  QUICKSTART.md  FAQ.md  CONTRIBUTING.md  CHANGELOG.md
 ├── INDEX.md                # where to look for each task
 ├── CODE_MAP.md             # what each stage reads and writes, and what every file does
-├── AGENTS.md  CLAUDE.md    # instructions for AI assistants (Codex, Claude Code)
+├── TAGS.md                 # the line each panel column, filter and rule lives on
+├── AGENTS.md  CLAUDE.md    # instructions for AI assistants; skills in .claude/ and .agents/
+├── doctor.py               # what is ready, and what to run next
+├── tools/                  # tags.py: checks the code tags and writes TAGS.md
+├── docs/                   # the questions an assistant must answer, and what has been run
 ├── config.py               # settings shared by stages 0-2
 ├── run_pipeline.sh         # runs stages 0 and 1 on WRDS
 ├── download_inputs.sh  check_disk_space.sh  run_smoke_test.sh
@@ -698,4 +710,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Last Updated:** September 2026
-**Version:** 4.0.0 — see [CHANGELOG.md](CHANGELOG.md) for what each release changed.
+**Version:** 4.1.0 — see [CHANGELOG.md](CHANGELOG.md) for what each release changed.

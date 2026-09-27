@@ -13,7 +13,7 @@ from config import WRDS_USERNAME, AUTHOR, OUTPUT_FORMAT
 # hard-coded "*.parquet" name via pd.read_parquet. Writing CSV therefore produces a
 # stage-0 output that nothing downstream can open, and the run fails hours later with
 # "Expected: stage0/<member>/trace_<member>_<stamp>.parquet". Refuse it up front.
-if str(OUTPUT_FORMAT).lower() != "parquet":
+if str(OUTPUT_FORMAT).lower() != "parquet":  # [tag:rule.parquet_only] every stage reads parquet, so any other OUTPUT_FORMAT stops here
     raise ValueError(
         f"OUTPUT_FORMAT={OUTPUT_FORMAT!r} in config.py is not supported. Only "
         "'parquet' works end to end -- Stage 1 and the data reports read "
@@ -192,7 +192,7 @@ def validate_connection_budget(members) -> None:
     """
     concurrent = [m for m in members if m in ("enhanced", "144a")]
     total = sum(workers(m) for m in concurrent)
-    if total > MAX_WRDS_CONNECTIONS - 1:
+    if total > MAX_WRDS_CONNECTIONS - 1:  # [tag:rule.connection_cap] the members' CONCURRENCY together must leave one of WRDS's 7 connections free
         raise ValueError(
             f"WRDS connection budget exceeded: {concurrent} would hold {total} "
             f"connections, but the measured ceiling is {MAX_WRDS_CONNECTIONS} and one "
@@ -229,6 +229,7 @@ MEM_PER_SLOT_GB = {
 }
 
 
+# [tag:rule.memory_per_slot] memory is charged per slot and a job may use 8 slots and 48 GB; a larger request would wait in the queue forever, so this refuses it
 def qsub_resources(member: str) -> str:
     """qsub flags for one stage0 member, derived from its worker count.
 

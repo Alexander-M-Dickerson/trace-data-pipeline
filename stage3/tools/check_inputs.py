@@ -14,6 +14,7 @@ a grid.
 The contract lives in `spec/inputs.json`, beside this file. Editing that file changes
 what is required; editing this one changes how it is checked.
 """
+# [tag:entry.stage3_inputs] checks stage 3's inputs exist and have the expected shape
 from __future__ import annotations
 
 import argparse

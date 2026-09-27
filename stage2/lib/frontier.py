@@ -71,6 +71,7 @@ def describe(bad: pd.DataFrame) -> str:
     return "\n".join(lines)
 
 
+# [tag:rule.frontier] the panel's last month must be a real cross-section, not one TRACE database alone
 def assert_frontier_is_a_cross_section(df: pd.DataFrame, *, what: str = "panel",
                                        date_col: str = "date", id_col: str = "cusip",
                                        min_share: float = MIN_COVERAGE_SHARE) -> None:

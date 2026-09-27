@@ -38,13 +38,18 @@ def installed_version() -> str | None:
     return getattr(PyBondLab, "__version__", "unknown")
 
 
+# [tag:rule.pybondlab_pin] stages 2-4 stop at start-up unless PyBondLab is the pinned release and numba and numexpr are installed
 def check() -> str | None:
     """None when PyBondLab is the pinned release and numba and numexpr are present; else the fix.
 
     numexpr changes numbers, not just speed: see numeric_setup.py."""
     problems = []
-    got = installed_version()
-    if got is None:
+    try:
+        got = installed_version()
+    except ImportError as e:        # installed, but a module it imports (numba) is missing
+        got = None
+        problems.append(f"PyBondLab is installed but cannot be imported ({e})")
+    if got is None and not problems:
         problems.append("PyBondLab is not installed")
     elif got != VERSION:
         problems.append(f"PyBondLab {got} is installed, and this repository runs on {VERSION}")

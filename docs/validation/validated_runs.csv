@@ -1,0 +1,8 @@
+run_id,stage,platform,date,command,result,what_was_measured,evidence
+wrds_full_2026-09-21,stages 0 and 1,WRDS Cloud grid,2026-09-21,./run_pipeline.sh,pass,"5.3 h wall clock; a Stage 1 panel of 31,344,732 rows over 70,684 CUSIPs, 2002-07-01 to 2025-11-28",README.md
+stage2_on_2026-09-21,stage 2,own computer,2026-09-22,python _run_stage2.py,pass,"1,950,002 bond-months, 55,422 bonds, 2002-08 to 2025-11, 145 columns",CHANGELOG.md (3.3.0)
+stage2_pinned_reproduction,stage 2,"own computer, fresh checkout",2026-09-26,python _run_stage2.py --factor-source pinned,pass,"reproduces the published 2026 panel: identical in all but six liquidity columns, which differ by less than 1e-13",CHANGELOG.md (4.0.0); stage2/AGENTS.md
+stage3_cold_2026-09-26,stage 3,"own computer, 24 cores",2026-09-26,bash run_stage3.sh,pass,"15.7 minutes, a cold run with data/ and reports/ empty, all 41 steps",stage3/QUICKSTART_stage3.md
+stage4_on_2026-09-21,stage 4,own computer,2026-09-26,bash run_stage4.sh,pass,"all 4,354,560 rows identical to the published TRACE-only factors of the same run",stage4/README_stage4.md; CHANGELOG.md (4.0.0)
+fresh_clone_v4.0.0,install and tests,"Windows, Python 3.13",2026-09-27,git clone; the two install lines; python -m pytest stage2/tests tests stage3/tests stage4/tests -q,pass,a clone of v4.0.0 from GitHub installs from the two lines and passes its tests; the tests that need built data skip,this file
+tagref_check,code tags,Windows,2026-09-27,"tagref (v1.14.0), from the repository root",pass,"212 tags, 85 group members and 53 references validated in 257 files; tools/tags.py counts the same 297 places",this file

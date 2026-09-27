@@ -38,6 +38,7 @@ def _fetch() -> pd.DataFrame:
         return pd.read_parquet(io.BytesIO(zf.read(cfg.QUOTE_ZIPKEY)))
 
 
+# [group:trap.stale_cache] a cached download is used whenever it exists, so each loader checks it before trusting it
 def load_quote(force_fetch: bool = False) -> pd.DataFrame:
     """The quote-returns frame (cusip_id, date, ret_vw, tret, cs, bbtm, sze, + the tret_* block).
 

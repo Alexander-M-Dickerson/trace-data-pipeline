@@ -132,6 +132,7 @@ MMN_TWINNED: frozenset[str] = frozenset((
 ))
 
 
+# [tag:rule.mmn_twins] every price-based signal ships with its unadjusted _mmn twin
 def assert_mmn_twins(sidecar_columns, *, what: str = "mmn sidecar") -> None:
     """Every MMN_TWINNED signal must have its `<col>_mmn` twin in the sidecar."""
     have = set(sidecar_columns)
@@ -175,6 +176,7 @@ def assert_mmn_twins_are_declared(sidecar_columns, *, what: str = "mmn sidecar")
     )
 
 
+# [tag:rule.adjusted_in_panel] the main panel carries the gap-adjusted form of each signal, never the unadjusted twin
 def assert_main_panel_is_adjusted(panel, sidecar, *, what: str = "main panel") -> None:
     """The main panel must carry the MMN-ADJUSTED form, not the unadjusted twin.
 
@@ -218,6 +220,7 @@ def assert_main_panel_is_adjusted(panel, sidecar, *, what: str = "main panel") -
     )
 
 
+# [tag:rule.holding_period] hprd must equal the NYSE sessions between dt_s and dt_e
 def assert_holding_period_is_the_window(panel, cal_lut, *, what: str = "main panel") -> None:
     """`hprd` must be the return's real window: NYSE sessions from `dt_s` to `dt_e`.
 
@@ -256,6 +259,7 @@ def assert_holding_period_is_the_window(panel, cal_lut, *, what: str = "main pan
             "  longer describes the return printed beside it.")
 
 
+# [tag:rule.column_contract] the panel's 145 column names and their order are fixed; a build that changes them fails
 def assert_panel_contract(df, *, what: str = "main panel") -> None:
     """Raise unless `df` carries exactly PANEL_COLUMNS, in exactly that order."""
     actual = list(df.columns)

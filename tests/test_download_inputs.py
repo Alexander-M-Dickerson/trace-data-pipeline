@@ -64,13 +64,13 @@ def _tree(tmp_path: Path, *, earlier_run: bool) -> Path:
     return work
 
 
-def _run(tmp_path: Path, work: Path, wget: str, python3_rc: int = 0):
+def _run(tmp_path: Path, work: Path, wget: str, python3_rc: int = 0, args=()):
     bindir = tmp_path / "bin"
     bindir.mkdir()
     _fake(bindir, "wget", wget)
     _fake(bindir, "python3", f"echo 'the linker check says: count drifted'; exit {python3_rc}")
     env = dict(os.environ, PATH=str(bindir) + os.pathsep + os.environ["PATH"])
-    r = subprocess.run([BASH, SCRIPT.name], cwd=work, env=env, capture_output=True, text=True,
+    r = subprocess.run([BASH, SCRIPT.name, *args], cwd=work, env=env, capture_output=True, text=True,
                        encoding="utf-8", errors="replace")
     return r.returncode, r.stdout + r.stderr
 
@@ -129,3 +129,29 @@ def test_a_linker_that_fails_its_own_check_stops_the_run_and_says_why(tmp_path):
     rc, out = _run(tmp_path, work, WGET_EMPTIES_THEN_FAILS, python3_rc=1)
     assert rc == 1, out
     assert "count drifted" in out and "failed its own check" in out
+
+
+# `wget` that leaves a mark, so a test can tell whether anything was downloaded.
+WGET_MARKS = 'echo called >> "$(dirname "$0")/wget_was_called"; exit 4'
+
+
+@pytest.mark.parametrize("earlier_run, rc_expected", [(True, 0), (False, 1)])
+def test_check_downloads_nothing_and_reports_what_is_there(tmp_path, earlier_run, rc_expected):
+    """`--check` is what doctor.py --wrds runs: the script's own file list, no network."""
+    work = _tree(tmp_path, earlier_run=earlier_run)
+    rc, out = _run(tmp_path, work, WGET_MARKS, args=("--check",))
+    assert rc == rc_expected, out
+    assert not (tmp_path / "bin" / "wget_was_called").exists(), "--check downloaded something"
+    assert "Downloading nothing" in out
+    if earlier_run:
+        _unchanged(work)
+
+
+def test_check_creates_no_folder(tmp_path):
+    """doctor.py --wrds runs `--check`, and doctor.py creates no files."""
+    work = tmp_path / "repo"
+    work.mkdir()
+    shutil.copy(SCRIPT, work / SCRIPT.name)
+    rc, out = _run(tmp_path, work, WGET_MARKS, args=("--check",))
+    assert rc == 1, out
+    assert not (work / "stage1").exists(), "--check created stage1/"

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# [tag:entry.stage4] stage 4, the factors and the comparison: bash run_stage4.sh
 # Stage 4: the TRACE-only bond factors from Stage 2's panel, then the check against the
 # files openbondassetpricing.com publishes.
 #

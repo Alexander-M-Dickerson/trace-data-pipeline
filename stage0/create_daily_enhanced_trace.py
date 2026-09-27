@@ -259,6 +259,8 @@ def compute_trace_all_metrics(trace):
     }
 
     
+    # [group:daily.cusip_id] the bond's 9-character CUSIP; with trd_exctn_dt, the daily key
+    # [group:daily.trd_exctn_dt] the trade date: one row per bond and day
     results = trace.groupby(['cusip_id', 'trd_exctn_dt']).agg(agg_dict)
     
     # Flatten column names
@@ -269,6 +271,16 @@ def compute_trace_all_metrics(trace):
     results['prc_vw_par'] = results['volume_weighted_price_sum'] / results['entrd_vol_qt_sum']
     
     # Create final PricesAll dataframe
+    # [group:daily.pr] the dollar-volume-weighted clean price (prc_vw here; stage 1 renames it pr)
+    # [group:daily.prc_vw_par] the par-volume-weighted price
+    # [group:daily.prc_ew] the equal-weighted price
+    # [group:daily.prc_first] the day's first trade price
+    # [group:daily.prc_last] the day's last trade price
+    # [group:daily.prc_hi] the day's highest trade price
+    # [group:daily.prc_lo] the day's lowest trade price
+    # [group:daily.trade_count] the number of trades
+    # [group:daily.time_ew] the average trade time, in seconds after midnight
+    # [group:daily.time_last] the last trade time, in seconds after midnight
     PricesAll = results.rename(columns={
         'rptd_pr_mean': 'prc_ew',
         'rptd_pr_first': 'prc_first',
@@ -291,6 +303,8 @@ def compute_trace_all_metrics(trace):
     #--------------------------------------------------------------------------
     
     # 
+    # [group:daily.qvolume] par volume, in $ millions
+    # [group:daily.dvolume] dollar volume, in $ millions
     VolumesAll = trace.groupby(['cusip_id', 'trd_exctn_dt']).agg({
         'entrd_vol_qt': 'sum',
         'dollar_vol': 'sum'
@@ -316,6 +330,11 @@ def compute_trace_all_metrics(trace):
                                         'prc_ask', 'bid_count', 'ask_count'])
     
     # Process bid data
+    # [group:daily.prc_bid] the dollar-volume-weighted price of dealer purchases from customers (the bid)
+    # [group:daily.bid_last] the day's last price at which a dealer bought from a customer
+    # [group:daily.bid_time_ew] the average time of the day's dealer purchases from customers, in seconds after midnight
+    # [group:daily.bid_time_last] the time of the day's last dealer purchase from a customer, in seconds after midnight
+    # [group:daily.bid_count] the number of dealer purchases from customers
     if not _bid.empty:
         # Sort by cusip and execution date
         _bid = _bid.sort_values(['cusip_id', 'trd_exctn_dt'])
@@ -351,6 +370,8 @@ def compute_trace_all_metrics(trace):
             prc_BID_ASK['ask_count'] = 0
     
     # Process ask data
+    # [group:daily.prc_ask] the dollar-volume-weighted price of dealer sales to customers (the ask)
+    # [group:daily.ask_count] the number of dealer sales to customers
     if not _ask.empty:
         # Sort by cusip and execution date
         _ask = _ask.sort_values(['cusip_id', 'trd_exctn_dt'])
@@ -432,6 +453,7 @@ def compute_trace_all_metrics(trace):
     merged = merged.sort_values(['cusip_id','trd_exctn_dt']).reset_index(drop=True)
     return merged    
 # -------------------------------------------------------------------------
+# [group:filter.price_scale] rescales prices quoted per unit to percent of par; runs before every other filter, and only when the par-1000 FISD screen is off
 def normalize_price_scale(trace, principal_amt, *, chunk_id=None, logger=None):
     """Rescale unit-quoted bonds to percent of par.
 
@@ -620,7 +642,7 @@ def _process_one_chunk(chunk_id, cusips, ctx, fetch_fn, n_chunks=None,
         log_filter(trace, trace, "start", chunk_id)
         
         # Filter 1: Dick-Nielsen
-        if f["dick_nielsen"]:
+        if f["dick_nielsen"]:  # [group:filter.dick_nielsen] the cancellation, correction and reversal clean
             clean_chunk = clean_trace_chunk(
                 trace,
                 chunk_id      = chunk_id,
@@ -705,7 +727,7 @@ def _process_one_chunk(chunk_id, cusips, ctx, fetch_fn, n_chunks=None,
 
         
         # Filter 5: Prices                      
-        if f["price_filters"]:
+        if f["price_filters"]:  # [group:filter.price_range] drops prices at or below 0 and above 1000
             trace = filter_with_log(trace, trace['rptd_pr'] > 0,     "neg_price_filter",   chunk_id)
             trace = filter_with_log(trace, trace['rptd_pr'] <= 1000, "large_price_filter", chunk_id)
         else:
@@ -720,7 +742,7 @@ def _process_one_chunk(chunk_id, cusips, ctx, fetch_fn, n_chunks=None,
         # https://wrds-www.wharton.upenn.edu/documents/1240/TRACE_Enhanced_Corporate_and_Agency_Historic_Data_File_Layout_pre_2_6_12_09092021v.pdf            
         trace['dollar_vol'] = (trace['entrd_vol_qt'] * trace['rptd_pr'] / 100)  # always compute
         
-        if f["volume_filter_toggle"]:
+        if f["volume_filter_toggle"]:  # [group:filter.volume] drops trades below a dollar or par volume floor; off by default
             vkind, vthr = _normalize_volume_filter(volume_filter)  # NEW
             if vkind == "dollar":
                 mask = trace['dollar_vol'] >= vthr
@@ -781,7 +803,7 @@ def _process_one_chunk(chunk_id, cusips, ctx, fetch_fn, n_chunks=None,
         gc.collect()    
                         
         # Filter 8: Yield != Price
-        if f["yld_price_filter"]:
+        if f["yld_price_filter"]:  # [group:filter.yield_as_price] drops trades whose price equals their reported yield
             mask = (trace["rptd_pr"] != trace["yld_pt"]) | trace["yld_pt"].isna()
             trace = filter_with_log(trace, mask, "price_yld_filter", chunk_id)
         else:
@@ -789,7 +811,7 @@ def _process_one_chunk(chunk_id, cusips, ctx, fetch_fn, n_chunks=None,
 
         # Filter 9: Amount-outstanding vs. volume filter            
         trace = trace.merge(fisd_off, how="left", left_on='cusip_id', right_on='cusip_id')
-        if f["amtout_volume_filter"]:
+        if f["amtout_volume_filter"]:  # [group:filter.volume_vs_amount] drops trades of half the offering amount or more
             trace = filter_with_log(
                 trace,
                 trace['entrd_vol_qt'] < trace['offering_amt']*1000*0.50,
@@ -800,7 +822,7 @@ def _process_one_chunk(chunk_id, cusips, ctx, fetch_fn, n_chunks=None,
             log_filter(trace, trace, "volume_offamt_filter (skipped)", chunk_id)
 
         # Filter 10: Execution date cannot exceed maturity
-        if f["trd_exe_mat_filter"]:
+        if f["trd_exe_mat_filter"]:  # [group:filter.after_maturity] drops trades dated after the bond's maturity
             trace = filter_with_log(
                 trace,
                 trace['trd_exctn_dt'] <= trace['maturity'],
@@ -1044,6 +1066,7 @@ def clean_trace_data(
     else:
         return pd.DataFrame(), bb_cusips_all, dec_shift_cusips_all, init_price_cusips_all
 # -------------------------------------------------------------------------
+# [group:filter.decimal_shift] corrects prices entered 10 or 100 times too large or small
 def decimal_shift_corrector(
     df: pd.DataFrame,
     *,
@@ -1250,6 +1273,7 @@ def decimal_shift_corrector(
     # Return triplet for output_type="cleaned"
     return cleaned_df, n_corrected, affected_cusips
 # -------------------------------------------------------------------------
+# [group:filter.bounce_back] drops a price that jumps away and straight back, a likely entry error
 def flag_price_change_errors(
     df: pd.DataFrame,
     *,
@@ -1516,6 +1540,7 @@ def flag_price_change_errors(
     out["filtered_error"] = filtered.astype(np.int8)
     return out
 # -------------------------------------------------------------------------
+# [group:filter.initial_price] drops erroneous prices at the start of a bond's trading history
 def flag_initial_price_errors(
     df: pd.DataFrame,
     *,
@@ -1637,6 +1662,7 @@ def _hms_to_seconds(x: str) -> float:
         return np.nan
 
 
+# [group:filter.trade_time] keeps trades inside the configured hours of the day
 def filter_by_trade_time(
     df: pd.DataFrame,
     trade_times: list[str] | tuple[str, str] | None,
@@ -1706,6 +1732,7 @@ def _valid_session_dates(calendar_name: str, start_date: str, end_date: str) -> 
 
 
 # -------------------------------------------------------------------------
+# [group:filter.calendar] keeps trades dated on an exchange trading day
 def filter_by_calendar(
     df: pd.DataFrame,
     calendar_name: str | None,
@@ -1888,6 +1915,7 @@ def clean_trace_chunk(trace, *, chunk_id=None, clean_agency=True, logger=None):
     
     return clean_final
 # -------------------------------------------------------------------------
+# [tag:filter.dn_post_2012] Enhanced TRACE after 2012-02-06: cancellations and corrections matched to the trades they amend
 def clean_post_20120206(post, chunk_id=None, logger=None):
     """
     Clean Enhanced TRACE data reported on or after February 6, 2012.
@@ -2049,6 +2077,7 @@ def clean_post_20120206(post, chunk_id=None, logger=None):
     
     return clean_post2
 # -------------------------------------------------------------------------
+# [tag:filter.dn_pre_2012] Enhanced TRACE before 2012-02-06: cancellations, corrections and reversals, the Dick-Nielsen rules
 def clean_pre_20120206(pre, *, chunk_id=None, logger=None):
     """
     Clean Enhanced TRACE data reported before February 6, 2012.
@@ -2367,6 +2396,7 @@ def clean_pre_20120206(pre, *, chunk_id=None, logger=None):
     
     return clean_pre5
 # -------------------------------------------------------------------------
+# [tag:filter.agency] removes the buyer's report of a dealer-to-dealer trade that the seller also reported (same bond, day, price and size), so it counts once
 def clean_agency_transactions(clean_combined, 
                               remove_all_interdealer_buys=False                            
                               ):
@@ -2537,6 +2567,7 @@ def clean_agency_transactions(clean_combined,
     
     return clean_final
 # -------------------------------------------------------------------------
+# [group:filter.fisd_universe] the bond universe: the FISD screens on bond type, currency, coupon and the rest
 def build_fisd(db, params: dict | None = None):
     """
     Build FISD bond universe with switchable screens.
@@ -2797,7 +2828,7 @@ def _process_one_error_chunk(chunk_id, cusips, ctx, fetch_fn, n_chunks=None,
         log_filter(trace, trace, "start", i)
         
         # Filter 1: Dick-Nielsen
-        if f["dick_nielsen"]:
+        if f["dick_nielsen"]:  # [group:filter.dick_nielsen] the cancellation, correction and reversal clean, the data report's copy
             clean_chunk = clean_trace_chunk(
                 trace,
                 chunk_id      = i,
@@ -2904,7 +2935,7 @@ def _process_one_error_chunk(chunk_id, cusips, ctx, fetch_fn, n_chunks=None,
 
         
         # Filter 5: Prices                      
-        if f["price_filters"]:
+        if f["price_filters"]:  # [group:filter.price_range] drops prices at or below 0 and above 1000, the data report's copy
             trace = filter_with_log(trace, trace['rptd_pr'] > 0,     "neg_price_filter",   i)
             trace = filter_with_log(trace, trace['rptd_pr'] <= 1000, "large_price_filter", i)
         else:
@@ -2919,7 +2950,7 @@ def _process_one_error_chunk(chunk_id, cusips, ctx, fetch_fn, n_chunks=None,
         # https://wrds-www.wharton.upenn.edu/documents/1240/TRACE_Enhanced_Corporate_and_Agency_Historic_Data_File_Layout_pre_2_6_12_09092021v.pdf            
         trace['dollar_vol'] = (trace['entrd_vol_qt'] * trace['rptd_pr'] / 100)  # always compute
         
-        if f["volume_filter_toggle"]:
+        if f["volume_filter_toggle"]:  # [group:filter.volume] the trade-size floor, the data report's copy; off by default
             vkind, vthr = _normalize_volume_filter(volume_filter)  
             if vkind == "dollar":
                 mask = trace['dollar_vol'] >= vthr
@@ -2989,7 +3020,7 @@ def _process_one_error_chunk(chunk_id, cusips, ctx, fetch_fn, n_chunks=None,
         trace_ie = trace_bb[trace_bb['filtered_error'] == 0].copy()
 
         # Filter 8: Yield != Price
-        if f["yld_price_filter"]:
+        if f["yld_price_filter"]:  # [group:filter.yield_as_price] drops trades whose price equals their reported yield, the data report's copy
             mask = (trace_ie["rptd_pr"] != trace_ie["yld_pt"]) | trace_ie["yld_pt"].isna()
             trace_ie = filter_with_log(trace_ie, mask, "price_yld_filter", i)
         else:
@@ -2997,7 +3028,7 @@ def _process_one_error_chunk(chunk_id, cusips, ctx, fetch_fn, n_chunks=None,
 
         # Filter 9: Amount-outstanding vs. volume filter
         trace_ie = trace_ie.merge(fisd_off, how="left", left_on='cusip_id', right_on='cusip_id')
-        if f["amtout_volume_filter"]:
+        if f["amtout_volume_filter"]:  # [group:filter.volume_vs_amount] drops trades of half the offering amount or more, the data report's copy
             trace_ie = filter_with_log(
                 trace_ie,
                 trace_ie['entrd_vol_qt'] < trace_ie['offering_amt']*1000*0.50,
@@ -3008,7 +3039,7 @@ def _process_one_error_chunk(chunk_id, cusips, ctx, fetch_fn, n_chunks=None,
             log_filter(trace_ie, trace_ie, "volume_offamt_filter (skipped)", i)
 
         # Filter 10: Execution date cannot exceed maturity
-        if f["trd_exe_mat_filter"]:
+        if f["trd_exe_mat_filter"]:  # [group:filter.after_maturity] drops trades dated after the bond's maturity, the data report's copy
             trace_ie = filter_with_log(
                 trace_ie,
                 trace_ie['trd_exctn_dt'] <= trace_ie['maturity'],

@@ -98,7 +98,7 @@ if N_CORES is None:
 # Standard only for dates AFTER the last Enhanced date, and any trailing cutoff
 # falls before that, so the two conditions cannot both hold. That was already
 # true of the previous fixed date; it is stated here so it is not a surprise.
-DATE_CUT_OFF = "auto:complete"
+DATE_CUT_OFF = "auto:complete"  # [tag:rule.complete_months] the sample ends at the last complete month
 
 # --- Output Settings ---
 # OUTPUT_FORMAT is imported from shared config.py
@@ -186,7 +186,7 @@ LINKER_ZIPKEY = "bond_firm_linker_2026/fl_linker.parquet"
 #                 only if you want ids exactly where equity data exists.
 # The identity window contains the evidence window on every row of the linker, so the
 # identity join never changes an id the evidence join gives. It adds labels outside it.
-LINKER_WINDOW = ("i0", "i1")
+LINKER_WINDOW = ("i0", "i1")  # [group:rule.linker_window] firm ids join the linker's identity window; stages 1 and 2 must agree
 
 # ============================================================================
 # PRE-DOWNLOADED EXTERNAL FILES (DO NOT EDIT)

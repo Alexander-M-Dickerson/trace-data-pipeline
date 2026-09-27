@@ -1,0 +1,16 @@
+date,agent,prompt_id,clone,result,missed,notes
+2026-09-27,Claude Code (claude-opus-5-5),setup_local,a copy with no data,fail,"installed into the machine's existing Python environment instead of a separate one, without asking",fixed: onboard now always makes a separate environment and asks before using an existing one
+2026-09-27,Claude Code (claude-opus-5-5),setup_local,a copy with no data,pass,,"second run, after the fix: made a separate environment in the repository; its install then stopped at the Windows path-length limit, which onboard now covers"
+2026-09-27,Claude Code (claude-opus-5-5),wrds_plan,a copy with no data,pass,,"saw it was not on WRDS and gave the commands to run there, in order"
+2026-09-27,Claude Code (claude-opus-5-5),stage2_build,a copy with no data,pass,,"dry run showed the missing inputs; asked the factor source, the username and before installing"
+2026-09-27,Claude Code (claude-opus-5-5),reproduce_published,a copy with no data,pass,,also named the condition that the WRDS data must be the same run
+2026-09-27,Claude Code (claude-opus-5-5),explain_cs_sprd,a copy with no data,pass,,found the tag; noted the panel holds the form without the bond's last day of trading in the month
+2026-09-27,Claude Code (claude-opus-5-5),explain_decimal_shift,a copy with no data,pass,,found both copies through the group tag
+2026-09-27,Claude Code (claude-opus-5-5),exhibit_table4,a copy with no data,fail,did not say the folder numbers are not the paper's section numbers,fixed: added to the explain skill
+2026-09-27,Claude Code (claude-opus-5-5),exhibit_table4,a copy with no data,pass,,"second run, after the fix"
+2026-09-27,Claude Code (claude-opus-5-5),add_a_column,a copy with no data,pass,,"named the contract, the twin rule, the dictionary and the spec, the tag, the tests, and the CHANGELOG entry and new vintage"
+2026-09-27,Claude Code (claude-opus-5-5),public_daily_file,a copy with no data,pass,,searched for the trap's tag first
+2026-09-27,Claude Code (claude-opus-5-5),stage4_differences,a copy with no data,pass,,followed the factor-source trap tag from stage 4 to stage 2
+2026-09-27,Codex CLI (read-only sandbox),setup_local,a copy with no data,pass,,"could not install in its sandbox; asked for the data, the username and the factor source"
+2026-09-27,Codex CLI (read-only sandbox),explain_cs_sprd,a copy with no data,pass,,used the explain skill from .agents/skills and the tag in TAGS.md
+2026-09-27,Codex CLI (read-only sandbox),stage2_build,a copy with no data,pass,,used the build-panel skill; asked the factor source

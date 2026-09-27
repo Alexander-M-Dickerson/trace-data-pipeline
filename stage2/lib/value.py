@@ -650,6 +650,10 @@ def make_value_signals(
     if verbose:
         logger.info("[Step D] Computing value signals...")
 
+    # [tag:col.val_hz] value: the credit spread's deviation from the spread a monthly cross-sectional regression predicts (rating, industry, 3-month spread change, callable)
+    # [tag:col.val_hz_dts] the HZ value signal (val_hz), demeaned within duration-times-spread quintiles
+    # [tag:col.val_ipr] value: the log-spread residual of a regression on rating, industry, log duration, volatility and callable
+    # [tag:col.val_ipr_dts] the IPR value signal (val_ipr), demeaned within duration-times-spread quintiles
     # Compute value signals for end (standard)
     val_end = compute_value(
         end,
@@ -873,6 +877,8 @@ def build_d_spreads(
 
         out = d[[id_col, date_col]].copy()
 
+        # [tag:col.dcs6] the log change in the credit spread over six months, positive when it narrowed
+        # [tag:col.cs_mu12_1] the average credit spread over the bond's twelve observations before this month, at least six of them
         for n in lags:
             cs_lag, bbtm_lag = _fill_lag(d, lk, cs, bbtm, n=n)
             out[f"dcs{n}{suffix}"] = _safe_log(cs_lag) - log_cs_now

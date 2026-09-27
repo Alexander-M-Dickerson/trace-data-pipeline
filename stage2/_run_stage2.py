@@ -18,6 +18,7 @@ Usage
 Author: Open Source Bond Asset Pricing
 """
 
+# [tag:entry.stage2] stage 2, the monthly panel: python _run_stage2.py (--dry-run first)
 from __future__ import annotations
 
 import argparse

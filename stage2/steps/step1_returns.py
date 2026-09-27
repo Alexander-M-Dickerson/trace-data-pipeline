@@ -39,6 +39,7 @@ PRICE_MAP = {
 ALT_RET_COLS = ("ret_vwp", "ret_ew", "ret_1st", "ret_lst", "ret_bid")
 
 
+# [tag:col.tret] the Treasury return matched to the bond: CRSP fixed-term index returns interpolated at its modified duration
 def _attach_tret(con, table: str, date_col: str, mode: str | None = None) -> None:
     """Upstream step 20: round mod_dur to 2dp (pandas float32 semantics), interpolate the CRSP
     fixed-term curve at it, and add `tret` to `table` keyed exactly by (cusip_id, {date_col})."""
@@ -73,6 +74,7 @@ def build(con, mode: str | None = None, limit_cusips: int | None = None) -> dict
     con.register("month_bounds", month_boundaries.build_month_bounds(months["month_start"]))
     con.register("cal_lut", nyse_calendar.cal_lut_frame())
 
+    # [tag:col.ret_vw] the month-end return: the change in clean price plus accrued interest plus coupons paid, over the dirty price at the start; defaulted bonds are handled below
     fp_defs, lag_defs, ret_defs = [], [], []
     for px in PRICE_MAP:
         sfx = "" if px == "pr" else f"_{px}"
@@ -121,6 +123,8 @@ FROM (
 )
 """)
 
+    # [tag:col.dt_s] the date of the trade that starts the month-end return (last month's month-end trade)
+    # [tag:col.dt_e] the date of the month-end trade that ends the month-end return
     # ============ upstream step 11: month-end frame + per-cusip lags (PRE n<=31 filter) ===========
     con.execute(f"""
 CREATE OR REPLACE TEMP TABLE t_end_full AS
@@ -137,6 +141,9 @@ FROM (
 )
 """)
 
+    # [tag:col.ret_vw_bgn] the month-begin return: from the first trade early in the month to the last trade late in the same month
+    # [tag:col.dt_s_bgn] the date of the month's first trade, which starts the month-begin return
+    # [tag:col.dt_e_bgn] the date of the month's last trade, which ends the month-begin return
     # ============ upstream step 10: within-month (bgn) frame ======================================
     # cnt=2 months hold exactly [begin-row, end-row]; the end-row's cusip-lag is its month's begin row
     con.execute("""
@@ -154,6 +161,7 @@ SELECT * FROM (
 WHERE end_dummy = 1
 """)
 
+    # [tag:col.ret_type] how the return was measured: standard, default_evnt (the month the bond defaults) or trad_in_def (trading while in default)
     # ============ upstream steps 10.5/11.5: default-return handling (event_based) =================
     # ratings lag AFTER the n<=31 filter (end) / on the bgn-returns frame, per pandas shift order.
     # pandas NaN==22 -> False is COALESCE(..., FALSE). ret_std snapshots the pre-adjustment ret_vw.
@@ -190,6 +198,9 @@ FROM (
 )
 """)
 
+    # [tag:col.hprd] the holding period: NYSE sessions from the start trade (dt_s) to the end trade (dt_e)
+    # [tag:col.hprd_bgn] the holding period of the month-begin return: NYSE sessions from its first trade to its last
+    # [tag:col.igap_bgn] NYSE sessions from the last session of last month to this month's first trade
     # ============ upstream steps 12-13: hprd / igap via the session LUT ===========================
     # end hprd: sessions in [prev month-end TRADE, this month-end TRADE); bgn hprd: [first, last
     # trade); igap: [previous business month-end, first trade)
@@ -218,6 +229,8 @@ LEFT JOIN cal_lut ce ON ce.cday = b.dt
 LEFT JOIN cal_lut cl ON cl.cday = b.date_end_bus_lag
 """)
 
+    # [tag:col.lib] the clean-price return from this month-end to next month's first trade, the gap that follows the month-end price
+    # [tag:col.libd] the dirty-price twin of lib: this month-end to next month's first trade, with accrued interest and coupons, over the dirty price
     # ============ upstream step 15: LIB (bgn gap cost, re-dated to t-1, merged onto end) ==========
     # lib = (pr_bgn_start - pr_prev)/pr_prev ; libd = (fp_bgn_start - fp_prev)/prfull_prev, where
     # *_prev are the end frame's lagged month-end values at the SAME (cusip, month).
@@ -267,6 +280,13 @@ SELECT * FROM t_bgn_ret2 WHERE hprd > 0 AND month_end_cal >= DATE '{cfg.START_DA
     print(f"  duration-adjusted benchmarks [bgn]: {_dab['tret_bns']:,}/{_dab['rows']:,} rows "
           f"(tret_mat {_dab['tret_mat']:,})")
 
+    # [tag:col.tmat] years to maturity at the month-end trade (stage 1's bond_maturity)
+    # [tag:col.age] years since issue at the month-end trade (stage 1's bond_age)
+    # [tag:col.fce_val] amount outstanding in thousands of dollars (stage 1's bond_amt_outstanding), rounded
+    # [tag:col.ff17num] the Fama-French 17-industry code, from stage 1
+    # [tag:col.ff30num] the Fama-French 30-industry code, from stage 1
+    # [tag:col.mcap_s] market value at the start trade: amount outstanding x dirty price, in $ millions
+    # [tag:col.mcap_e] market value at the month-end trade: amount outstanding x dirty price, in $ millions
     # ============ upstream steps 16/16.6: end_signals (PRE n<=31 frame, point-in-time) ============
     # bbtm = 100/pr (float32); sze = mcap; fce_val = round(ao); short-name renames per SIGNAL_NAME_MAP
     con.execute(f"""
@@ -284,6 +304,11 @@ WHERE date_end_ref >= DATE '{cfg.START_DATE}'
 QUALIFY row_number() OVER (PARTITION BY cusip_id, date_end_ref ORDER BY dt) = 1
 """)
 
+    # [tag:col.sig_dt] the date of the signal trade: the trade in the month closest to the session before the month-end trade
+    # [tag:col.ytm] yield to maturity, read at the signal trade rather than the month-end trade
+    # [tag:col.md_dur] modified duration, read at the signal trade
+    # [tag:col.convx] convexity, read at the signal trade
+    # [tag:col.cs] credit spread, read at the signal trade
     # ============ upstream step 16 (adj machinery): pick the lagged in-month signal trade =========
     # candidates: same-month trades STRICTLY before the month-end trade, within adj_window sessions
     # of the CALENDAR month-end; pick the trade with min |calendar days to cut_off_adj| where
@@ -313,6 +338,10 @@ SELECT * FROM (
 QUALIFY row_number() OVER (PARTITION BY cusip_id, month_end_cal ORDER BY ddiff, sig_dt) = 1
 """)
 
+    # [tag:col.str] short-term reversal: the return from last month-end to the signal trade
+    # [tag:col.sig_gap] NYSE sessions from the signal trade to the month-end trade
+    # [tag:col.bbtm] book-to-market: 100 over the clean price at the signal trade
+    # [tag:col.sze] size: market value at the signal trade, in $ millions
     # str1_adj = (fp_adj - fp_s)/prfull_s (prev MONTH-END lags); str2_adj uses the BGN frame's lags;
     # bbtm_adj/sze_adj are float32 values stored float64 (np.asarray(..., 'float64') upstream);
     # sig_gap = sessions in [sig_dt, month-end trade)
@@ -332,6 +361,10 @@ LEFT JOIN cal_lut css ON css.cday = a.sig_dt
 LEFT JOIN cal_lut cse ON cse.cday = a.dt_e
 """)
 
+    # [tag:col.cusip] the bond's 9-character CUSIP; with date, the panel's key
+    # [tag:col.date] the calendar month-end the row belongs to
+    # [tag:col.spc_rat] the S&P rating, filled from Moody's where missing (stage 1's spc_rating), at the month-end trade
+    # [tag:col.mdc_rat] the Moody's rating, filled from S&P where missing (stage 1's mdc_rating); renamed from mdyc_rat in lib/wrangle.py
     # ============ final frames: normalize (runner) + block outputs ================================
     # end_returns: ret_vw = default-adjusted then capped at ret_std for trad_in_def; alt returns are
     # aligned to the normalized ret_vw on default rows (normalize_default_returns, is_end=True).
@@ -449,6 +482,9 @@ SELECT cusip, date, ret_vw, tret, tret_bns, tret_cls, ret_std, ret_type FROM (
     #   cfg.LINKER_WINDOW; its authority is the linker bundle's own README.md and SCHEMA.md.
     #   History: until 2026-09-21 stage 1 joined the EVIDENCE window (w0/w1), and inheriting those
     #   ids made the panels disagree about firm membership on 2.14% of bond-months (lib/linker.py).
+    # [tag:col.permno] the issuer's CRSP PERMNO, from the published bond-firm linker on its identity window
+    # [tag:col.permco] the issuer's CRSP PERMCO, from the published bond-firm linker on its identity window; blank in the public release
+    # [tag:col.gvkey] the issuer's Compustat GVKEY, from the published bond-firm linker on its identity window; blank in the public release
     lo, hi = linker.register(con, "_linker")
     _copy("firm_ids", f"""
         SELECT e.cusip_id AS cusip, e.date_end_ref::TIMESTAMP AS date,

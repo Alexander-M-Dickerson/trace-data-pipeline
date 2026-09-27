@@ -21,6 +21,7 @@ month -- that is correct, not a straggler. Anything that dies 2+ months early is
 A column is only judged if it was "healthy" (coverage >= HEALTHY_FRAC) at its own last populated
 month -- naturally-sparse or always-empty columns are reported separately, never failed.
 """
+# [tag:entry.stage2_coverage] checks every column reaches the panel's last month
 from __future__ import annotations
 
 import argparse

@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.1.0] - 2026-09-27
+
+**The repository is set up for a user and their AI assistant.** An assistant opened here finds
+what to run, what to check, and the line where each thing is computed, and `python doctor.py`
+says what is ready. Nothing a stage computes has changed: every Python file that gained a tag
+parses to the same code as in 4.0.0.
+
+### Added
+- `doctor.py`: what is ready and what to run next, on your own computer (stages 2-4) or, with
+  `--wrds`, on the login node (stages 0-1). It runs each stage's own check, and downloads,
+  connects to and creates nothing.
+- **Code tags**, in [tagref](https://github.com/stepchowfun/tagref)'s syntax: a named tag in a
+  comment on the line that computes each of the 145 monthly and 44 daily panel columns, applies
+  each cleaning filter, enforces each rule or guards each known trap, and on each entry point.
+  `TAGS.md` lists them; `tools/tags.py` checks them and writes it. The tests fail when a
+  reference points nowhere, a tag is declared twice, or a panel column has no tag, and the
+  official `tagref` reads the same tags. A filter both stage 0 cleaners apply is tagged as a
+  group, one name for both copies.
+- **Six assistant skills**, step-by-step procedures: `onboard`, `run-wrds`, `build-panel`,
+  `reproduce-exhibits`, `build-factors` and `explain`. The same file is in `.claude/skills/` for
+  Claude Code and in `.agents/skills/` for Codex, Cursor, Copilot and Gemini;
+  `tests/test_skills.py` keeps the two copies identical and checks every file they name.
+- `AGENTS.md` rewritten around the assistant's job (run, check, explain), with new guides in
+  `stage0/`, `stage1/` and `tests/` beside those in stages 2-4; `.claude/settings.json`, which
+  lets the read-only checks run without asking and blocks the usual spellings of a force-push
+  and a recursive delete;
+  and `.github/copilot-instructions.md`.
+- `docs/acceptance/prompts.csv`, the questions a new assistant must answer well, and
+  `docs/validation/validated_runs.csv`, what has been run end to end and where the evidence is.
+- A GitHub Actions workflow that runs the tests, the three test scripts, the tag check and
+  `doctor.py` on Linux, Windows and macOS with Python 3.11 and 3.13, and the official tagref,
+  on every push.
+- `download_inputs.sh --check` says which of stage 1's inputs are present, and downloads and
+  creates nothing.
+
+### Fixed
+- Stages 2-4's start-up check stopped with a traceback, rather than the two install lines,
+  when PyBondLab was installed but numba was missing.
+
 ## [4.0.0] - 2026-09-26
 
 **Stages 2-4 run on PyBondLab 0.3.0 from PyPI, and Stage 4 builds the TRACE-only bond factors

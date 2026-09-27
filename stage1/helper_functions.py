@@ -57,6 +57,14 @@ def Date2Timestamp(d):
     return pd.Timestamp(d.year(), d.month(), d.dayOfMonth())
 
 
+# [tag:daily.ytm] yield to maturity, solved by QuantLib from the day's price
+# [tag:daily.prfull] the dirty price: clean price plus accrued interest
+# [tag:daily.acclast] interest accrued since the last coupon
+# [tag:daily.accpmt] the coupons paid since issue
+# [tag:daily.accall] accrued interest plus coupons paid; the returns use it
+# [tag:daily.mod_dur] modified duration
+# [tag:daily.mac_dur] Macaulay duration
+# [tag:daily.convexity] convexity
 def GetNewVarsPy(x):
     """
     Calculate bond analytics using QuantLib
@@ -409,7 +417,7 @@ def calculate_credit_spreads(traced_out, ylds, n_jobs=10):
     )
     
     # Calculate credit spread (bond yield - treasury yield)
-    final_df['credit_spread'] = final_df['ytm'] - final_df['yld_interp']
+    final_df['credit_spread'] = final_df['ytm'] - final_df['yld_interp']  # [tag:daily.credit_spread] ytm minus the Treasury yield interpolated at the bond's maturity
     
     return final_df
 
@@ -1006,6 +1014,7 @@ def _compute_round_mask(prices, round_numbers, round_tolerance, valid_mask):
     return is_round
 
 
+# [tag:filter.ultra_distressed_flags] flags probable price errors among very low-priced bonds: anomalies, upward spikes, plateaus and intraday gaps
 def ultra_distressed_filter(
     df: pd.DataFrame,
     *,
@@ -4514,7 +4523,7 @@ def add_ff_industries(fisd_df: pd.DataFrame, verbose: bool = True):
         if verbose:
             print(f"  Matching {len(fisd_df):,} SIC codes to FF12 industries...")
         
-        fisd_df['ff12num'] = fisd_df['sic_code'].apply(match_sic_to_ff12)
+        fisd_df['ff12num'] = fisd_df['sic_code'].apply(match_sic_to_ff12)  # [tag:daily.ff12num] the Fama-French 12-industry code, from the FISD SIC code
         
         if verbose:
             ind_counts = fisd_df['ff12num'].value_counts().sort_index()
@@ -4650,7 +4659,7 @@ def add_ff_industries(fisd_df: pd.DataFrame, verbose: bool = True):
         if verbose:
             print(f"  Matching {len(fisd_df):,} SIC codes to FF17 industries...")
         
-        fisd_df['ff17num'] = fisd_df['sic_code'].apply(match_sic_to_ff17)
+        fisd_df['ff17num'] = fisd_df['sic_code'].apply(match_sic_to_ff17)  # [tag:daily.ff17num] the Fama-French 17-industry code
         
         if verbose:
             ind_counts = fisd_df['ff17num'].value_counts().sort_index()
@@ -4786,7 +4795,7 @@ def add_ff_industries(fisd_df: pd.DataFrame, verbose: bool = True):
         if verbose:
             print(f"  Matching {len(fisd_df):,} SIC codes to FF30 industries...")
         
-        fisd_df['ff30num'] = fisd_df['sic_code'].apply(match_sic_to_ff30)
+        fisd_df['ff30num'] = fisd_df['sic_code'].apply(match_sic_to_ff30)  # [tag:daily.ff30num] the Fama-French 30-industry code
         
         if verbose:
             ind_counts = fisd_df['ff30num'].value_counts().sort_index()

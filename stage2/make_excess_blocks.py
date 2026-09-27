@@ -33,6 +33,7 @@ nothing. Build them first with `step3_bbw.build(benchmark=...)`.
 
 Author: Open Source Bond Asset Pricing
 """
+# [tag:entry.stage2_benchmarks] re-estimates the betas on the two alternative Treasury benchmarks
 from __future__ import annotations
 
 import argparse

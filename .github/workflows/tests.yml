@@ -1,0 +1,59 @@
+# The offline checks on every push: the tests, the code tags, and the readiness check, on the
+# three operating systems and at both ends of the supported Python range. Nothing here needs
+# WRDS, data or a secret.
+name: tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.11", "3.13"]
+    defaults:
+      run:
+        # bash on every runner, Windows included: it stops at the first failing line, where
+        # PowerShell would report only the last one.
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - name: Install, with the two lines the README gives
+        run: |
+          python -m pip install -r requirements-local.txt
+          python -m pip install --no-deps pybondlab==0.3.0
+      - name: Tests
+        run: python -m pytest stage2/tests tests stage3/tests stage4/tests -q
+      - name: The three test scripts pytest does not collect
+        run: |
+          python tests/test_chunk_plan.py
+          python tests/test_chunk_scheduler.py
+          python tests/test_merge_keys.py
+      - name: Code tags
+        run: python tools/tags.py --check
+      - name: Readiness check on a clone with no data
+        run: python doctor.py
+
+  tagref:
+    # The same tags, read by the official tool: proves they are tagref's syntax, not a dialect.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: tagref check
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/tagref" \
+            https://github.com/stepchowfun/tagref/releases/download/v1.14.0/tagref-x86_64-unknown-linux-gnu
+          chmod +x "$RUNNER_TEMP/tagref"
+          "$RUNNER_TEMP/tagref"

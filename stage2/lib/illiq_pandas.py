@@ -36,6 +36,7 @@ def _is_sorted_by(df: pd.DataFrame, id_col: str, date_col: str) -> bool:
 # ----------------------------------------------------------------------------------------------
 # monthly_pi_fast
 # ----------------------------------------------------------------------------------------------
+# [tag:col.pi] price impact: minus the loading on signed lagged volume in a regression of the bond's daily excess log return
 def monthly_pi_fast(df, id_col="cusip_id", date_col="trd_exctn_dt", month_col="month_year",
                     ret_col="ret_c", lag_ret_col="ret_c_lag", vol_col="dvol_lag",
                     lst_col="lst_txn", min_obs=MIN_OBS_DEFAULT):
@@ -98,6 +99,9 @@ def monthly_pi_fast(df, id_col="cusip_id", date_col="trd_exctn_dt", month_col="m
 # ----------------------------------------------------------------------------------------------
 # compute_monthly_amihud
 # ----------------------------------------------------------------------------------------------
+# [tag:col.ami] Amihud illiquidity: the month's mean of |log return| over dollar volume
+# [tag:col.ami_v] the standard deviation of the same daily ratios
+# [tag:col.lix] minus the LIX liquidity index, so it rises with illiquidity
 def compute_monthly_amihud(df, id_col="cusip_id", month_col="month_year", ret_col="ret_d",
                            vol_col="dvol", prc_lst_col="prc_lst", prc_hi_col="prc_hi",
                            prc_lo_col="prc_lo", lst_col="lst_txn", min_obs=MIN_OBS_DEFAULT):
@@ -138,6 +142,8 @@ def compute_monthly_amihud(df, id_col="cusip_id", month_col="month_year", ret_co
 # ----------------------------------------------------------------------------------------------
 # compute_monthly_illiq_roll_fast
 # ----------------------------------------------------------------------------------------------
+# [tag:col.ilq] minus the autocovariance of daily log returns (x100)
+# [tag:col.roll] the Roll spread: 2 x the square root of ilq when positive, else 0
 def compute_monthly_illiq_roll_fast(df, id_col="cusip_id", month_col="month_year",
                                     ret_col="ret_c", ret_lag_col="ret_c_lag",
                                     lst_col="lst_txn", min_obs=MIN_OBS_DEFAULT):
@@ -189,6 +195,18 @@ def compute_monthly_illiq_roll_fast(df, id_col="cusip_id", month_col="month_year
 # ----------------------------------------------------------------------------------------------
 # compute_within_month_risk + numba kernel
 # ----------------------------------------------------------------------------------------------
+# [tag:col.dvol] the standard deviation of the month's daily returns
+# [tag:col.dskew] the skewness of the bond's daily returns in the month
+# [tag:col.dkurt] the excess kurtosis of the bond's daily returns in the month
+# [tag:col.db_mkt] beta of the daily return on the day's average bond return
+# [tag:col.dvol_sys] systematic volatility: |beta| times the volatility of the day's average bond return, within the month
+# [tag:col.dvol_idio] idiosyncratic volatility: the residual volatility of the daily return on the day's average bond return, within the month
+# [tag:col.rvol] realized volatility: the square root of the sum of squared daily returns
+# [tag:col.rsj] realized signed jump: up-move minus down-move realized volatility, over realized variance
+# [tag:col.rsk] the realized skewness of the bond's daily returns in the month
+# [tag:col.rkt] the realized kurtosis of the bond's daily returns in the month
+# [tag:col.b_vix] beta of the daily return on the VIX level, within the month
+# [tag:col.b_dvixd] beta of the daily return on the daily VIX change, within the month
 @njit(cache=True, fastmath=True)
 def _group_stats_realized_vix_numba(y, f, vix, dvix, g, n_groups, min_obs):
     out = np.empty((n_groups, 13), dtype=np.float64)

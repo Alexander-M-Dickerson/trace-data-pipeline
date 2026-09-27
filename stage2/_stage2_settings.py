@@ -70,7 +70,7 @@ DAILY_INPUT = None
 #             to reproduce a specific published vintage exactly -- data vendors revise
 #             history (FRED re-seasonally-adjusts CPI, EPU back-renormalizes), so the
 #             two sources agree closely but do not match bit-for-bit.
-FACTOR_SOURCE = "public"
+FACTOR_SOURCE = "public"  # [tag:trap.factor_source] public is fresh data and will not reproduce a published vintage; pinned does
 FACTORS_PINNED_FILE = None
 
 # The factor panel each published vintage was built from, hosted so a published number can
@@ -204,7 +204,7 @@ QUOTE_HAS_BENCHMARKS = True
 LINKER_URL = "https://openbondassetpricing.com/wp-content/uploads/2026/09/bond_firm_linker_2026.zip"
 LINKER_ZIPKEY = "bond_firm_linker_2026/fl_linker.parquet"
 LINKER_REQUIRED_COLS = ("cusip9", "permno", "permco", "gvkey")
-LINKER_WINDOW = ("i0", "i1")
+LINKER_WINDOW = ("i0", "i1")  # [group:rule.linker_window] firm ids join the linker's identity window; stages 1 and 2 must agree
 
 # Extended "modified" BBW factor series, used ONLY to backfill factor history before
 # 2002-08-31 (rows from 2002-08 on are recomputed from TRACE and overwritten).
@@ -616,7 +616,7 @@ def _validate_daily_panel(daily: Path) -> None:
         }
         missing = [c for c in REQUIRED_DAILY_COLUMNS if c not in present]
         withheld = sorted(set(missing) & LICENSED_DAILY_COLUMNS)
-        if withheld:
+        if withheld:  # [tag:trap.public_daily_file] the Stage 1 file published for download lacks the licensed columns, so stage 2 refuses it at this check
             # The public download withholds exactly these. Say so, rather than send the user
             # looking for an older release.
             raise ValueError(

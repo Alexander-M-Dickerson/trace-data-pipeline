@@ -364,64 +364,96 @@ def compute_all_betas(
     # Beta model configuration
     BETA_MODELS = [
         # Models with model suffix (multiple outputs or conflicts)
+        # [tag:col.b_mktrf_mkt] beta on the equity market (MKTRF), with the bond market (MKTB) alongside
+        # [tag:col.b_mktb_mkt] beta on the bond market (MKTB), with MKTRF alongside
+        # [tag:col.ivol_mkt] idiosyncratic volatility: the residual volatility of the regression on MKTRF and MKTB
         {"name": "mkt", "factors": ["mktrf", "mktb"], "keep": None, "sum": None, "ivol": True,
          "out": {"mktrf": "mktrf_mkt", "mktb": "mktb_mkt"}},
+        # [tag:col.ivol_bbw] idiosyncratic volatility from the four BBW factors (MKTB, DRF, CRF, LRF)
         {"name": "bbw", "factors": ["mktb", "drf", "crf", "lrf"], "keep": [], "sum": None, "ivol": True,
          "out": {}},
+        # [tag:col.b_mktbx_dcapm] beta on the duration-adjusted bond market (MKTBx), with TERM alongside
+        # [tag:col.b_term_dcapm] beta on TERM, with MKTBx alongside
         {"name": "dcapm", "factors": ["mktbx", "term"], "keep": None, "sum": None, "ivol": False,
          "out": {"mktbx": "mktbx_dcapm", "term": "term_dcapm"}},
+        # [tag:col.b_dvix_va] the sum of the betas on this month's and last month's VIX change, with FF3, VIX and AMD alongside
         {"name": "volam", "factors": ["mktrf", "smb", "hml", "vix", "dvix", "dvixlag", "amd"],
          "keep": ["dvix"], "sum": ("dvix", ["dvix", "dvixlag"]), "ivol": False,
          "out": {"dvix": "dvix_va"}},
+        # [tag:col.b_dvix_vp] the sum of the betas on this month's and last month's VIX change, with FF3, VIX and PSB alongside
+        # [tag:col.ivol_vp] idiosyncratic volatility: the residual volatility of the regression on FF3, VIX, the VIX change and PSB
         {"name": "volpsb", "factors": ["mktrf", "smb", "hml", "vix", "dvix", "dvixlag", "psb"],
          "keep": ["dvix"], "sum": ("dvix", ["dvix", "dvixlag"]), "ivol": True,
          "out": {"dvix": "dvix_vp"}},
+        # [tag:col.b_psb_m] beta on PSB (price impact), with FF3, MKTBx and TERM alongside
         {"name": "psbm", "factors": ["mktrf", "smb", "hml", "mktbx", "term", "psb"],
          "keep": ["psb"], "sum": None, "ivol": False,
          "out": {"psb": "psb_m"}},
+        # [tag:col.b_amd_m] beta on AMD (Amihud), with FF3, MKTBx and TERM alongside
         {"name": "amdm", "factors": ["mktrf", "smb", "hml", "mktbx", "term", "amd"],
          "keep": ["amd"], "sum": None, "ivol": False,
          "out": {"amd": "amd_m"}},
         # Models with simple naming (unique output)
+        # [tag:col.b_dvix] the sum of the betas on this month's and last month's VIX change, with MKTB and MKTRF alongside
         {"name": "vix", "factors": ["mktb", "mktrf", "dvix", "dvixlag"],
          "keep": ["dvix"], "sum": ("dvix", ["dvix", "dvixlag"]), "ivol": False,
          "out": {"dvix": "dvix"}},
+        # [tag:col.b_cpi_vol6] beta on inflation volatility (six-month CPI volatility), with MKTB alongside
         {"name": "inflv", "factors": ["mktb", "cpi_vol6"], "keep": ["cpi_vol6"], "sum": None, "ivol": False,
          "out": {"cpi_vol6": "cpi_vol6"}},
+        # [tag:col.b_dunc] beta on the change in macro uncertainty (Jurado, Ludvigson and Ng), with MKTB alongside
         {"name": "unc", "factors": ["mktb", "dunc"], "keep": ["dunc"], "sum": None, "ivol": False,
          "out": {"dunc": "dunc"}},
+        # [tag:col.b_unc] beta on the level of macro uncertainty, with MKTB alongside
         {"name": "uncl", "factors": ["mktb", "unc"], "keep": ["unc"], "sum": None, "ivol": False,
          "out": {"unc": "unc"}},
+        # [tag:col.b_dunc3] beta on its three-month change, with MKTB alongside
         {"name": "unc3", "factors": ["mktb", "dunc3"], "keep": ["dunc3"], "sum": None, "ivol": False,
          "out": {"dunc3": "dunc3"}},
+        # [tag:col.b_dunc6] beta on its six-month change, with MKTB alongside
         {"name": "unc6", "factors": ["mktb", "dunc6"], "keep": ["dunc6"], "sum": None, "ivol": False,
          "out": {"dunc6": "dunc6"}},
+        # [tag:col.b_duncr] beta on the change in real uncertainty, with MKTB alongside
         {"name": "uncr", "factors": ["mktb", "duncr"], "keep": ["duncr"], "sum": None, "ivol": False,
          "out": {"duncr": "duncr"}},
+        # [tag:col.b_duncf] beta on the change in financial uncertainty, with MKTB alongside
         {"name": "uncf", "factors": ["mktb", "duncf"], "keep": ["duncf"], "sum": None, "ivol": False,
          "out": {"duncf": "duncf"}},
+        # [tag:col.b_dcredit] beta on the change in the BAA-AAA spread, with MKTB alongside
         {"name": "credd", "factors": ["mktb", "dcredit"], "keep": ["dcredit"], "sum": None, "ivol": False,
          "out": {"dcredit": "dcredit"}},
+        # [tag:col.b_credit] beta on the BAA-AAA spread level, with MKTB alongside
         {"name": "credl", "factors": ["mktb", "credit"], "keep": ["credit"], "sum": None, "ivol": False,
          "out": {"credit": "credit"}},
+        # [tag:col.b_dcpi] beta on CPI inflation, with MKTB alongside
         {"name": "infl", "factors": ["mktb", "dcpi"], "keep": ["dcpi"], "sum": None, "ivol": False,
          "out": {"dcpi": "dcpi"}},
+        # [tag:col.b_cptlt] beta on the traded intermediary capital factor, with MKTRF alongside
         {"name": "hkm", "factors": ["mktrf", "cptlt"], "keep": ["cptlt"], "sum": None, "ivol": False,
          "out": {"cptlt": "cptlt"}},
+        # [tag:col.b_rvol] beta on the bond market's realized volatility factor, with MKTB alongside
         {"name": "rvol", "factors": ["mktb", "rvol"], "keep": ["rvol"], "sum": None, "ivol": False,
          "out": {"rvol": "rvol"}},
+        # [tag:col.b_rsj] beta on the realized signed jump factor, with MKTB alongside
         {"name": "rsj", "factors": ["mktb", "rsj"], "keep": ["rsj"], "sum": None, "ivol": False,
          "out": {"rsj": "rsj"}},
+        # [tag:col.b_psb] beta on the price impact factor (PSB), with MKTB alongside
         {"name": "psb", "factors": ["mktb", "psb"], "keep": ["psb"], "sum": None, "ivol": False,
          "out": {"psb": "psb"}},
+        # [tag:col.b_amd] beta on the Amihud factor, with MKTB alongside
         {"name": "amd", "factors": ["mktb", "amd"], "keep": ["amd"], "sum": None, "ivol": False,
          "out": {"amd": "amd"}},
+        # [tag:col.b_illiq] beta on the illiquidity factor, with MKTB alongside
         {"name": "illiq", "factors": ["mktb", "illiq"], "keep": ["illiq"], "sum": None, "ivol": False,
          "out": {"illiq": "illiq"}},
         # Asymmetric VIX model (control for mktrf)
+        # [tag:col.b_dvix_dn] beta on falls in VIX, with rises and MKTRF alongside
+        # [tag:col.b_dvix_up] beta on rises in VIX, with falls and MKTRF alongside
         {"name": "dvix_asym", "factors": ["mktrf", "dvix_down", "dvix_up"], "keep": ["dvix_down", "dvix_up"], "sum": None, "ivol": False,
          "out": {"dvix_down": "dvix_dn", "dvix_up": "dvix_up"}},
         # Coskewness model (mktb + mktb^2) - coskew is beta on mktb_sq
+        # [tag:col.b_coskew] coskewness: beta on MKTB squared, with MKTB alongside
+        # [tag:col.iskew] idiosyncratic skewness: the skewness of the residuals of the coskewness regression (MKTB and its square)
         {"name": "coskew", "factors": ["mktb", "mktb_sq"], "keep": ["mktb_sq"], "sum": None, "ivol": False,
          "out": {"mktb_sq": "coskew"}, "iskew": True},
         # Univariate models
@@ -442,28 +474,41 @@ def compute_all_betas(
         # `keep` fixes the OUTPUT column order and `factors` the design matrix, so keeping
         # defb first here preserves the panel's historical b_defb/b_termb ordering while
         # leaving the regression itself untouched (bit-identical betas).
+        # [tag:col.b_defb] beta on the default factor DEFB, from one regression on TERMB and DEFB
+        # [tag:col.b_termb] beta on the term factor TERMB, from one regression on TERMB and DEFB
         {"name": "defterm", "factors": ["termb", "defb"], "keep": ["defb", "termb"],
          "sum": None, "ivol": False, "out": {"defb": "defb", "termb": "termb"}},
+        # [tag:col.b_drf] beta on the downside risk factor DRF alone
         {"name": "drf", "factors": ["drf"], "keep": None, "sum": None, "ivol": False,
          "out": {"drf": "drf"}},
+        # [tag:col.b_crf] beta on the credit risk factor CRF alone
         {"name": "crf", "factors": ["crf"], "keep": None, "sum": None, "ivol": False,
          "out": {"crf": "crf"}},
+        # [tag:col.b_lrf] beta on the liquidity risk factor LRF alone
         {"name": "lrf", "factors": ["lrf"], "keep": None, "sum": None, "ivol": False,
          "out": {"lrf": "lrf"}},
+        # [tag:col.b_mktb] beta on the bond market MKTB alone
         {"name": "mktb", "factors": ["mktb"], "keep": None, "sum": None, "ivol": False,
          "out": {"mktb": "mktb"}},
+        # [tag:col.b_lvl] beta on the Treasury yield level factor alone
         {"name": "lvl", "factors": ["lvl"], "keep": None, "sum": None, "ivol": False,
          "out": {"lvl": "lvl"}},
+        # [tag:col.b_ysp] beta on the Treasury yield spread factor alone
         {"name": "ysp", "factors": ["ysp"], "keep": None, "sum": None, "ivol": False,
          "out": {"ysp": "ysp"}},
         # Asymmetric market model
+        # [tag:col.b_mktb_dn] beta on MKTB's falls, with its rises alongside
+        # [tag:col.b_mktb_up] beta on MKTB's rises, with its falls alongside
         {"name": "mktb_asym", "factors": ["mktb_down", "mktb_up"], "keep": None, "sum": None, "ivol": False,
          "out": {"mktb_down": "mktb_dn", "mktb_up": "mktb_up"}},
         # EPU models
+        # [tag:col.b_epu] beta on economic policy uncertainty, with MKTB alongside
         {"name": "epu", "factors": ["mktb", "epu"], "keep": ["epu"], "sum": None, "ivol": False,
          "out": {"epu": "epu"}},
+        # [tag:col.b_epum] beta on monetary policy uncertainty, with MKTB alongside
         {"name": "epum", "factors": ["mktb", "epum"], "keep": ["epum"], "sum": None, "ivol": False,
          "out": {"epum": "epum"}},
+        # [tag:col.b_eput] beta on tax policy uncertainty, with MKTB alongside
         {"name": "eput", "factors": ["mktb", "eput"], "keep": ["eput"], "sum": None, "ivol": False,
          "out": {"eput": "eput"}},
     ]
@@ -697,6 +742,12 @@ def compute_sys_momentum(
                 gid_arr, y, X, int(window), int(min_obs), float(ridge)
             )
 
+        # [tag:col.sysmom3_1] systematic momentum: the part of the bond's two previous returns that the rolling MKTB regression explains, summed
+        # [tag:col.sysmom6_1] systematic momentum: the part of the bond's five previous returns that the rolling MKTB regression explains, summed
+        # [tag:col.sysmom12_1] systematic momentum: the part of the bond's eleven previous returns that the rolling MKTB regression explains, summed
+        # [tag:col.idimom3_1] idiosyncratic momentum: the part of the bond's two previous returns that the rolling MKTB regression leaves unexplained, summed
+        # [tag:col.idimom6_1] idiosyncratic momentum: the part of the bond's five previous returns that the rolling MKTB regression leaves unexplained, summed
+        # [tag:col.idimom12_1] idiosyncratic momentum: the part of the bond's eleven previous returns that the rolling MKTB regression leaves unexplained, summed
         # Build output dataframe
         mom_df = pd.DataFrame({
             "cusip": merged["cusip"].values,

@@ -171,29 +171,43 @@ def build_mom_ltr_and_industry(
     # ---- specs (L,S)  ----
     # Momentum
     MOM = [
+        # [tag:col.mom3_1] momentum: the bond's return compounded over the two returns before this month's
         ("mom3_1", 3, 1),
+        # [tag:col.mom6_1] momentum: the bond's return compounded over the five returns before this month's
         ("mom6_1", 6, 1),
+        # [tag:col.mom9_1] momentum: the bond's return compounded over the eight returns before this month's
         ("mom9_1", 9, 1),
+        # [tag:col.mom12_1] momentum: the bond's return compounded over the eleven returns before this month's
         ("mom12_1", 12, 1),
+        # [tag:col.mom12_7] intermediate momentum: the bond's return compounded from eleven to seven returns back
         ("mom12_7", 12, 7),
     ]
     # LTR (ramped)
     LTR = [
+        # [tag:col.ltr48_12] long-term reversal: the bond's return compounded from 47 to 12 returns back, from 12-3 while its history is short
         ("ltr48_12", 48, 12),
+        # [tag:col.ltr30_6] long-term reversal: the bond's return compounded from 29 to 6 returns back, from 12-3 while its history is short
         ("ltr30_6", 30, 6),
+        # [tag:col.ltr24_3] long-term reversal: the bond's return compounded from 23 to 3 returns back, from 12-3 while its history is short
         ("ltr24_3", 24, 3),
     ]
 
     # Industry momentum (imom1 = last month industry return => (L=2,S=1))
     IMOM = [
+        # [tag:col.imom1] industry momentum: last month's equal-weighted return of the bonds sharing the bond's SIC code, the bond included
         ("imom1", 2, 1),
+        # [tag:col.imom3_1] industry momentum: the equal-weighted return of the bonds sharing the bond's SIC code, the bond included, compounded over the two months before this one
         ("imom3_1", 3, 1),
+        # [tag:col.imom12_1] industry momentum: the equal-weighted return of the bonds sharing the bond's SIC code, the bond included, compounded over the eleven months before this one
         ("imom12_1", 12, 1),
     ]
     # Industry LTR (ramped)
     ILTR = [
+        # [tag:col.iltr48_12] industry long-term reversal: the SIC-industry return compounded from 47 to 12 months back, from 12-3 while the history is short
         ("iltr48_12", 48, 12),
+        # [tag:col.iltr30_6] industry long-term reversal: the SIC-industry return compounded from 29 to 6 months back, from 12-3 while the history is short
         ("iltr30_6", 30, 6),
+        # [tag:col.iltr24_3] industry long-term reversal: the SIC-industry return compounded from 23 to 3 months back, from 12-3 while the history is short
         ("iltr24_3", 24, 3),
     ]
 

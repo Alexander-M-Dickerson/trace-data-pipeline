@@ -38,6 +38,7 @@ year's run publishes itself.
 Author: Open Source Bond Asset Pricing
 """
 
+# [tag:entry.stage2_release] writes the redacted, shareable copy of your panel
 from __future__ import annotations
 
 import argparse
@@ -262,6 +263,7 @@ def redact_for_publication(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+# [tag:rule.redaction] the public panel must have permco and gvkey blank and the ratings reduced to 1 (investment grade) or 11 (high yield)
 def assert_publishable(df: pd.DataFrame, what: str) -> None:
     """Refuse to package anything still carrying restricted data."""
     problems = []
@@ -980,6 +982,7 @@ DAILY_LICENSED = tuple(c for c, why in DAILY_WITHHELD.items() if "not in the pub
 _LICENSED_NAME = ("rating", "permco", "gvkey", "_rat")
 
 
+# [tag:rule.daily_redaction] the public daily file must not carry the licensed columns
 def assert_daily_publishable(path: Path, source_rows: int | None = None) -> None:
     """Refuse a daily file that is not exactly the public layout."""
     pf = pq.ParquetFile(path)

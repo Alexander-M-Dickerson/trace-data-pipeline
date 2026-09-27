@@ -1,4 +1,5 @@
 #!/bin/bash
+# [tag:entry.smoke_test] a 10-minute check of stages 0 and 1 on a few chunks: qsub run_smoke_test.sh
 #$ -S /bin/bash
 #$ -V
 #$ -cwd
@@ -57,6 +58,7 @@ set -uo pipefail
 _looks_like_repo() { [[ -d "$1/stage0" && -d "$1/stage1" ]]; }
 
 REPO=""
+# [tag:trap.spool_copy] qsub runs a copy of this script from its spool folder, so the repository is found from SGE_O_WORKDIR
 for _cand in "${SGE_O_WORKDIR:-}" "${PWD}" "$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"; do
     [[ -n "${_cand}" ]] || continue
     if _looks_like_repo "${_cand}"; then REPO="${_cand}"; break; fi
