@@ -1325,7 +1325,8 @@ def decimal_shift_corrector(
     low_pr, high_pr : float, defaults 5.0 and 300.0
         Plausible price bounds; help gate clearly implausible observations.
     anchor : str, default "rolling"
-        Anchor type. Currently supports "rolling" (rolling unique-median).
+        Anchor type. "rolling" is the rolling unique-median; any other value uses the
+        median price of the same bond on the same day.
     window : int, default 5
         Rolling half-window size for the anchor (effective window = 2*window+1).
     improvement_frac : float, default 0.2
@@ -1335,10 +1336,13 @@ def decimal_shift_corrector(
     par_band : float, default 15.0
         Par proximity band (|price-100| <= par_band) for the par snap rule.
     output_type : {"uncleaned","cleaned"}, default "uncleaned"
-        - "uncleaned": Return the input frame (sorted) with three added columns:
+        - "uncleaned": Return the input rows, sorted (see Notes), with added columns:
             * dec_shift_flag   (int8)   - 1 if corrected candidate accepted
             * dec_shift_factor (float)  - chosen factor (1.0 if no change)
             * suggested_price  (float)  - corrected price proposal
+            * anchor_price     (float)  - the price each row is judged against
+          With anchor="rolling" (the default) it also carries the three medians the
+          anchor is built from: anchor_med_center, anchor_med_fwd, anchor_med_back.
         - "cleaned": Apply `suggested_price` where flagged and return a triplet:
             (cleaned_df, n_corrected, affected_cusips).
 
@@ -1346,12 +1350,11 @@ def decimal_shift_corrector(
     -------
     If output_type == "uncleaned":
         pandas.DataFrame
-            Sorted copy of `df` with added columns:
-            ["dec_shift_flag", "dec_shift_factor", "suggested_price"].
+            Sorted copy of `df` with the added columns above.
     If output_type == "cleaned":
         tuple[pandas.DataFrame, int, list[str]]
             cleaned_df :
-                Copy of `df` with `price_col` overwritten where flagged.
+                Sorted copy of `df` with `price_col` overwritten where flagged.
             n_corrected :
                 Count of rows where a correction was applied.
             affected_cusips :
@@ -1359,9 +1362,9 @@ def decimal_shift_corrector(
 
     Notes
     -----
-    - This function does NOT sort and does NOT reset the index; it uses the row
-      order it is given, and `time_col` is accepted but never read. Sort the frame
-      before calling it (the pipeline does).
+    - This copy SORTS by (id_col, date_col, and time_col when it is in `df`) and
+      resets the index to 0..n-1 before it starts. The copy in
+      create_daily_enhanced_trace.py does not sort.
     - "Unique" here means the (id_col, date_col, price_col) de-duplication applied
       before the medians are taken -- repeated prints at the same price on the same
       day count once. The medians themselves are plain medians, not medians of
@@ -3063,7 +3066,7 @@ class ProcessStandardTRACE:
             if self.limit_chunks is not None:
                 # Dev/test escape hatch: process only the first N CUSIP chunks so a
                 # config or filter change can be checked in minutes rather than
-                # re-running the full ~4h universe. Never set for a production run.
+                # re-running the full universe, which takes hours. Never set for a production run.
                 kept = cusip_chunks[: self.limit_chunks]
                 self.logger.warning(
                     "limit_chunks=%d set -- processing %d of %d CUSIP chunks. "

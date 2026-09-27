@@ -1101,9 +1101,9 @@ def decimal_shift_corrector(
     id_col : str, default "cusip_id"
         Bond identifier column.
     date_col : str, default "trd_exctn_dt"
-        Trade date column (used for sorting and grouping).
+        Trade date column (used for grouping).
     time_col : str | None, default "trd_exctn_tm"
-        Optional trade time column (included in sort if present in `df`).
+        Accepted so the call matches the Standard copy; never read here.
     price_col : str, default "rptd_pr"
         Price column to evaluate and potentially correct.
     factors : iterable of float, default (0.1, 0.01, 10.0, 100.0)
@@ -1117,7 +1117,8 @@ def decimal_shift_corrector(
     low_pr, high_pr : float, defaults 5.0 and 300.0
         Plausible price bounds; help gate clearly implausible observations.
     anchor : str, default "rolling"
-        Anchor type. Currently supports "rolling" (rolling unique-median).
+        Anchor type. "rolling" is the rolling unique-median; any other value uses the
+        median price of the same bond on the same day.
     window : int, default 5
         Rolling half-window size for the anchor (effective window = 2*window+1).
     improvement_frac : float, default 0.2
@@ -1127,10 +1128,13 @@ def decimal_shift_corrector(
     par_band : float, default 15.0
         Par proximity band (|price-100| <= par_band) for the par snap rule.
     output_type : {"uncleaned","cleaned"}, default "uncleaned"
-        - "uncleaned": Return the input frame (sorted) with three added columns:
+        - "uncleaned": Return the input rows, in the order given, with added columns:
             * dec_shift_flag   (int8)    1 if corrected candidate accepted
             * dec_shift_factor (float)   chosen factor (1.0 if no change)
             * suggested_price  (float)   corrected price proposal
+            * anchor_price     (float)   the price each row is judged against
+          With anchor="rolling" (the default) it also carries the three medians the
+          anchor is built from: anchor_med_center, anchor_med_fwd, anchor_med_back.
         - "cleaned": Apply `suggested_price` where flagged and return a triplet:
             (cleaned_df, n_corrected, affected_cusips).
 
@@ -1138,8 +1142,7 @@ def decimal_shift_corrector(
     -------
     If output_type == "uncleaned":
         pandas.DataFrame
-            Sorted copy of `df` with added columns:
-            ["dec_shift_flag", "dec_shift_factor", "suggested_price"].
+            Copy of `df`, in the order given, with the added columns above.
     If output_type == "cleaned":
         tuple[pandas.DataFrame, int, list[str]]
             cleaned_df :
@@ -1151,9 +1154,10 @@ def decimal_shift_corrector(
 
     Notes
     -----
-    - This function does NOT sort and does NOT reset the index; it uses the row
-      order it is given, and `time_col` is accepted but never read. Sort the frame
-      before calling it (the pipeline does).
+    - This function does NOT sort; it keeps the row order it is given, and
+      `time_col` is never read. Sort the frame before calling it (the pipeline
+      does). With anchor="rolling" (the default) the result has a new 0..n-1 index,
+      from a merge; with any other anchor the input index is kept.
     - "Unique" here means the (id_col, date_col, price_col) de-duplication applied
       before the medians are taken -- repeated prints at the same price on the same
       day count once. The medians themselves are plain medians, not medians of
@@ -3447,7 +3451,7 @@ class ProcessEnhancedTRACE:
             if self.limit_chunks is not None:
                 # Dev/test escape hatch: process only the first N CUSIP chunks so a
                 # config or filter change can be checked in minutes rather than
-                # re-running the full ~4h universe. Never set for a production run.
+                # re-running the full universe, which takes hours. Never set for a production run.
                 kept = cusip_chunks[: self.limit_chunks]
                 self.logger.warning(
                     "limit_chunks=%d set -- processing %d of %d CUSIP chunks. "

@@ -115,8 +115,8 @@ if [[ $MISSING_FILES -gt 0 ]]; then
     # the industry codes -- so a missing one is not a warning, it is a run that fails
     # several hours later having burned the grid time.
     echo "[error] ${MISSING_FILES} required file(s) missing. Not continuing."
-    echo "[error] Check your internet access on this node, or fetch them by hand"
-    echo "[error] following stage1/QUICKSTART_stage1.md."
+    echo "[error] Check your internet access on this node, or fetch them by hand from"
+    echo "[error] the URLs in this script (download_inputs.sh) into stage1/data/."
     exit 1
 fi
 echo "[ok] All required data files present"

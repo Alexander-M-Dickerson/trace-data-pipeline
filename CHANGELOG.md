@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.1.1] - 2026-09-27
+
+**Definitions that now say what the code computes, and fixes found by a sweep of the docs.**
+Nothing a stage computes has changed: the code that builds data in stages 0 to 4 differs from
+4.1.0 only in docstrings and comments, checked by comparing the parsed code.
+
+### Fixed
+- **Twenty-seven column definitions** in `stage2/DATA_DICTIONARY.md` and the Table IA.VIII spec
+  (`stage3/spec/signal_definitions.json`) now say what the code does, each checked against the
+  code and, where a number is quoted, measured on the 2026-09-21 panel. Each row that departs
+  from the printed table records the printed text and the reason (fifty rows now, from
+  twenty-three); `stage3/RECONCILIATION_ia08.md` lists them. Among them: `cs_mu12_1` includes
+  month $t-1$; `spd_abs` and `spd_rel` have no minimum count; `fce_val` is in thousands of
+  dollars; `rsj` divides by the realized variance, so it is not bounded by 1; TERM keeps the
+  risk-free rate (MKTB + rf - MKTBX); the panel's DCAPM betas regress `ret_vw`; `p_zro` in the
+  panel is the gap-adjusted share and is never 0; `ilq` and `roll` are built from returns in
+  percent; `b_dcpi` and `b_cpi_vol6` are in CPI index points. The dictionary's technical
+  sections, factor table and file list were corrected to match.
+- `run_smoke_test.sh` reads the WRDS username the way the stages do, from the environment or
+  `config.py`; it refused a username set only in `config.py`, which `doctor.py --wrds` accepts.
+- `run_pipeline.sh` refuses an unset username before it submits a job. Before, every job was
+  submitted, stage 0 failed at its first connection, and the jobs held behind it started anyway
+  and failed in turn. It, the smoke test and `doctor.py` now count a name as unset as stage 2
+  does: empty, or starting "your_", so a doc's example pasted as written is refused too.
+- `stage1/AGENTS.md` said Standard TRACE never survives the automatic cut-off (so did 4.1.0's
+  entry here). The cut-off counts Standard with Enhanced, so with Standard in `TRACE_MEMBERS` it
+  can carry the sample past the last Enhanced month.
+- The stage 2 tests no longer write their temporary file hashes into
+  `stage2/output/_cache/sha_cache.json`.
+- `decimal_shift_corrector`'s docstrings: the Enhanced copy keeps the row order it is given and
+  the Standard copy sorts; "uncleaned" adds seven columns with the default anchor, not three.
+
+### Added
+- A seventh assistant skill, `add-a-column`: every place a new monthly panel column must be
+  added, and the check that fails when one is skipped.
+- `GEMINI.md`, which imports `AGENTS.md` for Gemini CLI, and PowerShell twins of the rules in
+  `.claude/settings.json`, which applied only to Bash.
+
+### Changed
+- The docs on WRDS: one clone location (`~/trace-data-pipeline`); wait for the smoke test to
+  finish before the full run (the two together pass WRDS's connection limit); the log folder a
+  job submitted by hand needs; a new zip rather than an update of an old one; one package list,
+  `requirements.txt`; the stage 1 result checked without loading it on the login node; and no
+  password file (`~/.pgpass`) is needed on the WRDS Cloud, which the docs listed as a
+  prerequisite (an account with none runs the whole pipeline).
+- The docs on your own computer: a separate environment for stages 2-4; `--factor-source
+  pinned` reproduces a published panel only from the same WRDS run of stages 0 and 1;
+  stage 2's disk footprint (about 10 GB, and 5 GB more for the release bundles); run times from
+  the 2026-09-21 run.
+
 ## [4.1.0] - 2026-09-27
 
 **The repository is set up for a user and their AI assistant.** An assistant opened here finds
@@ -1774,29 +1824,6 @@ chunk loop.
   - Enhanced TRACE: ~30 million rows (2002-present)
   - Standard TRACE: ~2-3 million rows (2024-present)
   - Rule 144A: ~5-8 million rows (2002-present)
-
----
-
-## Project Roadmap
-
-### Version 1.x - Stage 0 Enhancements (Ongoing)
-- Bug fixes and performance improvements
-- Additional filter options
-- Enhanced documentation
-- Community contributions integration
-
-### Version 2.0 - Stage 1 Release (November 2025)
-- Daily bond metrics calculation module
-- Duration and convexity measures
-- Credit spread computation
-- Yield calculations
-
-### Version 3.0 - Stage 2 Release (November 2025)
-- Monthly panel construction
-- 50+ bond characteristic signals
-- Factor construction tools
-- Portfolio-ready outputs
-- Integration with PyBondLab
 
 ---
 

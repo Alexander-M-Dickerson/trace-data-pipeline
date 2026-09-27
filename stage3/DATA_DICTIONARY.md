@@ -45,7 +45,7 @@ pdflatex transcript.
 | column | type | meaning |
 |---|---|---|
 | `date` | date | **return realisation date (t+1)**. Formation was one month earlier, so the first row of every series is NaN. |
-| `factor` | text | signal mnemonic. ❗A trailing `*` means the series has been **sign-corrected** — see the conventions below. |
+| `factor` | text | signal mnemonic. ❗A trailing `*` means the series has been **sign-corrected** — see the conventions below. The flip is decided per weighting, so one signal can appear with the `*` for one weighting and without it for the other in the same file. |
 | `freq` | int | holding period in months |
 | `leg` | text | `l` long, `s` short, `ls` long minus short |
 | `weighting` | text | `ew` or `vw` |
@@ -285,6 +285,13 @@ recomputes a regression.
 
 Approaches are `unadjusted`, `adj_signal`, `adj_return`; pairs are `bias_1_2` and
 `bias_1_3`.
+
+`table02_stats.csv` is laid out differently: one row per (design cell, factor), with the eight
+numbers Table 2 prints as columns (`s1_lib/lib_engine.py`). `mu_end` and `mu_bgn` are the
+mean month-end and month-begin returns, `dmu` their difference and `t_dmu` its Newey-West
+t-statistic, `mu_lib` and `t_mu_lib` the mean of the portfolio's `lib` characteristic and its
+t-statistic, `rho` the correlation of the return difference with `lib`, and `resid` is
+`dmu - mu_lib`. Means are in percent per month; then `first`, `last`, `T`, `nw_lags`.
 
 **Section 4** (`data/s2_lab/*_stats.csv`) — one row per
 (return_type, rating, tail, factor, leg, variant, stat), then `value, tstat, T, nw_lags`.

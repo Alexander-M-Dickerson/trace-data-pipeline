@@ -55,9 +55,10 @@ def _checks(**over):
 
 
 @pytest.mark.parametrize("over, panel, expect", [
+    ({"packages": Check("packages", False)}, False, "python -m venv .venv"),
     ({"python": Check("Python", False)}, False, "install Python 3.11"),
     ({"pybondlab": Check("PyBondLab", False)}, False, "--no-deps pybondlab=="),
-    ({"stage2": Check("s2", False, "Stage 1 directory not found: x")}, False, "copy the stage0/"),
+    ({"stage2": Check("s2", False, "Stage 1 directory not found: x")}, False, "work in the folder you unzipped"),
     ({"stage2": Check("s2", False, "WRDS_USERNAME is not set")}, False, "export WRDS_USERNAME"),
     ({}, False, "python _run_stage2.py"),
     ({}, True, "bash stage3/run_stage3.sh"),
@@ -90,3 +91,18 @@ def test_a_run_in_this_environment_exits_0_and_names_a_next_step(capsys):
     """In the environment the two install lines make, whatever data is present."""
     assert doctor.main([]) == 0
     assert "\nNext: " in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("name", ["", "your_wrds_username", "your_wrds_id", "Your_ID", "jsmith1"])
+def test_it_counts_a_placeholder_username_as_stage_2_does(monkeypatch, name):
+    """doctor, run_pipeline.sh and run_smoke_test.sh refuse an empty name or one starting "your_",
+    the rule stage 2 applies. A doc's example pasted as written must not pass one and fail another."""
+    import config
+    sys.path.insert(0, str(ROOT / "stage2"))
+    import _stage2_settings as s2
+    monkeypatch.setattr(config, "WRDS_USERNAME", name)
+    monkeypatch.setattr(s2, "WRDS_USERNAME", name)
+    monkeypatch.delenv("WRDS_USERNAME", raising=False)
+    assert doctor.check_username().ok == bool(s2.wrds_username())
+    for script in ("run_pipeline.sh", "run_smoke_test.sh"):
+        assert "[Yy][Oo][Uu][Rr]_*" in (ROOT / script).read_text(encoding="utf-8"), script

@@ -43,16 +43,16 @@ your WRDS login; later runs read the cache.
 
 **On WRDS** — you will be SSH'd into `wrds-cloud.wharton.upenn.edu`:
 
-1. Clone this repository into your WRDS home directory.
-2. Install the Python packages (`pip install --user -r requirements.txt`).
-3. Run `bash download_inputs.sh` **on the login node** — compute nodes have no internet.
-4. Submit the pipeline: `./run_pipeline.sh`. Stage 0 runs in parallel per TRACE member, then
-   Stage 1 starts automatically when they finish.
-5. Wait. Check on it with `qstat`.
+1. Clone this repository into your WRDS home directory (`cd ~` first).
+2. Install the Python packages (`python -m pip install --user -r requirements.txt`).
+3. Set your WRDS username: `export WRDS_USERNAME=your_wrds_id`, or edit `config.py`.
+4. Run `bash download_inputs.sh` **on the login node** — compute nodes have no internet.
+5. Submit the pipeline: `./run_pipeline.sh`. Stage 0 runs in parallel per TRACE member, then
+   Stage 1 starts automatically when they finish. Check on it with `qstat`.
 
 **Moving the results** — you end up with roughly 5 GB across hundreds of files:
 
-6. On WRDS, zip it: `cd ~ && zip -r "/scratch/$(basename "$(dirname "$HOME")")/trace-data-pipeline.zip" trace-data-pipeline/`
+6. On WRDS, zip it: `cd ~ && rm -f "/scratch/$(basename "$(dirname "$HOME")")/trace-data-pipeline.zip" && zip -r "/scratch/$(basename "$(dirname "$HOME")")/trace-data-pipeline.zip" trace-data-pipeline/`
 7. From your own computer, copy it down with `scp`, then unzip.
 
 > ❗Zip from `~` using a **relative** path, exactly as written. `zip -r out.zip ~/trace-data-pipeline/`
@@ -68,8 +68,8 @@ your WRDS login; later runs read the cache.
    this repository installs numpy 2, so it goes in without its dependency list
    (`requirements-local.txt` says why that is safe). Stage 2's first run fetches a few series
    from WRDS, so set your username in `config.py` or `export WRDS_USERNAME=...`.
-9. `cd stage2 && python _run_stage2.py` (add `--factor-source pinned` to reproduce a
-   published panel exactly; see [stage2/QUICKSTART_stage2.md](stage2/QUICKSTART_stage2.md))
+9. `cd stage2 && python _run_stage2.py` (add `--factor-source pinned` to use the factors a
+   published panel was built with; see [stage2/QUICKSTART_stage2.md](stage2/QUICKSTART_stage2.md))
 10. You now have `stage2/output/panel/main_panel_<mode>.parquet` — 145 columns per bond-month.
 
 **Still on your own computer, if you want the research output too:**
@@ -77,7 +77,7 @@ your WRDS login; later runs read the cache.
 11. `cd ../stage3 && python tools/check_inputs.py` — confirms Stage 3 can see what Stage 2 made.
 12. `bash run_stage3.sh` — portfolio sorts, the uncertainty grids, and 33 tables and
     11 figures into `stage3/reports/`.
-13. `cd ../stage2 && python make_excess_blocks.py --mode stage1 --benchmark all`, then
+13. `cd ../stage2 && python make_excess_blocks.py --mode stage1 --verify`, then `--benchmark all`, then
     `cd ../stage4 && bash run_stage4.sh` — the TRACE-only bond factors that
     openbondassetpricing.com publishes, into `stage4/output/`, then a cell-by-cell comparison
     with the published files.
@@ -97,9 +97,9 @@ Full detail: [QUICKSTART.md](QUICKSTART.md) for stages 0-1,
 [stage3/QUICKSTART_stage3.md](stage3/QUICKSTART_stage3.md) for stage 3,
 [stage4/README_stage4.md](stage4/README_stage4.md) for stage 4.
 
-Running stages 2-4 with Claude Code or Codex? The repository carries instructions they read by
-themselves: [AGENTS.md](AGENTS.md) here and in `stage2/`, `stage3/` and `stage4/` (Codex), and a
-`CLAUDE.md` beside each that points to it (Claude Code).
+Working with an AI assistant (Claude Code, Codex, Copilot and others)? It reads
+[AGENTS.md](AGENTS.md) by itself, and a skill walks each stage step by step: see
+[Documentation](#documentation). `python doctor.py` says what is ready and what to run next.
 
 > ❗**You cannot skip stages 0 and 1 by downloading the published Stage 1 file.** The public
 > download has its rating columns removed, because agency ratings are licensed. Stage 2 keeps
@@ -152,8 +152,9 @@ Produces a clean, error-corrected monthly panel with dozens of corporate bond si
 **Execution:** Your own machine, NOT the WRDS grid (a WRDS subscription is still required)
 
 ### Stage 3: Sorts and the Paper's Exhibits
-Turns the Stage 2 panel into portfolio sorts, two uncertainty grids, and the 33 tables and
-11 figures of *The Corporate Bond Factor Replication Crisis*, compiled into one PDF. Optional.
+Turns the Stage 2 panel into portfolio sorts, two uncertainty grids, and 33 tables and 11
+figures, compiled into one PDF: 29 tables and the figures of *The Corporate Bond Factor
+Replication Crisis*, and four tables of Stage 3's own. Optional.
 
 **Execution:** Your own machine, and it opens no WRDS connection
 **Documentation:** See [stage3/README_stage3.md](stage3/README_stage3.md) and [stage3/INDEX.md](stage3/INDEX.md)
@@ -175,7 +176,7 @@ published files, cell by cell. Optional.
 - **Stage 0**: ✅ **Now available** - Public beta, ready for testing
 - **Stage 1**: ✅ **Now available** - Public beta, ready for testing
 - **Stage 2**: ✅ **Released** - Builds the monthly panel from your Stage 1 output; published vintages are on [openbondassetpricing.com](https://openbondassetpricing.com)
-- **Stage 3**: 🔨 **Code available** - Turns that monthly panel into portfolio sorts, uncertainty grids and the paper's 33 tables and 11 figures
+- **Stage 3**: 🔨 **Code available** - Turns that monthly panel into portfolio sorts, uncertainty grids and 33 tables and 11 figures (29 tables are the paper's)
 - **Stage 4**: 🔨 **Code available** - Builds the TRACE-only bond factors published on openbondassetpricing.com from that monthly panel, and checks them against the published files
 
 **This project is under active development and any feedback is greatly appreciated.**
@@ -230,7 +231,7 @@ Please reach out to `alexander.dickerson1@unsw.edu.au` if you would like to coll
 - WRDS subscription with access to TRACE, FISD, and ratings data
 - Python 3.10 or higher on WRDS (the 2026-09-21 production run used Python 3.14.5 there), and 3.11 to 3.13 on your own computer for Stages 2-4
 - SSH access to WRDS Cloud (or local Python environment)
-- `.pgpass` configured for passwordless WRDS authentication
+- No password file on WRDS: jobs on the WRDS Cloud connect without one
 
 ### Setup
 
@@ -258,7 +259,7 @@ nano config.py
 # Change: AUTHOR = "Your Name"  # Default is "Open Source Bond Asset Pricing"
 ```
 
-*Note: Password comes from `.pgpass`, not code.*
+*Note: your password is never in code. On WRDS none is needed. On your own computer (stage 2's first run), connect once by hand, `python -c "import wrds; wrds.Connection()"`: it asks for the password and offers to save it where the `wrds` package looks (`~/.pgpass`, or `%APPDATA%\postgresql\pgpass.conf` on Windows).*
 
 2. **Install the dependencies** (Stages 0 and 1 both need them):
 ```bash
@@ -311,10 +312,10 @@ the cross-stage invariants in `tests/smoke_assertions.py`. It writes to `smoke/`
 each rule enforced. `python doctor.py` says what is ready and what to run next.
 
 **With an AI assistant.** Claude Code, Codex, Cursor and Copilot read [AGENTS.md](AGENTS.md) by
-themselves: what to run, what to check, and the traps. Six skills walk a stage step by step:
-`/onboard`, `/run-wrds`, `/build-panel`, `/reproduce-exhibits`, `/build-factors` and `/explain`
-in Claude Code (`$onboard` and so on in Codex). Ask it to set the repository up, to build a
-stage, or what a column is and where it is computed.
+themselves: what to run, what to check, and the traps. Seven skills walk a task step by step:
+`/onboard`, `/run-wrds`, `/build-panel`, `/reproduce-exhibits`, `/build-factors`, `/explain` and
+`/add-a-column` in Claude Code (`$onboard` and so on in Codex). Ask it to set the repository up,
+to build a stage, what a column is and where it is computed, or to add a column to the panel.
 
 **Stage 0 - TRACE Data Processing:**
 - **[README](stage0/README_stage0.md)**: Complete guide for intraday to daily TRACE processing
@@ -347,6 +348,10 @@ stage, or what a column is and where it is computed.
 - **[Stage 3 Exhibit Index](stage3/INDEX.md)**: Every table and figure the report prints,
   mapped to the file that produces it, its LaTeX label and the sample it states.
   Generated; `tools/build_index.py --check` fails when the exhibits or their files change
+
+**Stage 4 - TRACE-only Factors:**
+- **[Stage 4 README](stage4/README_stage4.md)**: What it builds, how long it takes, and the check against the published files
+- **[Stage 4 Data Dictionary](stage4/DATA_DICTIONARY.md)**: Every column of the factor files
 
 ---
 
@@ -603,15 +608,15 @@ defined in [stage2/DATA_DICTIONARY.md](stage2/DATA_DICTIONARY.md).
 
 Using `./run_pipeline.sh` (complete automated pipeline from ROOT):
 - **Stage 0 - Data processing** (Enhanced and 144A in parallel):
-  - Enhanced TRACE: **~2-2.5 hours**. It was ~4 hours before v2.2.0; it now pulls 5 CUSIP
+  - Enhanced TRACE: **~2-2.6 hours**. It was ~4 hours before v2.2.0; it now pulls 5 CUSIP
     chunks at a time over separate WRDS connections, about twice as fast (2.0 h on
     2026-09-09, 2.6 h on 2026-09-21).
-  - 144A TRACE: **~45 minutes**
+  - 144A TRACE: **~40 minutes** (38 on 2026-09-21)
   - Standard TRACE: ~30-60 minutes, and OPT-IN since v2.2.0 (`TRACE_MEMBERS`). When
     requested it is scheduled after the other two, not beside them.
 - **Stage 0 - Report generation**: ~20 minutes since v2.2.2 (was ~50; 22 on 2026-09-21);
   waits for every member submitted, and runs ALONGSIDE Stage 1 rather than before it
-- **Stage 1 - Bond analytics**: **~2.5-3 hours** (waits for the Stage 0 DATA jobs)
+- **Stage 1 - Bond analytics**: **~2.4-2.7 hours** (2.7 on 2026-09-21; waits for the Stage 0 DATA jobs)
 
 **End to end: about 5 hours.** The 2026-09-21 run, which the 2026 vintage was built from, took
 5.3 h wall clock (04:17 to 09:34) and wrote a Stage 1 panel of 31,344,732 rows over 70,684
@@ -710,4 +715,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Last Updated:** September 2026
-**Version:** 4.1.0 — see [CHANGELOG.md](CHANGELOG.md) for what each release changed.
+**Version:** 4.1.1 — see [CHANGELOG.md](CHANGELOG.md) for what each release changed.

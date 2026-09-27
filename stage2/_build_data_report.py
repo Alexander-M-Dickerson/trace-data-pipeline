@@ -9,10 +9,10 @@ The report answers, for whoever downloads the panel: what is in it, how much of 
 is populated, how the numbers are distributed, and how it compares with the other
 TRACE-derived bond databases in circulation.
 
-    python3 _build_data_report.py                    # the current build, everything
-    python3 _build_data_report.py --no-external      # skip the DFPS/WRDS comparisons
-    python3 _build_data_report.py --no-pdf           # emit .tex only
-    python3 _build_data_report.py --mode prod_ext    # a specific build
+    python _build_data_report.py                     # the current build, everything
+    python _build_data_report.py --no-external       # skip the DFPS/WRDS comparisons
+    python _build_data_report.py --no-pdf            # emit .tex only
+    python _build_data_report.py --mode <mode>       # a build other than the default stage1
 
 Two comparison suites need the network (and WRDS credentials). They are ON by
 default because a data report that does not compare against the alternatives is

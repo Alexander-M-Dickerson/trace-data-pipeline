@@ -2,6 +2,7 @@
 
 ## Table of Contents
 - [Getting Started](#getting-started)
+- [Working with an AI assistant](#working-with-an-ai-assistant)
 - [Configuration](#configuration)
 - [Output Files](#output-files)
 - [Troubleshooting](#troubleshooting)
@@ -9,7 +10,7 @@
 - [Contributing](#contributing)
 - [Academic Use](#academic-use)
 
-- [Stage 1, 2 & 3](#stage-1-2--3)
+- [Stages 1 to 4](#stages-1-to-4)
 - [Support](#support)
 ---
 
@@ -43,15 +44,15 @@ want the daily panel itself.
 ### How long does processing take?
 Using `./run_pipeline.sh` (complete automated pipeline):
 - **Pre-stage (data downloads)**: ~5 minutes
-- **Stage 0 (Enhanced TRACE)**: **~2-2.5 hours**. It was ~4 hours serial; since v2.2.0 it
+- **Stage 0 (Enhanced TRACE)**: **~2-2.6 hours**. It was ~4 hours serial; since v2.2.0 it
   pulls 5 CUSIP chunks at once over separate WRDS connections, about twice as fast (2.0 h
   on 2026-09-09, 2.6 h on 2026-09-21).
-- **Stage 0 (Rule 144A)**: **~45 minutes**, running at the same time as Enhanced
+- **Stage 0 (Rule 144A)**: **~40 minutes** (38 on 2026-09-21), running at the same time as Enhanced
 - **Stage 0 (Standard TRACE)**: ~30-60 minutes, and OPT-IN since v2.2.0. When requested
   it is scheduled after the other two rather than beside them.
 - **Stage 0 (Report generation)**: **~20 minutes** since v2.2.2 (22 on 2026-09-21), and it no
   longer blocks Stage 1 -- the two run side by side. It was ~50 minutes before that release.
-- **Stage 1 (Bond analytics)**: **~2.5-3 hours**
+- **Stage 1 (Bond analytics)**: **~2.4-2.7 hours** (2.7 on 2026-09-21)
 
 **End to end: about 5 hours.** The 2026-09-21 run took 5.3 h.
 
@@ -67,8 +68,8 @@ TRACE_MEMBERS = ["enhanced"]  # Process only Enhanced TRACE
 
 Or for one run, without editing anything: `TRACE_MEMBERS=enhanced ./run_pipeline.sh`.
 Submitting a stage 0 job script by hand (`qsub stage0/run_enhanced_trace.sh`, from the
-repository root) skips the cores and memory `run_pipeline.sh` requests for it, so prefer the
-line above.
+repository root) skips the cores and memory `run_pipeline.sh` requests for it, and on a fresh
+clone needs `mkdir -p stage0/logs` first, so prefer the line above.
 
 ### What Python version do I need?
 Python 3.10 or higher on WRDS for Stages 0 and 1 (the WRDS Cloud runs 3.14), and 3.11 to 3.13
@@ -89,13 +90,36 @@ python --version
 For Stage 0, you need:
 - WRDS subscription with TRACE access
 - SSH access to WRDS Cloud
-- `.pgpass` file configured for password-less authentication
 - Required Python packages (installed via `requirements.txt`)
 
 For Stage 3, one non-Python thing: **pdflatex** (TeX Live or MiKTeX), used by the last
 step to compile every exhibit into one PDF. `stage3/tools/check_inputs.py` warns when it
 is missing rather than failing -- without it you still get every table and figure as a
 file, you just do not get `reports/exhibits.pdf`.
+
+---
+
+## Working with an AI assistant
+
+### Can I run this with Claude Code, Codex or Copilot?
+Yes. Open the assistant in the repository folder and it reads [AGENTS.md](AGENTS.md) by itself:
+what each stage does, what to run, what to check and the mistakes to avoid. Skills walk each task
+step by step: `onboard`, `run-wrds`, `build-panel`, `reproduce-exhibits`, `build-factors`,
+`explain` and `add-a-column`. In Claude Code type `/build-panel`; in Codex, `$build-panel`. Or ask
+in plain words: "set this repository up", "build the monthly panel", "what is `cs_sprd` and where
+is it computed?".
+
+### What does `doctor.py` do?
+It says what is ready and what to run next. `python doctor.py` checks your own computer for
+stages 2-4; `python3 doctor.py --wrds` checks the WRDS login node for stages 0 and 1. It asks each
+stage through that stage's own check, and downloads nothing, opens no WRDS connection and writes
+nothing of its own, so it is always safe to run.
+
+### Where is a column computed?
+[TAGS.md](TAGS.md) lists, for every column of the daily and monthly panels, every cleaning filter
+and every rule the code enforces, the file that holds it. Search that file for the tag, for
+example `git grep -n "tag:col.cs_sprd"`. The column's definition is in the stage's
+`DATA_DICTIONARY.md`.
 
 ---
 
@@ -481,8 +505,6 @@ qstat -j <job_id>  # View specific job details
 ### ImportError: No module named 'wrds' (or other package)
 **Solution**: Install missing packages:
 ```bash
-pip install --user wrds pandas numpy pandas-market-calendars
-# Or install all requirements:
 python -m pip install --user -r requirements.txt
 ```
 
@@ -742,7 +764,7 @@ Yes! For collaboration or complex use cases, email alexander.dickerson1@unsw.edu
 
 ---
 
-## Stage 1, 2 & 3
+## Stages 1 to 4
 
 ### Is Stage 1 available?
 **Yes!** Stage 1 is now in **public beta**. It enriches Stage 0 daily panels with:

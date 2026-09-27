@@ -5,7 +5,7 @@
 - SSH access to WRDS Cloud
 - WRDS account with TRACE access
 - Python ≥ 3.10
-- `.pgpass` for passwordless database login (see the WRDS documentation)
+- No password file: jobs on the WRDS Cloud connect without one
 
 ---
 
@@ -25,7 +25,7 @@ and `stage1/` are both directly beneath the working directory.
 
 ## 2. Set up environment and install dependencies
 
-### Option A — `venv` (default)
+### Option A — `venv`
 
 ```bash
 # --system-site-packages keeps the WRDS Cloud's own pandas 2.2 visible: pip has no build of it
@@ -35,6 +35,10 @@ source ~/wrds_env/bin/activate
 python -m pip install -U pip
 python -m pip install -r requirements.txt      # do NOT add --user
 ```
+
+❗In every later session, `source ~/wrds_env/bin/activate` again before `./run_pipeline.sh` or
+`qsub`. The jobs take your shell's environment when you submit them (`#$ -V`), so they run
+whichever Python is active then.
 
 ### Option B — conda (if installed)
 
@@ -77,10 +81,10 @@ which merely imports it):
 WRDS_USERNAME = os.getenv("WRDS_USERNAME", "your_wrds_username")
 ```
 
-❗`run_smoke_test.sh` reads the ENVIRONMENT, not `config.py`, and refuses to start
-without it -- so if you take Option B, still `export WRDS_USERNAME` before using it.
+`run_smoke_test.sh` reads the username the way the stages do, from the environment or
+`config.py`, so either option works for it.
 
-You do **not** need to put the password in code; `.pgpass` supplies it.
+Your password goes nowhere: jobs on the WRDS Cloud connect without it.
 
 ---
 
@@ -170,7 +174,8 @@ A: Yes. That installs to `~/.local/...` and bypasses your env. Reinstall **witho
 A: No. Anything submitted via `qsub` keeps running on the cluster.
 
 **Q: The script asks for a password.**
-A: Fix `.pgpass` and its permissions: `chmod 600 ~/.pgpass`.
+A: On the WRDS Cloud that means the username is wrong: check `WRDS_USERNAME`
+(`python3 doctor.py --wrds`). No password file is needed there.
 
 
 

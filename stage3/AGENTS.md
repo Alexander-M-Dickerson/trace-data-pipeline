@@ -4,6 +4,10 @@ Stage 3 reproduces the exhibits of *The Corporate Bond Factor Replication Crisis
 figures) from the panel stage 2 built. Read the repository's [AGENTS.md](../AGENTS.md) first. The full
 human guide is [QUICKSTART_stage3.md](QUICKSTART_stage3.md).
 
+The `reproduce-exhibits` skill (`/reproduce-exhibits` in Claude Code, `$reproduce-exhibits` in
+Codex) walks this file step by step, and `python doctor.py`, from the repository root, says
+whether this stage's inputs are ready.
+
 ## Before running
 
 - Stage 2 must have finished: stage 3 reads `stage2/output/panel/main_panel_stage1.parquet` and the
@@ -11,8 +15,8 @@ human guide is [QUICKSTART_stage3.md](QUICKSTART_stage3.md).
 - Stage 3 sorts portfolios with PyBondLab 0.3.0, installed with the two lines in
   `requirements-local.txt`. It stops and prints them if PyBondLab is missing or a different
   version, and prints the version it used.
-- Ask the user which sample they want: the full panel (default) or the paper's sample
-  (`--sample paper`, 2002-09 to 2024-12).
+- Ask the user which sample they want: the whole panel (the default, `--sample frontier`) or the
+  paper's sample (`--sample paper`, 2002-09 to 2024-12).
 
 ## The commands, in order
 

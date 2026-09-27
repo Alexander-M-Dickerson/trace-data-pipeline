@@ -4,6 +4,10 @@ Stage 4 builds the TRACE-only bond factors published on openbondassetpricing.com
 stage 2 built, and compares them with the published files. Read the repository's
 [AGENTS.md](../AGENTS.md) first. The full human guide is [README_stage4.md](README_stage4.md).
 
+The `build-factors` skill (`/build-factors` in Claude Code, `$build-factors` in Codex) walks
+this file step by step, and `python doctor.py`, from the repository root, says whether this
+stage's inputs are ready.
+
 ## Before running
 
 - Stage 2 must have finished: stage 4 reads `stage2/output/panel/main_panel_stage1.parquet` and

@@ -64,8 +64,8 @@ trace-data-pipeline/
 at least one agency rating. Stage 2 recognises that file and refuses it at start-up. Run
 Stages 0 and 1 yourself on WRDS and use their output.
 
-Python packages beyond Stage 1's: `duckdb`, `numba`, `numexpr`, `scipy`, `statsmodels`,
-`pandas_market_calendars` and PyBondLab 0.3.0, in Python 3.11 to 3.13 (3.14 cannot install yet;
+Python packages beyond Stage 1's: `numba` (Stage 1 takes it only below Python 3.14), `numexpr`,
+`pytest` and PyBondLab 0.3.0, in Python 3.11 to 3.13 (3.14 cannot install yet;
 `requirements-local.txt` says why). Two lines install them
 all:
 
@@ -99,7 +99,7 @@ Useful flags (passed straight through to `_run_stage2.py`):
 | `--dry-run` | Validate the configuration and exit |
 | `--limit-cusips 200` | Build on the first 200 CUSIPs — a fast development loop. ❗It writes to the same `output/` as a full build, replacing its panel and blocks |
 | `--from-step N --to-step M` | Run part of the pipeline (steps 1-7) |
-| `--factor-source pinned` | Use the factor file published with your vintage (downloaded once) instead of rebuilding it from public sources. Needed to reproduce a published panel exactly |
+| `--factor-source pinned` | Use the factor file published with your vintage (downloaded once) instead of rebuilding it from public sources. Needed to reproduce a published panel, which also takes the same WRDS run of stages 0 and 1 |
 | `--validate` | After the build, run the column-coverage check (`validate_coverage.py`) and record it in the run manifest |
 
 ---

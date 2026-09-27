@@ -5,6 +5,10 @@ cleans them, and writes one daily bond panel per TRACE database: Enhanced, Rule 
 Standard when the user asks for it. Read the repository's [AGENTS.md](../AGENTS.md) first; the
 full guide is [README_stage0.md](README_stage0.md).
 
+The `run-wrds` skill (`/run-wrds` in Claude Code, `$run-wrds` in Codex) walks stages 0 and 1
+step by step, and `python3 doctor.py --wrds`, from the repository root, says whether the login
+node is ready.
+
 ## How it runs
 
 - `./run_pipeline.sh`, from the repository root, submits one SGE job per database, then the
@@ -15,7 +19,7 @@ full guide is [README_stage0.md](README_stage0.md).
 - **There are two cleaners.** `create_daily_enhanced_trace.py` cleans Enhanced TRACE;
   `create_daily_standard_trace.py` cleans Standard TRACE and Rule 144A. They apply the same
   filters in the same order, each in its own copy of the code, so a fix to one usually belongs
-  in the other. Their shared filters are tagged as groups: `grep -rn "filter.decimal_shift" .`
+  in the other. Their shared filters are tagged as groups: `git grep -n "filter.decimal_shift"`
   finds both copies. Six of the filters are also written out a second time in each cleaner, in
   the code that rebuilds the data reports; those copies are members of the same groups, so a
   group can have four members, and all of them change together.
@@ -60,11 +64,13 @@ the bond universe, `DS_PARAMS`, `BB_PARAMS` and `INIT_ERROR` tune three of the f
 ## Traps
 
 - **Connections.** WRDS allows 7 held at once; Enhanced and 144A run together and must leave
-  one free [ref:rule.connection_cap]. A refused connection, a missing username and a missing
-  `~/.pgpass` entry all surface as `EOFError: EOF when reading a line` [ref:trap.eof_error].
+  one free [ref:rule.connection_cap]. A refused connection and a missing username both surface
+  as `EOFError: EOF when reading a line` [ref:trap.eof_error]. No password file is needed on the
+  WRDS Cloud, so do not send the user to make one.
 - **Memory is charged per slot.** A job asking for more than 8 slots or 48 GB waits in the queue
   forever without an error, so `qsub_resources()` refuses to ask [ref:rule.memory_per_slot]. A
-  job stuck at `qw`: lower that database's `CONCURRENCY` and resubmit.
+  job waiting at `qw` is therefore usually the grid (WRDS runs at most 5 of a user's jobs at
+  once; `qstat -j <id>` says why), and `hqw`, a job held behind another, is normal.
 - **Parquet only.** Every later stage reads parquet, so another `OUTPUT_FORMAT` stops the run
   at start-up [ref:rule.parquet_only].
 

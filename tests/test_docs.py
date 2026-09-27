@@ -76,11 +76,10 @@ DOC_FILES = [
     "AGENTS.md", "stage2/AGENTS.md", "stage3/AGENTS.md",
     "stage4/README_stage4.md", "stage4/DATA_DICTIONARY.md", "stage4/AGENTS.md",
     "stage0/AGENTS.md", "stage1/AGENTS.md", "tests/AGENTS.md", "CLAUDE.md", "TAGS.md",
-    ".github/copilot-instructions.md",
-    ".agents/skills/onboard/SKILL.md", ".agents/skills/run-wrds/SKILL.md",
-    ".agents/skills/build-panel/SKILL.md", ".agents/skills/reproduce-exhibits/SKILL.md",
-    ".agents/skills/build-factors/SKILL.md", ".agents/skills/explain/SKILL.md",
+    ".github/copilot-instructions.md", "GEMINI.md",
 ]
+# Every skill, found rather than listed: a list kept by hand missed the seventh.
+DOC_FILES += sorted(p.relative_to(ROOT).as_posix() for p in (ROOT / ".agents" / "skills").glob("*/SKILL.md"))
 
 # Named in prose but produced at runtime or shipped inside a download, so they are
 # legitimately absent from a fresh clone.

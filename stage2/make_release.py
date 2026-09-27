@@ -10,12 +10,12 @@ Released artifacts carry the vintage YEAR -- ``factors_2026.parquet`` -- which i
 users cite. This script does that rename and assembles the provenance that makes a
 published number checkable.
 
-    python3 make_release.py                     # panel, factor and BBW bundles
-    python3 make_release.py --what panel        # just the panel
-    python3 make_release.py --out-dir dist      # somewhere else
-    python3 make_release.py --what bbw          # the BBW four-factor bundle
-    python3 make_release.py --what daily        # the Stage 1 daily panel, public layout
-    python3 make_release.py --mode <mode>       # a build other than the default stage1
+    python make_release.py                      # panel, factor and BBW bundles
+    python make_release.py --what panel         # just the panel
+    python make_release.py --out-dir dist       # somewhere else
+    python make_release.py --what bbw           # the BBW four-factor bundle
+    python make_release.py --what daily         # the Stage 1 daily panel, public layout
+    python make_release.py --mode <mode>        # a build other than the default stage1
 
 ❗**This script is for REDISTRIBUTION, and only redistribution.**
 
@@ -126,8 +126,10 @@ def collect_provenance(factors: pd.DataFrame) -> dict:
 
 README = """# OSBAP monthly factor panel -- {vintage} vintage
 
-`factors_{vintage}.parquet` -- the exogenous monthly factor time series used to estimate
-every rolling beta in the Stage 2 bond panel of the same vintage.
+`factors_{vintage}.parquet` -- the monthly factors from outside sources that the rolling betas
+in the Stage 2 bond panel of the same vintage use. Its copies of the extended BBW bond factors
+(to 2023-01) are not read by the build, which takes the bond factors, and those made from the
+trade tape, from its own steps.
 
 **Why this file is published.** Stage 2 assembles this panel from public sources at build
 time, and those sources revise: Ken French restates SMB/HML, FRED re-seasonally-adjusts
@@ -345,15 +347,15 @@ Data is distributed in two packages. Download both for full functionality.
   PACKAGE 2: osbap_additional_data_{vintage}.zip
   -----------------------------------------------------------------------------
   betas_x_{vintage}.parquet                Factor betas from duration-adjusted returns
-  mom_retx_{vintage}.parquet               Momentum/LTR from duration-adjusted returns
+  mom_retx_{vintage}.parquet               Momentum/LTR and VaR/ES, duration-adjusted
   mmn_price_based_signals_{vintage}.parquet   Unadjusted price signals (*_mmn suffix)
   returns_alt_{vintage}.parquet            Alternative return measures
 
   ALSO PUBLISHED SEPARATELY
   -----------------------------------------------------------------------------
-  factors_{vintage}.parquet                The exogenous monthly factor panel every
-                                         rolling beta in this release was estimated
-                                         on. Public factor sources revise, so a build
+  factors_{vintage}.parquet                The monthly factors from outside sources
+                                         that the rolling betas in this release use.
+                                         Public factor sources revise, so a build
                                          run later will NOT reproduce this release
                                          unless it is pinned to this file.
 

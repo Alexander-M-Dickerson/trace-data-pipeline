@@ -194,7 +194,11 @@ def test_every_corrected_row_is_in_the_reconciliation():
     words = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
              "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen",
              "eighteen", "nineteen", "twenty"]
-    words += [f"twenty-{w}" for w in words[1:10]]
+    for tens in ("twenty", "thirty", "forty", "fifty"):
+        if tens != "twenty":                       # "twenty" is already the list's last word
+            words.append(tens)
+        words += [f"{tens}-{w}" for w in words[1:10]]
+    assert words[33] == "thirty-three" and words[50] == "fifty"
     said = re.search(r"\. ([\w-]+) rows there differ from the printed table", rec)
     assert said, "RECONCILIATION_ia08.md no longer says how many rows differ from the printed table"
     assert said.group(1).lower() == words[len(fixed)], (

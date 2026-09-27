@@ -103,7 +103,7 @@ it is an **input to both Stage 1 and Stage 2** (Stage 2 reads `issue_id`, `rule_
 | `issue_name` | string | Issue description. |
 | `issuer_id` | float | FISD issuer identifier (whole numbers, stored as float). |
 | `foreign_currency` | string | `Y` if the bond is denominated in a foreign currency. |
-| `coupon_type` | string | FISD coupon type (`F` fixed, `V` variable, `Z` zero). |
+| `coupon_type` | string | FISD coupon type (`F` fixed, `V` variable, `Z` zero). Stage 0 drops variable coupons (`V`) in its FISD screen, so only `F` and `Z` occur (109,987 and 6,214 bonds in the 2026-09-21 Enhanced file). |
 | `coupon` | float | Annual coupon rate, percent. |
 | `convertible` | string | `Y` if convertible. |
 | `asset_backed` | string | `Y` if asset-backed. |

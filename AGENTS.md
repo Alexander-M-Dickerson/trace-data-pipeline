@@ -38,7 +38,7 @@ python doctor.py            # on the user's computer: what is ready, what is mis
 python3 doctor.py --wrds    # the same on the WRDS login node, for stages 0 and 1
 ```
 
-`doctor.py` only looks: it downloads nothing, opens no WRDS connection and creates no files. It
+`doctor.py` only looks: it downloads nothing, opens no WRDS connection and writes nothing of its own. It
 asks each stage through that stage's own check, so its answer is the stage's answer.
 
 ## Skills
@@ -54,6 +54,7 @@ Each is a step-by-step procedure in `.claude/skills/<name>/SKILL.md`, with the s
 | `reproduce-exhibits` | build the exhibits (stage 3) |
 | `build-factors` | build the TRACE-only factors and compare them with the published ones (stage 4) |
 | `explain` | explain a column, filter, factor, setting, exhibit or trap, from the code |
+| `add-a-column` | add, rename, move or remove a monthly panel column, in every place it must change |
 
 ## Where to look
 
@@ -76,20 +77,21 @@ monthly and daily panels has one where it is computed, as does each cleaning fil
 a check enforces, each known trap and each entry point. To go from a name to the code:
 
 ```bash
-grep -rn "tag:col.cs_sprd" .          # where the Corwin-Schultz spread is computed
-grep -rn "filter.bounce_back" .       # the filter in both stage 0 cleaners, and every pointer to it
+git grep -n "tag:col.cs_sprd"         # where the Corwin-Schultz spread is computed
+git grep -n "filter.bounce_back"      # the filter in both stage 0 cleaners, and every pointer to it
 ```
 
 The namespaces are `col.` (monthly panel), `daily.` (daily panel), `filter.`, `rule.`, `trap.`
 and `entry.`. A group, rather than a tag, marks the same thing done in several places (the two
 stage 0 cleaners), which must be changed together. `python tools/tags.py` checks every tag and
-rewrites [TAGS.md](TAGS.md); the test suite fails when a ref points nowhere, a tag is
+rewrites [TAGS.md](TAGS.md), which lists every tag's file for a copy without git; the test suite fails when a ref points nowhere, a tag is
 duplicated, or a panel column has no tag.
 
 ## Rules for the assistant
 
-1. **Read the stage's guide before running anything**: `stage2/QUICKSTART_stage2.md`,
-   `stage3/QUICKSTART_stage3.md`, `stage4/README_stage4.md`. They hold the exact commands and
+1. **Read the stage's `AGENTS.md` and its guide before running anything**: the `AGENTS.md` in
+   that stage's folder (some tools read only this root file), then `stage2/QUICKSTART_stage2.md`,
+   `stage3/QUICKSTART_stage3.md` or `stage4/README_stage4.md`. They hold the exact commands and
    the expected run times.
 2. **Always dry-run first.** `python _run_stage2.py --dry-run`, `python _run_stage3.py --dry-run`
    and `python build_factors.py --dry-run` print every input they resolved. Show the user that
@@ -133,9 +135,9 @@ and [stage1/AGENTS.md](stage1/AGENTS.md) what each stage does.
   (`MAX_WRDS_CONNECTIONS`). The Enhanced and 144A jobs run at the same time, so their
   `CONCURRENCY` values together must stay below it [ref:rule.connection_cap]. A failed
   connection shows up as `EOFError: EOF when reading a line`, which looks like a keyboard
-  problem. It has two causes: first check the credentials (`WRDS_USERNAME` still the
-  placeholder, or no `~/.pgpass`), which is the commoner one [ref:trap.eof_error]; only then
-  this limit.
+  problem. It has two causes: first check the username (`WRDS_USERNAME` unset or still the
+  placeholder), which is the commoner one [ref:trap.eof_error]; only then this limit. Jobs on
+  the WRDS Cloud need no password file, so do not send the user to make one.
 - **To move the results off WRDS**, zip from `~` with a relative path, exactly as QUICKSTART writes
   it. An absolute path makes an archive nested four folders deep.
 
@@ -148,7 +150,9 @@ and [stage1/AGENTS.md](stage1/AGENTS.md) what each stage does.
 - A WRDS account (`WRDS_USERNAME`, in `config.py` or the environment) for stage 2's first run,
   which fetches and caches Treasury returns, Fama-French factors, VIX and FISD coupon terms.
   Later runs use the cache.
-- Python 3.11 to 3.13 on their computer (3.14 cannot install yet), and two install lines, in this order:
+- Python 3.11 to 3.13 on their computer (3.14 cannot install yet), in an environment made for this
+  repository (the `onboard` skill makes one, `.venv`, and calls its Python by path), and two
+  install lines, in this order:
   ```
   python -m pip install -r requirements-local.txt
   python -m pip install --no-deps pybondlab==0.3.0
@@ -179,7 +183,7 @@ and [stage1/AGENTS.md](stage1/AGENTS.md) what each stage does.
    network, takes under a minute, and includes `tests/test_docs.py`, which fails when a doc stops
    matching the code. [tests/AGENTS.md](tests/AGENTS.md) says what each gate guards.
 2. **A new or renamed `.py` or `.sh` file** goes into [CODE_MAP.md](CODE_MAP.md).
-3. **A new panel column** needs its name in `stage2/lib/contract.py` at the right position, the
+3. **A new panel column** (the `add-a-column` skill walks it) needs its name in `stage2/lib/contract.py` at the right position, the
    same definition in `stage2/DATA_DICTIONARY.md` and `stage3/spec/signal_definitions.json`,
    and a `col.` tag on the line that computes it. A price-based signal also needs its
    unadjusted `_mmn` twin and a place in `MMN_TWINNED`. The column list is published, so a

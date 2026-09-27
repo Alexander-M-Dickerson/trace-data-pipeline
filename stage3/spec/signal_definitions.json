@@ -135,16 +135,18 @@
       "mnemonic": "tret",
       "group": "Bond Identifiers and Return Metrics",
       "name": "Treasury Return",
-      "description": "Duration-matched U.S. Treasury portfolio return. Used to compute duration-adjusted returns: $r^x = r - tret$.",
+      "description": "Duration-matched U.S. Treasury portfolio return: the CRSP fixed-term Treasury returns interpolated at the bond's modified duration, rounded to 2 decimals, on its month-end trade date ($dt_e$). That is the unadjusted duration, not the panel's gap-adjusted \\texttt{md\\_dur}. Used to compute duration-adjusted returns: $r^x = r - tret$.",
       "citation": "--",
       "citation_keys": [],
-      "citation_text": "--"
+      "citation_text": "--",
+      "paper_prints": "Duration-matched U.S. Treasury portfolio return. Used to compute duration-adjusted returns: $r^x = r - tret$.",
+      "why_corrected": "The printed row leaves the duration unstated, and the dictionary said `md_dur`. `_attach_tret` in `stage2/steps/step1_returns.py` reads `mod_dur` on the month-end trade row, where the return ends; the panel's `md_dur` is read at the signal date, before it."
     },
     {
       "mnemonic": "tret_bns",
       "group": "Bond Identifiers and Return Metrics",
       "name": "Treasury Return, Duration-Weighted Cash Flows",
-      "description": "Treasury benchmark built from the bond's own cash flows, weighted by their present-value shares (Macaulay duration weights) and applied to zero-coupon Treasury returns from the Gurkaynak-Sack-Wright curve. Subtract from `ret_vw` for a duration-adjusted return.",
+      "description": "Treasury benchmark built from the bond's own cash flows, weighted by their present-value shares (Macaulay duration weights) and applied to zero-coupon Treasury returns from the Gurkaynak-Sack-Wright curve. Subtract from \\texttt{ret\\_vw} for a duration-adjusted return.",
       "citation": "van Binsbergen, Nozawa, and Schwert (2025)",
       "citation_keys": [],
       "citation_text": "van Binsbergen, Nozawa, and Schwert (2025)"
@@ -153,7 +155,7 @@
       "mnemonic": "tret_cfm",
       "group": "Bond Identifiers and Return Metrics",
       "name": "Treasury Return, Cash-Flow-Weighted",
-      "description": "As `tret_bns`, but weighting the same cash flows by their future value rather than their present value. Places more weight on long-dated cash flows and so overstates a bond's interest rate risk; reported as the authors' own robustness alternative.",
+      "description": "As \\texttt{tret\\_bns}, but weighting the same cash flows by their future value rather than their present value. Places more weight on long-dated cash flows and so overstates a bond's interest rate risk; reported as the authors' own robustness alternative.",
       "citation": "van Binsbergen, Nozawa, and Schwert (2025), Internet Appendix A1",
       "citation_keys": [],
       "citation_text": "van Binsbergen, Nozawa, and Schwert (2025), Internet Appendix A1"
@@ -162,7 +164,7 @@
       "mnemonic": "tret_gprs",
       "group": "Bond Identifiers and Return Metrics",
       "name": "Treasury Return, Exact Duration Match",
-      "description": "As `tret_bns`, refined so the Treasury portfolio's duration equals the bond's exactly. The present-value weights are duration-matched only when the term structure is flat; this solves for the Treasury yield that restores the match and reweights accordingly.",
+      "description": "As \\texttt{tret\\_bns}, refined so the Treasury portfolio's duration equals the bond's exactly. The present-value weights are duration-matched only when the term structure is flat; this solves for the Treasury yield that restores the match and reweights accordingly.",
       "citation": "Ghaderi, Plante, Roussanov, and Seo (2026), Appendix B.2",
       "citation_keys": [],
       "citation_text": "Ghaderi, Plante, Roussanov, and Seo (2026), Appendix B.2"
@@ -171,7 +173,7 @@
       "mnemonic": "tret_cls",
       "group": "Bond Identifiers and Return Metrics",
       "name": "Treasury Return, Cash-Flow-Matched",
-      "description": "As `tret_bns`, but discounting the same cash flows on the Treasury zero curve instead of at the bond's own yield to maturity. This replicates the bond's cash flows rather than its duration, so it removes slope and curvature effects as well as parallel shifts. The difference from `tret_bns` is the authors' higher-order component.",
+      "description": "As \\texttt{tret\\_bns}, but discounting the same cash flows on the Treasury zero curve instead of at the bond's own yield to maturity. This replicates the bond's cash flows rather than its duration, so it removes slope and curvature effects as well as parallel shifts. The difference from \\texttt{tret\\_bns} is the authors' higher-order component.",
       "citation": "Cui, Lu, and Song (2026)",
       "citation_keys": [],
       "citation_text": "Cui, Lu, and Song (2026)"
@@ -180,7 +182,7 @@
       "mnemonic": "tret_mat",
       "group": "Bond Identifiers and Return Metrics",
       "name": "Treasury Return, Maturity-Matched",
-      "description": "The twin of `tret`: the same key-rate Treasury index returns, the same interpolation nodes and rounding, but interpolated at the bond's remaining MATURITY rather than its modified duration. Included as the maturity-matched comparator; duration matching is the more precise of the two.",
+      "description": "The twin of \\texttt{tret}: the same key-rate Treasury index returns, the same interpolation nodes and rounding, but interpolated at the bond's remaining MATURITY rather than its modified duration. Included as the maturity-matched comparator; duration matching is the more precise of the two.",
       "citation": "Bessembinder, Kahle, Maxwell, and Xu (2009)",
       "citation_keys": [],
       "citation_text": "Bessembinder, Kahle, Maxwell, and Xu (2009)"
@@ -283,10 +285,12 @@
       "mnemonic": "rfret",
       "group": "Bond Identifiers and Return Metrics",
       "name": "Risk-Free Rate",
-      "description": "Monthly risk-free rate from Fama-French. Used for excess returns: $r^x = r - r^f$.",
+      "description": "Monthly risk-free rate from Fama-French. Used for excess returns, $r - r^f$.",
       "citation": "--",
       "citation_keys": [],
-      "citation_text": "--"
+      "citation_text": "--",
+      "paper_prints": "Monthly risk-free rate from Fama-French. Used for excess returns: $r^x = r - r^f$.",
+      "why_corrected": "The printed row writes the excess return as $r^x$, the symbol this table uses for the duration-adjusted return $r - tret$. The two are different returns, so the symbol is dropped here."
     },
     {
       "mnemonic": "spc_rat",
@@ -323,10 +327,12 @@
       "mnemonic": "fce_val",
       "group": "Bond Characteristics",
       "name": "Face Value",
-      "description": "Bond amount outstanding (face value); units of the bond outstanding.",
+      "description": "Bond amount outstanding (face value), in thousands of dollars.",
       "citation": "--",
       "citation_keys": [],
-      "citation_text": "--"
+      "citation_text": "--",
+      "paper_prints": "Bond amount outstanding (face value); units of the bond outstanding.",
+      "why_corrected": "The printed row says units of the bond outstanding. The column is FISD's amount outstanding, which FISD reports in thousands of dollars: its median on the 2026-09-21 panel is 500,000, a $500 million issue."
     },
     {
       "mnemonic": "144a",
@@ -341,10 +347,12 @@
       "mnemonic": "country",
       "group": "Bond Characteristics",
       "name": "Country",
-      "description": "Country of issuance (e.g., USA for U.S. bonds).",
+      "description": "The issuer's country of domicile, from FISD \\texttt{country\\_domicile} (e.g., USA).",
       "citation": "--",
       "citation_keys": [],
-      "citation_text": "--"
+      "citation_text": "--",
+      "paper_prints": "Country of issuance (e.g., USA for U.S. bonds).",
+      "why_corrected": "The printed row says country of issuance. `stage2/steps/step7_final.py` reads FISD's `country_domicile`, which is where the issuer is domiciled."
     },
     {
       "mnemonic": "tmat",
@@ -436,12 +444,14 @@
       "mnemonic": "cs_mu12_1",
       "group": "Cluster I: Spreads, Yields, Size",
       "name": "12-Month Average Spread",
-      "description": "Rolling 12-month average credit spread, skipping the prior month. Requires minimum 6 observations.",
+      "description": "Average credit spread over the bond's 12 monthly observations before month $t$, month $t{-}1$ included. Requires minimum 6 observations.",
       "citation": "\\citet{elkamhi2022one}",
       "citation_keys": [
         "elkamhi2022one"
       ],
-      "citation_text": "Elkamhi, Jo and Nozawa (2024)"
+      "citation_text": "Elkamhi, Jo and Nozawa (2024)",
+      "paper_prints": "Rolling 12-month average credit spread, skipping the prior month. Requires minimum 6 observations.",
+      "why_corrected": "The printed row says it skips the prior month. `stage2/lib/value.py` shifts the spread by one row and averages the 12 rows before it (at least 6), so month $t{-}1$ is in the window and month $t$ is the one left out. On the 2026-09-21 run the published column equals that average on 100% of 1,665,078 rows, and the version that skips $t{-}1$ on under 0.5%."
     },
     {
       "mnemonic": "bbtm",
@@ -777,34 +787,40 @@
       "mnemonic": "roll",
       "group": "Cluster IV: Illiquidity",
       "name": "Roll Spread",
-      "description": "Implicit bid-ask spread: $2\\sqrt{\\max(-\\text{Cov}(r_t, r_{t-1}), 0)}$. Requires a minimum of 5 daily returns.",
+      "description": "Implicit bid-ask spread: $2\\sqrt{\\max(-\\text{Cov}(r_t, r_{t-1}), 0)}$, with $r_t$ the daily log clean-price return in percent, so the spread is in percent of price. Requires a minimum of 5 daily returns.",
       "citation": "\\citet{roll1984simple}",
       "citation_keys": [
         "roll1984simple"
       ],
-      "citation_text": "Roll (1984)"
+      "citation_text": "Roll (1984)",
+      "paper_prints": "Implicit bid-ask spread: $2\\sqrt{\\max(-\\text{Cov}(r_t, r_{t-1}), 0)}$. Requires a minimum of 5 daily returns.",
+      "why_corrected": "The printed formula leaves the units open. `stage2/lib/illiq_pandas.py` builds it from log returns multiplied by 100, the covariance behind `ilq`, so a value of 0.47 is 0.47% of price."
     },
     {
       "mnemonic": "ilq",
       "group": "Cluster IV: Illiquidity",
       "name": "Roll Autocovariance",
-      "description": "Negative autocovariance of log returns $\\times 100$. Requires a minimum of 5 daily returns.",
+      "description": "Negative autocovariance of the bond's daily log clean-price returns, the returns taken in percent (log return $\\times 100$), so 10,000 times the autocovariance of decimal returns. Requires a minimum of 5 daily returns.",
       "citation": "\\citet{bao2011illiquidity}",
       "citation_keys": [
         "bao2011illiquidity"
       ],
-      "citation_text": "Bao, Pan and Wang (2011)"
+      "citation_text": "Bao, Pan and Wang (2011)",
+      "paper_prints": "Negative autocovariance of log returns $\\times 100$. Requires a minimum of 5 daily returns.",
+      "why_corrected": "The printed row reads as the autocovariance multiplied by 100. `stage2/lib/illiq_pandas.py` multiplies each log return by 100 before taking the covariance, which scales the covariance by 10,000."
     },
     {
       "mnemonic": "spd_rel",
       "group": "Cluster IV: Illiquidity",
       "name": "Relative Bid-Ask Spread",
-      "description": "Volume-weighted $(P^{ask} - P^{bid})/\\text{mid}$. Requires a minimum of 5 prices.",
+      "description": "Dollar-volume-weighted average dealer ask minus average dealer bid, over their midpoint. No minimum: a month with one bid and one ask has a value.",
       "citation": "\\citet{hong2000empirical}",
       "citation_keys": [
         "hong2000empirical"
       ],
-      "citation_text": "Hong and Warga (2000)"
+      "citation_text": "Hong and Warga (2000)",
+      "paper_prints": "Volume-weighted $(P^{ask} - P^{bid})/\\text{mid}$. Requires a minimum of 5 prices.",
+      "why_corrected": "The printed row requires a minimum of 5 prices. As for `spd_abs`, the code applies none."
     },
     {
       "mnemonic": "cs_sprd",
@@ -832,23 +848,27 @@
       "mnemonic": "p_zro",
       "group": "Cluster IV: Illiquidity",
       "name": "No-Trade Day Proportion",
-      "description": "Fraction of business days with no valid price. Returns are never inspected, so the old name \"Zero-Return Proportion\" contradicted this description.",
+      "description": "Fraction of the month's business days with no valid price. In the published (gap-adjusted) form the bond's last trading day in the month counts as a day without one, so the value is at least one over the month's business days; the unadjusted share is \\texttt{p\\_zro\\_mmn}. Returns are never inspected, so the old name \"Zero-Return Proportion\" contradicted this description.",
       "citation": "\\citet{fong2017}",
       "citation_keys": [
         "fong2017"
       ],
-      "citation_text": "Fong, Holden and Trzcinka (2017)"
+      "citation_text": "Fong, Holden and Trzcinka (2017)",
+      "paper_prints": "Fraction of business days with no valid price.",
+      "why_corrected": "The printed row is the unadjusted share. `stage2/steps/step2_illiquidity.py` builds the adjusted share by leaving the last trading day out of the priced days, and the panel carries that form: on the 2026-09-21 panel it is never 0 (its minimum is 0.0435) and it exceeds `p_zro_mmn` on all 1,933,258 rows where both exist, while `p_zro_mmn` is 0 on 350,662. The printed name was \"Zero-Return Proportion\"; the column counts days without a price and never looks at returns."
     },
     {
       "mnemonic": "p_fht",
       "group": "Cluster IV: Illiquidity",
       "name": "FHT Spread",
-      "description": "Spread derived from zero-return proportion: $2\\sigma\\Phi^{-1}((1+p_{zro})/2)$. Requires a minimum of 5 daily returns.",
+      "description": "Spread derived from the no-trade proportion: $2\\sigma\\Phi^{-1}((1+p_{zro})/2)$, where $p_{zro}$ is always the full-month share, while in the published form $\\sigma$ leaves out the bond's last day of trading. Requires a minimum of 5 daily returns.",
       "citation": "\\citet{fong2017}",
       "citation_keys": [
         "fong2017"
       ],
-      "citation_text": "Fong, Holden and Trzcinka (2017)"
+      "citation_text": "Fong, Holden and Trzcinka (2017)",
+      "paper_prints": "Spread derived from zero-return proportion: $2\\sigma\\Phi^{-1}((1+p_{zro})/2)$. Requires a minimum of 5 daily returns.",
+      "why_corrected": "The printed formula reads as if it used the panel's own `p_zro`. In the published (gap-adjusted) form, `stage2/steps/step2_illiquidity.py` combines the adjusted $\\sigma$ with the FULL-month $p_{zro}$, while the panel's `p_zro` column is the adjusted share."
     },
     {
       "mnemonic": "vov",
@@ -865,21 +885,25 @@
       "mnemonic": "lix",
       "group": "Cluster IV: Illiquidity",
       "name": "Negative LIX (Illiquidity)",
-      "description": "$-\\log_{10}[(V \\times P_{\\text{close}}) / (P_{\\text{high}} - P_{\\text{low}})]$. Requires a minimum of 5 prices. Stored NEGATED (lib/illiq_pandas.py), so it rises with ILLIQUIDITY -- 99.29% of non-null values are negative, median -2.181.",
+      "description": "$-\\log_{10}[(V \\times P_{\\text{close}}) / (P_{\\text{high}} - P_{\\text{low}})]$, averaged over the month's days whose high differs from their low. Requires a minimum of 5 daily Amihud ratios (a daily return with positive volume), the count \\texttt{ami} uses. Stored NEGATED (lib/illiq_pandas.py), so it rises with ILLIQUIDITY -- 99.29% of non-null values are negative, median -2.181.",
       "citation": "\\citet{danyliv2014convenient}",
       "citation_keys": [
         "danyliv2014convenient"
       ],
-      "citation_text": "Danyliv, Bland and Nicholass (2014)"
+      "citation_text": "Danyliv, Bland and Nicholass (2014)",
+      "paper_prints": "$\\log_{10}[(V \\times P_{\\text{close}}) / (P_{\\text{high}} - P_{\\text{low}})]$. Requires a minimum of 5 prices.",
+      "why_corrected": "The printed row requires 5 prices. `stage2/lib/illiq_pandas.py` gates it on 5 daily Amihud ratios, the same count as `ami`, and a day whose high equals its low has no value, so it is left out of the mean. The printed row, named \"LIX Liquidity\", also had no minus sign: the column is stored negated, so it rises with illiquidity."
     },
     {
       "mnemonic": "spd_abs",
       "group": "Cluster IV: Illiquidity",
       "name": "Absolute Bid-Ask Spread",
-      "description": "Volume-weighted $(P^{ask} - P^{bid})$ in dollars. Requires a minimum of 5 prices.",
+      "description": "Dollar-volume-weighted average dealer ask price minus average dealer bid price over the month, in points of par. No minimum: a month with one bid and one ask has a value.",
       "citation": "--",
       "citation_keys": [],
-      "citation_text": "--"
+      "citation_text": "--",
+      "paper_prints": "Volume-weighted $(P^{ask} - P^{bid})$ in dollars. Requires a minimum of 5 prices.",
+      "why_corrected": "The printed row requires a minimum of 5 prices. `stage2/steps/step2_illiquidity.py` applies none to the two Hong-Warga spreads: on the 2026-09-21 run 78,937 published values come from months with fewer than 5 priced days, the fewest 2."
     },
     {
       "mnemonic": "dvol",
@@ -921,12 +945,14 @@
       "mnemonic": "rsj",
       "group": "Cluster V: Volatility & Risk",
       "name": "Realized Signed Jump",
-      "description": "Within-month asymmetry in positive vs.\\ negative squared returns: $(RV^+ - RV^-)/RV$. Requires a minimum of 5 daily returns.",
+      "description": "Within-month signed jump as the code computes it: $(\\sqrt{\\sum_{r>0} r_t^2} - \\sqrt{\\sum_{r<0} r_t^2}) / \\sum_t r_t^2$, the up-minus-down volatility over the realized variance. It is not bounded by 1 and scales with one over the volatility. Requires a minimum of 5 daily returns.",
       "citation": "\\citet{bollerslev2020}",
       "citation_keys": [
         "bollerslev2020"
       ],
-      "citation_text": "Bollerslev, Li and Zhao (2020)"
+      "citation_text": "Bollerslev, Li and Zhao (2020)",
+      "paper_prints": "Within-month asymmetry in positive vs.\\ negative squared returns: $(RV^+ - RV^-)/RV$. Requires a minimum of 5 daily returns.",
+      "why_corrected": "The printed row, $(RV^+ - RV^-)/RV$, reads as a ratio between -1 and 1. `stage2/lib/illiq_pandas.py` takes the square roots of the up and down sums of squares and divides their difference by the sum of squares itself, not its square root. On the 2026-09-21 panel the column runs from -2,142 to 2,254 and 90.5% of its values lie outside [-1, 1]."
     },
     {
       "mnemonic": "rsk",
@@ -989,19 +1015,23 @@
       "mnemonic": "dvol_sys",
       "group": "Cluster V: Volatility & Risk",
       "name": "Systematic Volatility",
-      "description": "Standard deviation of systematic returns (CAPMB fitted values) within the month. Requires a minimum of 5 daily returns.",
+      "description": "Standard deviation of the systematic part of the bond's daily returns within the month, from a regression on the day's equal-weighted average return across all bonds. Requires a minimum of 5 daily returns.",
       "citation": "--",
       "citation_keys": [],
-      "citation_text": "--"
+      "citation_text": "--",
+      "paper_prints": "Standard deviation of systematic returns (CAPMB fitted values) within the month. Requires a minimum of 5 daily returns.",
+      "why_corrected": "The printed row names a CAPMB regression. The market in `stage2/lib/illiq_pandas.py` is the day's equal-weighted average daily return across every bond in the sample, not the MKTB factor."
     },
     {
       "mnemonic": "dvol_idio",
       "group": "Cluster V: Volatility & Risk",
       "name": "Idiosyncratic Volatility",
-      "description": "Standard deviation of idiosyncratic returns (CAPMB residuals) within the month. Requires a minimum of 5 daily returns.",
+      "description": "Standard deviation of the idiosyncratic part of the bond's daily returns within the month: the residual of a regression on the day's equal-weighted average return across all bonds. Requires a minimum of 5 daily returns.",
       "citation": "--",
       "citation_keys": [],
-      "citation_text": "--"
+      "citation_text": "--",
+      "paper_prints": "Standard deviation of idiosyncratic returns (CAPMB residuals) within the month. Requires a minimum of 5 daily returns.",
+      "why_corrected": "As for `dvol_sys`: the market is the day's average return across all bonds, not the MKTB factor."
     },
     {
       "mnemonic": "ivol_mkt",
@@ -1038,12 +1068,14 @@
       "mnemonic": "iskew",
       "group": "Cluster V: Volatility & Risk",
       "name": "Idiosyncratic Skewness",
-      "description": "Skewness of residuals from coskewness regression.",
+      "description": "Rolling skewness of the residuals of the coskewness regression (MKTB and its square), each residual taken with that month's rolling betas. Before the bond has enough observations for the betas, its residual is the raw return.",
       "citation": "\\citet{harvey2000conditional}",
       "citation_keys": [
         "harvey2000conditional"
       ],
-      "citation_text": "Harvey and Siddique (2000)"
+      "citation_text": "Harvey and Siddique (2000)",
+      "paper_prints": "Skewness of residuals from coskewness regression.",
+      "why_corrected": "The printed row does not say how the residuals are formed. `stage2/lib/betas.py` subtracts each month's own rolling betas times the factors and fills a missing beta with 0, so the bond's first months enter the skewness window as raw returns."
     },
     {
       "mnemonic": "b_mktrf_mkt",
@@ -1078,23 +1110,27 @@
       "mnemonic": "b_mktbx_dcapm",
       "group": "Cluster VI: Market Risk",
       "name": "Duration-Adj Market Beta",
-      "description": "Beta on MKTBX from duration-adjusted CAPM.",
+      "description": "Beta on MKTBX, from a rolling regression of the bond's return \\texttt{ret\\_vw} on MKTBX and TERM. The regression is on the total return; the version on the duration-adjusted return is in the \\texttt{betas\\_x} block.",
       "citation": "\\citet{Binsbergen-Schwert-Nozawa-2023}",
       "citation_keys": [
         "Binsbergen-Schwert-Nozawa-2023"
       ],
-      "citation_text": "van Binsbergen, Nozawa and Schwert (2025)"
+      "citation_text": "van Binsbergen, Nozawa and Schwert (2025)",
+      "paper_prints": "Beta on MKTBX from duration-adjusted CAPM.",
+      "why_corrected": "The printed duration-adjusted CAPM has the duration-adjusted return on the left. The panel's column comes from the `std` variant in `stage2/lib/betas.py`, which regresses `ret_vw`; the `x` variant, published in `betas_x`, regresses the duration-adjusted return."
     },
     {
       "mnemonic": "b_term_dcapm",
       "group": "Cluster VI: Market Risk",
       "name": "Term Premium Beta",
-      "description": "Beta on TERM $=$ MKTB $-$ MKTBX from duration-adjusted CAPM.",
+      "description": "Beta on TERM, from the same regression of \\texttt{ret\\_vw} on MKTBX and TERM. TERM $=$ MKTB $+ r^f -$ MKTBX, the value-weighted duration-matched Treasury return, not an excess return.",
       "citation": "\\citet{Binsbergen-Schwert-Nozawa-2023}",
       "citation_keys": [
         "Binsbergen-Schwert-Nozawa-2023"
       ],
-      "citation_text": "van Binsbergen, Nozawa and Schwert (2025)"
+      "citation_text": "van Binsbergen, Nozawa and Schwert (2025)",
+      "paper_prints": "Beta on TERM $=$ MKTB $-$ MKTBX from duration-adjusted CAPM.",
+      "why_corrected": "The printed row defines TERM as MKTB $-$ MKTBX. `stage2/steps/step3_bbw.py` subtracts MKTBX from the raw market return, before the risk-free rate is taken off, so TERM keeps $r^f$: on the 2026-09-21 factors it equals MKTB $+ r^f -$ MKTBX to within 2e-17 in all 628 months of the merged factors. The regression is on `ret_vw`, as for `b_mktbx_dcapm`: the panel's column averages 1.05, against -0.08 in `betas_x`."
     },
     {
       "mnemonic": "b_mktb_dn",
@@ -1122,12 +1158,14 @@
       "mnemonic": "b_termb",
       "group": "Cluster VI: Market Risk",
       "name": "Term Beta",
-      "description": "Beta on TERMB from market regression.",
+      "description": "Beta on TERMB, from one rolling regression of the bond's return on TERMB and DEFB.",
       "citation": "\\citet{gebhardt2005cross}",
       "citation_keys": [
         "gebhardt2005cross"
       ],
-      "citation_text": "Gebhardt, Hvidkjaer and Swaminathan (2005)"
+      "citation_text": "Gebhardt, Hvidkjaer and Swaminathan (2005)",
+      "paper_prints": "Beta on TERMB from market regression.",
+      "why_corrected": "The printed row describes a market regression. As for `b_defb`: one two-factor regression on TERMB and DEFB gives both loadings."
     },
     {
       "mnemonic": "db_mkt",
@@ -1175,12 +1213,14 @@
       "mnemonic": "b_defb",
       "group": "Cluster VII: Credit & Default Betas",
       "name": "Default Beta",
-      "description": "Beta on DEFB from duration-adjusted market regression.",
+      "description": "Beta on DEFB, from one rolling regression of the bond's return on TERMB and DEFB.",
       "citation": "\\citet{gebhardt2005cross}",
       "citation_keys": [
         "gebhardt2005cross"
       ],
-      "citation_text": "Gebhardt, Hvidkjaer and Swaminathan (2005)"
+      "citation_text": "Gebhardt, Hvidkjaer and Swaminathan (2005)",
+      "paper_prints": "Beta on DEFB from duration-adjusted market regression.",
+      "why_corrected": "The printed row describes a duration-adjusted market regression. Since the DEF/TERM fix, `stage2/lib/betas.py` estimates both loadings from one two-factor regression, r = a + b_term TERMB + b_def DEFB, on the bond's total return."
     },
     {
       "mnemonic": "b_dvix",
@@ -1195,23 +1235,27 @@
       "mnemonic": "b_dvix_va",
       "group": "Cluster VIII: Volatility & Liquidity Betas",
       "name": "VIX Beta (Amihud)",
-      "description": "$\\Delta$VIX beta from FF3+VIX+Amihud specification.",
+      "description": "Sum of the betas on this month's and last month's VIX change, from a rolling regression on FF3, the VIX level, both VIX changes and the Amihud factor (AMD).",
       "citation": "\\citet{ChungWangWu_2019}",
       "citation_keys": [
         "ChungWangWu_2019"
       ],
-      "citation_text": "Chung, Wang and Wu (2019)"
+      "citation_text": "Chung, Wang and Wu (2019)",
+      "paper_prints": "$\\Delta$VIX beta from FF3+VIX+Amihud specification.",
+      "why_corrected": "The printed row names one $\\Delta$VIX beta. `stage2/lib/betas.py` adds the betas on the current and the lagged change (the model's `sum`), and reports the total."
     },
     {
       "mnemonic": "b_dvix_vp",
       "group": "Cluster VIII: Volatility & Liquidity Betas",
       "name": "VIX Beta (PSB)",
-      "description": "$\\Delta$VIX beta from FF3+VIX+PSB specification.",
+      "description": "Sum of the betas on this month's and last month's VIX change, from a rolling regression on FF3, the VIX level, both VIX changes and the Pastor-Stambaugh factor (PSB).",
       "citation": "\\citet{ChungWangWu_2019}",
       "citation_keys": [
         "ChungWangWu_2019"
       ],
-      "citation_text": "Chung, Wang and Wu (2019)"
+      "citation_text": "Chung, Wang and Wu (2019)",
+      "paper_prints": "$\\Delta$VIX beta from FF3+VIX+PSB specification.",
+      "why_corrected": "As for `b_dvix_va`: `stage2/lib/betas.py` reports the sum of the betas on the current and the lagged VIX change."
     },
     {
       "mnemonic": "b_dvix_dn",
@@ -1290,21 +1334,25 @@
       "mnemonic": "b_vix",
       "group": "Cluster VIII: Volatility & Liquidity Betas",
       "name": "VIX Level Beta",
-      "description": "Beta on VIX level from monthly regression.",
+      "description": "Beta on the VIX level (divided by 100 and by $\\sqrt{12}$), from a regression of the bond's daily returns within the month. Requires a minimum of 5 daily returns.",
       "citation": "\\citet{ChungWangWu_2019}",
       "citation_keys": [
         "ChungWangWu_2019"
       ],
-      "citation_text": "Chung, Wang and Wu (2019)"
+      "citation_text": "Chung, Wang and Wu (2019)",
+      "paper_prints": "Beta on VIX level from monthly regression.",
+      "why_corrected": "The printed row says a monthly regression. `stage2/lib/illiq_pandas.py` regresses the bond's daily returns on the daily VIX level within each bond-month, at least 5, as the dictionary's technical appendix already said. The VIX enters divided by 100 and by the square root of 12 (`stage2/lib/vix.py`)."
     },
     {
       "mnemonic": "b_dvixd",
       "group": "Cluster VIII: Volatility & Liquidity Betas",
       "name": "Daily VIX Innovation Beta",
-      "description": "Beta on daily $\\Delta$VIX within the month. Requires a minimum of 5 daily returns.",
+      "description": "Beta on the change in VIX between the bond's consecutive trade dates within the month, from a regression of its daily returns; a change across more than 5 days is left out. Requires a minimum of 5 daily returns.",
       "citation": "--",
       "citation_keys": [],
-      "citation_text": "--"
+      "citation_text": "--",
+      "paper_prints": "Beta on daily $\\Delta$VIX within the month. Requires a minimum of 5 daily returns.",
+      "why_corrected": "The printed row says the daily $\\Delta$VIX. `stage2/lib/illiq_pandas.py` differences VIX across the bond's own trade dates and drops a change when they are more than 5 days apart, so each change spans the same days as the return beside it."
     },
     {
       "mnemonic": "b_illiq",
@@ -1385,21 +1433,25 @@
       "mnemonic": "b_dcpi",
       "group": "Cluster IX: Macro & Other Betas",
       "name": "Inflation Beta",
-      "description": "Beta on monthly CPI changes.",
+      "description": "Beta on the one-month-lagged change in the CPI level (FRED CPIAUCSL), in index points: a change in the index, not a rate of inflation.",
       "citation": "--",
       "citation_keys": [],
-      "citation_text": "--"
+      "citation_text": "--",
+      "paper_prints": "Beta on monthly CPI changes.",
+      "why_corrected": "The printed row says monthly CPI changes, which reads as inflation. `stage2/lib/factor_fetch.py` differences the CPI index lagged one month, so the factor is in index points: from -3.84 to 3.66, mean 0.451, in the 2026-09-21 factors. A point is a larger share of CPI early in the sample than now."
     },
     {
       "mnemonic": "b_cpi_vol6",
       "group": "Cluster IX: Macro & Other Betas",
       "name": "Inflation Volatility Beta",
-      "description": "Beta on 6-month rolling CPI volatility.",
+      "description": "Beta on the 6-month rolling standard deviation of that lagged CPI change, in index points.",
       "citation": "\\citet{ceballos2021inflation}",
       "citation_keys": [
         "ceballos2021inflation"
       ],
-      "citation_text": "Ceballos (2021)"
+      "citation_text": "Ceballos (2021)",
+      "paper_prints": "Beta on 6-month rolling CPI volatility.",
+      "why_corrected": "As for `b_dcpi`: `stage2/lib/factor_fetch.py` builds the series from CPI index-point changes, not from inflation rates."
     },
     {
       "mnemonic": "b_dcredit",
@@ -1427,12 +1479,14 @@
       "mnemonic": "b_cptlt",
       "group": "Cluster IX: Macro & Other Betas",
       "name": "Intermediary Capital Beta",
-      "description": "Beta on traded intermediary capital ratio.",
+      "description": "Beta on the He-Kelly-Manela traded intermediary capital factor, a return less the risk-free rate, with MKTRF alongside.",
       "citation": "\\citet{he2017intermediary}",
       "citation_keys": [
         "he2017intermediary"
       ],
-      "citation_text": "He, Kelly and Manela (2017)"
+      "citation_text": "He, Kelly and Manela (2017)",
+      "paper_prints": "Beta on traded intermediary capital ratio.",
+      "why_corrected": "The printed row calls it the capital ratio. `stage2/lib/factor_fetch.py` reads HKM's `intermediary_value_weighted_investment_return`, a traded return, and the risk-free rate is subtracted when the factors are merged (`stage2/steps/compute_factors.py`)."
     },
     {
       "mnemonic": "b_rvol",

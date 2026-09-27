@@ -33,6 +33,7 @@ not a pass: say which ones skipped and why.
 | `test_docs.py` | the docs against the code: every code file in CODE_MAP.md, output trees, links, anchors, quoted counts |
 | `test_public_boundary.py` | nothing private in any tracked file: no private project names, personal paths or other drives, and no pointer to a file the repository does not have |
 | `test_tags.py` | the code tags: refs resolve, no duplicates, every panel column tagged, TAGS.md current |
+| `test_skills.py` | the assistant skills: the two copies identical, the frontmatter valid, every file they name present, and AGENTS.md and CLAUDE.md listing exactly these skills |
 | `test_doctor.py` | `doctor.py`: the Python range, that it never connects to WRDS, and the next step in each state |
 | `test_environment.py` | `numeric_setup.py` and `pybondlab_pin.py`, which make a run independent of the machine |
 | `test_download_inputs.py` | `download_inputs.sh`: a failed download keeps the earlier file, and `--check` downloads nothing |

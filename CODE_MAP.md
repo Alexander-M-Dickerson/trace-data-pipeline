@@ -197,9 +197,10 @@ On GitHub, `.github/workflows/tests.yml` runs it on Linux, Windows and macOS wit
 | file | what it is |
 |---|---|
 | `AGENTS.md`, and one in each of `stage0/` to `stage4/` and `tests/` | The instructions every assistant reads: what to run, what to check, the traps. Each `CLAUDE.md` beside one imports it |
-| `.claude/skills/`, `.agents/skills/` | Six step-by-step procedures (`onboard`, `run-wrds`, `build-panel`, `reproduce-exhibits`, `build-factors`, `explain`), the same file twice: Claude Code reads the first folder, Codex, Cursor, Copilot and Gemini the second |
+| `.claude/skills/`, `.agents/skills/` | Seven step-by-step procedures (`onboard`, `run-wrds`, `build-panel`, `reproduce-exhibits`, `build-factors`, `explain`, `add-a-column`), the same file twice: Claude Code reads the first folder, Codex and Gemini the second, and Cursor and Copilot both, so they may list each skill twice |
 | `.claude/settings.json` | Lets Claude Code run the read-only checks without asking, and blocks the usual spellings of a force-push and a recursive delete |
 | `.github/copilot-instructions.md` | Points GitHub Copilot at `AGENTS.md` |
+| `GEMINI.md` | Imports `AGENTS.md` for Gemini CLI, which reads `GEMINI.md` and not `AGENTS.md` |
 | `TAGS.md` | Every code tag, with its file and what it marks. Written by `tools/tags.py` |
 | `docs/acceptance/prompts.csv` | The questions a new assistant must answer well, with what a good answer uses and says |
 | `docs/validation/validated_runs.csv` | What has been run end to end, when, and where the evidence is |

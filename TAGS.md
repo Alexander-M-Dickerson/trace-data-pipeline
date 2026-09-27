@@ -59,7 +59,7 @@ A mistake that has caught people, at the line that guards against it.
 | name | where | what | pointed to from |
 |---|---|---|---|
 | `trap.eof_error` | [stage0/_wrds_pool.py](stage0/_wrds_pool.py) | no username makes the wrds package prompt and die with an EOFError that looks like the connection cap | `AGENTS.md`, `stage0/AGENTS.md` |
-| `trap.factor_source` | [stage2/_stage2_settings.py](stage2/_stage2_settings.py) | public is fresh data and will not reproduce a published vintage; pinned does | `AGENTS.md` |
+| `trap.factor_source` | [stage2/_stage2_settings.py](stage2/_stage2_settings.py) | public is fresh data and will not reproduce a published vintage; pinned uses its factors | `AGENTS.md` |
 | `trap.no_internet` | [download_inputs.sh](download_inputs.sh) | WRDS compute nodes have no internet, so this runs on the login node first | `AGENTS.md`, `stage1/AGENTS.md` |
 | `trap.public_daily_file` | [stage2/_stage2_settings.py](stage2/_stage2_settings.py) | the Stage 1 file published for download lacks the licensed columns, so stage 2 refuses it at this check | `AGENTS.md` |
 | `trap.spool_copy` | [run_smoke_test.sh](run_smoke_test.sh) | qsub runs a copy of this script from its spool folder, so the repository is found from SGE_O_WORKDIR |  |

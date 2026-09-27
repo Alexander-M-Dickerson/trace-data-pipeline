@@ -1,6 +1,7 @@
 # Quickstart — Stage 3
 
-Stage 3 turns the Stage-2 monthly panel into the paper's 33 tables and 11 figures.
+Stage 3 turns the Stage-2 monthly panel into 33 tables and 11 figures: 29 of the tables are the
+paper's, and four are Stage 3's own.
 It runs **on your own computer** and opens no WRDS connection.
 
 If you have just finished Stage 2, everything below should work with no configuration.
@@ -217,7 +218,7 @@ its own numbers as it goes — each driver records a PASS/FAIL line in
 | `the DUA statistics layer is not at ...` | run `s3_nse/run_dua_grid.py`, then the same file with `--stats` |
 | `the MUA summary is not at ...` | run `s3_nse/run_mua_grid.py`, then `s3_nse/mua_summarize.py` |
 | `this exhibit needs sort CSVs under ...` | the message names the missing files and the command that makes them |
-| `Stage 3 cannot start: PyBondLab ...` | PyBondLab is missing or not 0.3.0: run the two install lines at the top of this page |
+| `ABORT: PyBondLab ...` (from `_run_stage3.py`), `PyBondLab UNAVAILABLE` (from its dry run) or `Stage 3 cannot start: PyBondLab ...` (from a single driver) | PyBondLab is missing or not 0.3.0: run the two install lines at the top of this page |
 | `--stats with a --signals subset` | refused on purpose: it would overwrite the full statistics with subset-only frames, and no exhibit downstream could tell |
 | `the MUA status ledger is not at ...` | run `s3_nse/mua_summarize.py`; it writes the ledger beside the summary |
 | `the MUA status ledger is OLDER than the grid it describes` | the grid was rebuilt and the summary was not. Re-run `s3_nse/mua_summarize.py`. `STAGE3_ALLOW_STALE_LEDGER=1` proceeds anyway |

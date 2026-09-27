@@ -6,7 +6,7 @@ This document describes the methodology for calculating bond returns when bonds 
 
 ## Rating Variables
 
-We use the raw agency rating variables to identify default status:
+We use the raw agency ratings from the stage 1 daily panel, `sp_rating` and `mdy_rating`, to identify default status. Step 1 calls them `sp_rat` and `mdy_rat`, the names below; neither is a column of the published panel, which carries the composite ratings `spc_rat` and `mdc_rat`:
 
 | Rating Agency | Variable | Default Level |
 |--------------|----------|---------------|

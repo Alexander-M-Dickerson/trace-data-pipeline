@@ -25,7 +25,7 @@ Transforms raw TRACE data into a research-ready bond dataset with:
 
 - ✅ **WRDS account** with TRACE, FISD, and ratings access
 - ✅ **WRDS Cloud access** (or local Python environment)
-- ✅ **`.pgpass`** configured for passwordless WRDS authentication
+- ✅ **No password file on WRDS**: jobs on the WRDS Cloud connect without one
 - ✅ **Python ≥ 3.10** (the 2026-09-21 run used 3.14.5 on the WRDS Cloud)
 
 ---
@@ -89,7 +89,7 @@ AUTHOR = "Your Name"  # Change from default "Open Source Bond Asset Pricing"
 
 Save and exit (Ctrl+O, Enter, Ctrl+X).
 
-**Note:** You do **not** need to put your password in code; `.pgpass` supplies it automatically.
+**Note:** Your password goes nowhere: jobs on the WRDS Cloud connect without it.
 
 ---
 
@@ -110,10 +110,9 @@ source venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
-**Required packages for Stages 0 and 1** (minimums, from `requirements.txt`):
-- pandas>=2.2.3, numpy>=2.0, pyarrow>=20.0.0, wrds>=3.3.0, tqdm
-- QuantLib>=1.36, joblib>=1.4
-- openpyxl, requests, matplotlib>=3.8.0
+**Required packages for Stages 0 and 1:** the list, with minimum versions, is
+`requirements.txt`; install it whole: `download_inputs.sh` already needs `duckdb`, to check the
+bond-firm linker.
 
 ❗Do **not** pin these to exact versions on the WRDS Cloud. `--user` installs shadow the
 system packages, and WRDS already ships newer ones than any pin here (numpy 2.4.6,
@@ -130,6 +129,7 @@ The scripts ship executable, so a fresh clone needs no `chmod`.
 # OPTIONAL BUT RECOMMENDED: prove the chain works first, in ~10 minutes
 bash download_inputs.sh     # LOGIN NODE only -- compute nodes have no internet
 qsub run_smoke_test.sh      # result in smoke_test.out
+# wait until qstat no longer lists it: it and the full run both hold WRDS connections
 
 # Run the complete pipeline
 ./run_pipeline.sh
@@ -269,6 +269,7 @@ ssh {wrds_username}@wrds-cloud.wharton.upenn.edu
 **Create the zip file in scratch space:**
 ```bash
 cd ~
+rm -f "/scratch/$(basename "$(dirname "$HOME")")/trace-data-pipeline.zip"   # zip would otherwise ADD to an old archive
 zip -r "/scratch/$(basename "$(dirname "$HOME")")/trace-data-pipeline.zip" trace-data-pipeline/
 ```
 
@@ -303,7 +304,9 @@ scp {wrds_username}@wrds-cloud.wharton.upenn.edu:/scratch/{institution}/trace-da
 ### Step 3: Extract the Zip File Locally
 
 **Windows:**
-- Right-click `trace-data-pipeline.zip` → **Extract All...**
+- Right-click `trace-data-pipeline.zip` → **Extract All...**, and remove the trailing
+  `\trace-data-pipeline` from the folder it proposes. The zip already holds that folder, so
+  keeping it gives `trace-data-pipeline\trace-data-pipeline\`.
 
 **Mac:**
 - Double-click `trace-data-pipeline.zip` (extracts automatically)
@@ -333,18 +336,15 @@ rm /scratch/{institution}/trace-data-pipeline.zip
 
 ## Verify Your Data
 
+This reads only the file's metadata, so it is safe on the WRDS login node, where heavy work
+is not allowed:
+
 ```python
-import pandas as pd
+import pyarrow.parquet as pq
 
-# Load the final dataset
-df = pd.read_parquet('stage1/data/stage1_20251119.parquet')  # Use your date
-
-print(f"Dataset shape: {df.shape}")
-print(f"\nColumns ({len(df.columns)}):")
-print(df.columns.tolist())
-
-print(f"\nSample data:")
-print(df.head())
+f = pq.ParquetFile('stage1/data/stage1_YYYYMMDD.parquet')   # your date
+print(f"{f.metadata.num_rows:,} rows, {len(f.schema_arrow.names)} columns")   # 44 columns
+print(f.schema_arrow.names)
 ```
 
 ---
@@ -356,13 +356,19 @@ files you just downloaded. Its first run connects to WRDS once, to fetch and cac
 series (CRSP Treasury returns, Fama-French factors, VIX and FISD coupon terms), so it needs
 your WRDS username, in `config.py` or `export WRDS_USERNAME=...`; later runs read the cache.
 
-First install the requirements for stages 2-4 there, in Python 3.11 to 3.13, with two lines:
+First install the requirements for stages 2-4 there, in Python 3.11 to 3.13, in an environment of
+their own (the install replaces packages other projects may rely on):
 
 ```bash
 cd trace-data-pipeline          # the folder you just unzipped
+python -m venv .venv
+source .venv/bin/activate       # macOS/Linux; Windows: .venv\Scripts\activate
 python -m pip install -r requirements-local.txt
 python -m pip install --no-deps pybondlab==0.3.0
 ```
+
+Activate it again in every new terminal before running stages 2-4. (If Windows PowerShell refuses
+to run `activate`, run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once.)
 
 PyBondLab 0.3.0 declares `numpy<2` and this repository installs numpy 2, so it goes in without
 its dependency list; `requirements-local.txt` says why that is safe. Stages 2-4 stop at start-up
@@ -376,9 +382,8 @@ python _run_stage2.py --dry-run     # resolve and validate the config, build not
 python _run_stage2.py               # the full build, ~8-18 minutes on 24 cores
 ```
 
-To reproduce a published panel exactly, add `--factor-source pinned`: it uses the factor file
-published with your vintage instead of rebuilding it from public sources that revise their
-history. See [stage2/QUICKSTART_stage2.md](stage2/QUICKSTART_stage2.md). To match it exactly in 139 of 145 columns, the other six within 1e-13, also install the exact
+`--factor-source pinned` uses the factor file published with your vintage instead of
+rebuilding it from public sources that revise their history. It reproduces a published panel only when stages 0 and 1 are the same WRDS run; a new run ends later and carries WRDS's revisions, so its panel differs whichever factors it uses. See [stage2/QUICKSTART_stage2.md](stage2/QUICKSTART_stage2.md). To match it exactly in 139 of 145 columns, the other six within 1e-13, also install the exact
 package versions it was built with:
 `python -m pip install -r requirements-local.txt -c constraints-2026.txt`, which the file
 explains.
@@ -394,6 +399,7 @@ published file.
 To package a vintage for distribution:
 
 ```bash
+python make_excess_blocks.py --mode stage1 --verify           # first: the default rebuilt, checked
 python make_excess_blocks.py --mode stage1 --benchmark all   # the blocks the release packs
 python make_release.py              # the stage1 build; --mode <mode> for another
 ```
@@ -403,12 +409,14 @@ that still carries them. See [stage2/QUICKSTART_stage2.md](stage2/QUICKSTART_sta
 
 ## Optional: Stages 3 and 4
 
-Both run on your own computer and read only the files Stage 2 wrote. Neither of them connects
-to WRDS.
+Both run on your own computer and read what Stage 2 wrote, plus Stage 1's daily file (Stage 3's
+data appendix, Stage 4's vintage year). Neither connects to WRDS; Stage 4 downloads the
+published factor files to compare with.
 
 ```bash
-cd ../stage3 && bash run_stage3.sh   # the paper's 33 tables and 11 figures, ~15-20 min
-cd ../stage2 && python make_excess_blocks.py --mode stage1 --benchmark all   # Stage 4 reads these
+cd ../stage3 && bash run_stage3.sh   # 33 tables and 11 figures, ~15-20 min
+cd ../stage2 && python make_excess_blocks.py --mode stage1 --verify && \
+  python make_excess_blocks.py --mode stage1 --benchmark all   # Stage 4 reads these
 cd ../stage4 && bash run_stage4.sh   # the TRACE-only bond factors, then the check against
                                      # the published files, ~8 min
 ```
@@ -436,19 +444,16 @@ cd ~/trace-data-pipeline
 
 ### "WRDS connection failed"
 
-**Check:** Is `.pgpass` configured?
-```bash
-cat ~/.pgpass
-```
+**On the WRDS Cloud** no password file is needed: jobs there connect without one. A failed
+connection is almost always the username: `WRDS_USERNAME` unset, or still `your_wrds_username`
+in `config.py` (`python3 doctor.py --wrds` checks it). If the username is right, it is WRDS's
+limit of 7 connections held at once (`stage0/README_stage0.md`).
 
-Should contain:
-```
-wrds-pgdata.wharton.upenn.edu:9737:wrds:your_username:your_password
-```
-
-**Fix:** Set permissions
+**On your own computer** (stage 2's first run), the password must be saved where the `wrds`
+package looks. Connect once by hand; it asks for the password and offers to save it
+(`~/.pgpass`, or `%APPDATA%\postgresql\pgpass.conf` on Windows):
 ```bash
-chmod 600 ~/.pgpass
+python -c "import wrds; wrds.Connection()"
 ```
 
 ---
@@ -469,9 +474,10 @@ pip install --user QuantLib
 ls stage0/enhanced/trace_enhanced_*.parquet
 ```
 
-**Fix:** Wait for Stage 0 to complete, or check logs for errors:
+**Fix:** `run_pipeline.sh` starts Stage 1 only after Stage 0 has ended, so this means a
+Stage 0 job failed. Read its log for the first error, fix it, and run `./run_pipeline.sh` again:
 ```bash
-tail -f stage0/logs/*.err
+grep -n -m5 -i "error" stage0/logs/*.err
 ```
 
 ---
@@ -544,6 +550,7 @@ python -m pip install --user -r requirements.txt
 # Fetch stage 1's external inputs (login node) and check the chain end to end
 bash download_inputs.sh
 qsub run_smoke_test.sh             # ~10 min -> smoke_test.out
+# wait until qstat no longer lists it: it and the full run both hold WRDS connections
 
 # Run complete pipeline
 ./run_pipeline.sh

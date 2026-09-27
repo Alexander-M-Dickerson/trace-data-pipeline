@@ -114,8 +114,9 @@ column follows the new grouping.
 
 **Several chunks are fetched at once**, each worker process holding its own WRDS
 connection. `CONCURRENCY` in `_trace_settings.py` sets how many. `STAGE0_WORKERS` overrides
-it for a single run, but for every member at once, 144A included, and neither the connection
-check nor the `qsub` request sees the override: keep twice its value at 6 or below.
+it for a single run, for every member at once, 144A included. The connection check and the
+`qsub` request both use it, so `run_pipeline.sh` refuses a value above 3: Enhanced and 144A run
+together and hold twice it.
 
 **Output is sorted canonically before export**, by `(cusip_id, trd_exctn_dt)`. Row order
 no longer depends on the work plan, which is what makes it possible to *prove* a
@@ -136,7 +137,10 @@ WRDS publishes is the concurrent-*job* limit, a different thing.) Enhanced + 144
 therefore 6, leaving one spare so a mid-run reconnect cannot be refused.
 `validate_connection_budget` enforces this at submit time rather than four hours in.
 
-Measure it on your own account before raising anything:
+Measure it on your own account before raising anything, when no other job of yours is
+running. It opens up to 10 connections, so it belongs in a job, not on the login node: put the
+line below in a job script that starts with the `#!/bin/bash`, `#$ -cwd` and `#$ -V` lines the
+stage 0 job scripts start with, and `qsub` it from the repository root.
 
 ```bash
 python3 tests/probe_wrds_connections.py --max 10
@@ -178,7 +182,7 @@ Please read these in order:
 
 This code package assumes you have:
 - Access to the WRDS cloud
-- Set up your `.pgpass` file for password-less authentication
+- Your WRDS username set (`WRDS_USERNAME`, in `config.py` or the environment); no password file is needed on the WRDS Cloud
 - Basic familiarity with simple scripting commands in Windows/Mac
 - Appropriate WRDS entitlements for TRACE Enhanced, Standard, and/or 144A data
 
@@ -193,11 +197,14 @@ From a PuTTY shell on your computer, choose one of the following:
 ❗**Take the whole repository, not just `stage0/`.** Stage 0 does not stand alone:
 the root `config.py` is where `WRDS_USERNAME` is set and stage 0 imports it, the job wrappers
 `cd stage0` from the repository root and log to `stage0/logs/`, and `run_pipeline.sh`
-lives at the root. A `~/proj/stage0/` holding only the stage-0 files cannot be run.
+lives at the root. A folder holding only the stage-0 files cannot be run.
+
+Put it in your home directory, `~/trace-data-pipeline/`: the zip and download lines in
+[QUICKSTART.md](../QUICKSTART.md) assume that path.
 
 #### Option A - Download a ZIP (no git required)
 ```bash
-mkdir -p ~/proj && cd ~/proj
+cd ~
 wget -O trace.zip \
   https://github.com/Alexander-M-Dickerson/trace-data-pipeline/archive/refs/heads/main.zip
 unzip trace.zip
@@ -207,7 +214,7 @@ cd trace-data-pipeline
 
 #### Option B - Using `curl` (also no git)
 ```bash
-mkdir -p ~/proj && cd ~/proj
+cd ~
 curl -L -o trace.zip \
   https://github.com/Alexander-M-Dickerson/trace-data-pipeline/archive/refs/heads/main.zip
 unzip trace.zip
@@ -217,15 +224,13 @@ cd trace-data-pipeline
 
 #### Option C - Clone (if `git` is available on your WRDS node)
 ```bash
-mkdir -p ~/proj && cd ~/proj
+cd ~
 git clone https://github.com/Alexander-M-Dickerson/trace-data-pipeline.git
 cd trace-data-pipeline
 ```
 
-You should now have `~/proj/trace-data-pipeline/` holding `config.py`,
+You should now have `~/trace-data-pipeline/` holding `config.py`,
 `run_pipeline.sh`, `stage0/` and `stage1/`. Run everything from that directory. 
-
-**Note:** `proj` is the directory you have created on your WRDS file system - call it anything you like. Perhaps `trace` is an apt name.
 
 ---
 
@@ -243,15 +248,9 @@ Once connected, you will see a WRDS prompt. From there, you can use **Option A, 
 
 If you already have the repository on your local computer and want to upload it after editing the scripts, you can use the secure copy protocol `scp`. Upload the whole repository: as the note above says, `stage0/` alone cannot run.
 
-Log in to wrds-cloud with SSH and create a folder called proj:
-
+Transfer the repository to your home directory on the WRDS Cloud:
 ```bash
-mkdir proj
-```
-
-Transfer the repository to the proj folder in WRDS cloud:
-```bash
-scp -r ~/path/to/trace-data-pipeline wrds_username@wrds-cloud.wharton.upenn.edu:/home/university/wrds_username/proj/
+scp -r ~/path/to/trace-data-pipeline wrds_username@wrds-cloud.wharton.upenn.edu:/home/university/wrds_username/
 ```
 
 Replace:
@@ -262,7 +261,7 @@ Replace:
 
 ## Requirements
 
-**Python version:** 3.10 or higher (the 2026-09-10 production run used Python 3.14.5, the WRDS Cloud default)
+**Python version:** 3.10 or higher (the 2026-09-21 run used Python 3.14.5, the WRDS Cloud default)
 
 **Required packages:** everything in the repository's `requirements.txt`, which states the
 minimum versions. For stage 0 that is `pandas`, `numpy`, `wrds`, `SQLAlchemy`,
@@ -290,7 +289,7 @@ SSH into the WRDS cloud, put the repository there (see [Getting the code onto WR
 ### 2. Navigate to the repository and configure settings
 
 ```bash
-cd ~/proj/trace-data-pipeline   # wherever you put the repository
+cd ~/trace-data-pipeline   # wherever you put the repository
 ```
 
 **CRITICAL:** set your WRDS username. It lives in the shared `config.py` at the repo
@@ -317,7 +316,8 @@ Save and exit `nano` with Ctrl+O, Enter, then Ctrl+X. Confirm with
 `EOFError: EOF when reading a line` -- the `wrds` package prompting on a closed stdin.
 That looks exactly like the connection limit and is not.
 
-The WRDS password should be handled by the `.pgpass` file which you should have set up following the WRDS documentation.
+No password file is needed on the WRDS Cloud: jobs there connect without one. So an `EOFError`
+is the username first, and only then the connection limit.
 
 Review the default filter settings in `_trace_settings.py`. All filters but two (`trading_time` and `volume_filter_toggle`) are on by default, with recommended values from Dickerson, Robotti and Rossetti (2026). See the [Configuration](#configuration-choices-you-can-edit) section for more details.
 
@@ -396,6 +396,7 @@ one by hand without them and SGE gives the job a single slot with default memory
 the code still opens `CONCURRENCY[member]` connections -- they contend for one core.
 
 ```bash
+mkdir -p stage0/logs    # SGE opens the log before the job starts; without the folder the job sits in Eqw
 qsub -pe onenode 5 -l m_mem_free=8G  stage0/run_enhanced_trace.sh    # enhanced
 qsub -pe onenode 6 -l m_mem_free=8G  stage0/run_standard_trace.sh    # standard
 qsub -pe onenode 1 -l m_mem_free=16G stage0/run_144a_trace.sh        # 144a
@@ -725,20 +726,9 @@ stage0/
         └── (figures)
 ```
 
-**For downstream stages:** When exporting to your home machine, maintain this structure:
-```
-data/
-    stage0/
-        enhanced/
-        standard/
-        144a/
-        data_reports/
-            enhanced/
-            standard/
-            144a/
-    stage1/
-    stage2/
-```
+**For downstream stages:** bring the whole repository folder home, as it is. Stage 2 reads
+`stage0/enhanced/` and `stage1/data/` from beside `stage2/`, so the folder must keep its
+layout.
 
 ### Files produced
 
@@ -786,17 +776,9 @@ the data report draws a figure family from each:
 
 ### Downloading outputs
 
-**Windows users:** Use WinSCP to download the entire `enhanced/`, `standard/`, `144a/`, `data_reports/`, and `logs/` folders to your local machine.
-
-**Mac/Linux users:** Use `scp` from your local machine:
-```bash
-# Download all outputs preserving folder structure
-scp -r wrds_username@wrds-cloud.wharton.upenn.edu:~/proj/trace-data-pipeline/stage0/enhanced ./local_destination/stage0/
-scp -r wrds_username@wrds-cloud.wharton.upenn.edu:~/proj/trace-data-pipeline/stage0/standard ./local_destination/stage0/
-scp -r wrds_username@wrds-cloud.wharton.upenn.edu:~/proj/trace-data-pipeline/stage0/144a ./local_destination/stage0/
-scp -r wrds_username@wrds-cloud.wharton.upenn.edu:~/proj/trace-data-pipeline/stage0/data_reports ./local_destination/stage0/
-scp -r wrds_username@wrds-cloud.wharton.upenn.edu:~/proj/trace-data-pipeline/stage0/logs ./local_destination/stage0/
-```
+Zip the whole repository folder on WRDS and copy the zip down, as
+[QUICKSTART: Download Results](../QUICKSTART.md#download-results-to-your-local-machine) writes
+it. Stage 2 needs `stage0/` and `stage1/` together, in the folder layout they were built in.
 
 ---
 
@@ -907,12 +889,12 @@ Or use your favorite LaTeX editor (TeXShop, TeXstudio, Overleaf, etc.).
     chunks at once and takes 2-2.6 hours (2.0 h on 2026-09-09, 2.6 h on 2026-09-21), about
     twice as fast.
   - Standard TRACE (from 2024): 30-60 minutes, and opt-in
-  - Rule 144A (full sample): 30-60 minutes (39 minutes on the 2026-09-10 run)
+  - Rule 144A (full sample): 30-60 minutes (38 minutes on the 2026-09-21 run)
   - Data reports (with figures): was ~50 minutes for Enhanced; since v2.2.2 its
     re-clean pulls 5 chunks at once (22 minutes for the whole job on 2026-09-21), and the job
     no longer blocks stage 1
 
-- **Disk space**: Enhanced TRACE generates ~31M rows. On the 2026-09-10 run the Enhanced panel was about 2.2 GB and the 144A panel about 250 MB, and the whole `stage0/` folder about 2.7 GB.
+- **Disk space**: Enhanced TRACE generates ~31M rows. On the 2026-09-21 run the Enhanced panel was about 2.2 GB and the 144A panel about 250 MB, and the whole `stage0/` folder about 2.7 GB.
 
 ---
 
@@ -1027,7 +1009,7 @@ wc -l stage0/logs/*.out        # Count lines in log files
 If a job fails:
 1. Review the error log: `cat stage0/logs/01_enhanced.err`
 2. Fix the issue in configuration or code
-3. Resubmit from the repo root: `qsub -pe onenode 5 -l m_mem_free=8G stage0/run_enhanced_trace.sh` (or just `./run_pipeline.sh`)
+3. Resubmit from the repo root: `mkdir -p stage0/logs && qsub -pe onenode 5 -l m_mem_free=8G stage0/run_enhanced_trace.sh` (or just `./run_pipeline.sh`)
 
 ---
 

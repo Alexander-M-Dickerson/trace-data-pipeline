@@ -11,7 +11,7 @@ One row per exhibit the report prints: the paper's number, the LaTeX label, the 
 | folder | paper | what it covers |
 |---|---|---|
 | `s0_data` | Data appendix | the daily and monthly panels as delivered |
-| `s1_lib` | Section 3 | look-ahead bias in the published factor set |
+| `s1_lib` | Section 3 | latent implementation bias in the published factor set |
 | `s2_lab` | Section 4 | look-ahead bias measured under ex-post filtering |
 | `s3_nse` | Section 5 | non-standard errors across the two uncertainty grids |
 | `s4_zoo` | Factor zoo | the 108-signal census and its cluster tables |
@@ -171,7 +171,7 @@ The same exhibits keyed on the file instead of the paper's numbering, in the ord
 | `s4_zoo/t_ia10_11.py` | exhibit | Table IA.X, Table IA.XI |
 | `s4_zoo/t_inline.py` | exhibit | Inline counts (alpha), Inline counts (premium) |
 
-Producers are the expensive half -- they run sorts through PyBondLab and save return series, and are skipped when their output already exists. Exhibits read those series and render in seconds. `python _run_stage3.py --list` prints all 41 steps with their arguments.
+Producers are the expensive half -- they run sorts through PyBondLab and save return series, and are skipped when their output already exists AND was built from the same Stage 2 inputs; otherwise they re-run with a [rebuild] line. Exhibits read those series and render in seconds. `python _run_stage3.py --list` prints all 41 steps with their arguments.
 
 ## What the producers read and write
 

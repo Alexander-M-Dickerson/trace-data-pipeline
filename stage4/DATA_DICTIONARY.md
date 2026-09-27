@@ -22,7 +22,8 @@ in every month: a month in which a factor cannot be formed has an empty `return`
 | `return_type` | string | `exc`, `dur`, `dbns` or `dcls` (see [README_stage4.md](README_stage4.md)) |
 | `num_portfolios` | int | single sorts only: 10 for `all`, 5 within a band |
 
-**Within-firm sorts.** The factor is the `ls` leg. Each month, inside each firm and each of
+**Within-firm sorts.** The firm is the bond's `permno`, so a bond with no `permno` (11.2% of the
+2026-09-21 panel's rows) never enters them. The factor is the `ls` leg. Each month, inside each firm and each of
 three rating groups (AAA to A-, BBB, below investment grade), it is the return of the firm's high-signal bonds minus its low-signal
 bonds, each weighted equally (`ew`) or by market value (`vw`); those differences are averaged across firms (equally for `ew`, by the firm's bond market
 value for `vw`), then across the rating groups that have a firm that month. A firm counts in a

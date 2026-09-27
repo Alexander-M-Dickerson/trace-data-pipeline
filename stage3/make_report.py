@@ -1,6 +1,6 @@
 r"""make_report.py -- assemble the generated exhibits into one compiled PDF.
 
-Stage 3 writes 32 table fragments and 11 figures. On their own they are 43 loose files;
+Stage 3 writes 33 table fragments and 11 figures. On their own they are 44 loose files;
 this puts them in the paper's own order, under the paper's own exhibit numbers, with a
 provenance page saying which panel and which engine produced them -- and compiles it.
 

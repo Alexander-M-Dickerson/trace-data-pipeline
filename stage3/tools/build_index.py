@@ -40,7 +40,7 @@ OUT = STAGE3 / "INDEX.md"
 # and never have been, which is the single most common way to misread this tree.
 SECTION_OF = {
     "s0_data": ("Data appendix", "the daily and monthly panels as delivered"),
-    "s1_lib": ("Section 3", "look-ahead bias in the published factor set"),
+    "s1_lib": ("Section 3", "latent implementation bias in the published factor set"),
     "s2_lab": ("Section 4", "look-ahead bias measured under ex-post filtering"),
     "s3_nse": ("Section 5", "non-standard errors across the two uncertainty grids"),
     "s4_zoo": ("Factor zoo", "the 108-signal census and its cluster tables"),
@@ -264,7 +264,8 @@ def render(rs: list[dict]) -> str:
         L.append(f"| `{drv}` | {kind} | " + ", ".join(seen[drv]) + " |")
     L += ["",
           "Producers are the expensive half -- they run sorts through PyBondLab and "
-          "save return series, and are skipped when their output already exists. "
+          "save return series, and are skipped when their output already exists AND was "
+          "built from the same Stage 2 inputs; otherwise they re-run with a [rebuild] line. "
           "Exhibits read those series and render in seconds. `python _run_stage3.py "
           "--list` prints all 41 steps with their arguments.",
           ""]

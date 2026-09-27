@@ -19,10 +19,10 @@ neither says which it is. That ambiguity is the real trap: it is easy to read ev
 EOFError as the connection cap and go hunting a limit that is not the problem. Two
 causes, in the order worth checking:
 
-  * No usable credentials -- WRDS_USERNAME unset, so config.py falls back to the
-    literal "your_wrds_username", or no ~/.pgpass entry. Ruled out FIRST below, before
-    a connection is even attempted, because it is much the commoner cause and costs
-    nothing to check.
+  * No usable username -- WRDS_USERNAME unset, so config.py falls back to the
+    literal "your_wrds_username" (jobs on the WRDS Cloud need no password file).
+    Ruled out FIRST below, before a connection is even attempted, because it is much
+    the commoner cause and costs nothing to check.
   * The per-user connection limit, once several workers are open at once.
 
 SECOND: never inherit a connection across a fork. A psycopg2 socket shared between a
@@ -130,8 +130,8 @@ limit, and is not.""" % user)
 The wrds package reports EVERY connect failure as 'EOF when reading a line',
 because its failure path calls input(). It is not a stdin problem, and it does
 not say which failure it was. Check, in order:
-  1. ~/.pgpass has a line for wrds-pgdata.wharton.upenn.edu:9737 with this
-     username, and is chmod 600.
+  1. The username above is yours (WRDS_USERNAME, in config.py or the
+     environment). Jobs on the WRDS Cloud need no password file.
   2. The per-user CONNECTION LIMIT -- lower CONCURRENCY in
      stage0/_trace_settings.py, or re-measure it with
      tests/probe_wrds_connections.py.""" % (user, attempts)) from last

@@ -23,7 +23,9 @@ Read first: `AGENTS.md`, then `stage2/AGENTS.md`, which this follows, and
 
 1. **Ask which factors**, because the two sources give different numbers:
    - `public` (the default): assembled from the live public sources, the newest data;
-   - `pinned`: the factor panel published for the vintage, to reproduce a published panel.
+   - `pinned`: the factor panel published for the vintage. It reproduces a published panel only
+     from the same WRDS run of stages 0 and 1; a user's own run differs whichever factors it
+     uses.
 
    A `public` build does not reproduce a published panel, and that is expected.
 2. **Dry run**, and show the user every input it resolved:

@@ -27,13 +27,17 @@ Read first: `AGENTS.md` (the section "Stages 0 and 1 on WRDS"), `stage0/AGENTS.m
    bash download_inputs.sh        # login node only: compute nodes have no internet
    qsub run_smoke_test.sh         # its verdict is at the end of smoke_test.out
    ```
-   Read `smoke_test.out` and report the verdict and anything it flags.
+   Read `smoke_test.out` and report the verdict and anything it flags. Wait until `qstat` no
+   longer lists it before the full run: the two together hold more WRDS connections than an
+   account may.
 3. **The full run**, from the repository root: `./run_pipeline.sh`. It checks disk space,
    fetches the inputs, and submits every job in order, each waiting on the ones it needs.
    About 5 hours.
 4. **Watch it** with `qstat` and the logs: `stage0/logs/01_enhanced.out`,
    `stage0/logs/03_144a.out`, `stage1/logs/stage1.out`, and the `.err` files beside them.
-   Report progress from the logs, not from guesses.
+   Report progress from the logs, not from guesses. A finished stage 1 leaves about a hundred
+   harmless `resource_tracker` tracebacks in `stage1.err`; success is "Stage 1 processing
+   completed successfully" at the end of `stage1.out`.
 5. **Check the result**: `ls -lh stage1/data/stage1_*.parquet`, and the data reports under
    `stage0/data_reports/` and `stage1/data_reports/`.
 6. **Bring it home**, exactly as "Download Results to Your Local Machine" in `QUICKSTART.md`
@@ -41,12 +45,17 @@ Read first: `AGENTS.md` (the section "Stages 0 and 1 on WRDS"), `stage0/AGENTS.m
 
 ## When a job fails or will not start
 
-- **Stuck at `qw`**: the memory request. `m_mem_free` is charged per slot, and a job asking
-  for more than 8 slots or 48 GB waits forever with no error. Lower `CONCURRENCY` in
-  `stage0/_trace_settings.py` and resubmit; `qsub_resources()` derives the request from it.
-- **`EOFError: EOF when reading a line`**: first the login (the username unset or still the
-  `config.py` placeholder, or no `~/.pgpass` entry), then the connection cap (7 held at once
-  per account).
+- **Waiting in the queue**: `hqw` is a job held behind another, which is normal. A long `qw`
+  is usually the grid: WRDS runs at most 5 of your jobs at once, and `qstat -j <id>` says why
+  a job waits. A request over 8 slots or 48 GB waits forever with no error, but
+  `qsub_resources()` refuses to make one, so that happens only to a job submitted by hand
+  with its own `-pe`/`-l`.
+- **`EOFError: EOF when reading a line`**: first the username (unset, or still the `config.py`
+  placeholder), then the connection cap (7 held at once per account). Jobs on the WRDS Cloud
+  need no password file.
+- **Stage 1 failed and stage 0 finished**: fix the cause and re-run stage 1 alone, from the
+  repository root: `mkdir -p stage1/logs && qsub stage1/run_stage1.sh`. `./run_pipeline.sh`
+  would repeat stage 0 too, about 3 more hours.
 - **Any other failure**: the job's `.err` log, then "Troubleshooting" in
   `stage0/README_stage0.md` or `stage1/README_stage1.md`, and `FAQ.md`.
 

@@ -281,7 +281,7 @@ COMMON_KWARGS = dict(
     target_rows_per_chunk = TARGET_ROWS_PER_CHUNK,
     limit_chunks  = LIMIT_CHUNKS,   # dev/test only: process just the first N CUSIP
                                     # chunks (None = the full universe). Lets a config
-                                    # change be checked in minutes rather than a ~4h run.
+                                    # change be checked in minutes rather than a full run of hours.
     clean_agency  = True,
     out_dir       = "",
     # The threshold used only when volume_filter_toggle is True, which it is NOT by

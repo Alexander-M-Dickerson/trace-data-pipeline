@@ -6,7 +6,7 @@
 - ✅ **SSH access to WRDS Cloud** (or local Python environment)
 - ✅ **WRDS account** with FISD and ratings data access
 - ✅ **Python ≥ 3.10** (the 2026-09-21 run, which the 2026 vintage was built from, used 3.14.5 on the WRDS Cloud)
-- ✅ **`.pgpass`** configured for passwordless WRDS authentication
+- ✅ **No password file on WRDS**: jobs on the WRDS Cloud connect without one
 
 ---
 
@@ -23,7 +23,7 @@ Stage 1 enriches your cleaned TRACE data from Stage 0 with:
 
 **Output:** A research-ready dataset of 44 columns per bond-day.
 
-**Runtime:** about 2.5-2.7 hours on the WRDS Cloud with the 4 slots `run_stage1.sh` requests (2.4 h on the 2026-09-10 run, 2.7 h on 2026-09-21).
+**Runtime:** about 2.4-2.7 hours on the WRDS Cloud with the 4 slots `run_stage1.sh` requests (2.4 h on the 2026-09-10 run, 2.7 h on 2026-09-21).
 
 ---
 
@@ -51,11 +51,6 @@ python -m pip install --user -r requirements.txt
 python3 -m venv --system-site-packages venv
 source venv/bin/activate
 python -m pip install -r requirements.txt
-```
-
-**Manual installation** (only if `requirements.txt` is unavailable):
-```bash
-python -m pip install --user pandas numpy wrds pyarrow tqdm QuantLib joblib openpyxl requests matplotlib
 ```
 
 ❗Do **not** pin these to exact versions on the WRDS Cloud. `--user` installs shadow the
@@ -229,16 +224,16 @@ stage1/
 
 **Verify data:**
 
+This reads only the file's metadata, so it is safe on the WRDS login node, where heavy work
+is not allowed:
+
 ```python
-import pandas as pd
+import pyarrow.parquet as pq
 
-# Load the data (from stage1/)
-df = pd.read_parquet('data/stage1_YYYYMMDD.parquet')  # Use your date
-
-print(f"Shape: {df.shape}")
-print(f"Columns: {df.columns.tolist()}")
-print(f"\nFirst few rows:")
-print(df.head())
+# From stage1/
+f = pq.ParquetFile('data/stage1_YYYYMMDD.parquet')  # your date
+print(f"{f.metadata.num_rows:,} rows, {len(f.schema_arrow.names)} columns")
+print(f.schema_arrow.names)
 
 # Check key variables
 print(f"\nKey variables available:")
@@ -332,17 +327,10 @@ For detailed explanations of the accrued interest variables (`acclast`, `accpmt`
 
 ### 7. Download Data (WRDS Cloud Users)
 
-**Windows users (WinSCP):**
-- Connect to WRDS Cloud via WinSCP
-- Navigate to `~/trace-data-pipeline/stage1/data/`
-- Download `stage1_YYYYMMDD.parquet` to your local machine
-
-**Mac/Linux users (scp):**
-
-```bash
-# From your LOCAL machine, run:
-scp -r <wrds_id>@wrds-cloud.wharton.upenn.edu:~/trace-data-pipeline/stage1/data ./local_destination/
-```
+Zip the whole repository folder on WRDS and copy the zip down, as
+[QUICKSTART: Download Results](../QUICKSTART.md#download-results-to-your-local-machine) writes
+it. Stage 2 reads `stage1/data/` and `stage0/enhanced/` from the same folder, so bring both, in
+the layout they were built in; the stage 1 parquet alone is not enough.
 
 ---
 
@@ -449,15 +437,18 @@ echo 'export WRDS_USERNAME="your_wrds_username_here"' >> ~/.bashrc
 
 **Problem:** WRDS connection failed
 
-**Solution:** Check `.pgpass` file:
-```bash
-chmod 600 ~/.pgpass
-cat ~/.pgpass
-```
+**Solution:**
 
-Should contain:
-```
-wrds-pgdata.wharton.upenn.edu:9737:wrds:your_username:your_password
+**On the WRDS Cloud** no password file is needed: jobs there connect without one. A failed
+connection is almost always the username: `WRDS_USERNAME` unset, or still `your_wrds_username`
+in `config.py` (`python3 doctor.py --wrds` checks it). If the username is right, it is WRDS's
+limit of 7 connections held at once (`stage0/README_stage0.md`).
+
+**On your own computer** (stage 2's first run), the password must be saved where the `wrds`
+package looks. Connect once by hand; it asks for the password and offers to save it
+(`~/.pgpass`, or `%APPDATA%\postgresql\pgpass.conf` on Windows):
+```bash
+python -c "import wrds; wrds.Connection()"
 ```
 
 ---
@@ -479,11 +470,9 @@ wrds-pgdata.wharton.upenn.edu:9737:wrds:your_username:your_password
    `N_CORES = None`: it follows the 4 slots the job was granted, and a larger number starts more
    workers than the job has cores and memory for.
 
-3. **Check you're not in the middle of a WRDS outage:**
-   ```bash
-   # Test WRDS connection
-   python -c "import wrds; db = wrds.Connection(); print('Connected OK')"
-   ```
+3. **Check you're not in the middle of a WRDS outage:** submit the smoke test
+   (`qsub run_smoke_test.sh`, from the repository root). It connects inside a job, where every
+   WRDS connection belongs, rather than on the login node.
 
 ---
 
@@ -510,8 +499,7 @@ tail -f stage1/logs/stage1.err
 # Check output
 ls -lh stage1/data/stage1_*.parquet
 
-# Download from WRDS (Mac/Linux, run from LOCAL machine)
-scp -r <wrds_id>@wrds-cloud.wharton.upenn.edu:~/trace-data-pipeline/stage1/data ./local_destination/
+# Download from WRDS: zip the whole folder, then scp (QUICKSTART.md, "Download Results")
 ```
 
 ---

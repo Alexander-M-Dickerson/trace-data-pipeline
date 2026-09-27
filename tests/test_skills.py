@@ -2,8 +2,8 @@
 
     python -m pytest tests/test_skills.py -q
 
-Claude Code reads skills from .claude/skills/; Codex, Cursor, Copilot and Gemini read
-.agents/skills/. The two copies must be the same file, or one tool follows a procedure the
+Claude Code reads skills from .claude/skills/; Codex and Gemini read .agents/skills/; Cursor and
+Copilot read both. The two copies must be the same file, or one tool follows a procedure the
 other has already corrected.
 """
 from __future__ import annotations
@@ -67,6 +67,6 @@ def test_agents_md_and_claude_md_list_exactly_these_skills():
 def test_every_command_settings_json_allows_names_a_real_script():
     settings = json.loads((ROOT / ".claude" / "settings.json").read_text(encoding="utf-8"))
     for rule in settings["permissions"]["allow"]:
-        m = re.match(r"Bash\((?:python3?|bash) ([\w./-]+\.(?:py|sh))", rule)
+        m = re.match(r"(?:Bash|PowerShell)\((?:python3?|bash) ([\w./-]+\.(?:py|sh))", rule)
         if m:
             assert any((ROOT / d / m.group(1)).exists() for d in STAGE_DIRS), rule

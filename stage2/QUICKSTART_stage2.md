@@ -49,6 +49,17 @@ lines if PyBondLab is missing or a different version.
 
 ### 1. Check the configuration
 
+Set your WRDS username first if it is not already in the environment or `config.py`:
+
+```bash
+export WRDS_USERNAME=your_username        # macOS/Linux
+setx WRDS_USERNAME your_username          # Windows, then reopen the shell
+```
+
+Before the first build, connect once by hand, so the build never has to ask for the password:
+`python -c "import wrds; wrds.Connection()"`. It asks for it and offers to save it where the
+`wrds` package looks (`~/.pgpass`, or `%APPDATA%\postgresql\pgpass.conf` on Windows).
+
 ```bash
 cd stage2
 python _run_stage2.py --dry-run
@@ -57,14 +68,12 @@ python _run_stage2.py --dry-run
 This resolves every input, prints what it found, and exits. If a file is missing it says
 which one and where it looked. Nothing is built.
 
-Set your WRDS username first if it is not already in the environment:
-
-```bash
-export WRDS_USERNAME=your_username        # macOS/Linux
-setx WRDS_USERNAME your_username          # Windows, then reopen the shell
-```
-
 ### 2. Build
+
+It needs room: on the 2026-09-21 run `stage2/output/` came to 9.4 GB (`output/_cache/`, stage 2's
+working copy of the stage 1 panel, 2.7 GB; the blocks 5.6 GB; the panel 1.2 GB), and the release
+bundles (`make_release.py`) add 5.0 GB in `stage2/release/`. The downloads in `stage2/data/` are
+small (34 MB).
 
 ```bash
 python _run_stage2.py
@@ -91,7 +100,7 @@ Useful flags:
 ```bash
 python _run_stage2.py --limit-cusips 200      # a fast smoke build (replaces output/ -- see below)
 python _run_stage2.py --from-step 4           # resume after a failure
-python _run_stage2.py --factor-source pinned  # reproduce a published vintage exactly
+python _run_stage2.py --factor-source pinned  # the factors a published vintage used
 ```
 
 ❗`--limit-cusips` writes to the same `output/` as a full build, so it replaces that build's
@@ -145,7 +154,7 @@ so a panel that builds is a panel you can read positionally.
 | "It looks like the Stage 1 file published for download" | you pointed it at the public Stage 1 file; the licensed columns are removed from it |
 | a missing-input box at start-up | Stage 0/1 output is absent; `--dry-run` shows where it looked (each input is the newest file of its kind, so check that the three come from the same run) |
 | `FileNotFoundError` on a factor | first run with no cache and no internet; the fetchers need one online run |
-| WRDS asks for a password on every step | no `.pgpass`; create one, or run `wrds.Connection()` once interactively |
+| WRDS asks for a password on every step | no saved password: run `python -c "import wrds; wrds.Connection()"` once by hand and let it save one |
 | the build asserts on the column contract | something changed the panel's columns; the message names them — see `lib/contract.py` |
 | step 2 takes several times its usual ~2 minutes | you are running steps in one process; a full `_run_stage2.py` build starts each group of steps in a fresh process (a `--from-step`/`--to-step` run does not) |
 

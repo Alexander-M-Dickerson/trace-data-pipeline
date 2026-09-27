@@ -191,8 +191,8 @@ def _connect_wrds_or_none(user):
         first = (str(e).strip().splitlines() or [type(e).__name__])[0][:110]
         note("WRDS checks", "SKIPPED -- could not connect", skipped=True)
         print(f"       {first}")
-        print(f"       Check ~/.pgpass has a line for "
-              f"wrds-pgdata.wharton.upenn.edu:9737:wrds:{user} and is chmod 600.")
+        print(f"       Check the username ({user}). On the WRDS Cloud no password file is needed; "
+              f"elsewhere, connect once by hand so the wrds package saves the password.")
         return None
     finally:
         sys.stdin = saved

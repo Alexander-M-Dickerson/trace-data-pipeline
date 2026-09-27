@@ -952,8 +952,8 @@ affected_cusips = df_flagged.loc[df_flagged["flag_refined_any"] == 1, "cusip_id"
 
 print(f"Flagged {n_flagged:,} / {n_total:,} observations ({100*n_flagged/n_total:.2f}%)")
 print(f"Affected CUSIPs: {affected_cusips:,}")
-# The 2026-09-10 production run printed the equivalent of:
-#   Flagged 10,185 observations (0.03%)
+# The 2026-09-21 run printed the equivalent of:
+#   Flagged 10,182 observations (0.03%)
 #   Affected CUSIPs: 1,045
 ```
 
@@ -1068,6 +1068,6 @@ At function exit, individual flag columns are **dropped** to conserve RAM:
 
 - `../stage0/README_bounce_back_filter.md` — Documentation for the intraday bounce-back filter (Stage 0)
 - `_stage1_settings.py` — Default configuration parameters
-- `stage1/helper_functions.py:1009-1249` — source of `ultra_distressed_filter()`
+- `stage1/helper_functions.py`, `ultra_distressed_filter()` (tag `filter.ultra_distressed_flags`) — its source
 - `stage1/stage1_pipeline.py::step8_ultra_distressed()` — where the pipeline calls it,
   and `step10a_build_filter_tables()` — where flagged rows are DELETED

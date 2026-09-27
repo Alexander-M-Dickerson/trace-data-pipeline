@@ -166,7 +166,7 @@ def main(argv=None):
     ap.add_argument("--hold-only", action="store_true", help="skip the storm probe")
     args = ap.parse_args(argv)
 
-    print(f"user      : {args.user or '(from ~/.pgpass)'}")
+    print(f"user      : {args.user or '(the wrds package default)'}")
     print(f"max tried : {args.max}")
     print("NOTE: run this with no other WRDS jobs of yours active, or you are")
     print("      measuring what is left of the cap rather than the cap.")

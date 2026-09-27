@@ -15,7 +15,18 @@
       "Bash(qstat:*)",
       "Bash(git status:*)",
       "Bash(git diff:*)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "PowerShell(python doctor.py)",
+      "PowerShell(python doctor.py --wrds)",
+      "PowerShell(python3 doctor.py --wrds)",
+      "PowerShell(python -m pytest:*)",
+      "PowerShell(python tools/tags.py --check)",
+      "PowerShell(python _run_stage2.py --dry-run:*)",
+      "PowerShell(python validate_coverage.py)",
+      "PowerShell(python tools/check_inputs.py:*)",
+      "PowerShell(python _run_stage3.py --dry-run:*)",
+      "PowerShell(python build_factors.py --dry-run:*)",
+      "PowerShell(bash download_inputs.sh --check)"
     ],
     "deny": [
       "Bash(git push --force:*)",
@@ -26,7 +37,14 @@
       "Bash(rm -fr:*)",
       "Bash(rm -r -f:*)",
       "Bash(rm -f -r:*)",
-      "Bash(rm -Rf:*)"
+      "Bash(rm -Rf:*)",
+      "Bash(git push *--force*)",
+      "PowerShell(git push *--force*)",
+      "PowerShell(git push -f:*)",
+      "PowerShell(git reset --hard:*)",
+      "PowerShell(git clean:*)",
+      "PowerShell(Remove-Item -r*)",
+      "PowerShell(Remove-Item * -r*)"
     ]
   }
 }

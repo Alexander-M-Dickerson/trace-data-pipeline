@@ -16,7 +16,11 @@ from lib import factor_fetch as ffetch
 
 @pytest.fixture
 def cache_dir(tmp_path, monkeypatch):
+    from lib import manifest
     monkeypatch.setattr(cfg, "FACTOR_CACHE_DIR", tmp_path)
+    # The meta records a sha256, and sha256_file keeps its own cache under output/_cache/. Keep
+    # that here too, or every test run writes its temporary paths into the user's build.
+    monkeypatch.setattr(manifest, "_SHA_CACHE_PATH", tmp_path / "sha_cache.json")
     return tmp_path
 
 

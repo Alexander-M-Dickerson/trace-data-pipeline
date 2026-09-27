@@ -94,15 +94,21 @@ done
 
 PY="${PYTHON:-python3}"
 
+# The stages read the username through config.py, which takes the environment first and then
+# its own default, so an edit to config.py counts as much as an export. Read it the same way:
+# a smoke test that accepted only the export refused a setup doctor.py had passed.
+if [[ -z "${WRDS_USERNAME:-}" ]]; then
+    WRDS_USERNAME="$(cd "${REPO}" && "${PY}" -B -c 'import config; print(config.WRDS_USERNAME)' 2>/dev/null)"
+fi
+
 # Check the credentials BEFORE spending anything on them. Without WRDS_USERNAME,
 # config.py falls back to the literal "your_wrds_username", the wrds package prompts on
 # stdin, and the run dies minutes in with "EOFError: EOF when reading a line" -- which
 # reads exactly like the connection limit and sends you hunting the wrong thing
 # entirely. Two seconds here saves that.
-if [[ -z "${WRDS_USERNAME:-}" || "${WRDS_USERNAME}" == "your_wrds_username" ]]; then
+if [[ -z "${WRDS_USERNAME:-}" || "${WRDS_USERNAME}" == [Yy][Oo][Uu][Rr]_* ]]; then   # as stage 2 counts it
     echo "[error] WRDS_USERNAME is not set (got: ${WRDS_USERNAME:-<unset>})"
-    echo "        export WRDS_USERNAME=\"your_id\"    # then re-run"
-    echo "        You also need a ~/.pgpass entry for wrds-pgdata.wharton.upenn.edu:9737."
+    echo "        export WRDS_USERNAME=\"your_id\", or set it in config.py, then re-run"
     exit 1
 fi
 

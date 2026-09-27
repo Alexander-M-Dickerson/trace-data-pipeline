@@ -3,7 +3,7 @@ r"""doctor.py -- is this machine ready to run the pipeline, and what is the next
     python doctor.py            your own computer: stages 2, 3 and 4
     python doctor.py --wrds     the WRDS login node: stages 0 and 1
 
-It only looks: it downloads nothing, opens no WRDS connection and creates no files. Each stage
+It only looks: it downloads nothing, opens no WRDS connection and writes nothing of its own. Each stage
 is asked through its own check -- stage 2's `_run_stage2.py --dry-run`, stage 3's
 `tools/check_inputs.py`, stage 4's `build_factors.py --dry-run`, and on WRDS
 `download_inputs.sh --check` and `check_disk_space.sh` -- so this file keeps no second copy
@@ -166,13 +166,15 @@ def next_step_local(checks: dict[str, Check]) -> str:
         return ("install Python 3.11, 3.12 or 3.13, make a virtual environment with it, and "
                 "install from the repository root:\n" + pybondlab_pin.INSTALL)
     if not checks["packages"].ok or not checks["pybondlab"].ok:
-        return "install the requirements, from the repository root:\n" + pybondlab_pin.INSTALL
+        return ("install the requirements, from the repository root, into an environment made "
+                "for this repository (python -m venv .venv, then activate it):\n"
+                + pybondlab_pin.INSTALL)
     s2 = checks["stage2"]
     if not s2.ok:
         if "directory not found" in s2.detail or "daily panel not found" in s2.detail:
-            return ("copy the stage0/ and stage1/ folders your WRDS run produced into this "
-                    "folder (QUICKSTART.md, \"Download Results to Your Local Machine\"), then "
-                    "run python doctor.py again")
+            return ("work in the folder you unzipped from WRDS, or copy its stage0/enhanced/ and "
+                    "stage1/data/ folders into this one (QUICKSTART.md, \"Download Results to "
+                    "Your Local Machine\"), then run python doctor.py again")
         if "WRDS_USERNAME" in s2.detail:
             return ("set your WRDS username (export WRDS_USERNAME=your_wrds_id, or edit config.py): "
                     "stage 2's first run fetches Treasury, Fama-French, VIX and FISD data")
@@ -198,8 +200,8 @@ def next_step_local(checks: dict[str, Check]) -> str:
 
 def check_username() -> Check:
     import config
-    user = config.WRDS_USERNAME
-    if not user or user == PLACEHOLDER_USERNAME:
+    user = (config.WRDS_USERNAME or "").strip()
+    if not user or user.lower().startswith("your_"):     # a placeholder, as stage 2 counts it
         return Check("WRDS_USERNAME", False,
                      "not set: export WRDS_USERNAME=your_wrds_id, or edit config.py")
     return Check("WRDS_USERNAME", True, user)
@@ -240,8 +242,8 @@ def wrds() -> tuple[list[Check], str, bool]:
     elif not checks[5].ok:
         step = "free some space in your home directory (the message above says how much)"
     else:
-        step = ("a 10-minute test on a few chunks: qsub run_smoke_test.sh; then the full run: "
-                "./run_pipeline.sh (QUICKSTART.md)")
+        step = ("a 10-minute test on a few chunks: qsub run_smoke_test.sh; once qstat no longer "
+                "lists it, the full run: ./run_pipeline.sh (QUICKSTART.md)")
     return checks, step, env_ok
 
 

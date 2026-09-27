@@ -4,6 +4,10 @@ Stage 2 builds the monthly bond asset pricing panel from stage 1's daily panel, 
 computer. Read the repository's [AGENTS.md](../AGENTS.md) first; this file adds what is specific to
 stage 2. The full human guide is [QUICKSTART_stage2.md](QUICKSTART_stage2.md).
 
+The `build-panel` skill (`/build-panel` in Claude Code, `$build-panel` in Codex) walks this file
+step by step, and `python doctor.py`, from the repository root, says whether this stage's inputs
+are ready.
+
 ## Ask the user one question before building: which factors?
 
 Stage 2 needs a monthly factor panel (Fama-French, VIX, uncertainty indices, the BBW bond
@@ -12,7 +16,7 @@ factors). There are two sources, and they give different numbers:
 | `--factor-source` | what it does | use it when |
 |---|---|---|
 | `public` (default) | assembles the factors from the live public sources | the user wants the newest data |
-| `pinned` | downloads the factor panel published for this vintage (from the osbap-site GitHub release, the file openbondassetpricing.com links to) | the user wants to reproduce a published panel exactly |
+| `pinned` | downloads the factor panel published for this vintage (from the osbap-site GitHub release, the file openbondassetpricing.com links to) | the user wants the factors a published panel used |
 
 The public sources revise their history (Ken French restates factors, FRED re-adjusts CPI,
 Ludvigson re-estimates uncertainty), so a `public` build will not match a published release
@@ -37,8 +41,9 @@ python make_release.py --what panel                        # 6. optional: the re
 ```
 
 1. **Dry run.** Show the user the resolved paths: the daily panel, the FISD file, the callable
-   flags, and the factor source (with `pinned`, the file or URL it will use). All three input files
-   must carry the same date stamp and come from the user's own stage 0/1 folder.
+   flags, and the factor source (with `pinned`, the file or URL it will use). The three input files
+   should carry the same date stamp and come from the user's own stage 0/1 folder. Stage 2 takes
+   the newest of each on its own and does not compare the stamps, so compare them in the list.
 2. **Build.** Run it in the background with a log. It runs the 7 steps in fresh processes: step
    1, step 2, then steps 3-4 and 5-6 as two processes side by side, then step 7. It prints a
    line as each starts and ends. It checks its own output at the end: the 145
@@ -61,6 +66,11 @@ python make_release.py --what panel                        # 6. optional: the re
    run, and otherwise skips it, says so and exits 1 after writing the other bundles.
 
 ## Reproducing a published panel: what "identical" means
+
+This needs the same WRDS run of stages 0 and 1 as the published panel, which only its builder
+has. A user's own run ends later and carries WRDS's revisions, so `pinned` then removes the
+factor difference and nothing else. Say so before a user compares their panel with a published
+one.
 
 With `--factor-source pinned`, a build from the same WRDS run reproduces the published panel
 once the release redaction is applied (`permco`, `gvkey`, `spc_rat`, `mdc_rat`; step 6):

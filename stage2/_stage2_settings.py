@@ -45,11 +45,11 @@ except ImportError:  # pragma: no cover - only hit outside the pipeline tree
 # ROOT_PATH is the parent directory containing stage0/, stage1/ and stage2/.
 #
 # Option 1: AUTO-DETECT (recommended - leave blank or use "")
-# If you run from ~/proj/stage2, ROOT_PATH becomes ~/proj.
+# If you run from ~/trace-data-pipeline/stage2, ROOT_PATH becomes ~/trace-data-pipeline.
 ROOT_PATH = ""  # Auto-detect from current working directory
 
 # Option 2: MANUAL OVERRIDE (uncomment and edit if auto-detect doesn't work)
-# ROOT_PATH = Path("~/proj").expanduser()                          # Linux/Mac
+# ROOT_PATH = Path("~/trace-data-pipeline").expanduser()           # Linux/Mac
 # ROOT_PATH = Path("C:\\Users\\YourName\\Documents\\trace_data")   # Windows
 
 # --- Release vintage ---
@@ -70,7 +70,7 @@ DAILY_INPUT = None
 #             to reproduce a specific published vintage exactly -- data vendors revise
 #             history (FRED re-seasonally-adjusts CPI, EPU back-renormalizes), so the
 #             two sources agree closely but do not match bit-for-bit.
-FACTOR_SOURCE = "public"  # [tag:trap.factor_source] public is fresh data and will not reproduce a published vintage; pinned does
+FACTOR_SOURCE = "public"  # [tag:trap.factor_source] public is fresh data and will not reproduce a published vintage; pinned uses its factors
 FACTORS_PINNED_FILE = None
 
 # The factor panel each published vintage was built from, hosted so a published number can
@@ -277,7 +277,7 @@ BLOCKS_DIR = OUTPUT_DIR / "blocks"         # per-step intermediate blocks
 PANEL_DIR = OUTPUT_DIR / "panel"           # final panels
 REPORT_DIR = STAGE2_DIR / "data_reports"   # LaTeX report + figures
 LOG_DIR = STAGE2_DIR / "logs"
-MANIFEST_DIR = STAGE2_DIR / "manifests"    # committed JSON run manifests
+MANIFEST_DIR = STAGE2_DIR / "manifests"    # JSON run manifests (gitignored: they record your own builds)
 FACTOR_CACHE_DIR = STAGE2_DATA / "factor_cache"
 
 # What Stage 2 fetches from WRDS on its first run, cached in STAGE2_DATA after one fetch. Both

@@ -7,6 +7,10 @@ Read the repository's [AGENTS.md](../AGENTS.md) first; the full guide is
 [README_stage1.md](README_stage1.md), and every column is defined in
 [DATA_DICTIONARY.md](DATA_DICTIONARY.md).
 
+The `run-wrds` skill (`/run-wrds` in Claude Code, `$run-wrds` in Codex) walks stages 0 and 1
+step by step, and `python3 doctor.py --wrds`, from the repository root, says whether the login
+node is ready.
+
 ## Before it runs
 
 - **Its external inputs come from `download_inputs.sh`, run on the login node**, because
@@ -53,9 +57,14 @@ the ultra-distressed filter's parameters. `TRACE_MEMBERS` and `WRDS_USERNAME` co
 
 ## Traps
 
-- **Standard TRACE never survives the default cut-off.** Stage 1 keeps Standard only for dates
-  after the last Enhanced date, and every automatic cut-off ends on or before it, so
-  `db_type == 2` has no rows unless a literal `DATE_CUT_OFF` reaches past Enhanced.
+- **A finished stage 1 leaves about a hundred `ValueError` tracebacks in `stage1.err`**, from
+  Python's `resource_tracker` at shutdown. They are harmless ([FAQ.md](../FAQ.md) says why).
+  The run succeeded when the last lines of `stage1/logs/stage1.out` say "Stage 1 processing
+  completed successfully".
+- **Standard TRACE is not run by default**, and when it is, it can move the sample's end.
+  Stage 1 keeps Standard only for dates after the last Enhanced date, and the automatic
+  cut-off counts Standard with Enhanced (`CUT_OFF_POPULATIONS`), so adding it to
+  `TRACE_MEMBERS` can carry `auto:complete` past the last Enhanced month.
 - **The two linker windows are not interchangeable.** Stages 1 and 2 label each bond's issuer
   with the identity window; the evidence window is for joining equity data. Change
   `LINKER_WINDOW` in both settings files or in neither [ref:rule.linker_window].

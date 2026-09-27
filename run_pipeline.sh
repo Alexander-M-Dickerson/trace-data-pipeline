@@ -62,6 +62,16 @@ MEMBERS=$("${PY}" -c "import sys; sys.path.insert(0,'.'); from config import TRA
     echo "[error] could not read TRACE_MEMBERS from config.py"; exit 1; }
 echo "[info] members: ${MEMBERS}"
 
+# Every job connects as config.WRDS_USERNAME. With the placeholder, stage 0 dies at its first
+# connection, and the jobs held behind it start anyway (SGE releases a hold when a job ENDS,
+# however it ended) and fail in turn. Stop before submitting any of them.
+WRDS_USER=$("${PY}" -c "import sys; sys.path.insert(0,'.'); from config import WRDS_USERNAME; print(WRDS_USERNAME)") || {
+    echo "[error] could not read WRDS_USERNAME from config.py"; exit 1; }
+if [[ -z "${WRDS_USER}" || "${WRDS_USER}" == [Yy][Oo][Uu][Rr]_* ]]; then   # "your_..." is a placeholder, as stage 2 counts it
+    echo "[error] WRDS_USERNAME is not set: export WRDS_USERNAME=your_wrds_id, or set it in config.py"
+    exit 1
+fi
+
 # Fail HERE if the members ask for more WRDS connections than the account can hold.
 # Four hours in, the same problem arrives as "EOFError: EOF when reading a line".
 "${PY}" -c "

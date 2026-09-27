@@ -3,7 +3,8 @@
 
 Two sources (cfg.FACTOR_SOURCE / --factor-source):
   pinned -- use the factor panel PUBLISHED for this vintage (downloaded from OSBAP), or
-            FACTORS_PINNED_FILE. The route that reproduces a published panel exactly.
+            FACTORS_PINNED_FILE. The route to a published panel's factors; the panel itself is
+            reproduced only from the same WRDS run of stages 0 and 1.
   public -- assemble fresh from the public fetchers (lib/factor_fetch) + the published extended BBW
             series (lib/extended_factors). Runs with NO private input, anywhere -- but does NOT
             bit-match the pinned vintage (FRED/EPU/HKM/Ludvigson back-revise history). The

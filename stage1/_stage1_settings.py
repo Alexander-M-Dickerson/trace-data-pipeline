@@ -27,12 +27,12 @@ from config import WRDS_USERNAME, AUTHOR, OUTPUT_FORMAT, TRACE_MEMBERS
 #
 # Option 1: AUTO-DETECT (recommended - leave blank or use "")
 # The code will automatically detect ROOT_PATH from the current working directory.
-# If you run the script from ~/proj/stage1, ROOT_PATH will be set to ~/proj
+# If you run the script from ~/trace-data-pipeline/stage1, ROOT_PATH will be set to ~/trace-data-pipeline
 ROOT_PATH = ""  # Auto-detect from current working directory
 
 # Option 2: MANUAL OVERRIDE (uncomment and edit if auto-detect doesn't work)
 # Uncomment ONE of the following lines if you need to manually specify ROOT_PATH:
-# ROOT_PATH = Path("~/proj").expanduser()                          # Linux/Mac/WRDS
+# ROOT_PATH = Path("~/trace-data-pipeline").expanduser()           # Linux/Mac/WRDS
 # ROOT_PATH = Path("C:\\Users\\YourName\\Documents\\trace_data")   # Windows
 # ROOT_PATH = Path("/Users/yourname/Documents/trace_data")         # Mac
 
@@ -94,10 +94,9 @@ if N_CORES is None:
 # bond-day, against a 2025 range of 11.3-11.9k bonds and 10-12 trades. Only
 # December is unusable, and "auto:complete" is exactly what excludes it.
 #
-# Note this buffer means Standard TRACE (db_type=2) never survives: step 2 keeps
-# Standard only for dates AFTER the last Enhanced date, and any trailing cutoff
-# falls before that, so the two conditions cannot both hold. That was already
-# true of the previous fixed date; it is stated here so it is not a surprise.
+# Standard TRACE (db_type=2) is kept only for dates AFTER the last Enhanced date, and
+# CUT_OFF_POPULATIONS below counts it with Enhanced, so when Standard is run it can carry
+# "auto:complete" past the last Enhanced month and its rows survive.
 DATE_CUT_OFF = "auto:complete"  # [tag:rule.complete_months] the sample ends at the last complete month
 
 # --- Output Settings ---
@@ -213,7 +212,7 @@ EXTERNAL_FILES = {
 # Auto-detect ROOT_PATH if not set
 if not ROOT_PATH or ROOT_PATH == "":
     # Get current working directory (where the script is being run from)
-    # If running from ~/proj/stage1, this will be ~/proj/stage1
+    # If running from ~/trace-data-pipeline/stage1, this will be ~/trace-data-pipeline/stage1
     current_dir = Path.cwd()
 
     # If current directory is named 'stage1', use parent directory as ROOT_PATH

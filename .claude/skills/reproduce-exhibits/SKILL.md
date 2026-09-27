@@ -21,8 +21,8 @@ file that makes it.
 
 ## Steps (from `stage3/`)
 
-1. **Ask which sample**: the full panel (the default) or the paper's window
-   (`--sample paper`, 2002-09 to 2024-12).
+1. **Ask which sample**: the whole panel (the default, `--sample frontier`) or the paper's
+   window (`--sample paper`, 2002-09 to 2024-12).
 2. **Inputs**: `python tools/check_inputs.py`. Each input must exist and have the expected
    shape.
 3. **Dry run**: `python _run_stage3.py --dry-run` shows what would run and what exists already.

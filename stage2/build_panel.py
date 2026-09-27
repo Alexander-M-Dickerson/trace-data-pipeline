@@ -207,8 +207,8 @@ def main() -> None:
                          "month")
     ap.add_argument("--factor-source", choices=["pinned", "public"], default=None,
                     help="where the factor panel comes from. 'public' (the default) fetches "
-                         "every source fresh; 'pinned' uses the file published for the vintage, "
-                         "which reproduces a published panel exactly")
+                         "every source fresh; 'pinned' uses the file published for the vintage "
+                         "(a published panel is reproduced only from the same WRDS run)")
     ap.add_argument("--refresh-factors", action="store_true",
                     help="with --factor-source public: force re-fetch of every source")
     ap.add_argument("--sequential", action="store_true",

@@ -119,12 +119,6 @@ system packages, and WRDS already ships newer ones than any pin here (numpy 2.4.
 pyarrow 24.0.0 on Python 3.14) — pinning downgrades a working environment. Use
 `requirements.txt`, which states minimums.
 
-The equivalent by hand, if `requirements.txt` is unavailable:
-
-```bash
-python -m pip install --user pandas numpy wrds pyarrow tqdm QuantLib joblib openpyxl requests matplotlib
-```
-
 Or, in a virtual environment:
 
 ```bash
@@ -351,7 +345,9 @@ YLD_TYPE = 'LIU_WU'  # Options: 'LIU_WU' (recommended), 'FRED'
 
 **Liu-Wu** provides zero-coupon treasury yields at daily frequency with maturities from 1 month to 30 years. This is the recommended source for credit spread calculation.
 
-**FRED** provides constant maturity treasury yields, but with fewer maturities and potential gaps.
+**FRED** provides constant maturity treasury yields, but with fewer maturities and potential gaps. It is
+downloaded while stage 1 runs, and WRDS compute nodes have no internet, so on the grid it fails:
+use it only on a machine with internet access.
 
 ### Ultra-Distressed Filter Configuration
 
@@ -753,7 +749,8 @@ ROOT_PATH/
 - The date stamp is read from `stage0/enhanced/trace_enhanced_<stamp>.parquet`, and every
   member you process must carry the same stamp
 - `ROOT_PATH` can be left blank (it is found from the folder you run from) or set by hand
-- Run from `~/proj/stage1` or from `~/proj`: either way `ROOT_PATH` becomes `~/proj`
+- Run from `~/trace-data-pipeline/stage1` or from `~/trace-data-pipeline`: either way
+  `ROOT_PATH` becomes `~/trace-data-pipeline`
 
 ---
 
@@ -835,11 +832,11 @@ export WRDS_USERNAME="your_wrds_username_here"
 Solution:
 1. Run from the repository root or from the `stage1/` directory:
    ```bash
-   cd ~/proj  # or wherever you cloned the repository
+   cd ~/trace-data-pipeline  # or wherever you cloned the repository
    ```
 2. If auto-detection doesn't work, manually specify `ROOT_PATH` in `_stage1_settings.py`:
    ```python
-   ROOT_PATH = Path("~/proj").expanduser()  # Or your actual root path
+   ROOT_PATH = Path("~/trace-data-pipeline").expanduser()  # Or your actual root path
    ```
 
 **Error: "Stage0 output files not found"**
@@ -870,10 +867,18 @@ Solution: Ensure `helper_functions.py` is in the `stage1/` directory and you're 
 
 **Error: "Unable to connect to WRDS"**
 
-Solution: Verify `.pgpass` file is set up correctly:
+Solution:
+
+**On the WRDS Cloud** no password file is needed: jobs there connect without one. A failed
+connection is almost always the username: `WRDS_USERNAME` unset, or still `your_wrds_username`
+in `config.py` (`python3 doctor.py --wrds` checks it). If the username is right, it is WRDS's
+limit of 7 connections held at once (`stage0/README_stage0.md`).
+
+**On your own computer** (stage 2's first run), the password must be saved where the `wrds`
+package looks. Connect once by hand; it asks for the password and offers to save it
+(`~/.pgpass`, or `%APPDATA%\postgresql\pgpass.conf` on Windows):
 ```bash
-chmod 600 ~/.pgpass
-cat ~/.pgpass  # Should contain: wrds-pgdata.wharton.upenn.edu:9737:wrds:your_username:your_password
+python -c "import wrds; wrds.Connection()"
 ```
 
 **WRDS refuses access to a table**

@@ -18,13 +18,14 @@ computes, never what the paper concludes.
 
 - the user wants something run: use `onboard`, `run-wrds`, `build-panel`,
   `reproduce-exhibits` or `build-factors`
+- the user wants a column added to the panel, or one changed: use `add-a-column`
 
 ## Where to start
 
 | the question is about | start at | then read |
 |---|---|---|
-| a monthly panel column | its tag: `grep -rn "tag:col.<name>" .` | its row in `stage2/DATA_DICTIONARY.md` |
-| a daily panel column | its tag: `grep -rn "daily.<name>" .` | its row in `stage1/DATA_DICTIONARY.md` |
+| a monthly panel column | its tag: `git grep -n "tag:col.<name>"`, or `TAGS.md` without git | its row in `stage2/DATA_DICTIONARY.md` |
+| a daily panel column | its tag: `git grep -n "daily.<name>"` | its row in `stage1/DATA_DICTIONARY.md` |
 | a cleaning filter | its tag, in the `filter` section of `TAGS.md` | the order in `stage0/AGENTS.md` or `stage1/AGENTS.md` |
 | a TRACE-only factor | `stage4/DATA_DICTIONARY.md` | `stage4/spec/factors.json`, `stage4/README_stage4.md` |
 | a table or figure of stage 3 | `stage3/INDEX.md`: exhibit to the file that makes it | that file's docstring, `stage3/DATA_DICTIONARY.md` |

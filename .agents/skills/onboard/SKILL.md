@@ -30,7 +30,7 @@ python doctor.py            # the user's own computer
 python3 doctor.py --wrds    # the WRDS login node
 ```
 
-`doctor.py` downloads nothing, opens no WRDS connection and creates no files, so it is always
+`doctor.py` downloads nothing, opens no WRDS connection and writes nothing of its own, so it is always
 safe to run. Its last line is the next step.
 
 ## On the user's own computer
@@ -54,9 +54,11 @@ safe to run. Its last line is the next step.
    to 4 check its version at start-up.
 4. **The WRDS login**, for stage 2's first run only, which fetches and caches a few series.
    The username: `export WRDS_USERNAME="your_wrds_id"` (PowerShell:
-   `$env:WRDS_USERNAME="your_wrds_id"`), or edit `config.py`. The password: a line in
-   `~/.pgpass`, as "WRDS connection failed" in `QUICKSTART.md` shows, because a build running
-   in the background cannot answer a password prompt. Ask the user for the username, never
+   `$env:WRDS_USERNAME="your_wrds_id"`), or edit `config.py`. The password: have the user run
+   `VENVPY -c "import wrds; wrds.Connection()"` once, themselves, in a terminal. It asks for
+   the username and then the password, and offers to save them in the file the `wrds` package reads (`~/.pgpass`, or
+   `%APPDATA%\postgresql\pgpass.conf` on Windows), because a build running in the background
+   cannot answer a password prompt. Ask the user for the username, never
    guess one. The password the user writes into that file: never ask for it in the chat, and
    never write it into the repository.
 5. **The data.** Stage 2 reads the `stage0/` and `stage1/` folders a WRDS run produced. If they

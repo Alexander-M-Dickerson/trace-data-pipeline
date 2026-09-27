@@ -10,7 +10,7 @@ does not describe what the code does is wrong however carefully it was written, 
 only way to find out is to open the function.
 
 Stage 3 now generates the table from `spec/signal_definitions.json`
-(`s4_zoo/t_ia08.py`). Twenty-three rows there differ from the printed table; each carries
+(`s4_zoo/t_ia08.py`). Fifty rows there differ from the printed table; each carries
 `why_corrected` and what was printed (`paper_prints`, or `paper_prints_citation` where only
 the citation changed), is marked `†` in the rendered table, and is listed below. `python s4_zoo/t_ia08.py --diffs` prints them.
 
@@ -296,15 +296,58 @@ never leaves the bond out. So every bond in a (`sic_code`, month) group carries 
 
 ---
 
+## 15. Ten more rows the code settles
+
+| column | the paper printed | the code |
+|---|---|---|
+| `cs_mu12_1` | skips the prior month | averages the 12 observations before month $t$, $t-1$ included; the published column matches that on 100% of 1,665,078 rows |
+| `spd_abs`, `spd_rel` | a minimum of 5 prices | no minimum; 78,937 published values come from months with fewer than 5 priced days |
+| `p_fht` | $p_{zro}$ in the formula | the full-month share, though the published $\sigma$ and `p_zro` column leave out the last day of trading |
+| `dvol_sys`, `dvol_idio` | a CAPMB regression | a regression on the day's equal-weighted average bond return |
+| `b_vix` | a monthly regression | a regression of daily returns within the month |
+| `b_defb`, `b_termb` | market regressions | one two-factor regression on TERMB and DEFB |
+| `fce_val` | units of the bond outstanding | thousands of dollars (median 500,000, a $500 million issue) |
+
+**Fixed here**, and in `stage2/DATA_DICTIONARY.md`.
+
+---
+
+## 16. Seventeen rows checked against the data
+
+Each was recomputed from the code, and where a number is quoted, measured on the 2026-09-21
+panel.
+
+| column | the paper printed | the code |
+|---|---|---|
+| `rsj` | $(RV^+ - RV^-)/RV$, a ratio within $\pm 1$ | up-minus-down volatility over the realized variance; runs from -2,142 to 2,254 |
+| `ilq`, `roll` | autocovariance $\times 100$; units unstated | log returns in percent, so `ilq` is 10,000 times the decimal autocovariance and `roll` is in percent of price |
+| `p_zro` | the share of days with no price | the gap-adjusted share, which counts the last trading day as unpriced: never 0 |
+| `lix` | a minimum of 5 prices | a minimum of 5 daily Amihud ratios; days with high = low left out |
+| `tret` | duration unstated | the duration on the month-end trade, not the gap-adjusted `md_dur` |
+| `country` | country of issuance | the issuer's domicile |
+| `rfret` | $r^x = r - r^f$ | $r - r^f$; $r^x$ is the duration-adjusted return |
+| `iskew` | residuals of the coskewness regression | the same, with each month's rolling betas, and raw returns before the betas exist |
+| `b_mktbx_dcapm`, `b_term_dcapm` | the duration-adjusted return on the left; TERM = MKTB - MKTBX | `ret_vw` on the left; TERM = MKTB + $r^f$ - MKTBX |
+| `b_dvix_va`, `b_dvix_vp` | a $\Delta$VIX beta | the sum of the betas on this month's and last month's change |
+| `b_dvixd` | the daily $\Delta$VIX | the change between the bond's own trade dates, at most 5 days apart |
+| `b_dcpi`, `b_cpi_vol6` | CPI changes | lagged changes in the CPI index, in index points |
+| `b_cptlt` | the capital ratio | the traded intermediary factor, a return |
+
+**Fixed here**, and in `stage2/DATA_DICTIONARY.md`. Two of these describe what the code does
+where it may not do what was meant (`rsj`, and TERM keeping $r^f$); they are recorded, not
+changed, because changing them changes published numbers.
+
+---
+
 ## How to re-run this
 
 ```bash
 cd stage3
-python s4_zoo/t_ia08.py --diffs     # the twenty-three corrected rows and what settled each
+python s4_zoo/t_ia08.py --diffs     # the fifty corrected rows and what settled each
 python s4_zoo/t_ia08.py             # -> reports/tables/table_ia08.tex
 python -m pytest tests/ -k definition -q  # every sorted signal has a definition
 ```
 
-The spec is `spec/signal_definitions.json`. It is the paper's text with twenty-three rows
+The spec is `spec/signal_definitions.json`. It is the paper's text with fifty rows
 corrected, each recording what was printed and why it changed — so the printed table can
 always be reconstructed from it, and no correction is silent.
