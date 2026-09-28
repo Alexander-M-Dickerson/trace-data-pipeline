@@ -118,7 +118,10 @@ def lab_stats(cell: dict, mktb: pd.Series, spec: LabSpec,
     # whole exhibit would be a fiction -- but the outer span is what a caption
     # states, and it has to come from the data rather than from the window that
     # was requested.
-    _idx = cell[_series_key(LEGS[0], 'base')].index
+    # ❗the months that hold data: the frame starts with an all-empty month (the first
+    # return needs a prior price), and taking its index printed 2002-08 for a sample whose
+    # first return is in 2002-09, a span of 280 months beside a longest T of 279
+    _idx = cell[_series_key(LEGS[0], 'base')].dropna(how="all").index
     _first, _last = str(_idx.min())[:10], str(_idx.max())[:10]
 
     def add(factor, leg, variant, stat, value, tstat, T):

@@ -9,8 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [4.2.1] - 2026-09-28
 
-**Table IA.VIII is the paper's, row for row.** No number any stage computes changes.
-`docs/validation/validated_runs.csv` records the checks.
+**Table IA.VIII is the paper's, row for row, and three exhibit defects are fixed.** A cold
+read of the revised paper against the data found them. The published panels and factors do
+not change; on a new run, Table IA.V's All column moves by a few counts, the Section 4
+captions start a month later, and Figures IA.5 and IA.6 draw their baseline marks where
+they belong. `docs/validation/validated_runs.csv` records the checks.
+
+### Fixed
+- **Figures IA.5 and IA.6 drew their baseline marks on the wrong sign** (since 4.2.0, which
+  added them). The boxes are signed once per signal, on the `VW_Dp_Q_all_all_all` mean; the
+  marks averaged six baselines each signed on its own mean, so `db_mkt`'s sat at -0.85
+  beside a box from -0.75 to 3.51. They now take the box's sign
+  (`nse_engine.mua_baseline_values`), and the driver refuses a mark outside its box: each
+  baseline is one of the signal's construction paths.
+- **The Section 4 sample started a month early** (Tables 3 and 4, IA.XV and IA.XVI, Figures 7,
+  8 and IA.2). The span came from the first row of a frame whose first month is empty, since
+  a first return needs a prior price: captions printed 2002-08 to 2025-11, 280 months, beside
+  a longest series of 279. It now comes from the months that hold data (2002-09).
+- **Tables IA.V and IA.VI counted extreme returns differently.** pandas hands a comparison
+  over a million elements to numexpr, which compares in float64, and smaller ones to numpy
+  in float32. A return stored at exactly -20% counted in IA.V's All column and nowhere else:
+  6,186 against 6,181 on the 2026-09-27 run. Both tables now compare in numpy, on the stored
+  values.
 
 ### Changed
 - **Table IA.VIII says what the paper prints.** The signal dictionary

@@ -178,10 +178,18 @@ def main() -> int:
                 # so for Figures IA.3-IA.5, and IA.6 drew it too)
                 base_col = {"tstat_alpha": "baseline_alpha_tstat", "tstat_premia": "baseline_tstat",
                             "t_stat": "baseline_tstat"}[plot_col]
-                baseline_vals = E.dua_baseline_values(baselines, base_col)
+                # ❗in the MUA figures on the boxes' sign (E.mua_baseline_values), not as stored
+                baseline_vals = (E.dua_baseline_values(baselines, base_col) if grid == "dua"
+                                 else E.mua_baseline_values(baselines, base_col, mua))
                 chosen = E.top4_per_cluster(sel_stats, by=by)
                 sel = plot_stats[plot_stats["signal"].isin(chosen["signal"])].copy()
                 assert len(sel) == 36, f"{exhibit}: selected {len(sel)} signals"
+                # a baseline is one of the signal's paths, so its mark lies inside the whiskers
+                outside = [r["signal"] for _, r in sel.iterrows()
+                           if r["signal"] in baseline_vals
+                           and not (r["min"] - 1e-9 <= baseline_vals[r["signal"]] <= r["max"] + 1e-9)]
+                if grid == "mua":
+                    assert not outside, f"{exhibit}: baseline marks outside their boxes: {outside}"
 
                 indep = recompute_box(dua if grid == "dua" else mua, plot_col,
                                       list(sel["signal"]), signed_baseline)

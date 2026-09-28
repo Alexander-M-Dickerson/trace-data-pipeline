@@ -331,6 +331,11 @@ def extreme_stats(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
                for d in ("End", "Begin") for b in RATING_BUCKETS}}
            for nm, fn in [("Skewness", sps.skew),
                           ("Excess Kurtosis", lambda x: sps.kurtosis(x, fisher=True))]]
+    # ❗compare in numpy, on the stored float32 values. pandas hands a comparison over a
+    # million elements to numexpr, which compares in float64, and the rest in float32, so a
+    # return stored at exactly -20% counted in IA.V's All column (1.95M rows) and in no other
+    # column or table: IA.V printed 6,186 where IA.VI and IA.V's own buckets summed to 6,181
+    series = {k: s.to_numpy() for k, s in series.items()}
     counts = []
     for t in EXTREME_THRESH:
         for sign, direction in [("<", f"neg{int(t*100)}"), (">", f"pos{int(t*100)}")]:
@@ -355,6 +360,7 @@ def time_concentration(df: pd.DataFrame) -> pd.DataFrame:
         for c, d in [("ret_vw", "End"), ("ret_vw_bgn", "Begin")]:
             s = ydf[c].dropna()
             row[f"N_{d}"] = len(s)
+            s = s.to_numpy()                       # as extreme_stats: numpy, float32
             for t in (0.20, 0.95):
                 row[f"{d}_neg_{int(t*100)}"] = int((s < -t).sum())
                 row[f"{d}_pos_{int(t*100)}"] = int((s > t).sum())

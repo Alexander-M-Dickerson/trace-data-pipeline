@@ -232,6 +232,24 @@ def dua_baseline_values(baselines_df: pd.DataFrame, col: str) -> dict[str, float
     return baselines_df.groupby("signal")[col].mean().to_dict()
 
 
+def mua_baseline_values(baselines_df: pd.DataFrame, col: str,
+                        mua_paths: pd.DataFrame) -> dict[str, float]:
+    """The same six baselines, on the MUA figures' sign convention.
+
+    ❗Each baseline unit is stored signed on its OWN mean (`sign_mult_premia`), which suits
+    the DUA boxes, signed the same way. The MUA boxes are signed once per signal, on the
+    FLIP_BASELINE mean (convention 4). Averaging the units as stored put db_mkt's mark at
+    -0.85 beside a box running from -0.75 to 3.51: undo each unit's sign, then apply the
+    box's. Each baseline is itself one of the signal's construction paths, so the mark
+    must lie inside the box's whiskers, and f_nse_figures checks that it does.
+    """
+    base = mua_paths[mua_paths["spec_id"] == FLIP_BASELINE].set_index("signal")["mean_ret"]
+    box_sign = pd.Series(1, index=base.index).where(~(base.notna() & (base < 0)), -1)
+    d = baselines_df.copy()
+    d["_v"] = d[col] * d["sign_mult_premia"] * d["signal"].map(box_sign).fillna(1)
+    return d.groupby("signal")["_v"].mean().to_dict()
+
+
 # ---------------------------------------------------------------------------
 # MUA -- method uncertainty. The analysis set's size depends on how many
 # strategies are degenerate in THIS data, so it is reported, never pinned.
