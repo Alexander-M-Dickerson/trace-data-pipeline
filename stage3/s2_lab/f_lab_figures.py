@@ -124,9 +124,12 @@ def build_fig7(source: dict, vix: pd.Series, out_pdf: Path, st) -> None:
                     color=st.c("fit"), lw=(2 if st.name == "paper" else 1.3))
             box = (dict(boxstyle="round", facecolor="white", alpha=0.8) if st.name == "paper"
                    else None)
-            ax.text(0.95, 0.95,
+            # the paper's note sits top right in a white box; unboxed, the house note would sit
+            # on the outlying points there, so it goes top left, where low VIX leaves no data
+            corner = (0.95, "right") if st.name == "paper" else (0.05, "left")
+            ax.text(corner[0], 0.95,
                     f"$R^2$ = {model.rsquared:.3f}\n$\\rho$ = {np.corrcoef(y, X)[0, 1]:.3f}",
-                    transform=ax.transAxes, va="top", ha="right",
+                    transform=ax.transAxes, va="top", ha=corner[1],
                     fontsize=(9 if st.name == "paper" else 7), bbox=box)
             ax.axhline(0, color=st.c("zero"), lw=0.5)
             st.grid(ax)

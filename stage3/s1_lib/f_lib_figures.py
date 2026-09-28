@@ -186,7 +186,8 @@ def bias_bars(ax, x, df, st, capsize: float) -> None:
 def build_fig4(data: dict, out_pdf: Path, st) -> None:
     with figstyle.use(st) as plt:
         fig, axes = plt.subplots(2, 2, figsize=st.size(12, 9))
-        ticks = 10 if st.name == "paper" else None
+        # the house panels are narrower: val_ipr and val_hz would run together unrotated
+        ticks = {"fontsize": 10} if st.name == "paper" else {"rotation": 30, "ha": "right"}
         for j, (sort, title) in enumerate([("single", "Single-Sort"), ("wf", "Within-Firm Sort")]):
             df = data[sort]
             x = np.arange(len(df))
@@ -194,7 +195,7 @@ def build_fig4(data: dict, out_pdf: Path, st) -> None:
             ax = axes[0, j]
             bias_bars(ax, x, df, st, capsize=3)
             ax.set_ylabel("Bias (% monthly)")
-            ax.set_xticks(x, names, fontsize=ticks)
+            ax.set_xticks(x, names, **ticks)
             st.panel(ax, "AB"[j], title)
             ax = axes[1, j]
             alpha = 0.9 if st.name == "paper" else 1.0
@@ -205,7 +206,7 @@ def build_fig4(data: dict, out_pdf: Path, st) -> None:
             ax.set_ylabel("Decomposition (%)")
             ax.set_ylim(0, 105)
             ax.axhline(100, color=st.c("zero"), lw=0.5, ls="--")
-            ax.set_xticks(x, names, fontsize=ticks)
+            ax.set_xticks(x, names, **ticks)
             st.panel(ax, "CD"[j], f"{title} - Decomposition")
             st.grid(ax)
         hb, lb = axes[0, 1].get_legend_handles_labels()
