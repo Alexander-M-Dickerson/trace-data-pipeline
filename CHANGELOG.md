@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.2.0] - 2026-09-28
+
+**Every figure in two looks, and the paper's new look is the default.** No table and no
+number that any stage computes changes: this release changes figures and their captions.
+`docs/validation/validated_runs.csv` records the checks.
+
 ### Changed
 - **Stage 3 draws every figure in two looks** (`stage3/figstyle.py`, `--style
   house|submitted|both`; the runner draws both).
