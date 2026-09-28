@@ -9,11 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [4.2.1] - 2026-09-28
 
-**Table IA.VIII is the paper's, row for row, and three exhibit defects are fixed.** A cold
+**Table IA.VIII is the paper's, row for row, and four exhibit defects are fixed.** A cold
 read of the revised paper against the data found them. The published panels and factors do
 not change; on a new run, Table IA.V's All column moves by a few counts, the Section 4
-captions start a month later, and Figures IA.5 and IA.6 draw their baseline marks where
-they belong. `docs/validation/validated_runs.csv` records the checks.
+captions start a month later, Figures IA.5 and IA.6 draw their baseline marks where
+they belong, and Table IA.IV prints the latent implementation bias in percent. `docs/validation/validated_runs.csv` records the checks.
 
 ### Fixed
 - **Figures IA.5 and IA.6 drew their baseline marks on the wrong sign** (since 4.2.0, which
@@ -31,6 +31,13 @@ they belong. `docs/validation/validated_runs.csv` records the checks.
   in float32. A return stored at exactly -20% counted in IA.V's All column and nowhere else:
   6,186 against 6,181 on the 2026-09-27 run. Both tables now compare in numpy, on the stored
   values.
+- **Table IA.IV printed the latent implementation bias as a decimal** beside returns in
+  percent: SD 0.02, and a mean and median of 0.00. It is a return, and is now scaled and
+  labelled like the others ("Latent Imp. Bias (%)"; on the 2026-09-27 run, mean 0.03%, SD
+  2.43%). The Stage 2 data report's monthly tables had the same row and are fixed the same
+  way; their note now gives the unit of every row (sessions for the holding periods and
+  gaps, $ millions for market capitalization). A test holds the rule: a row is scaled to
+  percent exactly when its label says (%).
 
 ### Changed
 - **Table IA.VIII says what the paper prints.** The signal dictionary

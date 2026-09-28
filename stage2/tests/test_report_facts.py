@@ -101,3 +101,20 @@ def test_an_unfilled_number_is_refused_not_printed(tmp_path, monkeypatch):
     assert "@@" not in doc
     assert "runs from 21 to 25 sessions" in doc
     assert "approximately 1.68" not in doc            # the typed number is gone
+
+
+def test_monthly_rows_in_percent_say_so():
+    """The descriptive-statistics tables scale a row to percent exactly when its label says
+    (%). The latent implementation bias printed as a decimal beside returns in percent."""
+    import ast
+    tree = ast.parse((STAGE2 / "_build_data_report.py").read_text(encoding="utf-8"))
+    found = {}
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Assign) and len(node.targets) == 1
+                and isinstance(node.targets[0], ast.Name)
+                and node.targets[0].id in ("stat_vars", "scale_vars")):
+            found[node.targets[0].id] = ast.literal_eval(node.value)
+    stat_vars, scale_vars = found["stat_vars"], found["scale_vars"]
+    assert scale_vars.get("lib") == 100
+    for v, label in stat_vars:
+        assert (scale_vars.get(v, 1) == 100) == label.endswith("(%)"), (v, label)

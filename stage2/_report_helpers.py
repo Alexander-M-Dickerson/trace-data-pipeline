@@ -2566,9 +2566,10 @@ def make_descriptive_stats_table_by_rating(
         r"Panel A shows statistics pooled across all cusip-month observations. "
         r"Panel B shows time-series averages of monthly cross-sectional statistics. "
         r"The sample spans the period " + min_date + r" to " + max_date + r". "
-        r"All prices are in percentage of par. "
-        r"Yield to maturity, spread, and returns are in percentage points. "
-        r"Duration, bond maturity and age are in years. "
+        r"Rows marked (\%) are in percent; prices are in percent of par. "
+        r"Holding periods, the implementation gap and the signal gap are counts of NYSE "
+        r"trading sessions. Duration, bond maturity and age are in years; market "
+        r"capitalization is in \$ millions. "
         r"Ratings are in numeric format (AAA = 1, ..., D = 22)."
     )
 

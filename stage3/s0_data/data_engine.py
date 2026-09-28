@@ -65,7 +65,7 @@ MONTHLY_AVAIL_VARS = [
 MONTHLY_STAT_VARS = [
     ("ret_vw", "Total End Return (%)"), ("ret_vw_bgn", "Total Begin Return (%)"),
     ("ret_vwx", "Dur. Adj. End Return (%)"), ("ret_vwx_bgn", "Dur. Adj. Begin Return (%)"),
-    ("lib", "Latent Imp. Bias"), ("hprd", "End Holding Period"),
+    ("lib", "Latent Imp. Bias (%)"), ("hprd", "End Holding Period"),
     ("hprd_bgn", "Begin Holding Period"), ("igap_bgn", "Implementation Gap"),
     ("sig_gap", "Signal Gap"), ("pr", "Price (VW)"), ("ytm", "YTM (%)"),
     ("cs", "Spread (%)"), ("mod_dur", "Duration (Modified)"),
@@ -74,7 +74,7 @@ MONTHLY_STAT_VARS = [
     ("mdc_rat", "Composite Rating (MD)"), ("spd_rel", "Bid-Ask Spread (%)"),
 ]
 MONTHLY_SCALE = {"ret_vw": 100, "ret_vw_bgn": 100, "ret_vwx": 100,
-                 "ret_vwx_bgn": 100, "ytm": 100, "cs": 100, "spd_rel": 100}
+                 "ret_vwx_bgn": 100, "lib": 100, "ytm": 100, "cs": 100, "spd_rel": 100}
 STAT_COLS = ["Mean", "Median", "SD", "P1", "P5", "P95", "P99"]
 
 RATING_BUCKETS = ["All", "IG", "NIG", "Def"]

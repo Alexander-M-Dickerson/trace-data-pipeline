@@ -1,8 +1,9 @@
-"""test_exhibit_fixes.py -- three defects a cold read of the revised paper found (2026-09-28).
+"""test_exhibit_fixes.py -- four defects a cold read of the revised paper found (2026-09-28).
 
   * the LAB sample span comes from the months that hold data, not the frame's empty first row;
   * Figures IA.5 and IA.6 draw each baseline mark on the boxes' sign, so it lies inside its box;
-  * Tables IA.V and IA.VI count extreme returns the same way at every sample size.
+  * Tables IA.V and IA.VI count extreme returns the same way at every sample size;
+  * Table IA.IV prints every return in percent, the latent implementation bias included.
 
     python -m pytest tests/test_exhibit_fixes.py -q
 """
@@ -55,3 +56,13 @@ def test_extreme_counts_do_not_depend_on_sample_size():
     assert counts.loc["<20", "End_All"] == counts.loc["<20", "End_IG"] + counts.loc["<20", "End_NIG"]
     per_year = DE.time_concentration(df)
     assert int(per_year["End_neg_20"].sum()) == int(counts.loc["<20", "End_All"])
+
+
+def test_monthly_rows_in_percent_say_so():
+    """Table IA.IV printed the latent implementation bias as a decimal (SD 0.02) beside
+    returns in percent (SD 4.88), so its mean and median read 0.00. A row is scaled to
+    percent exactly when its label says (%)."""
+    import data_engine as DE
+    assert DE.MONTHLY_SCALE.get("lib") == 100
+    for v, label in DE.MONTHLY_STAT_VARS:
+        assert (DE.MONTHLY_SCALE.get(v, 1) == 100) == label.endswith("(%)"), (v, label)

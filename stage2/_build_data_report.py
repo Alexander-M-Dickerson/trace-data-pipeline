@@ -213,7 +213,7 @@ def build_report(mode: str, report_dir: Path, external: bool, make_pdf: bool,
         ("ret_vw_bgn", "Total Begin Return (%)"),
         ("ret_vwx", "Dur. Adj. End Return (%)"),
         ("ret_vwx_bgn", "Dur. Adj. Begin Return (%)"),
-        ("lib", "Latent Imp. Bias"),
+        ("lib", "Latent Imp. Bias (%)"),
         ("hprd", "End Holding Period"),
         ("hprd_bgn", "Begin Holding Period"),
         ("igap_bgn", "Implementation Gap"),
@@ -233,7 +233,7 @@ def build_report(mode: str, report_dir: Path, external: bool, make_pdf: bool,
     ]
     scale_vars = {
         "ret_vw": 100, "ret_vw_bgn": 100,
-        "ret_vwx": 100, "ret_vwx_bgn": 100,
+        "ret_vwx": 100, "ret_vwx_bgn": 100, "lib": 100,
         "ytm": 100, "cs": 100,
         "spd_rel": 100,
     }
