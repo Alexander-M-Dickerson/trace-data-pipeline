@@ -9,17 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **Stage 3 draws every figure in two looks** (`stage3/figstyle.py`, `--style
-  paper|house|both`; the runner draws both).
-  - `paper` (the default, `reports/figures/`) restores the published figures' look, which
-    stage 3 had not reproduced. That means the serif type and the paper's colours for every
-    figure, plus the features individual figures had:
+  house|submitted|both`; the runner draws both).
+  - `house` (the default, `reports/figures/`) is the paper's look from the 2026 revision on:
+    the production-paper style of the bond_schedule project, maroon, blue and charcoal,
+    legends outside the data. Its nine cluster colours (Figures IA.3 to IA.6) are kept apart
+    by a test: the palette's teal and green, which the eye reads as one colour, are not both
+    used.
+  - `submitted` (`reports/figures/submitted/`) restores the look of the figures in the paper
+    as first submitted, which stage 3 had not reproduced. That means the serif type and the
+    submitted colours for every figure, plus the features individual figures had:
     - the cluster colours, the cluster legend and the baseline mark in Figures IA.3 to IA.6;
     - the threshold shading in Figure 6;
     - the coloured end values in Figures 3 and 8.
-  - `house` (`reports/figures/house/`) is the production-paper style of the bond_schedule
-    project: maroon, blue and charcoal, legends outside the data. Its nine cluster colours
-    (Figures IA.3 to IA.6) are kept apart by a test: the palette's teal and green, which the
-    eye reads as one colour, are not both used.
 - Every time-series figure shades the NBER recessions (the Great Recession and COVID-19), from
   one definition, `recessions.py` at the repository root: stage 3's Figures 3, 7A, 7B and 8,
   and the five time-series figures of the stage 2 data report, whose captions now say so.

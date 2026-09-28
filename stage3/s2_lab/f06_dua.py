@@ -19,7 +19,7 @@ that breaks it rather than leaving the reader to squint at a whisker.
 Unlike the rest of Section 4, this runs its own small sweep: momentum at a SIX-month
 holding period is not one of the 108 signals, so no stored grid covers it.
 
-    python s2_lab/f06_dua.py [--style paper|house|both] [--from-cells]
+    python s2_lab/f06_dua.py [--style house|submitted|both] [--from-cells]
 """
 from __future__ import annotations
 
@@ -127,11 +127,11 @@ def build_figure(panels: dict, out_pdf: Path, st) -> None:
             df = panels[title]
             x = np.arange(len(df))
             # the bars shade from the tightest threshold (dark) to the loosest (light)
-            paper = st.name == "paper"
-            ax.bar(x, df["alpha"], yerr=1.96 * df["se"], capsize=(3 if paper else 2.2),
-                   color=list(st.ramp[:len(df)]), alpha=(0.85 if paper else 1.0),
+            submitted = st.name == "submitted"
+            ax.bar(x, df["alpha"], yerr=1.96 * df["se"], capsize=(3 if submitted else 2.2),
+                   color=list(st.ramp[:len(df)]), alpha=(0.85 if submitted else 1.0),
                    edgecolor=st.c("bar_edge"), linewidth=0.5,
-                   error_kw=dict(ecolor=st.c("whisker"), elinewidth=(1.0 if paper else 0.7)))
+                   error_kw=dict(ecolor=st.c("whisker"), elinewidth=(1.0 if submitted else 0.7)))
             labels = ([f"<-{p}%" for p in TRIM_PCTS] if location == "left"
                       else [f">{p}%" for p in TRIM_PCTS])[:len(df)]
             ax.set_xticks(x)
@@ -141,7 +141,7 @@ def build_figure(panels: dict, out_pdf: Path, st) -> None:
             st.grid(ax)
             st.panel(ax, title[1], title[4:])
             ax.set_ylabel(r"Alpha ($\alpha$, % monthly)")
-        # no title line in either style: the paper cropped the old one away (trim=35pt), so the
+        # no title line in either look: the submitted paper cropped the old one away, so the
         # caption names the figure
         fig.tight_layout()
         figstyle.save(fig, out_pdf, dpi=150, bbox_inches="tight")

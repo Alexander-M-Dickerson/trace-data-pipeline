@@ -18,9 +18,9 @@ figure that disagrees with its own table is the failure worth catching, and the 
 itself cannot show you that it has happened.
 
 The data is computed once and drawn in each look `--style` asks for (figstyle.py): the
-paper's (the default) or the house style. Figure 3 shades the NBER recessions.
+house look (the default, the paper's) or the submitted look. Figure 3 shades the NBER recessions.
 
-    python s1_lib/f_lib_figures.py [--style paper|house|both]
+    python s1_lib/f_lib_figures.py [--style house|submitted|both]
 """
 from __future__ import annotations
 
@@ -113,7 +113,7 @@ def build_fig3(data: dict, out_pdf: Path, st) -> None:
             figstyle.dollar_axes(ax, cum, [finals[key][c] for c, *_ in FIG3_SERIES],
                                  [st.c(role) for _, _, role, _ in FIG3_SERIES], st)
         h, lab = axes[0, 0].get_legend_handles_labels()
-        if st.name == "paper":
+        if st.name == "submitted":
             st.add_legend(axes[0, 0], h, lab, loc="upper left", fontsize=8)
             fig.text(0.02, 0.5, "Dollar Value", va="center", rotation="vertical", fontsize=12)
             fig.tight_layout(rect=(0.03, 0, 1, 1))
@@ -173,8 +173,8 @@ def check_fig4(data: dict, root: Path | None = None) -> dict:
 
 def bias_bars(ax, x, df, st, capsize: float) -> None:
     """The two biases side by side with 1.96 x Newey-West whiskers (Figures 4 A-B and IA.1)."""
-    alpha = 0.8 if st.name == "paper" else 1.0
-    err = dict(ecolor=st.c("whisker"), elinewidth=(1.0 if st.name == "paper" else 0.7))
+    alpha = 0.8 if st.name == "submitted" else 1.0
+    err = dict(ecolor=st.c("whisker"), elinewidth=(1.0 if st.name == "submitted" else 0.7))
     ax.bar(x - 0.175, df["bias_1_2"], 0.35, yerr=1.96 * df["se_1_2"], capsize=capsize,
            label=r"Bias (1)$-$(2): Signal Adj.", color=st.c("bias12"), alpha=alpha, error_kw=err)
     ax.bar(x + 0.175, df["bias_1_3"], 0.35, yerr=1.96 * df["se_1_3"], capsize=capsize,
@@ -187,7 +187,7 @@ def build_fig4(data: dict, out_pdf: Path, st) -> None:
     with figstyle.use(st) as plt:
         fig, axes = plt.subplots(2, 2, figsize=st.size(12, 9))
         # the house panels are narrower: val_ipr and val_hz would run together unrotated
-        ticks = {"fontsize": 10} if st.name == "paper" else {"rotation": 30, "ha": "right"}
+        ticks = {"fontsize": 10} if st.name == "submitted" else {"rotation": 30, "ha": "right"}
         for j, (sort, title) in enumerate([("single", "Single-Sort"), ("wf", "Within-Firm Sort")]):
             df = data[sort]
             x = np.arange(len(df))
@@ -198,7 +198,7 @@ def build_fig4(data: dict, out_pdf: Path, st) -> None:
             ax.set_xticks(x, names, **ticks)
             st.panel(ax, "AB"[j], title)
             ax = axes[1, j]
-            alpha = 0.9 if st.name == "paper" else 1.0
+            alpha = 0.9 if st.name == "submitted" else 1.0
             ax.bar(x, df["lib_pct"], 0.6, label="LIB", color=st.c("lib_bar"), alpha=alpha)
             # Referee 1 (round 2, point B): the implementable part is the ADJUSTED return
             ax.bar(x, df["actual_pct"], 0.6, bottom=df["lib_pct"], label="Adjusted Return",

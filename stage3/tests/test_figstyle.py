@@ -50,7 +50,7 @@ def test_every_figure_is_saved_through_figstyle(rel):
     assert "fig.savefig(" not in src and "figstyle.save(" in src
 
 
-@pytest.mark.parametrize("look", ["paper", "house"])
+@pytest.mark.parametrize("look", ["house", "submitted"])
 def test_no_legend_hides_data(look):
     """The published Figure IA.1(B) hid its tallest bar under the legend; now the panel grows."""
     st = figstyle.BY_NAME[look]
@@ -82,9 +82,9 @@ def test_recessions_are_the_papers():
 
 def test_styles_have_the_same_roles():
     """A role the paper style knows and the house style does not would fail only at draw time."""
-    assert set(figstyle.PAPER.colours) == set(figstyle.HOUSE.colours)
-    assert len(figstyle.PAPER.clusters) == len(figstyle.HOUSE.clusters) == 9
-    assert len(figstyle.PAPER.ramp) == len(figstyle.HOUSE.ramp) == 9
+    assert set(figstyle.SUBMITTED.colours) == set(figstyle.HOUSE.colours)
+    assert len(figstyle.SUBMITTED.clusters) == len(figstyle.HOUSE.clusters) == 9
+    assert len(figstyle.SUBMITTED.ramp) == len(figstyle.HOUSE.ramp) == 9
 
 
 def test_house_colours_are_bond_schedules():
@@ -115,9 +115,9 @@ def test_house_clusters_can_be_told_apart():
 
 
 def test_out_paths(tmp_path):
-    assert figstyle.out_path(tmp_path, "f.pdf", figstyle.PAPER) == tmp_path / "f.pdf"
-    assert figstyle.out_path(tmp_path, "f.pdf", figstyle.HOUSE) == tmp_path / "house" / "f.pdf"
-    assert [s.name for s in figstyle.styles("both")] == ["paper", "house"]
+    assert figstyle.out_path(tmp_path, "f.pdf", figstyle.HOUSE) == tmp_path / "f.pdf"
+    assert figstyle.out_path(tmp_path, "f.pdf", figstyle.SUBMITTED) == tmp_path / "submitted" / "f.pdf"
+    assert [s.name for s in figstyle.styles("both")] == ["house", "submitted"]
     with pytest.raises(SystemExit):
         figstyle.styles("ft")
 
@@ -132,7 +132,7 @@ def _fig4_data() -> dict:
     return {"single": frame, "wf": frame.copy()}
 
 
-@pytest.mark.parametrize("look", ["paper", "house"])
+@pytest.mark.parametrize("look", ["house", "submitted"])
 def test_each_driver_draws_in_both_looks(tmp_path, look):
     import f06_dua
     import f_lib_figures as L

@@ -43,8 +43,8 @@ Compiling is what catches it.
 | `data/grids/` | the two uncertainty grids, one parquet per signal |
 | `data/<section>/` | the tidy statistics frames the exhibits format, plus a manifest per result |
 | `reports/tables/` | the paper's tables, as LaTeX fragments |
-| `reports/figures/` | the paper's figures, as PDF |
-| `reports/figures/house/` | the same figures in the house style (see *Two looks for every figure*, below) |
+| `reports/figures/` | the paper's figures, as PDF, in the house look |
+| `reports/figures/submitted/` | the same figures in the look of the paper as first submitted (see *Two looks for every figure*, below) |
 | **`reports/exhibits.pdf`** | **all 44 of them compiled into one document**, in the paper's order and under the paper's exhibit numbers, with a provenance page |
 | `reports/timings.jsonl` | one line per step: phases, wall clock, and the step's own check |
 
@@ -164,12 +164,13 @@ was printed and why it changed. `RECONCILIATION_ia08.md` has the full account, a
 Every figure driver draws its data once and renders it in each look `--style` asks for
 (`stage3/figstyle.py`); the runner asks for `both`.
 
-- **`paper`**, the default, is the published paper's look. It uses serif type, the blue
+- **`house`**, the default, is the paper's look since the 2026 revision: the
+  production-paper style of our bond_schedule project. It uses Arial, charcoal axes without
+  top or right spines, maroon, blue and charcoal, one legend outside the data and no title
+  in the image, and writes to `reports/figures/`.
+- **`submitted`** is the look of the paper as first submitted. It uses serif type, the blue
   scale for the three approaches, orange for the latent implementation bias, italic factor
-  names and framed legends, and writes to `reports/figures/`.
-- **`house`** is the production-paper style of our bond_schedule project. It uses Arial,
-  charcoal axes without top or right spines, maroon, blue and charcoal, one legend outside
-  the data and no title in the image, and writes to `reports/figures/house/`.
+  names and framed legends, and writes to `reports/figures/submitted/`.
 
 A look never computes: the identity checks run once, on the data both looks draw.
 Every figure whose x-axis is time shades the NBER recessions, the Great Recession

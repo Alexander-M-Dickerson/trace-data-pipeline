@@ -23,7 +23,7 @@ The data is computed once and drawn in each look `--style` asks for (figstyle.py
 Figures 7 (Panels A-B) and 8 shade the NBER recessions.
 
     python s2_lab/run_lab.py        # produce the series
-    python s2_lab/f_lab_figures.py [--style paper|house|both]
+    python s2_lab/f_lab_figures.py [--style house|submitted|both]
 """
 from __future__ import annotations
 
@@ -102,7 +102,7 @@ def build_fig7(source: dict, vix: pd.Series, out_pdf: Path, st) -> None:
                                          ["-", "--", ":"]):
                 s = src[sig] * sg * 100
                 ax.plot(s.index, s.values, color=st.c(role), lw=1.2, ls=ls,
-                        label=st.factor(sig), alpha=(0.9 if st.name == "paper" else 1.0))
+                        label=st.factor(sig), alpha=(0.9 if st.name == "submitted" else 1.0))
             ax.axhline(0, color=st.c("zero"), lw=0.5)
             st.grid(ax)
             st.panel(ax, letter, title)
@@ -116,21 +116,21 @@ def build_fig7(source: dict, vix: pd.Series, out_pdf: Path, st) -> None:
             src = left if tail == "left" else right
             df = pd.DataFrame({"lab": src[sig] * 100, "vix": vix}).dropna()
             X, y = df["vix"].to_numpy(float), df["lab"].to_numpy(float)
-            ax.scatter(X, y, alpha=0.4, s=(15 if st.name == "paper" else 8), color=st.c("scatter"),
+            ax.scatter(X, y, alpha=0.4, s=(15 if st.name == "submitted" else 8), color=st.c("scatter"),
                        lw=0)
             model = sm.OLS(y, np.column_stack([np.ones_like(X), X, X ** 2])).fit()
             xl = np.linspace(X.min(), X.max(), 100)
             ax.plot(xl, model.params[0] + model.params[1] * xl + model.params[2] * xl ** 2,
-                    color=st.c("fit"), lw=(2 if st.name == "paper" else 1.3))
-            box = (dict(boxstyle="round", facecolor="white", alpha=0.8) if st.name == "paper"
+                    color=st.c("fit"), lw=(2 if st.name == "submitted" else 1.3))
+            box = (dict(boxstyle="round", facecolor="white", alpha=0.8) if st.name == "submitted"
                    else None)
-            # the paper's note sits top right in a white box; unboxed, the house note would sit
+            # the submitted note sits top right in a white box; unboxed, the house note would sit
             # on the outlying points there, so it goes top left, where low VIX leaves no data
-            corner = (0.95, "right") if st.name == "paper" else (0.05, "left")
+            corner = (0.95, "right") if st.name == "submitted" else (0.05, "left")
             ax.text(corner[0], 0.95,
                     f"$R^2$ = {model.rsquared:.3f}\n$\\rho$ = {np.corrcoef(y, X)[0, 1]:.3f}",
                     transform=ax.transAxes, va="top", ha=corner[1],
-                    fontsize=(9 if st.name == "paper" else 7), bbox=box)
+                    fontsize=(9 if st.name == "submitted" else 7), bbox=box)
             ax.axhline(0, color=st.c("zero"), lw=0.5)
             st.grid(ax)
             st.panel(ax, panel, f"LAB({st.factor(sig)}) vs VIX")
@@ -181,7 +181,7 @@ def build_fig8(data: dict, out_pdf: Path, st) -> None:
             figstyle.dollar_axes(ax, cum, [d["finals"][c] for c, *_ in FIG8_SERIES],
                                  [st.c(role) for _, _, role, _ in FIG8_SERIES], st)
         h, lab = axes[0, 0].get_legend_handles_labels()
-        if st.name == "paper":
+        if st.name == "submitted":
             st.add_legend(axes[0, 0], h, lab, loc="upper left", fontsize=8)
             fig.text(0.02, 0.5, "Dollar Value", va="center", rotation="vertical", fontsize=12)
             fig.tight_layout(rect=(0.03, 0, 1, 1))
@@ -244,7 +244,7 @@ def build_ia2(data: dict, out_pdf: Path, st) -> None:
         fig = plt.figure(figsize=st.size(12, 8))
         # the house style's panel legends sit above each panel, so the rows need more room
         gs = fig.add_gridspec(2, 2, height_ratios=[1, 1],
-                              hspace=(0.3 if st.name == "paper" else 0.7), wspace=0.25)
+                              hspace=(0.3 if st.name == "submitted" else 0.7), wspace=0.25)
         ax_a, ax_b = fig.add_subplot(gs[0, 0]), fig.add_subplot(gs[0, 1])
         ax_c = fig.add_subplot(gs[1, :])
         width = 0.35
@@ -279,7 +279,7 @@ def build_ia2(data: dict, out_pdf: Path, st) -> None:
         h, lab = ax_c.get_legend_handles_labels()
         # the legs and the ratings are different things: each panel keeps its own legend
         st.panel_legend(ax_c, h, lab, loc="upper right")
-        if st.name == "paper":
+        if st.name == "submitted":
             fig.tight_layout()
         figstyle.save(fig, out_pdf, dpi=150, bbox_inches="tight")
         plt.close(fig)

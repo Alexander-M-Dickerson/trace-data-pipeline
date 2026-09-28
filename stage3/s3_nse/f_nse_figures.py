@@ -88,40 +88,40 @@ def render(sel, order: list[str], baseline_vals, out_pdf: Path, xlabel: str, st)
     import figstyle
     from matplotlib.lines import Line2D
 
-    paper = st.name == "paper"
+    submitted = st.name == "submitted"
     df = sel.set_index("signal").loc[order].reset_index().iloc[::-1].reset_index(drop=True)
     ink = st.c("ink")
     with figstyle.use(st) as plt:
-        fig, ax = plt.subplots(figsize=((10, 14) if paper else (6.5, 7.2)))
+        fig, ax = plt.subplots(figsize=((10, 14) if submitted else (6.5, 7.2)))
         h = 0.6
         drawn_baseline = False
         for i, row in df.iterrows():
             colour = st.clusters[int(row["group"]) - 1]
             ax.add_patch(plt.Rectangle((row["q25"], i - h / 2), row["q75"] - row["q25"], h,
                                        facecolor=colour, edgecolor=ink, linewidth=0.5))
-            ax.vlines(row["median"], i - h / 2, i + h / 2, color=ink, linewidth=(1.5 if paper else 1.1))
+            ax.vlines(row["median"], i - h / 2, i + h / 2, color=ink, linewidth=(1.5 if submitted else 1.1))
             if baseline_vals and row["signal"] in baseline_vals:
                 ax.vlines(baseline_vals[row["signal"]], i - h / 2, i + h / 2,
-                          color=st.c("baseline"), linewidth=(1.5 if paper else 1.3))
+                          color=st.c("baseline"), linewidth=(1.5 if submitted else 1.3))
                 drawn_baseline = True
-            lw = 0.8 if paper else 0.7
+            lw = 0.8 if submitted else 0.7
             ax.hlines(i, row["min"], row["q25"], color=ink, linewidth=lw)
             ax.hlines(i, row["q75"], row["max"], color=ink, linewidth=lw)
             for end in (row["min"], row["max"]):
                 ax.vlines(end, i - h / 4, i + h / 4, color=ink, linewidth=lw)
         ax.set_yticks(range(len(df)))
-        ax.set_yticklabels(list(df["signal"]), fontsize=(9 if paper else 6.5),
-                           style=("italic" if paper else "normal"))
+        ax.set_yticklabels(list(df["signal"]), fontsize=(9 if submitted else 6.5),
+                           style=("italic" if submitted else "normal"))
         ax.axvline(0, color=st.c("zero"), linewidth=0.5)
-        ax.axvline(1.96, color=st.c("threshold"), linewidth=(1.0 if paper else 0.8),
-                   linestyle="--", alpha=(0.7 if paper else 1.0))
+        ax.axvline(1.96, color=st.c("threshold"), linewidth=(1.0 if submitted else 0.8),
+                   linestyle="--", alpha=(0.7 if submitted else 1.0))
         ax.set_xlabel(xlabel)
         lo = min(float(df["min"].min()), 0.0) - 0.2
         hi = max(float(df["max"].max()), 1.96) + 0.2
         ax.set_xlim(lo, hi)
         ax.set_ylim(-0.5, len(df) - 0.5)
-        st.grid(ax, axis=("both" if paper else "x"))
-        if not paper:
+        st.grid(ax, axis=("both" if submitted else "x"))
+        if not submitted:
             ax.tick_params(axis="y", length=0)
         ax.set_axisbelow(True)
         # the clusters' colours, and the baseline mark, in a legend under the plot
@@ -132,11 +132,11 @@ def render(sel, order: list[str], baseline_vals, out_pdf: Path, xlabel: str, st)
             handles.append(Line2D([0], [0], color=st.c("baseline"), linewidth=1.5))
             labels.append("Baseline")
         ax.legend(handles=handles, labels=labels, loc="upper center",
-                  bbox_to_anchor=(0.5, (-0.04 if paper else -0.07)),
-                  ncol=(4 if drawn_baseline else 3) if paper else 4, fontsize=(8 if paper else 6.5),
+                  bbox_to_anchor=(0.5, (-0.04 if submitted else -0.07)),
+                  ncol=(4 if drawn_baseline else 3) if submitted else 4, fontsize=(8 if submitted else 6.5),
                   columnspacing=1.0, handletextpad=0.5, **st.legend)
         fig.tight_layout()
-        fig.subplots_adjust(bottom=(0.12 if paper else 0.16))
+        fig.subplots_adjust(bottom=(0.12 if submitted else 0.16))
         out_pdf.parent.mkdir(parents=True, exist_ok=True)
         figstyle.save(fig, out_pdf, dpi=150, bbox_inches="tight")
         plt.close(fig)

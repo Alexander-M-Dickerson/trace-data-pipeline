@@ -1,19 +1,19 @@
 r"""figstyle.py -- the two looks every stage 3 figure can be drawn in.
 
-  paper   the look of the published paper's figures: serif type, the blue scale for the three
-          approaches, orange for the latent implementation bias, framed legends, italic factor
-          names, "(A) ..." panel titles. The default.
-  house   the production-paper figure style of our bond_schedule project: Arial 8.5pt,
-          charcoal axes without top or right spines, maroon #990F3D / blue #0F5499 /
-          charcoal #262A33 with their light tints, the same family's FT palette where a
-          figure needs more categories, "Panel A. ..." titles set left, and no title inside
-          the image.
+  house      the paper's look, and the default: the production-paper figure style of our
+             bond_schedule project. Arial 8.5pt, charcoal axes without top or right spines,
+             maroon #990F3D / blue #0F5499 / charcoal #262A33 with their light tints, the same
+             family's FT palette where a figure needs more categories, "Panel A. ..." titles
+             set left, and no title inside the image.
+  submitted  the look of the figures in the paper as first submitted: serif type, the blue
+             scale for the three approaches, orange for the latent implementation bias, framed
+             legends, italic factor names, "(A) ..." panel titles.
 
-A driver computes its data once and draws it in each style asked for (`--style paper|house|
-both`); a style never computes. The paper style writes to reports/figures/<stem>.pdf, the
-house style to reports/figures/house/<stem>.pdf.
+A driver computes its data once and draws it in each look asked for (`--style house|submitted|
+both`); a look never computes. The house look writes to reports/figures/<stem>.pdf, the
+submitted look to reports/figures/submitted/<stem>.pdf.
 
-Every figure whose x-axis is time shades the NBER recessions it spans, in both styles, from
+Every figure whose x-axis is time shades the NBER recessions it spans, in both looks, from
 the one definition the whole pipeline uses (recessions.py at the repository root; stage 2's
 data report reads it too): the Great Recession and COVID-19, peak month to trough month.
 """
@@ -29,7 +29,7 @@ if str(Path(__file__).resolve().parents[1]) not in sys.path:
     sys.path.append(str(Path(__file__).resolve().parents[1]))
 import recessions as _recessions  # noqa: E402
 
-STYLES = ("paper", "house")
+STYLES = ("house", "submitted")
 
 # the NBER recessions inside the sample, as the paper's captions state them (recessions.py)
 NBER = _recessions.NBER
@@ -73,20 +73,20 @@ class Style:
 
     # ---- text
     def panel(self, ax, letter: str, text: str) -> None:
-        if self.name == "paper":
+        if self.name == "submitted":
             ax.set_title(f"({letter}) {text}")
         else:
             ax.set_title(f"Panel {letter}. {text}", loc="left")
 
     def factor(self, name: str) -> str:
-        """A factor mnemonic as a label: italic in the paper style, plain in the house style."""
-        if self.name == "paper":
+        """A factor mnemonic as a label: italic in the submitted look, plain in the house look."""
+        if self.name == "submitted":
             return "$\\mathit{" + name.replace("_", "\\_") + "}$"
         return name
 
     def suptitle(self, fig, text: str, **kw) -> None:
-        """The paper style kept a few figure titles; the house style puts none in the image."""
-        if self.name == "paper":
+        """The submitted look kept a few figure titles; the house look puts none in the image."""
+        if self.name == "submitted":
             fig.suptitle(text, **kw)
 
     # ---- marks
@@ -99,12 +99,12 @@ class Style:
     def legends(self, fig, per_axes: list, ncol: int | None = None) -> None:
         """Place a figure's legends, then lay it out.
 
-        paper  each legend where the published figure had it: `per_axes` holds
+        submitted  each legend where the submitted figure had it: `per_axes` holds
                (ax, handles, labels, keyword arguments), in order.
         house  one legend for the whole figure, above the panels and outside them (the
                bond_schedule convention: nothing drawn over the data), every entry once.
         """
-        if self.name == "paper":
+        if self.name == "submitted":
             for ax, handles, labels, kw in per_axes:
                 self.add_legend(ax, handles, labels, **kw)
             fig.tight_layout()
@@ -119,9 +119,9 @@ class Style:
 
     def panel_legend(self, ax, handles, labels, loc: str = "upper left", **kw) -> None:
         """A legend that belongs to one panel (its entries differ from the next panel's).
-        paper  inside the panel, where the published figure had it
+        submitted  inside the panel, where the submitted figure had it
         house  above the panel, under its title, so it never covers the data"""
-        if self.name == "paper":
+        if self.name == "submitted":
             self.add_legend(ax, handles, labels, loc=loc, **kw)
             return
         ax.set_title(ax.get_title(loc="left"), loc="left", pad=15)
@@ -135,14 +135,14 @@ class Style:
         _recessions.shade(ax, dates, **self.recession)
 
     def size(self, w: float, h: float) -> tuple[float, float]:
-        """The figure size: the figure's own in the paper style; the house style's fixed width,
+        """The figure size: the figure's own in the submitted look; the house look's fixed width,
         at the same aspect ratio."""
         if self.width is None:
             return (w, h)
         return (self.width, self.width * h / w)
 
     def grid(self, ax, axis: str = "y") -> None:
-        if self.name == "paper":
+        if self.name == "submitted":
             ax.grid(True, alpha=0.25, lw=0.6, axis=axis)
         else:
             ax.set_axisbelow(True)
@@ -154,9 +154,9 @@ def _font() -> str:
     return "Arial" if "Arial" in {f.name for f in fm.fontManager.ttflist} else "DejaVu Sans"
 
 
-PAPER = Style(
-    name="paper",
-    # the published figures' PlotParams: serif, 10 / 10 / 9 / 9, no LaTeX
+SUBMITTED = Style(
+    name="submitted",
+    # the submitted paper's figures' PlotParams: serif, 10 / 10 / 9 / 9, no LaTeX
     rc={"text.usetex": False, "font.family": "serif", "font.size": 10, "axes.titlesize": 10,
         "axes.labelsize": 10, "xtick.labelsize": 9, "ytick.labelsize": 9, "legend.fontsize": 9,
         "figure.dpi": 150},
@@ -226,21 +226,21 @@ HOUSE = Style(
     recession={"color": RECESSION_GREY},
 )
 
-BY_NAME = {"paper": PAPER, "house": HOUSE}
+BY_NAME = {"house": HOUSE, "submitted": SUBMITTED}
 
 
 def styles(arg: str) -> list[Style]:
     """The styles a `--style` argument asks for."""
     if arg == "both":
-        return [PAPER, HOUSE]
+        return [HOUSE, SUBMITTED]
     if arg not in BY_NAME:
-        raise SystemExit(f"--style must be paper, house or both, not {arg!r}")
+        raise SystemExit(f"--style must be house, submitted or both, not {arg!r}")
     return [BY_NAME[arg]]
 
 
 def add_argument(ap) -> None:
-    ap.add_argument("--style", default="paper", choices=("paper", "house", "both"),
-                    help="the look to draw the figures in (default: the paper's)")
+    ap.add_argument("--style", default="house", choices=("house", "submitted", "both"),
+                    help="the look to draw the figures in (default: house, the paper's)")
 
 
 @contextlib.contextmanager
@@ -286,7 +286,7 @@ def _covered(ax, box, pad: float) -> bool:
 def clear_legends(fig, pad: float = 8.0, step: float = 0.04, most: int = 25) -> list:
     """Raise the top of each panel whose legend sits on its data until nothing is covered.
 
-    The published figures let a legend hide the tallest bar (Figures IA.1(B), IA.2(B) and (C))
+    The submitted figures let a legend hide the tallest bar (Figures IA.1(B), IA.2(B) and (C))
     or the top of a stacked bar (Figure 4(D)). Only the panel's upper limit moves, in steps of
     `step` of its span on the axis's own scale (log panels stay log), until the data sits
     `pad` pixels clear of the legend; a legend outside the panel covers nothing and is left
@@ -323,9 +323,9 @@ def save(fig, out_pdf: Path, **kw) -> None:
 
 
 def out_path(fig_dir: Path, name: str, style: Style) -> Path:
-    """reports/figures/<name> for the paper style, reports/figures/house/<name> for the house
-    style (created)."""
-    d = fig_dir if style.name == "paper" else fig_dir / "house"
+    """reports/figures/<name> for the house look (the paper's), reports/figures/submitted/<name>
+    for the submitted look (created)."""
+    d = fig_dir if style.name == "house" else fig_dir / "submitted"
     d.mkdir(parents=True, exist_ok=True)
     return d / name
 
@@ -360,7 +360,7 @@ def end_labels(ax, finals: list[float], colours: list[str], st) -> None:
     on top of each other are spread apart on the log scale (the label moves; the value it
     states does not)."""
     lo, hi = (np.log(v) for v in ax.get_ylim())
-    gap = (0.06 if st.name == "paper" else 0.085) * (hi - lo)   # a label's height, about
+    gap = (0.06 if st.name == "submitted" else 0.085) * (hi - lo)   # a label's height, about
     order = sorted(range(len(finals)), key=lambda i: finals[i])
     placed: dict[int, float] = {}
     last = -np.inf
@@ -374,7 +374,7 @@ def end_labels(ax, finals: list[float], colours: list[str], st) -> None:
     for i, v in enumerate(finals):
         ax.annotate(fmt_final(v), xy=(1.0, np.exp(placed[i])), xycoords=("axes fraction", "data"),
                     xytext=(4, 0), textcoords="offset points", va="center", ha="left",
-                    color=colours[i], fontsize=(8 if st.name == "paper" else 7),
+                    color=colours[i], fontsize=(8 if st.name == "submitted" else 7),
                     annotation_clip=False)
 
 
