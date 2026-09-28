@@ -531,6 +531,36 @@ def _summaries() -> dict:
     return out
 
 
+def test_table_ia3_counts_the_price_it_prints():
+    """Table IA.III's Price (VW) row counts the month-end price, 100/bbtm.
+
+    The monthly panel has no price column; the resample creates it. Until 4.1.3 that line was
+    missing and the availability count read an absent column as 0, so every release printed
+    0 observations and 100% missing for the price. A variable the table prints and the panel
+    lacks must now stop the run.
+    """
+    import numpy as np
+    import pandas as pd
+
+    from s0_data import data_engine as E
+
+    df = pd.DataFrame({
+        "cusip": ["A", "A", "A", "B", "B"],
+        "date": pd.to_datetime(["2020-01-31", "2020-02-29", "2020-04-30", "2020-01-31",
+                                "2020-02-29"]),
+        "bbtm": [0.8, np.nan, 1.25, 1.0, 1.1],
+        "ret_vw": 0.01, "ret_vw_bgn": 0.01, "ytm": 0.05, "cs": 0.02,
+        "spc_rat": [5, 5, 5, 15, 15], "mdc_rat": 5, "permno": 1})
+    res = E.resample_monthly(df)
+    assert len(res) == 6                                  # A gains 2020-03, the skeleton month
+    assert np.allclose(res["pr"].dropna().sort_values(), sorted([125.0, 80.0, 100.0, 100 / 1.1]))
+    got = E.monthly_availability(res).set_index(["bucket", "variable"])
+    assert got.loc[("All", "Price (VW)"), "observations"] == 4
+    assert got.loc[("IG", "Price (VW)"), "observations"] == 2
+    with pytest.raises(KeyError, match="Price"):
+        E.monthly_availability(res.drop(columns=["pr"]))
+
+
 def test_every_exhibit_records_the_sample_it_used():
     """A caption that cannot say which months produced it is not provenance.
 

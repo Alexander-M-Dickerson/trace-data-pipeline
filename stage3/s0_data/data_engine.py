@@ -248,7 +248,9 @@ def resample_monthly(df: pd.DataFrame) -> pd.DataFrame:
                              "date": pd.PeriodIndex(periods).to_timestamp("M")})
     res = skeleton.merge(out, on=["cusip", "date"], how="left")
     # ❗bbtm is 100/price, so the price is 100/bbtm -- NOT bbtm*100. Created on the
-    # resampled frame, after the month-end pick.
+    # resampled frame, after the month-end pick. The panel carries no price column; without
+    # this line Table IA.III counted a column that did not exist, as 0 (every release to 4.1.2).
+    res["pr"] = 100.0 / res["bbtm"]
     return res
 
 
@@ -261,7 +263,12 @@ def monthly_availability(res: pd.DataFrame) -> pd.DataFrame:
         rows.append({"bucket": bucket, "variable": "Total",
                      "observations": len(sub), "pct_missing": None})
         for v, label in MONTHLY_AVAIL_VARS:
-            nn = int(sub[v].notna().sum()) if v in sub.columns else 0
+            if v not in sub.columns:
+                # A variable the table prints and the panel lacks is an error, never a row of
+                # zeros: that is how Price (VW) printed 0 observations for five releases.
+                raise KeyError(f"Table IA.III counts {v!r} ({label}), which the resampled "
+                               "monthly panel does not carry")
+            nn = int(sub[v].notna().sum())
             pct = (100.0 * (len(sub) - nn) / len(sub)) if len(sub) else 0.0
             rows.append({"bucket": bucket, "variable": label,
                          "observations": nn, "pct_missing": pct})

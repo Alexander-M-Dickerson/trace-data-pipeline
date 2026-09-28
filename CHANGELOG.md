@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Stage 3's Table IA.III printed 0 observations and 100% missing for Price (VW) in every
+  release since stage 3 shipped (3.2.0 to 4.1.2). The monthly panel has no price column; the
+  line that makes it from `bbtm` (100/bbtm) was missing, and the count read the absent column
+  as 0. On the 2026-09-27 run the row is 1,882,802 observations, 32.12% missing. A variable
+  Table IA.III prints and the panel lacks now stops the run instead of counting zero.
+
 ## [4.1.2] - 2026-09-28
 
 **An end-to-end test on a new WRDS run, and what it found.** Nothing a stage computes has
