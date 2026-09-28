@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Figures IA.5 and IA.6 now mark each signal's baseline t-statistic, as Figures IA.3 and IA.4
   already did.
 - End-value labels in Figures 3 and 8 no longer print on top of each other.
+- No legend covers data. A panel whose legend sat on its bars (Figures 4D, IA.1B, IA.2) is
+  drawn taller, with panels that shared a range keeping it; every figure is saved through
+  `figstyle.save`, which checks.
 - Figure 6 has no title line (the paper's layout cropped it). It can be redrawn from its stored
   bars without refitting: `f06_dua.py --from-cells`.
 

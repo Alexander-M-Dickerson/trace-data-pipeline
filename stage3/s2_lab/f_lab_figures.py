@@ -134,7 +134,7 @@ def build_fig7(source: dict, vix: pd.Series, out_pdf: Path, st) -> None:
             ax.set_xlabel("VIX")
             ax.set_ylabel("LAB (%)")
         fig.tight_layout()
-        fig.savefig(out_pdf, dpi=150, bbox_inches="tight")
+        figstyle.save(fig, out_pdf, dpi=150, bbox_inches="tight")
         plt.close(fig)
 
 
@@ -185,7 +185,7 @@ def build_fig8(data: dict, out_pdf: Path, st) -> None:
         else:
             fig.supylabel("Dollar value", fontsize=8.5)
             st.legends(fig, [(axes[0, 0], h, lab, {})])
-        fig.savefig(out_pdf, dpi=150, bbox_inches="tight")
+        figstyle.save(fig, out_pdf, dpi=150, bbox_inches="tight")
         plt.close(fig)
 
 
@@ -278,7 +278,7 @@ def build_ia2(data: dict, out_pdf: Path, st) -> None:
         st.panel_legend(ax_c, h, lab, loc="upper right")
         if st.name == "paper":
             fig.tight_layout()
-        fig.savefig(out_pdf, dpi=150, bbox_inches="tight")
+        figstyle.save(fig, out_pdf, dpi=150, bbox_inches="tight")
         plt.close(fig)
 
 

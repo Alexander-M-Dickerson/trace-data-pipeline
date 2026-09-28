@@ -144,7 +144,7 @@ def build_figure(panels: dict, out_pdf: Path, st) -> None:
         # no title line in either style: the paper cropped the old one away (trim=35pt), so the
         # caption names the figure
         fig.tight_layout()
-        fig.savefig(out_pdf, dpi=150, bbox_inches="tight")
+        figstyle.save(fig, out_pdf, dpi=150, bbox_inches="tight")
         plt.close(fig)
 
 

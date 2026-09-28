@@ -138,7 +138,7 @@ def render(sel, order: list[str], baseline_vals, out_pdf: Path, xlabel: str, st)
         fig.tight_layout()
         fig.subplots_adjust(bottom=(0.12 if paper else 0.16))
         out_pdf.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(out_pdf, dpi=150, bbox_inches="tight")
+        figstyle.save(fig, out_pdf, dpi=150, bbox_inches="tight")
         plt.close(fig)
 
 

@@ -120,7 +120,7 @@ def build_fig3(data: dict, out_pdf: Path, st) -> None:
         else:
             fig.supylabel("Dollar value", fontsize=8.5)
             st.legends(fig, [(axes[0, 0], h, lab, {})])
-        fig.savefig(out_pdf, bbox_inches="tight")
+        figstyle.save(fig, out_pdf, bbox_inches="tight")
         plt.close(fig)
 
 
@@ -213,7 +213,7 @@ def build_fig4(data: dict, out_pdf: Path, st) -> None:
         hd, ld = axes[1, 1].get_legend_handles_labels()
         st.legends(fig, [(axes[0, 1], hb, lb, {"loc": "upper right"}),
                          (axes[1, 1], hd[::-1], ld[::-1], {"loc": "upper right"})])
-        fig.savefig(out_pdf, bbox_inches="tight")
+        figstyle.save(fig, out_pdf, bbox_inches="tight")
         plt.close(fig)
 
 
@@ -270,7 +270,7 @@ def build_figia1(data: dict, out_pdf: Path, st) -> None:
             st.panel(ax, "AB"[j], title)
         h, lab = axes[1].get_legend_handles_labels()
         st.legends(fig, [(axes[1], h, lab, {"loc": "upper right"})])
-        fig.savefig(out_pdf, bbox_inches="tight")
+        figstyle.save(fig, out_pdf, bbox_inches="tight")
         plt.close(fig)
 
 

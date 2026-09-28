@@ -40,6 +40,33 @@ def test_no_driver_types_a_colour(rel):
     assert not hits, "colours typed in a driver:\n" + "\n".join(hits)
 
 
+@pytest.mark.parametrize("rel", DRIVERS)
+def test_every_figure_is_saved_through_figstyle(rel):
+    """figstyle.save clears the legends; a figure saved around it can hide a bar again."""
+    src = (STAGE3 / rel).read_text(encoding="utf-8")
+    assert "fig.savefig(" not in src and "figstyle.save(" in src
+
+
+@pytest.mark.parametrize("look", ["paper", "house"])
+def test_no_legend_hides_data(look):
+    """The published Figure IA.1(B) hid its tallest bar under the legend; now the panel grows."""
+    st = figstyle.BY_NAME[look]
+    with figstyle.use(st) as plt:
+        fig, (ax, calm) = plt.subplots(1, 2, figsize=(8, 3))
+        ax.bar([0, 1, 2], [0.3, 0.3, 1.0], yerr=0.05, label="tall")
+        st.add_legend(ax, loc="upper right")
+        calm.bar([0, 1, 2], [1.0, 0.2, 0.2], label="short")
+        st.add_legend(calm, loc="upper right")
+        fig.tight_layout()
+        before = calm.get_ylim()
+        moved = figstyle.clear_legends(fig)
+        fig.canvas.draw()
+        assert moved == [ax]
+        assert not figstyle._covered(ax, ax.get_legend().get_window_extent(), 3.0)
+        assert calm.get_ylim() == before          # nothing under its legend: left alone
+        plt.close(fig)
+
+
 def test_figure4_says_adjusted_return():
     src = (STAGE3 / "s1_lib" / "f_lib_figures.py").read_text(encoding="utf-8")
     assert '"Adjusted Return"' in src and "Actual Return" not in src

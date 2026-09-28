@@ -128,7 +128,8 @@ class Style:
         """Shade the NBER recessions on a date axis, behind the data, with no legend entry."""
         import pandas as pd
         for start, end, _ in NBER:
-            ax.axvspan(pd.Timestamp(start), pd.Timestamp(end), lw=0, zorder=0, **self.recession)
+            ax.axvspan(pd.Timestamp(start), pd.Timestamp(end), lw=0, zorder=0, label="_recession",
+                       **self.recession)
 
     def size(self, w: float, h: float) -> tuple[float, float]:
         """The figure size: the figure's own in the paper style; the house style's fixed width,
@@ -241,6 +242,75 @@ def use(style: Style):
     import matplotlib.pyplot as plt
     with plt.rc_context(style.rc):
         yield plt
+
+
+def _covered(ax, box, pad: float) -> bool:
+    """Does anything the panel plots (bars, error bars, lines, markers) sit under `box`?"""
+    from matplotlib.collections import LineCollection
+    x0, y0, x1, y1 = box.x0 - pad, box.y0 - pad, box.x1 + pad, box.y1 + pad
+
+    def points_in(xy) -> bool:
+        xy = np.asarray(xy, dtype=float).reshape(-1, 2)
+        return bool(np.any((xy[:, 0] >= x0) & (xy[:, 0] <= x1) & (xy[:, 1] >= y0) & (xy[:, 1] <= y1)))
+
+    for p in ax.patches:
+        if p.get_label() == "_recession":        # the NBER shading spans the panel by design
+            continue
+        b = p.get_window_extent()
+        if b.x1 > x0 and b.x0 < x1 and b.y1 > y0 and b.y0 < y1:
+            return True
+    for line in ax.lines:
+        xy = line.get_xydata()
+        if len(xy) and points_in(line.get_transform().transform(xy)):
+            return True
+    for coll in ax.collections:
+        if isinstance(coll, LineCollection):      # error bars: each whisker's two ends
+            for seg in coll.get_segments():
+                if len(seg) and points_in(coll.get_transform().transform(seg)):
+                    return True
+        elif len(coll.get_offsets()):             # scatter markers
+            if points_in(coll.get_offset_transform().transform(coll.get_offsets())):
+                return True
+    return False
+
+
+def clear_legends(fig, pad: float = 8.0, step: float = 0.04, most: int = 25) -> list:
+    """Raise the top of each panel whose legend sits on its data until nothing is covered.
+
+    The published figures let a legend hide the tallest bar (Figures IA.1(B), IA.2(B) and (C))
+    or the top of a stacked bar (Figure 4(D)). Only the panel's upper limit moves, in steps of
+    `step` of its span on the axis's own scale (log panels stay log), until the data sits
+    `pad` pixels clear of the legend; a legend outside the panel covers nothing and is left
+    alone. Panels that started with the same y-range (Figure 4's C and D) end with the same
+    one. Returns the panels it moved."""
+    start = {ax: ax.get_ylim() for ax in fig.axes}
+    moved = []
+    for ax in fig.axes:
+        leg = ax.get_legend()
+        if leg is None:
+            continue
+        fig.canvas.draw()
+        n = 0
+        while _covered(ax, leg.get_window_extent(), pad) and n < most:
+            tr = ax.yaxis.get_transform()
+            lo, hi = tr.transform(ax.get_ylim())
+            ax.set_ylim(*tr.inverted().transform([lo, hi + step * (hi - lo)]))
+            fig.canvas.draw()
+            n += 1
+        if n:
+            moved.append(ax)
+    for ax in moved:
+        twins = [b for b in fig.axes if start[b] == start[ax] and b.get_yscale() == ax.get_yscale()]
+        top = max(b.get_ylim()[1] for b in twins)
+        for b in twins:
+            b.set_ylim(start[b][0], top)
+    return moved
+
+
+def save(fig, out_pdf: Path, **kw) -> None:
+    """Every figure is written through here: no legend may hide data (clear_legends)."""
+    clear_legends(fig)
+    fig.savefig(out_pdf, **kw)
 
 
 def out_path(fig_dir: Path, name: str, style: Style) -> Path:
