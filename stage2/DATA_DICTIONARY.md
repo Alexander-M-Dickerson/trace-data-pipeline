@@ -138,7 +138,7 @@ For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month r
 | `permco` | CRSP PERMCO | CRSP permanent company identifier. **Null in the published file** -- see *Redaction* below. |
 | `gvkey` | Compustat GVKEY | Compustat global company key. **Null in the published file** -- see *Redaction* below. |
 | `hprd` | Holding Period | NYSE trading sessions from the start trade (dt_s) to the end trade (dt_e) of the month-end return. Runs 15 to 27, because each trade may fall anywhere in the last 5 sessions of its month. |
-| `lib` | Latent Implementation Bias | Clean price return from month-end to the next month-begin. On the row for month $t$: $\text{LIB}_t = P_{t+1}^{\text{bgn}} / P_t^{\text{end}} - 1$, the gap that FOLLOWS that month's end price. |
+| `lib` | Latent Implementation Bias | Clean price return from month-end to the next month-begin. On the row for month $t$: $\text{LIB}_t = P_{t+1}^{\text{bgn}} / P_t^{\text{end}} - 1$, the gap that follows that month's end price. |
 | `libd` | LIB (Dirty) | LIB computed using dirty prices (includes accrued interest and coupon). |
 | `ret_type` | Return Type | Return classification: `standard`, `trad_in_def`, or `default_evnt`. |
 | `ff17num` | FF17 Industry | Fama-French 17-industry classification. |
@@ -150,7 +150,7 @@ For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month r
 | `tret_cfm` | Treasury Return, Cash-Flow-Weighted | As `tret_bns`, but weighting the same cash flows by their future value rather than their present value. Places more weight on long-dated cash flows and so overstates a bond's interest rate risk; reported as the authors' own robustness alternative. |
 | `tret_gprs` | Treasury Return, Exact Duration Match | As `tret_bns`, refined so the Treasury portfolio's duration equals the bond's exactly. The present-value weights are duration-matched only when the term structure is flat; this solves for the Treasury yield that restores the match and reweights accordingly. |
 | `tret_cls` | Treasury Return, Cash-Flow-Matched | As `tret_bns`, but discounting the same cash flows on the Treasury zero curve instead of at the bond's own yield to maturity. This replicates the bond's cash flows rather than its duration, so it removes slope and curvature effects as well as parallel shifts. The difference from `tret_bns` is the authors' higher-order component. |
-| `tret_mat` | Treasury Return, Maturity-Matched | The twin of `tret`: the same key-rate Treasury index returns, the same interpolation nodes and rounding, but interpolated at the bond's remaining MATURITY rather than its modified duration. Included as the maturity-matched comparator; duration matching is the more precise of the two. |
+| `tret_mat` | Treasury Return, Maturity-Matched | The twin of `tret`: the same key-rate Treasury index returns, the same interpolation nodes and rounding, but interpolated at the bond's remaining maturity rather than its modified duration. Included as the maturity-matched comparator; duration matching is the more precise of the two. |
 | `ret_vw` | Total Return (End) | Month-end to month-end total return. |
 | `ret_vw_bgn` | Total Return (Begin) | Month-begin to month-end total return within the same month. |
 | `dt_s` | Date Start | Trade date for month-end price in month $t-1$ (last 5 BD). |
@@ -191,7 +191,7 @@ For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month r
 | `md_dur` | Modified Duration | Modified duration measuring price sensitivity to yield changes. Computed with QuantLib. |
 | `convx` | Convexity | Second-order price sensitivity to yield changes. Computed with QuantLib. |
 | `sze` | Bond Size | Bond market capitalization: dirty price times amount outstanding ($ millions). |
-| `dcs6` | 6-Month Spread Narrowing (log) | Log change in credit spread over prior 6 months: $\log(cs_{t-6}) - \log(cs_t)$. If the spread is missing exactly 6 months ago, the nearest adjacent month is used within a ±1 month band, the EARLIER month first. |
+| `dcs6` | 6-Month Spread Narrowing (log) | Log change in credit spread over prior 6 months: $\log(cs_{t-6}) - \log(cs_t)$. If the spread is missing exactly 6 months ago, the nearest adjacent month is used within a ±1 month band, the earlier month first. |
 | `cs_mu12_1` | 12-Month Average Spread | Average credit spread over the bond's 12 monthly observations before month $t$, month $t-1$ included. Requires minimum 6 observations. |
 
 ---
@@ -249,10 +249,10 @@ For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month r
 | `spd_abs` | Absolute Bid-Ask Spread | Dollar-volume-weighted average dealer ask price minus average dealer bid price over the month, in points of par. No minimum: a month with one bid and one ask has a value. |
 | `cs_sprd` | Corwin-Schultz Spread | High-low spread estimator using two-day price ranges. Requires a minimum of 5 prices. |
 | `ar_sprd` | Abdi-Ranaldo Spread | Closing price spread estimator. Requires a minimum of 5 prices. |
-| `p_zro` | No-Trade Day Proportion | Fraction of the month's business days with no valid price. In the published (gap-adjusted) form the bond's last trading day in the month counts as a day without one, so the value is at least one over the month's business days; the unadjusted share is `p_zro_mmn`. Returns are never inspected, so the old name "Zero-Return Proportion" contradicted this description. |
+| `p_zro` | No-Trade Day Proportion | Fraction of the month's business days with no valid price. In the published (gap-adjusted) form the bond's last trading day in the month counts as a day without one, so the value is at least one over the month's business days; the unadjusted share is `p_zro_mmn`. |
 | `p_fht` | FHT Spread | Spread derived from the no-trade proportion: $2\sigma\Phi^{-1}((1+p_{zro})/2)$, where $p_{zro}$ is always the full-month share, while in the published form $\sigma$ leaves out the bond's last day of trading. Requires a minimum of 5 daily returns. |
-| `vov` | Volatility-over-Volume | Liquidity proxy: $2.5 \times \sigma^{0.6} / \bar{V}^{0.25}$, where $\sigma$ is the volatility of daily RETURNS and $\bar{V}$ mean volume. Requires a minimum of 5 daily returns. ❗Not the volatility OF volume. |
-| `lix` | Negative LIX (Illiquidity) | $-\log_{10}[(V \times P_{close}) / (P_{high} - P_{low})]$, averaged over the month's days whose high differs from their low. Requires a minimum of 5 daily Amihud ratios (a daily return with positive volume), the count `ami` uses. Stored NEGATED (lib/illiq_pandas.py), so it rises with ILLIQUIDITY -- 99.29% of non-null values are negative, median -2.181. |
+| `vov` | Volatility-over-Volume | Liquidity proxy: $2.5 \times \sigma^{0.6} / \bar{V}^{0.25}$, where $\sigma$ is the volatility of daily returns and $\bar{V}$ the mean daily dollar volume. Requires a minimum of 5 daily returns. |
+| `lix` | Negative LIX (Illiquidity) | $-\log_{10}[(V \times P_{close}) / (P_{high} - P_{low})]$, averaged over the month's days whose high differs from their low. Requires a minimum of 5 daily Amihud ratios (a daily return with positive volume), the count `ami` uses. Stored negated, so it rises with illiquidity. |
 
 ---
 
@@ -264,7 +264,7 @@ For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month r
 | `dskew` | Daily Skewness | Central skewness of daily returns within the month. |
 | `dkurt` | Daily Kurtosis | Excess kurtosis of daily returns within the month. |
 | `rvol` | Realized Volatility | Within-month square root of sum of squared daily returns: $\sqrt{\sum r_t^2}$. Requires a minimum of 5 daily returns. |
-| `rsj` | Realized Signed Jump | Within-month signed jump as the code computes it: $(\sqrt{\sum_{r>0} r_t^2} - \sqrt{\sum_{r<0} r_t^2}) / \sum_t r_t^2$, the up-minus-down volatility over the realized variance. It is not bounded by 1 and scales with one over the volatility. Requires a minimum of 5 daily returns. |
+| `rsj` | Realized Signed Jump | Within-month signed jump: $(\sqrt{\sum_{r>0} r_t^2} - \sqrt{\sum_{r<0} r_t^2}) / \sum_t r_t^2$, the up-minus-down volatility over the realized variance. It is not bounded by 1 and scales with one over the volatility. Requires a minimum of 5 daily returns. |
 | `rsk` | Realized Skewness | Within-month third moment of daily returns scaled by realized volatility. Requires a minimum of 5 daily returns. |
 | `rkt` | Realized Kurtosis | Within-month fourth moment of daily returns scaled by realized volatility. Requires a minimum of 5 daily returns. |
 | `var_90` | 90% Value-at-Risk | 10th percentile loss from the empirical distribution of monthly returns over a 36(12) rolling window. |
@@ -286,7 +286,7 @@ For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month r
 | `b_mktrf_mkt` | Equity Market Beta | Beta on MKTRF from joint regression with MKTB (36-month rolling). |
 | `b_mktb_mkt` | Bond Market Beta | Beta on MKTB from joint regression with MKTRF (36-month rolling). |
 | `b_mktb` | Bond Market Beta (Univariate) | Beta from univariate regression on MKTB. |
-| `b_mktbx_dcapm` | Duration-Adj Market Beta | Beta on MKTBX, from a rolling regression of the bond's return `ret_vw` on MKTBX and TERM. The regression is on the total return; the version on the duration-adjusted return is in the `betas_x` block. |
+| `b_mktbx_dcapm` | Duration-Adj Market Beta | Beta on MKTBX, from a rolling regression of the bond's return `ret_vw` on MKTBX and TERM. |
 | `b_term_dcapm` | Term Premium Beta | Beta on TERM, from the same regression of `ret_vw` on MKTBX and TERM. TERM $=$ MKTB $+ r^f -$ MKTBX, the value-weighted duration-matched Treasury return, not an excess return. |
 | `b_mktb_dn` | Downside Market Beta | Beta on $\min(\text{MKTB}, 0)$ from asymmetric market model. |
 | `b_mktb_up` | Upside Market Beta | Beta on $\max(\text{MKTB}, 0)$ from asymmetric market model. |
@@ -347,7 +347,7 @@ For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month r
 | `b_ysp` | Yield Spread Beta | Beta on yield spread factor. |
 | `b_epu` | Economic Policy Uncertainty Beta | Beta on EPU index level. |
 | `b_epum` | Monetary Policy Uncertainty Beta | Beta on monetary policy uncertainty index level. |
-| `b_eput` | Tax Policy Uncertainty Beta | Beta on the tax policy uncertainty index level (Baker-Bloom-Davis categorical EPU, column "3. Taxes"). NOT trade policy -- a separate category in the same workbook, never read. |
+| `b_eput` | Tax Policy Uncertainty Beta | Beta on the tax policy uncertainty index level (Baker-Bloom-Davis categorical EPU, column "3. Taxes"). |
 ---
 
 

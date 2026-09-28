@@ -10,7 +10,7 @@ does not describe what the code does is wrong however carefully it was written, 
 only way to find out is to open the function.
 
 Stage 3 now generates the table from `spec/signal_definitions.json`
-(`s4_zoo/t_ia08.py`). Fifty rows there differ from the printed table; each carries
+(`s4_zoo/t_ia08.py`). Fifty-one rows there differ from the printed table; each carries
 `why_corrected` and what was printed (`paper_prints`, or `paper_prints_citation` where only
 the citation changed), is marked `†` in the rendered table, and is listed below. `python s4_zoo/t_ia08.py --diffs` prints them.
 
@@ -20,7 +20,8 @@ the citation changed), is marked `†` in the rendered table, and is listed belo
 
 | check | result |
 |---|---|
-| mnemonics in IA.VIII | **145** |
+| mnemonics defined in the spec | **145** |
+| rows Table IA.VIII prints | **140**: all but the five Treasury benchmarks added in 2026 |
 | columns in `stage2/lib/contract.PANEL_COLUMNS` | **145** |
 | in IA.VIII but not in the contract | **none** |
 | in the contract but not in IA.VIII | **none** |
@@ -336,6 +337,29 @@ panel.
 **Fixed here**, and in `stage2/DATA_DICTIONARY.md`. Two of these describe what the code does
 where it may not do what was meant (`rsj`, and TERM keeping $r^f$); they are recorded, not
 changed, because changing them changes published numbers.
+
+---
+
+## 17. The wording is the paper's, and `vov` says what $\bar{V}$ is (2026-09-28)
+
+The revised paper renders Table IA.VIII from this spec. Until 4.2.1 it could not do so
+verbatim: nine descriptions carried notes meant for readers of the code (capitals for
+emphasis, "as the code computes it", a file name, a summary statistic, what a column is NOT),
+and the paper printed its own cleaner wording beside them. The descriptions now say what
+the paper prints; each note that carried information moved to the row's `why_corrected`
+(`lix`'s statistic) or is already there (`p_zro`'s old name, `b_mktbx_dcapm`'s `betas_x`).
+
+| column | now says |
+|---|---|
+| `lib`, `dcs6`, `tret_mat` | the same, without the capitals |
+| `rsj`, `p_zro`, `b_mktbx_dcapm`, `b_eput` | the same, without the note for code readers |
+| `tret` | the same, with the column names in code type |
+| `lix` | the corrected definition, without the file name and statistic; the paper had kept "a minimum of 5 prices", which the code does not apply |
+| `vov` | ❗ what $\sigma$ and $\bar{V}$ are: the volatility of daily returns and the mean daily dollar volume (`avg(dvol)`); the paper as submitted defined neither, under the name "Volatility of Volume" |
+
+The five Treasury benchmarks added to the panel in 2026 (`tret_bns`, `tret_cfm`, `tret_cls`,
+`tret_gprs`, `tret_mat`) are defined here and in the Stage 2 data report, but the paper's
+table does not list them, so Table IA.VIII leaves them out (`in_table_ia08: false`).
 
 ---
 

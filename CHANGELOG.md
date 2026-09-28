@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Table IA.VIII says what the paper prints.** The signal dictionary
+  (`stage3/spec/signal_definitions.json`) now words every definition as the revised paper
+  prints it, so the paper renders the table from it verbatim. Nine descriptions carried notes
+  for readers of the code (capitals for emphasis, "as the code computes it", a file name, a
+  statistic); each note that carried information is in the row's `why_corrected`.
+  `stage2/DATA_DICTIONARY.md` follows, and a test keeps such notes out of the descriptions.
+- `vov` now says what $\sigma$ and $\bar{V}$ are: the volatility of daily returns and the mean
+  daily dollar volume. The paper as submitted defined neither. 51 rows now differ from the
+  printed table, each with its reason.
+- Table IA.VIII prints the paper's 140 rows. The five Treasury benchmarks added in 2026
+  (`tret_bns`, `tret_cfm`, `tret_cls`, `tret_gprs`, `tret_mat`) stay defined in the spec and in
+  the Stage 2 data report, but the paper's table does not list them (`in_table_ia08: false`).
+
 ## [4.2.0] - 2026-09-28
 
 **Every figure in two looks, and the paper's new look is the default.** No table and no

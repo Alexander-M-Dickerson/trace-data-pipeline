@@ -1,5 +1,5 @@
 {
-  "_about": "Table IA.VIII, Signal Definitions and Citations. One row per column of the 145-column Stage-2 panel: 108 sorted signals plus 37 identifiers, returns and characteristics. Extracted from the paper's longtable, then reconciled against Stage 2's DATA_DICTIONARY.md and the code that computes each signal. A row carrying `paper_prints` or `paper_prints_citation` is one where the two disagreed and the code settled it; `why_corrected` says what settled it. Everything else is the paper's text unchanged. See RECONCILIATION_ia08.md.",
+  "_about": "Table IA.VIII, Signal Definitions and Citations. One row per column of the 145-column Stage-2 panel: 108 sorted signals plus 37 identifiers, returns and characteristics. Extracted from the paper's longtable, then reconciled against Stage 2's DATA_DICTIONARY.md and the code that computes each signal. A row carrying `paper_prints` or `paper_prints_citation` is one where the two disagreed and the code settled it; `why_corrected` says what settled it. Everything else is the paper's text unchanged. A description says what the column is, in the paper's words; notes for readers of the code (file names, emphasis) belong in `why_corrected`. Table IA.VIII prints every row except those with `in_table_ia08: false`: the five Treasury benchmarks added in 2026, which the paper's table does not list and the Stage 2 data report defines. See RECONCILIATION_ia08.md.",
   "rows": [
     {
       "mnemonic": "cusip",
@@ -70,7 +70,7 @@
       "mnemonic": "lib",
       "group": "Bond Identifiers and Return Metrics",
       "name": "Latent Implementation Bias",
-      "description": "Clean price return from month-end to the next month-begin. On the row for month $t$: $\\text{LIB}_t = P_{t+1}^{\\text{bgn}} / P_t^{\\text{end}} - 1$, the gap that FOLLOWS that month's end price (see Fig. \\ref{fig:return_timeline}).",
+      "description": "Clean price return from month-end to the next month-begin. On the row for month $t$: $\\text{LIB}_t = P_{t+1}^{\\text{bgn}} / P_t^{\\text{end}} - 1$, the gap that follows that month's end price (see Fig. \\ref{fig:return_timeline}).",
       "citation": "--",
       "citation_keys": [],
       "paper_prints": "Clean price return from month-end to month-begin: $\\text{LIB} = P_t^{\\text{bgn}} / P_{t-1}^{\\text{end}} - 1$ (see Fig. \\ref{fig:return_timeline}).",
@@ -135,7 +135,7 @@
       "mnemonic": "tret",
       "group": "Bond Identifiers and Return Metrics",
       "name": "Treasury Return",
-      "description": "Duration-matched U.S. Treasury portfolio return: the CRSP fixed-term Treasury returns interpolated at the bond's modified duration, rounded to 2 decimals, on its month-end trade date ($dt_e$). That is the unadjusted duration, not the panel's gap-adjusted \\texttt{md\\_dur}. Used to compute duration-adjusted returns: $r^x = r - tret$.",
+      "description": "Duration-matched U.S. Treasury portfolio return: the CRSP fixed-term Treasury returns interpolated at the bond's modified duration, rounded to 2 decimals, on its month-end trade date (\\texttt{dt\\_e}). That is the unadjusted duration, not the panel's gap-adjusted \\texttt{md\\_dur}. Used to compute duration-adjusted returns: $r^x = r - \\texttt{tret}$.",
       "citation": "--",
       "citation_keys": [],
       "citation_text": "--",
@@ -149,7 +149,8 @@
       "description": "Treasury benchmark built from the bond's own cash flows, weighted by their present-value shares (Macaulay duration weights) and applied to zero-coupon Treasury returns from the Gurkaynak-Sack-Wright curve. Subtract from \\texttt{ret\\_vw} for a duration-adjusted return.",
       "citation": "van Binsbergen, Nozawa, and Schwert (2025)",
       "citation_keys": [],
-      "citation_text": "van Binsbergen, Nozawa, and Schwert (2025)"
+      "citation_text": "van Binsbergen, Nozawa, and Schwert (2025)",
+      "in_table_ia08": false
     },
     {
       "mnemonic": "tret_cfm",
@@ -158,7 +159,8 @@
       "description": "As \\texttt{tret\\_bns}, but weighting the same cash flows by their future value rather than their present value. Places more weight on long-dated cash flows and so overstates a bond's interest rate risk; reported as the authors' own robustness alternative.",
       "citation": "van Binsbergen, Nozawa, and Schwert (2025), Internet Appendix A1",
       "citation_keys": [],
-      "citation_text": "van Binsbergen, Nozawa, and Schwert (2025), Internet Appendix A1"
+      "citation_text": "van Binsbergen, Nozawa, and Schwert (2025), Internet Appendix A1",
+      "in_table_ia08": false
     },
     {
       "mnemonic": "tret_gprs",
@@ -167,7 +169,8 @@
       "description": "As \\texttt{tret\\_bns}, refined so the Treasury portfolio's duration equals the bond's exactly. The present-value weights are duration-matched only when the term structure is flat; this solves for the Treasury yield that restores the match and reweights accordingly.",
       "citation": "Ghaderi, Plante, Roussanov, and Seo (2026), Appendix B.2",
       "citation_keys": [],
-      "citation_text": "Ghaderi, Plante, Roussanov, and Seo (2026), Appendix B.2"
+      "citation_text": "Ghaderi, Plante, Roussanov, and Seo (2026), Appendix B.2",
+      "in_table_ia08": false
     },
     {
       "mnemonic": "tret_cls",
@@ -176,16 +179,18 @@
       "description": "As \\texttt{tret\\_bns}, but discounting the same cash flows on the Treasury zero curve instead of at the bond's own yield to maturity. This replicates the bond's cash flows rather than its duration, so it removes slope and curvature effects as well as parallel shifts. The difference from \\texttt{tret\\_bns} is the authors' higher-order component.",
       "citation": "Cui, Lu, and Song (2026)",
       "citation_keys": [],
-      "citation_text": "Cui, Lu, and Song (2026)"
+      "citation_text": "Cui, Lu, and Song (2026)",
+      "in_table_ia08": false
     },
     {
       "mnemonic": "tret_mat",
       "group": "Bond Identifiers and Return Metrics",
       "name": "Treasury Return, Maturity-Matched",
-      "description": "The twin of \\texttt{tret}: the same key-rate Treasury index returns, the same interpolation nodes and rounding, but interpolated at the bond's remaining MATURITY rather than its modified duration. Included as the maturity-matched comparator; duration matching is the more precise of the two.",
+      "description": "The twin of \\texttt{tret}: the same key-rate Treasury index returns, the same interpolation nodes and rounding, but interpolated at the bond's remaining maturity rather than its modified duration. Included as the maturity-matched comparator; duration matching is the more precise of the two.",
       "citation": "Bessembinder, Kahle, Maxwell, and Xu (2009)",
       "citation_keys": [],
-      "citation_text": "Bessembinder, Kahle, Maxwell, and Xu (2009)"
+      "citation_text": "Bessembinder, Kahle, Maxwell, and Xu (2009)",
+      "in_table_ia08": false
     },
     {
       "mnemonic": "ret_vw",
@@ -431,7 +436,7 @@
       "mnemonic": "dcs6",
       "group": "Cluster I: Spreads, Yields, Size",
       "name": "6-Month Spread Narrowing (log)",
-      "description": "Log change in credit spread over prior 6 months: $\\log(cs_{t-6}) - \\log(cs_t)$. If the spread is missing exactly 6 months ago, the nearest adjacent month is used within a $\\pm$1 month band, the EARLIER month first.",
+      "description": "Log change in credit spread over prior 6 months: $\\log(cs_{t-6}) - \\log(cs_t)$. If the spread is missing exactly 6 months ago, the nearest adjacent month is used within a $\\pm$1 month band, the earlier month first.",
       "citation": "\\citet{KPP2023}",
       "citation_keys": [
         "KPP2023"
@@ -848,7 +853,7 @@
       "mnemonic": "p_zro",
       "group": "Cluster IV: Illiquidity",
       "name": "No-Trade Day Proportion",
-      "description": "Fraction of the month's business days with no valid price. In the published (gap-adjusted) form the bond's last trading day in the month counts as a day without one, so the value is at least one over the month's business days; the unadjusted share is \\texttt{p\\_zro\\_mmn}. Returns are never inspected, so the old name \"Zero-Return Proportion\" contradicted this description.",
+      "description": "Fraction of the month's business days with no valid price. In the published (gap-adjusted) form the bond's last trading day in the month counts as a day without one, so the value is at least one over the month's business days; the unadjusted share is \\texttt{p\\_zro\\_mmn}.",
       "citation": "\\citet{fong2017}",
       "citation_keys": [
         "fong2017"
@@ -874,25 +879,27 @@
       "mnemonic": "vov",
       "group": "Cluster IV: Illiquidity",
       "name": "Volatility-over-Volume",
-      "description": "Liquidity proxy: $2.5 \\times \\sigma^{0.6} / \\bar{V}^{0.25}$, where $\\sigma$ is the volatility of daily RETURNS and $\\bar{V}$ mean volume. Requires a minimum of 5 daily returns. Not the volatility OF volume.",
+      "description": "Liquidity proxy: $2.5 \\times \\sigma^{0.6} / \\bar{V}^{0.25}$, where $\\sigma$ is the volatility of daily returns and $\\bar{V}$ the mean daily dollar volume. Requires a minimum of 5 daily returns.",
       "citation": "\\citet{tobek2016}",
       "citation_keys": [
         "tobek2016"
       ],
-      "citation_text": "Tobek (2016)"
+      "citation_text": "Tobek (2016)",
+      "paper_prints": "Liquidity proxy: $2.5 \\times \\sigma^{0.6} / \\bar{V}^{0.25}$. Requires a minimum of 5 daily returns.",
+      "why_corrected": "The printed row, named \"Volatility of Volume\", defined neither $\\sigma$ nor $\\bar{V}$. `stage2/steps/step2_illiquidity.py` takes $\\sigma$ as the standard deviation of the month's daily returns (`ret_d`), not of volume, and $\\bar{V}$ as the mean daily dollar volume (`avg(dvol)`), over months with at least `ILLIQ_MIN_OBS` = 5 daily returns."
     },
     {
       "mnemonic": "lix",
       "group": "Cluster IV: Illiquidity",
       "name": "Negative LIX (Illiquidity)",
-      "description": "$-\\log_{10}[(V \\times P_{\\text{close}}) / (P_{\\text{high}} - P_{\\text{low}})]$, averaged over the month's days whose high differs from their low. Requires a minimum of 5 daily Amihud ratios (a daily return with positive volume), the count \\texttt{ami} uses. Stored NEGATED (lib/illiq_pandas.py), so it rises with ILLIQUIDITY -- 99.29% of non-null values are negative, median -2.181.",
+      "description": "$-\\log_{10}[(V \\times P_{\\text{close}}) / (P_{\\text{high}} - P_{\\text{low}})]$, averaged over the month's days whose high differs from their low. Requires a minimum of 5 daily Amihud ratios (a daily return with positive volume), the count \\texttt{ami} uses. Stored negated, so it rises with illiquidity.",
       "citation": "\\citet{danyliv2014convenient}",
       "citation_keys": [
         "danyliv2014convenient"
       ],
       "citation_text": "Danyliv, Bland and Nicholass (2014)",
       "paper_prints": "$\\log_{10}[(V \\times P_{\\text{close}}) / (P_{\\text{high}} - P_{\\text{low}})]$. Requires a minimum of 5 prices.",
-      "why_corrected": "The printed row requires 5 prices. `stage2/lib/illiq_pandas.py` gates it on 5 daily Amihud ratios, the same count as `ami`, and a day whose high equals its low has no value, so it is left out of the mean. The printed row, named \"LIX Liquidity\", also had no minus sign: the column is stored negated, so it rises with illiquidity."
+      "why_corrected": "The printed row requires 5 prices. `stage2/lib/illiq_pandas.py` gates it on 5 daily Amihud ratios, the same count as `ami`, and a day whose high equals its low has no value, so it is left out of the mean. The printed row, named \"LIX Liquidity\", also had no minus sign: the column is stored negated, so it rises with illiquidity. On the 2026-09-21 panel 99.29% of its non-null values are negative (median -2.181)."
     },
     {
       "mnemonic": "spd_abs",
@@ -945,7 +952,7 @@
       "mnemonic": "rsj",
       "group": "Cluster V: Volatility & Risk",
       "name": "Realized Signed Jump",
-      "description": "Within-month signed jump as the code computes it: $(\\sqrt{\\sum_{r>0} r_t^2} - \\sqrt{\\sum_{r<0} r_t^2}) / \\sum_t r_t^2$, the up-minus-down volatility over the realized variance. It is not bounded by 1 and scales with one over the volatility. Requires a minimum of 5 daily returns.",
+      "description": "Within-month signed jump: $(\\sqrt{\\sum_{r>0} r_t^2} - \\sqrt{\\sum_{r<0} r_t^2}) / \\sum_t r_t^2$, the up-minus-down volatility over the realized variance. It is not bounded by 1 and scales with one over the volatility. Requires a minimum of 5 daily returns.",
       "citation": "\\citet{bollerslev2020}",
       "citation_keys": [
         "bollerslev2020"
@@ -1110,7 +1117,7 @@
       "mnemonic": "b_mktbx_dcapm",
       "group": "Cluster VI: Market Risk",
       "name": "Duration-Adj Market Beta",
-      "description": "Beta on MKTBX, from a rolling regression of the bond's return \\texttt{ret\\_vw} on MKTBX and TERM. The regression is on the total return; the version on the duration-adjusted return is in the \\texttt{betas\\_x} block.",
+      "description": "Beta on MKTBX, from a rolling regression of the bond's return \\texttt{ret\\_vw} on MKTBX and TERM.",
       "citation": "\\citet{Binsbergen-Schwert-Nozawa-2023}",
       "citation_keys": [
         "Binsbergen-Schwert-Nozawa-2023"
@@ -1556,7 +1563,7 @@
       "mnemonic": "b_eput",
       "group": "Cluster IX: Macro & Other Betas",
       "name": "Tax Policy Uncertainty Beta",
-      "description": "Beta on the tax policy uncertainty index level (Baker-Bloom-Davis categorical EPU, column \"3. Taxes\"). NOT trade policy -- a separate category in the same workbook, never read.",
+      "description": "Beta on the tax policy uncertainty index level (Baker-Bloom-Davis categorical EPU, column \"3. Taxes\").",
       "citation": "\\citet{baker2016measuring}",
       "citation_keys": [
         "baker2016measuring"

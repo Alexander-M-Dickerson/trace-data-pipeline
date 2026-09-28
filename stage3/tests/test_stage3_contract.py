@@ -748,6 +748,39 @@ def test_corrected_definition_rows_say_what_was_printed_and_why():
             f"{r['mnemonic']}: the reason is too short to be a reason")
 
 
+# the capitalised words a definition may use: names and acronyms, never emphasis
+DEFINITION_ACRONYMS = {"AAA", "AMD", "BAA", "BBW", "CAPMB", "CPI", "CPIAUCSL", "CRF", "CRSP",
+                       "CUSIP", "DEFB", "DRF", "EPU", "FISD", "FRED", "IPR", "LIB", "LRF", "MKTB",
+                       "MKTBX", "MKTRF", "NYSE", "PSB", "SIC", "TERM", "TERMB", "USA", "VIX",
+                       "VOLPSB", "YYYY"}
+
+
+def test_definitions_say_what_the_paper_prints():
+    """A description is the paper's words, because the revised paper renders Table IA.VIII
+    from it. Notes for readers of the code -- a file name, capitals for emphasis, "as the code
+    computes it" -- belong in `why_corrected`. Nine sat in descriptions until 4.2.1, and the
+    paper printed its own wording beside them, so the two tables differed.
+
+    The rows the table leaves out are the five Treasury benchmarks the paper's table does not
+    list, and only those.
+    """
+    import json
+    import re
+    rows = json.loads(
+        (STAGE3 / "spec" / "signal_definitions.json").read_text(encoding="utf-8"))["rows"]
+    bad = []
+    for r in rows:
+        d = re.sub(r"\$[^$]*\$|\\texttt\{[^}]*\}", "", r["description"])
+        if re.search(r"\.py\b|as the code computes", d):
+            bad.append(f"{r['mnemonic']}: a note for code readers")
+        caps = set(re.findall(r"\b[A-Z]{3,}\b", d)) - DEFINITION_ACRONYMS
+        if caps:
+            bad.append(f"{r['mnemonic']}: emphasis {sorted(caps)}")
+    assert not bad, bad
+    left_out = sorted(r["mnemonic"] for r in rows if not r.get("in_table_ia08", True))
+    assert left_out == ["tret_bns", "tret_cfm", "tret_cls", "tret_gprs", "tret_mat"], left_out
+
+
 def _declared_flags(script: str) -> set:
     """Every long option a driver declares, read from its own `add_argument` calls."""
     import ast

@@ -1,7 +1,10 @@
 r"""t_ia08.py -- Table IA.VIII, Signal Definitions and Citations.
 
-One row per column of the 145-column Stage-2 panel: the 108 sorted signals plus 37
-identifiers, returns and characteristics, each with its definition and its citation.
+The spec has one row per column of the 145-column Stage-2 panel: the 108 sorted signals
+plus 37 identifiers, returns and characteristics, each with its definition and its citation.
+The table prints the rows the paper prints: all but the five Treasury benchmarks added in
+2026 (`in_table_ia08: false`), which the Stage 2 data report defines. A description is the
+paper's words; notes for readers of the code go in `why_corrected`.
 
 This is the only exhibit in Stage 3 whose content is a SPEC rather than a computation.
 `spec/signal_definitions.json` holds the rows; this file renders them as the paper's
@@ -45,6 +48,11 @@ def load() -> list[dict]:
     if not SPEC.exists():
         raise SystemExit(f"Table IA.VIII needs its spec and it is not at {SPEC}.")
     return json.loads(SPEC.read_text(encoding="utf-8"))["rows"]
+
+
+def printed(rows: list[dict]) -> list[dict]:
+    """The rows the table prints: the paper's, not the benchmarks it does not list."""
+    return [r for r in rows if r.get("in_table_ia08", True)]
 
 
 # The paper's Figure 2 is a LaTeX schematic with no data behind it, so Stage 3 does
@@ -188,7 +196,7 @@ def main() -> int:
         with b.phase("render"):
             out = paths.section_results("s4_zoo")
             tex = paths.TABLES / "table_ia08.tex"
-            tex.write_text(render_latex(rows), encoding="utf-8")
+            tex.write_text(render_latex(printed(rows)), encoding="utf-8")
             import pandas as pd
             pd.DataFrame(rows).to_csv(out / "table_ia08_cells.csv", index=False)
             n_fix = sum(1 for r in rows if "why_corrected" in r)
@@ -196,7 +204,7 @@ def main() -> int:
                 "table_ia08",
                 {"summary": {
                     "exhibit": "Table IA.VIII", "tex_label": LABEL,
-                    "n_rows": len(rows),
+                    "n_rows": len(printed(rows)), "n_defined": len(rows),
                     "n_sorted_signals": sum(1 for r in rows
                                             if r["mnemonic"] in Z.CLUSTER_OF),
                     "n_corrected": n_fix,
@@ -208,7 +216,7 @@ def main() -> int:
                  "rows": rows},
                 section="s4_zoo", inputs=[SPEC], t0=t0,
                 extra={"exhibit": "Table IA.VIII", "tex_label": LABEL})
-        b.note(n_rows=len(rows), n_corrected=n_fix)
+        b.note(n_rows=len(printed(rows)), n_corrected=n_fix)
 
         # Every signal Stage 3 sorts must have a definition here, or the table
         # documents a different universe from the one the paper reports on.
@@ -217,7 +225,8 @@ def main() -> int:
                      f"{len(Z.CLUSTER_OF)} sorted signals all defined"
                      + (f"; MISSING {missing}" if missing else ""))
 
-    print(f"\nTable IA.VIII: {len(rows)} rows, {n_fix} differing from the printed table")
+    print(f"\nTable IA.VIII: {len(printed(rows))} rows of {len(rows)} defined, "
+          f"{n_fix} differing from the printed table")
     print(f"wrote {tex}")
     return 0 if ok else 1
 
