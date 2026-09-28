@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.1.3] - 2026-09-28
+
+**One wrong row in Table IA.III.** Nothing else a stage computes changes.
+
 ### Fixed
 - Stage 3's Table IA.III printed 0 observations and 100% missing for Price (VW) in every
   release since stage 3 shipped (3.2.0 to 4.1.2). The monthly panel has no price column; the
