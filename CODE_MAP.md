@@ -147,6 +147,7 @@ paper section: `s1_lib` is the paper's Section 3, `s2_lab` Section 4, `s3_nse` S
 | `stage3/fastrun.py` | Runs the grids one signal per fresh process |
 | `stage3/bench.py` | Times each run and records its own checks in `reports/timings.jsonl` |
 | `stage3/captions.py` | Every table caption |
+| `stage3/figstyle.py` | The two looks every figure can be drawn in: the paper's (the default) and the house style (`--style paper\|house\|both`); the NBER recession dates every time-series figure shades |
 | `stage3/latex_format.py` | Number formatting for the LaTeX tables |
 | `stage3/helper_functions.py` | Small shared conventions |
 | `stage3/make_report.py` | Puts every table and figure into `reports/exhibits.pdf` |

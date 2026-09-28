@@ -19,7 +19,7 @@ that breaks it rather than leaving the reader to squint at a whisker.
 Unlike the rest of Section 4, this runs its own small sweep: momentum at a SIX-month
 holding period is not one of the 108 signals, so no stored grid covers it.
 
-    python s2_lab/f06_dua.py
+    python s2_lab/f06_dua.py [--style paper|house|both] [--from-cells]
 """
 from __future__ import annotations
 
@@ -119,27 +119,39 @@ def compute_panels(result, mktb: pd.Series) -> dict:
     return out
 
 
-def build_figure(panels: dict, out_pdf: Path) -> None:
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+def build_figure(panels: dict, out_pdf: Path, st) -> None:
+    import figstyle
+    with figstyle.use(st) as plt:
+        fig, axes = plt.subplots(2, 2, figsize=st.size(12, 8))
+        for ax, (location, timing, title) in zip(axes.flatten(), PANELS):
+            df = panels[title]
+            x = np.arange(len(df))
+            # the bars shade from the tightest threshold (dark) to the loosest (light)
+            paper = st.name == "paper"
+            ax.bar(x, df["alpha"], yerr=1.96 * df["se"], capsize=(3 if paper else 2.2),
+                   color=list(st.ramp[:len(df)]), alpha=(0.85 if paper else 1.0),
+                   edgecolor=("gray" if paper else "white"), linewidth=0.5,
+                   error_kw=dict(ecolor=st.c("whisker"), elinewidth=(1.0 if paper else 0.7)))
+            labels = ([f"<-{p}%" for p in TRIM_PCTS] if location == "left"
+                      else [f">{p}%" for p in TRIM_PCTS])[:len(df)]
+            ax.set_xticks(x)
+            ax.set_xticklabels(labels, rotation=45, ha="right")
+            ax.set_xlabel("Trim Threshold")
+            ax.axhline(0, color=st.c("zero"), lw=0.5)
+            st.grid(ax)
+            st.panel(ax, title[1], title[4:])
+            ax.set_ylabel(r"Alpha ($\alpha$, % monthly)")
+        # no title line in either style: the paper cropped the old one away (trim=35pt), so the
+        # caption names the figure
+        fig.tight_layout()
+        fig.savefig(out_pdf, dpi=150, bbox_inches="tight")
+        plt.close(fig)
 
-    fig, axes = plt.subplots(2, 2, figsize=(12, 8))
-    for ax, (location, timing, title) in zip(axes.flatten(), PANELS):
-        df = panels[title]
-        x = np.arange(len(df))
-        ax.bar(x, df["alpha"], yerr=1.96 * df["se"], capsize=3,
-               color="#2171b5", alpha=0.85, edgecolor="gray", linewidth=0.5)
-        labels = ([f"<-{p}%" for p in TRIM_PCTS] if location == "left"
-                  else [f">{p}%" for p in TRIM_PCTS])[:len(df)]
-        ax.set_xticks(x)
-        ax.set_xticklabels(labels, fontsize=8, rotation=45, ha="right")
-        ax.axhline(0, color="gray", lw=0.5)
-        ax.set_title(title)
-        ax.set_ylabel(r"Alpha ($\alpha$, % monthly)")
-    plt.tight_layout()
-    fig.savefig(out_pdf, dpi=150, bbox_inches="tight")
-    plt.close(fig)
+
+def panels_from_cells(path: Path) -> dict:
+    """The plotted bars as the last sweep stored them (fig06_cells.csv), per panel title."""
+    allp = pd.read_csv(path)
+    return {title: allp[allp["panel"] == title].reset_index(drop=True) for _, _, title in PANELS}
 
 
 def main() -> int:
@@ -147,9 +159,23 @@ def main() -> int:
     ap.add_argument("--end", default=S.SAMPLE["lab"]["end"],
                     help="last month of the sweep (default: the paper's window)")
     ap.add_argument("--no-bench", action="store_true")
+    ap.add_argument("--from-cells", action="store_true",
+                    help="redraw from the stored fig06_cells.csv, without refitting the sweep")
+    import figstyle
+    figstyle.add_argument(ap)
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
     paths.FIGURES.mkdir(parents=True, exist_ok=True)
+    looks = figstyle.styles(args.style)
+    if args.from_cells:
+        cells = paths.section_results("s2_lab") / "fig06_cells.csv"
+        if not cells.exists():
+            raise SystemExit(f"no stored bars at {cells}; run without --from-cells first")
+        panels = panels_from_cells(cells)
+        for st in looks:
+            build_figure(panels, figstyle.out_path(paths.FIGURES, "fig06_momentum_trim.pdf", st), st)
+        print(f"redrew Figure 6 from {cells} ({', '.join(s.name for s in looks)})")
+        return 0
     pblenv.use()
     t0 = time.perf_counter()
 
@@ -165,7 +191,9 @@ def main() -> int:
             allp = pd.concat(panels.values(), ignore_index=True)
         with b.phase("render"):
             out_pdf = paths.FIGURES / "fig06_momentum_trim.pdf"
-            build_figure(panels, out_pdf)
+            for st in looks:
+                build_figure(panels, figstyle.out_path(paths.FIGURES, "fig06_momentum_trim.pdf", st),
+                             st)
             out = paths.section_results("s2_lab")
             allp.to_csv(out / "fig06_cells.csv", index=False)
             ex_ante = allp[allp["timing"] == "ex_ante"]

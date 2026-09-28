@@ -69,7 +69,8 @@ STEPS = [
     ("lib", "exhibit", "s1_lib/t13_rating_wf.py", [], "reports/tables/table13.tex"),
     ("lib", "exhibit", "s1_lib/t14_illiq.py", [], "reports/tables/table14.tex"),
     ("lib", "exhibit", "s1_lib/tB1_lib_summary.py", [], "reports/tables/tableB1.tex"),
-    ("lib", "exhibit", "s1_lib/f_lib_figures.py", [], "reports/figures/fig03_cumret.pdf"),
+    ("lib", "exhibit", "s1_lib/f_lib_figures.py", ["--style", "both"],
+     "reports/figures/fig03_cumret.pdf"),
 
     # -- Section 4: look-ahead bias ------------------------------------------
     ("lab", "producer", "s2_lab/run_lab.py", [],
@@ -80,9 +81,9 @@ STEPS = [
      "reports/tables/table15.tex"),
     ("lab", "exhibit", "s2_lab/t15_decomp.py", ["--which", "alpha"],
      "reports/tables/table16.tex"),
-    ("lab", "exhibit", "s2_lab/f06_dua.py", [],
+    ("lab", "exhibit", "s2_lab/f06_dua.py", ["--style", "both"],
      "reports/figures/fig06_momentum_trim.pdf"),
-    ("lab", "exhibit", "s2_lab/f_lab_figures.py", [],
+    ("lab", "exhibit", "s2_lab/f_lab_figures.py", ["--style", "both"],
      "reports/figures/fig07_lab_bias_2x2.pdf"),
 
     # -- Section 5: non-standard errors --------------------------------------
@@ -104,7 +105,7 @@ STEPS = [
      "reports/tables/table_ia18_{sample}.tex"),
     ("nse", "exhibit", "s3_nse/t19_mua_improvement.py", [],
      "reports/tables/table_ia19_{sample}.tex"),
-    ("nse", "exhibit", "s3_nse/f_nse_figures.py", [],
+    ("nse", "exhibit", "s3_nse/f_nse_figures.py", ["--style", "both"],
      "reports/figures/figIA3_nse_alpha_tstat_dua_{sample}.pdf"),
 
     # -- the factor zoo -------------------------------------------------------

@@ -19,8 +19,11 @@ Figure IA.2 carries an IDENTITY CHECK: every plotted bar is compared against the
 quantity from the statistics engine behind Table 4, at 1e-9. A figure that disagrees
 with its own table is what this catches, and the rendered PDF cannot show it to you.
 
+The data is computed once and drawn in each look `--style` asks for (figstyle.py).
+Figures 7 (Panels A-B) and 8 shade the NBER recessions.
+
     python s2_lab/run_lab.py        # produce the series
-    python s2_lab/f_lab_figures.py
+    python s2_lab/f_lab_figures.py [--style paper|house|both]
 """
 from __future__ import annotations
 
@@ -38,6 +41,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import _stage3_settings as S   # noqa: E402
 import drrlib as D          # noqa: E402
+import figstyle             # noqa: E402
 import lab_engine as E      # noqa: E402
 import paths                # noqa: E402
 from bench import Bench     # noqa: E402
@@ -80,63 +84,63 @@ def fig7_stats(source: dict, vix: pd.Series) -> dict:
     return out
 
 
-def build_fig7(source: dict, vix: pd.Series, out_pdf: Path) -> None:
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+def build_fig7(source: dict, vix: pd.Series, out_pdf: Path, st) -> None:
     import statsmodels.api as sm
 
     left = source[("standard", "All", "left")]["ts_bias_ls"]
     right = source[("standard", "All", "right")]["ts_bias_ls"]
-    fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+    with figstyle.use(st) as plt:
+        fig, axes = plt.subplots(2, 2, figsize=st.size(12, 8))
+        for ax, (letter, sigs, signs, title) in zip(
+                axes[0], [("A", ["b_dunc3", "ltr48_12", "ivol_bbw"], [-1, -1, 1],
+                           "Left-Tail Affected Factors"),
+                          ("B", ["mom3_1", "mom6_1", "mom12_1"], [1, 1, 1],
+                           "Right-Tail Affected Factors (Momentum)")]):
+            src = left if "b_dunc3" in sigs else right
+            st.recessions(ax)
+            for sig, sg, role, ls in zip(sigs, signs, ["series1", "series2", "series3"],
+                                         ["-", "--", ":"]):
+                s = src[sig] * sg * 100
+                ax.plot(s.index, s.values, color=st.c(role), lw=1.2, ls=ls,
+                        label=st.factor(sig), alpha=(0.9 if st.name == "paper" else 1.0))
+            ax.axhline(0, color=st.c("zero"), lw=0.5)
+            st.grid(ax)
+            st.panel(ax, letter, title)
+            ax.set_ylabel("LAB (%)")
+            h, lab = ax.get_legend_handles_labels()
+            # two different sets of factors: each panel keeps its own legend in both styles
+            st.panel_legend(ax, h, lab, loc="upper left", fontsize=8)
 
-    for ax, (sigs, signs, title) in zip(
-            axes[0], [(["b_dunc3", "ltr48_12", "ivol_bbw"], [-1, -1, 1],
-                       "(A) Left-Tail Affected Factors"),
-                      (["mom3_1", "mom6_1", "mom12_1"], [1, 1, 1],
-                       "(B) Right-Tail Affected Factors (Momentum)")]):
-        src = left if "b_dunc3" in sigs else right
-        for sig, sg, color, ls in zip(sigs, signs,
-                                      ["#08306b", "#2171b5", "#6baed6"],
-                                      ["-", "--", ":"]):
-            s = src[sig] * sg * 100
-            ax.plot(s.index, s.values, color=color, lw=1.2, ls=ls, label=sig)
-        ax.axhline(0, color="gray", lw=0.5)
-        ax.set_title(title)
-        ax.set_ylabel("LAB (%)")
-        ax.legend(loc="upper left", fontsize=8)
-
-    for ax, panel in zip(axes[1], ("C", "D")):
-        sig, tail = FIG7_SCATTER[panel]
-        src = left if tail == "left" else right
-        df = pd.DataFrame({"lab": src[sig] * 100, "vix": vix}).dropna()
-        X, y = df["vix"].to_numpy(float), df["lab"].to_numpy(float)
-        ax.scatter(X, y, alpha=0.4, s=15, color="#1f78b4")
-        model = sm.OLS(y, np.column_stack([np.ones_like(X), X, X ** 2])).fit()
-        xl = np.linspace(X.min(), X.max(), 100)
-        ax.plot(xl, model.params[0] + model.params[1] * xl + model.params[2] * xl ** 2,
-                color="#e31a1c", lw=2)
-        ax.text(0.95, 0.95,
-                f"$R^2$ = {model.rsquared:.3f}\n$\\rho$ = {np.corrcoef(y, X)[0, 1]:.3f}",
-                transform=ax.transAxes, va="top", ha="right", fontsize=9,
-                bbox=dict(boxstyle="round", facecolor="white", alpha=0.8))
-        ax.axhline(0, color="gray", lw=0.5)
-        ax.set_title(f"({panel}) LAB({sig}) vs VIX")
-        ax.set_xlabel("VIX")
-        ax.set_ylabel("LAB (%)")
-
-    plt.tight_layout()
-    fig.savefig(out_pdf, dpi=150, bbox_inches="tight")
-    plt.close(fig)
+        for ax, panel in zip(axes[1], ("C", "D")):
+            sig, tail = FIG7_SCATTER[panel]
+            src = left if tail == "left" else right
+            df = pd.DataFrame({"lab": src[sig] * 100, "vix": vix}).dropna()
+            X, y = df["vix"].to_numpy(float), df["lab"].to_numpy(float)
+            ax.scatter(X, y, alpha=0.4, s=(15 if st.name == "paper" else 8), color=st.c("scatter"),
+                       lw=0)
+            model = sm.OLS(y, np.column_stack([np.ones_like(X), X, X ** 2])).fit()
+            xl = np.linspace(X.min(), X.max(), 100)
+            ax.plot(xl, model.params[0] + model.params[1] * xl + model.params[2] * xl ** 2,
+                    color=st.c("fit"), lw=(2 if st.name == "paper" else 1.3))
+            box = (dict(boxstyle="round", facecolor="white", alpha=0.8) if st.name == "paper"
+                   else None)
+            ax.text(0.95, 0.95,
+                    f"$R^2$ = {model.rsquared:.3f}\n$\\rho$ = {np.corrcoef(y, X)[0, 1]:.3f}",
+                    transform=ax.transAxes, va="top", ha="right",
+                    fontsize=(9 if st.name == "paper" else 7), bbox=box)
+            ax.axhline(0, color=st.c("zero"), lw=0.5)
+            st.grid(ax)
+            st.panel(ax, panel, f"LAB({st.factor(sig)}) vs VIX")
+            ax.set_xlabel("VIX")
+            ax.set_ylabel("LAB (%)")
+        fig.tight_layout()
+        fig.savefig(out_pdf, dpi=150, bbox_inches="tight")
+        plt.close(fig)
 
 
 # ------------------------------------------------------------------ Figure 8
 FIG8_PANELS = [("A", "ltr48_12", "left", -1), ("B", "ivol_bbw", "left", 1),
                ("C", "b_dunc3", "left", -1), ("D", "mom3_1", "right", 1)]
-
-
-def _fmt_final(v: float) -> str:
-    return f"${v:.1f}" if v < 10 else f"${v:.0f}"
 
 
 def fig8_data(source: dict) -> dict:
@@ -152,30 +156,37 @@ def fig8_data(source: dict) -> dict:
     return out
 
 
-def build_fig8(data: dict, out_pdf: Path) -> None:
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+FIG8_SERIES = [("wins", "Infeasible (Wins.)", "wins", "-"), ("base", "Feasible", "base", "--"),
+               ("bias", "Cumulative LAB", "lab_line", ":")]
 
-    fig, axes = plt.subplots(2, 2, figsize=(12, 8))
-    order = {"A": (0, 0), "B": (0, 1), "C": (1, 0), "D": (1, 1)}
-    for panel, d in data.items():
-        ax = axes[order[panel]]
-        cum = d["cum"]
-        ax.plot(cum.index, cum["wins"], color="#a6cee3", lw=1.2, label="Infeasible (Wins.)")
-        ax.plot(cum.index, cum["base"], color="#08306b", lw=1.2, ls="--", label="Feasible")
-        ax.plot(cum.index, cum["bias"], color="gray", lw=1.0, ls=":", label="Cumulative LAB")
-        ax.set_yscale("log")
-        ax.set_title(f"({panel}) {d['sig']}")
-        ax.axhline(1, color="gray", lw=0.5)
-        for k, color in zip(("wins", "base", "bias"), ("#a6cee3", "#08306b", "gray")):
-            v = d["finals"][k]
-            ax.annotate(_fmt_final(v), xy=(cum.index[-1], v), xytext=(4, 0),
-                        textcoords="offset points", color=color, fontsize=8)
-    axes[0, 0].legend(loc="upper left", fontsize=8)
-    plt.tight_layout()
-    fig.savefig(out_pdf, dpi=150, bbox_inches="tight")
-    plt.close(fig)
+
+def build_fig8(data: dict, out_pdf: Path, st) -> None:
+    with figstyle.use(st) as plt:
+        fig, axes = plt.subplots(2, 2, figsize=st.size(12, 8))
+        order = {"A": (0, 0), "B": (0, 1), "C": (1, 0), "D": (1, 1)}
+        for panel, d in data.items():
+            ax = axes[order[panel]]
+            cum = d["cum"]
+            st.recessions(ax)
+            for c, lab, role, ls in FIG8_SERIES:
+                ax.plot(cum.index, cum[c], color=st.c(role), ls=ls,
+                        lw=(1.0 if c == "bias" else 1.2), label=lab)
+            st.panel(ax, panel, st.factor(d["sig"]))
+            ax.axhline(1, color=st.c("zero"), lw=0.5)
+            st.grid(ax)
+            figstyle.date_axis(ax)
+            figstyle.dollar_axes(ax, cum, [d["finals"][c] for c, *_ in FIG8_SERIES],
+                                 [st.c(role) for _, _, role, _ in FIG8_SERIES], st)
+        h, lab = axes[0, 0].get_legend_handles_labels()
+        if st.name == "paper":
+            st.add_legend(axes[0, 0], h, lab, loc="upper left", fontsize=8)
+            fig.text(0.02, 0.5, "Dollar Value", va="center", rotation="vertical", fontsize=12)
+            fig.tight_layout(rect=(0.03, 0, 1, 1))
+        else:
+            fig.supylabel("Dollar value", fontsize=8.5)
+            st.legends(fig, [(axes[0, 0], h, lab, {})])
+        fig.savefig(out_pdf, dpi=150, bbox_inches="tight")
+        plt.close(fig)
 
 
 # ------------------------------------------------------------------ Figure IA.2
@@ -225,55 +236,62 @@ def ia2_identity(data: dict, stats: pd.DataFrame) -> float:
     return worst
 
 
-def build_ia2(data: dict, out_pdf: Path) -> None:
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    fig = plt.figure(figsize=(12, 8))
-    gs = fig.add_gridspec(2, 2, height_ratios=[1, 1], hspace=0.3, wspace=0.25)
-    ax_a, ax_b = fig.add_subplot(gs[0, 0]), fig.add_subplot(gs[0, 1])
-    ax_c = fig.add_subplot(gs[1, :])
-    width = 0.35
-    for ax, sigs, title in ((ax_a, IA2_LEFT, "(A) Left-Tail Factors"),
-                            (ax_b, IA2_RIGHT, "(B) Right-Tail Factors (Momentum)")):
+def build_ia2(data: dict, out_pdf: Path, st) -> None:
+    with figstyle.use(st) as plt:
+        fig = plt.figure(figsize=st.size(12, 8))
+        # the house style's panel legends sit above each panel, so the rows need more room
+        gs = fig.add_gridspec(2, 2, height_ratios=[1, 1],
+                              hspace=(0.3 if st.name == "paper" else 0.7), wspace=0.25)
+        ax_a, ax_b = fig.add_subplot(gs[0, 0]), fig.add_subplot(gs[0, 1])
+        ax_c = fig.add_subplot(gs[1, :])
+        width = 0.35
+        edge = dict(edgecolor="white", lw=0.5)
+        for ax, letter, sigs, title in ((ax_a, "A", IA2_LEFT, "Left-Tail Factors"),
+                                        (ax_b, "B", IA2_RIGHT, "Right-Tail Factors (Momentum)")):
+            x = np.arange(len(sigs))
+            ax.bar(x - width / 2, [data["legs"][f]["long_bar"] for f in sigs], width,
+                   label="Long Leg", color=st.c("long"), **edge)
+            ax.bar(x + width / 2, [data["legs"][f]["short_bar"] for f in sigs], width,
+                   label="Short Leg", color=st.c("short"), **edge)
+            ax.axhline(0, color=st.c("zero"), lw=0.5)
+            st.grid(ax)
+            st.panel(ax, letter, title)
+            ax.set_ylabel("Average LAB (%)")
+            ax.set_xticks(x)
+            ax.set_xticklabels([st.factor(f) for f in sigs])
+            h, lab = ax.get_legend_handles_labels()
+            st.panel_legend(ax, h, lab, loc="upper right")
+        sigs = IA2_LEFT + IA2_RIGHT
         x = np.arange(len(sigs))
-        ax.bar(x - width / 2, [data["legs"][f]["long_bar"] for f in sigs], width,
-               label="Long Leg", color="#08306b")
-        ax.bar(x + width / 2, [data["legs"][f]["short_bar"] for f in sigs], width,
-               label="Short Leg", color="#6baed6")
-        ax.axhline(0, color="gray", lw=0.5)
-        ax.set_title(title)
-        ax.set_ylabel("Average LAB (%)")
-        ax.set_xticks(x)
-        ax.set_xticklabels(sigs, fontsize=8)
-        ax.legend(fontsize=8)
-    sigs = IA2_LEFT + IA2_RIGHT
-    x = np.arange(len(sigs))
-    wc = 0.25
-    for rating, off, color in (("All", -wc, "#08306b"), ("IG", 0, "#2171b5"),
-                               ("NIG", wc, "#6baed6")):
-        ax_c.bar(x + off, [data["rating"][f"{f}|{rating}"] for f in sigs], wc,
-                 label=rating, color=color)
-    ax_c.axhline(0, color="gray", lw=0.5)
-    ax_c.set_title("(C) LAB by Rating Category")
-    ax_c.set_ylabel("Average LAB (%)")
-    ax_c.set_xticks(x)
-    ax_c.set_xticklabels(sigs, fontsize=8)
-    ax_c.legend(fontsize=8)
-    plt.tight_layout()
-    fig.savefig(out_pdf, dpi=150, bbox_inches="tight")
-    plt.close(fig)
+        wc = 0.25
+        for rating, off, role in (("All", -wc, "all"), ("IG", 0, "ig"), ("NIG", wc, "nig")):
+            ax_c.bar(x + off, [data["rating"][f"{f}|{rating}"] for f in sigs], wc,
+                     label=rating, color=st.c(role), **edge)
+        ax_c.axhline(0, color=st.c("zero"), lw=0.5)
+        st.grid(ax_c)
+        st.panel(ax_c, "C", "LAB by Rating Category")
+        ax_c.set_ylabel("Average LAB (%)")
+        ax_c.set_xticks(x)
+        ax_c.set_xticklabels([st.factor(f) for f in sigs])
+        h, lab = ax_c.get_legend_handles_labels()
+        # the legs and the ratings are different things: each panel keeps its own legend
+        st.panel_legend(ax_c, h, lab, loc="upper right")
+        if st.name == "paper":
+            fig.tight_layout()
+        fig.savefig(out_pdf, dpi=150, bbox_inches="tight")
+        plt.close(fig)
 
 
 # --------------------------------------------------------------------------
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--no-bench", action="store_true")
+    figstyle.add_argument(ap)
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
     FIG_DIR.mkdir(parents=True, exist_ok=True)
     t0 = time.perf_counter()
+    looks = figstyle.styles(args.style)
 
     with Bench("lab-figures", section="s2_lab", sample=not args.no_bench,
                echo=True) as b:
@@ -290,14 +308,18 @@ def main() -> int:
             stats = E.build(source, specs, mktb=mktb)
         with b.phase("fig7"):
             f7 = fig7_stats(source, vix)
-            build_fig7(source, vix, FIG_DIR / "fig07_lab_bias_2x2.pdf")
+            for st in looks:
+                build_fig7(source, vix, figstyle.out_path(FIG_DIR, "fig07_lab_bias_2x2.pdf", st), st)
         with b.phase("fig8"):
             f8 = fig8_data(source)
-            build_fig8(f8, FIG_DIR / "fig08_lab_cumret_2x2.pdf")
+            for st in looks:
+                build_fig8(f8, figstyle.out_path(FIG_DIR, "fig08_lab_cumret_2x2.pdf", st), st)
         with b.phase("figIA2"):
             ia2 = ia2_data(source)
             ident = ia2_identity(ia2, stats)
-            build_ia2(ia2, FIG_DIR / "figIA2_lab_decomposition_rating.pdf")
+            for st in looks:
+                build_ia2(ia2, figstyle.out_path(FIG_DIR, "figIA2_lab_decomposition_rating.pdf", st),
+                          st)
         with b.phase("record"):
             out = paths.section_results("s2_lab")
             pd.DataFrame([{"panel": k, **v} for k, v in f7.items()]).to_csv(

@@ -44,6 +44,7 @@ Compiling is what catches it.
 | `data/<section>/` | the tidy statistics frames the exhibits format, plus a manifest per result |
 | `reports/tables/` | the paper's tables, as LaTeX fragments |
 | `reports/figures/` | the paper's figures, as PDF |
+| `reports/figures/house/` | the same figures in the house style (see *Two looks for every figure*, below) |
 | **`reports/exhibits.pdf`** | **all 44 of them compiled into one document**, in the paper's order and under the paper's exhibit numbers, with a provenance page |
 | `reports/timings.jsonl` | one line per step: phases, wall clock, and the step's own check |
 
@@ -157,6 +158,24 @@ was printed and why it changed. `RECONCILIATION_ia08.md` has the full account, a
 `python s4_zoo/t_ia08.py --diffs` prints them.
 
 ---
+
+## Two looks for every figure
+
+Every figure driver draws its data once and renders it in each look `--style` asks for
+(`stage3/figstyle.py`); the runner asks for `both`.
+
+- **`paper`**, the default, is the published paper's look. It uses serif type, the blue
+  scale for the three approaches, orange for the latent implementation bias, italic factor
+  names and framed legends, and writes to `reports/figures/`.
+- **`house`** is the production-paper style of our bond_schedule project. It uses Arial,
+  charcoal axes without top or right spines, maroon, blue and charcoal, one legend outside
+  the data and no title in the image, and writes to `reports/figures/house/`.
+
+A look never computes: the identity checks run once, on the data both looks draw.
+Every figure whose x-axis is time shades the NBER recessions, the Great Recession
+(2007:12 to 2009:06) and COVID-19 (2020:02 to 2020:04), in both looks. Figure 6 redraws
+from its stored bars without refitting its sweep: `python s2_lab/f06_dua.py --from-cells
+--style both`.
 
 ## The flags that change the answer
 

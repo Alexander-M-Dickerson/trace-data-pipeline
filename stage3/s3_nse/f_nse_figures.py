@@ -17,6 +17,10 @@ figure's selection for another silently changes which factors the reader sees.
 ❗The MUA half is sign-corrected on the FIGURE baseline (VW_Dp_Q_all_all_all), not the
 tables' VW_Qp baseline.
 
+Drawn in each look `--style` asks for (figstyle.py): each box in its cluster's colour, with
+a legend of the clusters and the baseline mark under the plot, top to bottom in selection
+order (cluster I first).
+
 Each figure carries an IDENTITY CHECK: every plotted box statistic is recomputed
 independently here and compared at 1e-9. It catches a selection or sign-correction
 applied on one path and not the other, which the picture cannot show you.
@@ -26,7 +30,7 @@ FLIPS somewhere across the grid -- the section's headline count, under its own
 selection rule (top four by median alpha level, Dp-signed). It is reported, not gated:
 the count is a finding about the data, not an invariant.
 
-    python s3_nse/f_nse_figures.py
+    python s3_nse/f_nse_figures.py [--window paper|full] [--style paper|house|both]
 """
 from __future__ import annotations
 
@@ -77,33 +81,65 @@ def recompute_box(df, value: str, signals: list[str], signed_baseline: str | Non
     return out
 
 
-def render(sel, baseline_vals, out_pdf: Path, xlabel: str) -> None:
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+def render(sel, order: list[str], baseline_vals, out_pdf: Path, xlabel: str, st) -> None:
+    """One box per signal, top to bottom in selection order (cluster I first): the IQR box
+    filled in its cluster's colour, the median, the min-max whiskers, and the baseline t
+    (averaged across ratings and weightings) as a mark across the box."""
+    import figstyle
+    from matplotlib.lines import Line2D
 
-    df = sel.sort_values(["group", "median"], ascending=[False, True]).reset_index(drop=True)
-    fig, ax = plt.subplots(figsize=(8, 10))
-    for i, row in df.iterrows():
-        ax.add_patch(plt.Rectangle((row["q25"], i - 0.3), row["q75"] - row["q25"], 0.6,
-                                   facecolor="#9ecae1", edgecolor="black", linewidth=0.5))
-        ax.vlines(row["median"], i - 0.3, i + 0.3, color="black", linewidth=1.5)
-        if baseline_vals and row["signal"] in baseline_vals:
-            ax.vlines(baseline_vals[row["signal"]], i - 0.3, i + 0.3,
-                      color="red", linewidth=1.5)
-        ax.hlines(i, row["min"], row["q25"], color="black", linewidth=0.8)
-        ax.hlines(i, row["q75"], row["max"], color="black", linewidth=0.8)
-    ax.set_yticks(range(len(df)))
-    ax.set_yticklabels(df["signal"], fontsize=8, style="italic")
-    ax.axvline(0, color="gray", linewidth=0.5)
-    ax.axvline(1.96, color="red", linewidth=1.0, linestyle="--", alpha=0.7)
-    ax.set_xlabel(xlabel)
-    ax.set_ylim(-0.5, len(df) - 0.5)
-    ax.grid(True, alpha=0.3, linewidth=0.5)
-    fig.tight_layout()
-    out_pdf.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_pdf, dpi=150, bbox_inches="tight")
-    plt.close(fig)
+    paper = st.name == "paper"
+    df = sel.set_index("signal").loc[order].reset_index().iloc[::-1].reset_index(drop=True)
+    ink = "black" if paper else figstyle.CHARCOAL
+    with figstyle.use(st) as plt:
+        fig, ax = plt.subplots(figsize=((10, 14) if paper else (6.5, 7.2)))
+        h = 0.6
+        drawn_baseline = False
+        for i, row in df.iterrows():
+            colour = st.clusters[int(row["group"]) - 1]
+            ax.add_patch(plt.Rectangle((row["q25"], i - h / 2), row["q75"] - row["q25"], h,
+                                       facecolor=colour, edgecolor=ink, linewidth=0.5))
+            ax.vlines(row["median"], i - h / 2, i + h / 2, color=ink, linewidth=(1.5 if paper else 1.1))
+            if baseline_vals and row["signal"] in baseline_vals:
+                ax.vlines(baseline_vals[row["signal"]], i - h / 2, i + h / 2,
+                          color=st.c("baseline"), linewidth=(1.5 if paper else 1.3))
+                drawn_baseline = True
+            lw = 0.8 if paper else 0.7
+            ax.hlines(i, row["min"], row["q25"], color=ink, linewidth=lw)
+            ax.hlines(i, row["q75"], row["max"], color=ink, linewidth=lw)
+            for end in (row["min"], row["max"]):
+                ax.vlines(end, i - h / 4, i + h / 4, color=ink, linewidth=lw)
+        ax.set_yticks(range(len(df)))
+        ax.set_yticklabels(list(df["signal"]), fontsize=(9 if paper else 6.5),
+                           style=("italic" if paper else "normal"))
+        ax.axvline(0, color=st.c("zero"), linewidth=0.5)
+        ax.axvline(1.96, color=st.c("threshold"), linewidth=(1.0 if paper else 0.8),
+                   linestyle="--", alpha=(0.7 if paper else 1.0))
+        ax.set_xlabel(xlabel)
+        lo = min(float(df["min"].min()), 0.0) - 0.2
+        hi = max(float(df["max"].max()), 1.96) + 0.2
+        ax.set_xlim(lo, hi)
+        ax.set_ylim(-0.5, len(df) - 0.5)
+        st.grid(ax, axis=("both" if paper else "x"))
+        if not paper:
+            ax.tick_params(axis="y", length=0)
+        ax.set_axisbelow(True)
+        # the clusters' colours, and the baseline mark, in a legend under the plot
+        handles = [plt.Rectangle((0, 0), 1, 1, facecolor=st.clusters[g - 1], edgecolor=ink,
+                                 linewidth=0.5) for g in sorted(int(g) for g in df["group"].unique())]
+        labels = [C.get_group_name(g) for g in sorted(int(g) for g in df["group"].unique())]
+        if drawn_baseline:
+            handles.append(Line2D([0], [0], color=st.c("baseline"), linewidth=1.5))
+            labels.append("Baseline")
+        ax.legend(handles=handles, labels=labels, loc="upper center",
+                  bbox_to_anchor=(0.5, (-0.04 if paper else -0.07)),
+                  ncol=(4 if drawn_baseline else 3) if paper else 4, fontsize=(8 if paper else 6.5),
+                  columnspacing=1.0, handletextpad=0.5, **st.legend)
+        fig.tight_layout()
+        fig.subplots_adjust(bottom=(0.12 if paper else 0.16))
+        out_pdf.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(out_pdf, dpi=150, bbox_inches="tight")
+        plt.close(fig)
 
 
 def main() -> int:
@@ -111,9 +147,12 @@ def main() -> int:
     ap.add_argument("--window", choices=("paper", "full"), default="paper")
     ap.add_argument("--twin", choices=("feb", "mar14"), default="feb")
     ap.add_argument("--no-bench", action="store_true")
+    import figstyle
+    figstyle.add_argument(ap)
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
     t0 = time.perf_counter()
+    looks = figstyle.styles(args.style)
 
     with Bench(f"nse-figures-{args.window}", section="s3_nse",
                sample=not args.no_bench, echo=True) as b:
@@ -130,14 +169,16 @@ def main() -> int:
                     sel_stats = E.dua_signal_stats(dua, sel_col)
                     plot_stats = E.dua_signal_stats(dua, plot_col)
                     signed_baseline = None
-                    base_col = {"tstat_alpha": "baseline_alpha_tstat",
-                                "tstat_premia": "baseline_tstat"}[plot_col]
-                    baseline_vals = E.dua_baseline_values(baselines, base_col)
                 else:
                     sel_stats = E.mua_signal_stats(mua, sel_col)
                     plot_stats = E.mua_signal_stats(mua, plot_col)
                     signed_baseline = E.FLIP_BASELINE
-                    baseline_vals = None
+                # the mark across each box: the signal's unfiltered baseline t, averaged across
+                # ratings and weightings, in all four figures (the published captions define it
+                # so for Figures IA.3-IA.5, and IA.6 drew it too)
+                base_col = {"tstat_alpha": "baseline_alpha_tstat", "tstat_premia": "baseline_tstat",
+                            "t_stat": "baseline_tstat"}[plot_col]
+                baseline_vals = E.dua_baseline_values(baselines, base_col)
                 chosen = E.top4_per_cluster(sel_stats, by=by)
                 sel = plot_stats[plot_stats["signal"].isin(chosen["signal"])].copy()
                 assert len(sel) == 36, f"{exhibit}: selected {len(sel)} signals"
@@ -147,8 +188,10 @@ def main() -> int:
                 max_d = max(abs(float(r[c]) - indep[r["signal"]][c])
                             for _, r in sel.iterrows() for c in BOX_COLS)
 
-                render(sel, baseline_vals, fig_dir / f"{stem}_{args.window}.pdf",
-                       xlabel="$t$-statistic")
+                xlabel = "$t$-statistic (Alpha)" if "alpha" in plot_col else "$t$-statistic"
+                for st in looks:
+                    render(sel, list(chosen["signal"]), baseline_vals,
+                           figstyle.out_path(fig_dir, f"{stem}_{args.window}.pdf", st), xlabel, st)
                 checks.append({
                     "exhibit": exhibit, "tex_label": tex_label,
                     "grid": grid,

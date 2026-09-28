@@ -17,7 +17,10 @@ same quantity computed by the statistics engine behind Tables 1 and 2, at 1e-9. 
 figure that disagrees with its own table is the failure worth catching, and the picture
 itself cannot show you that it has happened.
 
-    python s1_lib/f_lib_figures.py
+The data is computed once and drawn in each look `--style` asks for (figstyle.py): the
+paper's (the default) or the house style. Figure 3 shades the NBER recessions.
+
+    python s1_lib/f_lib_figures.py [--style paper|house|both]
 """
 from __future__ import annotations
 
@@ -34,6 +37,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import drrlib as D          # noqa: E402
+import figstyle             # noqa: E402
 import lib_engine as E      # noqa: E402
 import paths                # noqa: E402
 from bench import Bench     # noqa: E402
@@ -66,10 +70,6 @@ def _series(sort: str, sig: str, root, rating: str = "all"):
 
 
 # --------------------------------------------------------------- Figure 3
-def _fmt_final(v: float) -> str:
-    return f"${v:.1f}" if v < 10 else f"${v:.0f}"
-
-
 def fig3_data(root: Path | None = None) -> dict:
     out = {}
     for key, (sig, sort) in {"A": ("str", "single"), "B": ("str", "wf"),
@@ -82,55 +82,46 @@ def fig3_data(root: Path | None = None) -> dict:
     return out
 
 
-def build_fig3(root: Path | None, out_pdf: Path) -> dict:
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+# the series of each panel: (column, legend label, colour role, line style)
+FIG3_SERIES = [("r1", "With Noise", "unadjusted", "-"), ("r2", "Adj. Signal", "adj_signal", "--"),
+               ("r3", "Adj. Return", "adj_return", "-"), ("lib", "Cumulative LIB", "lib_line", ":")]
 
-    data = fig3_data(root=None)
-    fig, axes = plt.subplots(2, 2, figsize=(11, 7.5))
-    order = {"A": (0, 0), "B": (0, 1), "C": (1, 0), "D": (1, 1)}
-    titles = {"A": "(A) str: Single-Sort", "B": "(B) str: Within-Firm",
-              "C": "(C) cs: Single-Sort", "D": "(D) cs: Within-Firm"}
-    # the three-approach palette: light / medium / dark blue
-    style = [("r1", "With Noise", "#a6cee3", "-"), ("r2", "Adj. Signal", "#1f78b4", "--"),
-             ("r3", "Adj. Return", "#08306b", "-"), ("lib", "Cumulative LIB", "gray", ":")]
-    finals = {}
-    for key, d in data.items():
-        ax = axes[order[key]]
-        cum = d["cum"]
-        for c, lab, color, ls in style:
-            ax.plot(cum.index, cum[c], color=color, ls=ls, lw=1.1, label=lab)
-        from matplotlib.ticker import FixedLocator, FuncFormatter, NullLocator
-        ax.set_yscale("log")
-        ax.set_title(titles[key], fontsize=10)
-        ax.axhline(1, color="gray", lw=0.5)
-        ax.grid(True, alpha=0.25, lw=0.5)
-        # the paper's sparse 1-2-5 dollar ticks on the LEFT axis
-        vals_all = cum.to_numpy().ravel()
-        ymin, ymax = float(np.min(vals_all)), float(np.max(vals_all))
-        ticks = [t for t in (0.5, 1, 2, 5, 10, 20, 50, 100) if ymin * 0.7 <= t <= ymax * 1.3] or [1]
-        ax.set_ylim(ymin * 0.9, ymax * 1.1)
-        ax.yaxis.set_major_locator(FixedLocator(ticks))
-        ax.yaxis.set_minor_locator(NullLocator())
-        ax.yaxis.set_major_formatter(FuncFormatter(
-            lambda y, _: f"${y:.0f}" if y >= 1 else f"${y:.1f}"))
-        finals[key] = {c: float(cum[c].iloc[-1]) for c, *_ in style}
-        ax2 = ax.twinx()
-        ax2.set_yscale("log")
-        ax2.set_ylim(ax.get_ylim())
-        vals = list(finals[key].values())
-        ax2.yaxis.set_major_locator(FixedLocator(vals))
-        ax2.yaxis.set_minor_locator(NullLocator())
-        ax2.yaxis.set_major_formatter(FuncFormatter(lambda y, _: _fmt_final(y)))
-    axes[0, 0].legend(loc="upper left", fontsize=8, frameon=True, edgecolor="gray")
-    fig.suptitle("Cumulative factor returns under standard and adjusted approaches",
-                 fontsize=11)
-    fig.tight_layout()
-    out_pdf.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_pdf, bbox_inches="tight")
-    plt.close(fig)
-    return finals
+
+def fig3_finals(data: dict) -> dict:
+    """The growth of $1 at the end of the sample, per panel and series (printed in the prose)."""
+    return {key: {c: float(d["cum"][c].iloc[-1]) for c, *_ in FIG3_SERIES}
+            for key, d in data.items()}
+
+
+def build_fig3(data: dict, out_pdf: Path, st) -> None:
+    with figstyle.use(st) as plt:
+        fig, axes = plt.subplots(2, 2, figsize=st.size(12, 8))
+        order = {"A": (0, 0), "B": (0, 1), "C": (1, 0), "D": (1, 1)}
+        finals = fig3_finals(data)
+        for key, d in data.items():
+            ax = axes[order[key]]
+            cum = d["cum"]
+            st.recessions(ax)
+            for c, lab, role, ls in FIG3_SERIES:
+                ax.plot(cum.index, cum[c], color=st.c(role), ls=ls,
+                        lw=(1.0 if c == "lib" else 1.2), label=lab)
+            sort = "Single-Sort" if d["sort"] == "single" else "Within-Firm"
+            st.panel(ax, key, f"{st.factor(d['sig'])}: {sort}")
+            ax.axhline(1, color=st.c("zero"), lw=0.5)
+            st.grid(ax, axis="both")
+            figstyle.date_axis(ax)
+            figstyle.dollar_axes(ax, cum, [finals[key][c] for c, *_ in FIG3_SERIES],
+                                 [st.c(role) for _, _, role, _ in FIG3_SERIES], st)
+        h, lab = axes[0, 0].get_legend_handles_labels()
+        if st.name == "paper":
+            st.add_legend(axes[0, 0], h, lab, loc="upper left", fontsize=8)
+            fig.text(0.02, 0.5, "Dollar Value", va="center", rotation="vertical", fontsize=12)
+            fig.tight_layout(rect=(0.03, 0, 1, 1))
+        else:
+            fig.supylabel("Dollar value", fontsize=8.5)
+            st.legends(fig, [(axes[0, 0], h, lab, {})])
+        fig.savefig(out_pdf, bbox_inches="tight")
+        plt.close(fig)
 
 
 # --------------------------------------------------------------- Figure 4
@@ -180,38 +171,50 @@ def check_fig4(data: dict, root: Path | None = None) -> dict:
     return rep
 
 
-def build_fig4(data: dict, out_pdf: Path) -> None:
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+def bias_bars(ax, x, df, st, capsize: float) -> None:
+    """The two biases side by side with 1.96 x Newey-West whiskers (Figures 4 A-B and IA.1)."""
+    alpha = 0.8 if st.name == "paper" else 1.0
+    err = dict(ecolor=st.c("whisker"), elinewidth=(1.0 if st.name == "paper" else 0.7))
+    ax.bar(x - 0.175, df["bias_1_2"], 0.35, yerr=1.96 * df["se_1_2"], capsize=capsize,
+           label=r"Bias (1)$-$(2): Signal Adj.", color=st.c("bias12"), alpha=alpha, error_kw=err)
+    ax.bar(x + 0.175, df["bias_1_3"], 0.35, yerr=1.96 * df["se_1_3"], capsize=capsize,
+           label=r"Bias (1)$-$(3): Return Adj.", color=st.c("bias13"), alpha=alpha, error_kw=err)
+    ax.axhline(0, color=st.c("zero"), lw=0.5)
+    st.grid(ax)
 
-    fig, axes = plt.subplots(2, 2, figsize=(12, 9))
-    for j, (sort, title) in enumerate([("single", "Single-Sort"), ("wf", "Within-Firm Sort")]):
-        df = data[sort]
-        x = np.arange(len(df))
-        ax = axes[0, j]
-        ax.bar(x - 0.175, df["bias_1_2"], 0.35, yerr=1.96 * df["se_1_2"], capsize=3,
-               label=r"Bias (1)$-$(2): Signal Adj.", color="#1f78b4", alpha=0.8)
-        ax.bar(x + 0.175, df["bias_1_3"], 0.35, yerr=1.96 * df["se_1_3"], capsize=3,
-               label=r"Bias (1)$-$(3): Return Adj.", color="#08306b", alpha=0.8)
-        ax.set_ylabel("Bias (% monthly)")
-        ax.set_xticks(x, df["signal"], fontsize=8)
-        ax.set_title(f"({'AB'[j]}) {title}")
-        ax.grid(True, alpha=0.25, axis="y")
-        ax = axes[1, j]
-        ax.bar(x, df["lib_pct"], 0.6, label="LIB", color="#ff7f0e", alpha=0.9)
-        ax.bar(x, df["actual_pct"], 0.6, bottom=df["lib_pct"], label="Actual Return",
-               color="#08306b", alpha=0.9)
-        ax.set_ylabel("Decomposition (%)")
-        ax.set_ylim(0, 105)
-        ax.set_xticks(x, df["signal"], fontsize=8)
-        ax.set_title(f"({'CD'[j]}) {title} - Decomposition")
-        ax.grid(True, alpha=0.25, axis="y")
-    axes[0, 1].legend(loc="upper right", fontsize=8)
-    axes[1, 1].legend(loc="upper right", fontsize=8)
-    fig.tight_layout()
-    fig.savefig(out_pdf, bbox_inches="tight")
-    plt.close(fig)
+
+def build_fig4(data: dict, out_pdf: Path, st) -> None:
+    with figstyle.use(st) as plt:
+        fig, axes = plt.subplots(2, 2, figsize=st.size(12, 9))
+        ticks = 10 if st.name == "paper" else None
+        for j, (sort, title) in enumerate([("single", "Single-Sort"), ("wf", "Within-Firm Sort")]):
+            df = data[sort]
+            x = np.arange(len(df))
+            names = [st.factor(s_) for s_ in df["signal"]]
+            ax = axes[0, j]
+            bias_bars(ax, x, df, st, capsize=3)
+            ax.set_ylabel("Bias (% monthly)")
+            ax.set_xticks(x, names, fontsize=ticks)
+            st.panel(ax, "AB"[j], title)
+            ax = axes[1, j]
+            alpha = 0.9 if st.name == "paper" else 1.0
+            ax.bar(x, df["lib_pct"], 0.6, label="LIB", color=st.c("lib_bar"), alpha=alpha)
+            # Referee 1 (round 2, point B): the implementable part is the ADJUSTED return
+            ax.bar(x, df["actual_pct"], 0.6, bottom=df["lib_pct"], label="Adjusted Return",
+                   color=st.c("implementable"), alpha=alpha)
+            ax.set_ylabel("Decomposition (%)")
+            ax.set_ylim(0, 105)
+            ax.axhline(100, color=st.c("zero"), lw=0.5, ls="--")
+            ax.set_xticks(x, names, fontsize=ticks)
+            st.panel(ax, "CD"[j], f"{title} - Decomposition")
+            st.grid(ax)
+        hb, lb = axes[0, 1].get_legend_handles_labels()
+        # the stacked bars read top-down, so the legend does too: adjusted return, then LIB
+        hd, ld = axes[1, 1].get_legend_handles_labels()
+        st.legends(fig, [(axes[0, 1], hb, lb, {"loc": "upper right"}),
+                         (axes[1, 1], hd[::-1], ld[::-1], {"loc": "upper right"})])
+        fig.savefig(out_pdf, bbox_inches="tight")
+        plt.close(fig)
 
 
 # --------------------------------------------------------------- Figure IA.1
@@ -253,29 +256,22 @@ def check_figia1(data: dict, root: Path | None = None) -> dict:
     return rep
 
 
-def build_figia1(data: dict, out_pdf: Path) -> None:
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
+def build_figia1(data: dict, out_pdf: Path, st) -> None:
     labels = {"all": "All Bonds", "ig": "Inv. Grade", "nig": "Non-Inv. Grade"}
-    fig, axes = plt.subplots(1, 2, figsize=(10, 5))
-    for j, (sort, title) in enumerate([("single", "Single-Sort"), ("wf", "Within-Firm Sort")]):
-        df = data[sort]
-        x = np.arange(len(df))
-        ax = axes[j]
-        ax.bar(x - 0.175, df["bias_1_2"], 0.35, yerr=1.96 * df["se_1_2"], capsize=4,
-               label=r"Bias (1)$-$(2): Signal Adj.", color="#1f78b4", alpha=0.8)
-        ax.bar(x + 0.175, df["bias_1_3"], 0.35, yerr=1.96 * df["se_1_3"], capsize=4,
-               label=r"Bias (1)$-$(3): Return Adj.", color="#08306b", alpha=0.8)
-        ax.set_ylabel("Average Bias (% monthly)")
-        ax.set_xticks(x, [labels[r] for r in df["rating"]], fontsize=9)
-        ax.set_title(f"({'AB'[j]}) {title}")
-        ax.grid(True, alpha=0.25, axis="y")
-    axes[1].legend(loc="upper right", fontsize=8)
-    fig.tight_layout()
-    fig.savefig(out_pdf, bbox_inches="tight")
-    plt.close(fig)
+    with figstyle.use(st) as plt:
+        fig, axes = plt.subplots(1, 2, figsize=st.size(10, 5))
+        for j, (sort, title) in enumerate([("single", "Single-Sort"), ("wf", "Within-Firm Sort")]):
+            df = data[sort]
+            x = np.arange(len(df))
+            ax = axes[j]
+            bias_bars(ax, x, df, st, capsize=4)
+            ax.set_ylabel("Average Bias (% monthly)")
+            ax.set_xticks(x, [labels[r] for r in df["rating"]])
+            st.panel(ax, "AB"[j], title)
+        h, lab = axes[1].get_legend_handles_labels()
+        st.legends(fig, [(axes[1], h, lab, {"loc": "upper right"})])
+        fig.savefig(out_pdf, bbox_inches="tight")
+        plt.close(fig)
 
 
 # --------------------------------------------------------------------------
@@ -284,6 +280,7 @@ def main() -> int:
     ap.add_argument("--end", default=None,
                     help="override the sample end; T is then derived from the data")
     ap.add_argument("--no-bench", action="store_true")
+    figstyle.add_argument(ap)
     args = ap.parse_args()
 
     sys.stdout.reconfigure(encoding="utf-8")
@@ -292,19 +289,25 @@ def main() -> int:
         CTX["end"] = args.end
         CTX["expected_T"] = None
     FIG_DIR.mkdir(parents=True, exist_ok=True)
+    looks = figstyle.styles(args.style)
 
     with Bench("lib-figures", section="s1_lib", sample=not args.no_bench,
                echo=True) as b:
         with b.phase("fig3"):
-            finals = build_fig3(None, FIG_DIR / "fig03_cumret.pdf")
+            d3 = fig3_data()
+            finals = fig3_finals(d3)
+            for st in looks:
+                build_fig3(d3, figstyle.out_path(FIG_DIR, "fig03_cumret.pdf", st), st)
         with b.phase("fig4"):
             d4 = fig4_data()
             g4 = check_fig4(d4)
-            build_fig4(d4, FIG_DIR / "fig04_bias.pdf")
+            for st in looks:
+                build_fig4(d4, figstyle.out_path(FIG_DIR, "fig04_bias.pdf", st), st)
         with b.phase("figia1"):
             dia = figia1_data()
             gia = check_figia1(dia)
-            build_figia1(dia, FIG_DIR / "figIA1_bias_by_rating.pdf")
+            for st in looks:
+                build_figia1(dia, figstyle.out_path(FIG_DIR, "figIA1_bias_by_rating.pdf", st), st)
         with b.phase("record"):
             out = paths.section_results("s1_lib")
             for sort, df in d4.items():

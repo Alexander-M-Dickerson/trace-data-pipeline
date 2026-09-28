@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Stage 3 draws every figure in two looks** (`stage3/figstyle.py`, `--style
+  paper|house|both`; the runner draws both).
+  - `paper` (the default, `reports/figures/`) restores the published figures' look, which
+    stage 3 had not reproduced. That means the serif type and the paper's colours for every
+    figure, plus the features individual figures had:
+    - the cluster colours, the cluster legend and the baseline mark in Figures IA.3 to IA.6;
+    - the threshold shading in Figure 6;
+    - the coloured end values in Figures 3 and 8.
+  - `house` (`reports/figures/house/`) is the production-paper style of the bond_schedule
+    project: maroon, blue and charcoal, legends outside the data.
+- Every time-series panel (Figures 3, 7A, 7B and 8) now shades the NBER recessions, from one
+  definition in `figstyle.py`.
+- Figure 4's decomposition labels the implementable part "Adjusted Return", not "Actual
+  Return".
+- Figures IA.5 and IA.6 now mark each signal's baseline t-statistic, as Figures IA.3 and IA.4
+  already did.
+- End-value labels in Figures 3 and 8 no longer print on top of each other.
+- Figure 6 has no title line (the paper's layout cropped it). It can be redrawn from its stored
+  bars without refitting: `f06_dua.py --from-cells`.
+
 ## [4.1.3] - 2026-09-28
 
 **One wrong row in Table IA.III.** Nothing else a stage computes changes.
