@@ -92,6 +92,28 @@ def test_house_colours_are_bond_schedules():
     assert {c["unadjusted"], c["adj_signal"], c["adj_return"]} == {"#990F3D", "#0F5499", "#262A33"}
 
 
+def _lab(hex_colour: str) -> tuple[float, float, float]:
+    """sRGB -> CIE Lab (D65)."""
+    c = [int(hex_colour[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+    c = [((v + 0.055) / 1.055) ** 2.4 if v > 0.04045 else v / 12.92 for v in c]
+    xyz = ((0.4124 * c[0] + 0.3576 * c[1] + 0.1805 * c[2]) / 0.95047,
+           0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2],
+           (0.0193 * c[0] + 0.1192 * c[1] + 0.9505 * c[2]) / 1.08883)
+    f = [t ** (1 / 3) if t > 0.008856 else 7.787 * t + 16 / 116 for t in xyz]
+    return 116 * f[1] - 16, 500 * (f[0] - f[1]), 200 * (f[1] - f[2])
+
+
+def test_house_clusters_can_be_told_apart():
+    """The nine cluster colours of Figures IA.3-IA.6. The FT palette's teal and green are
+    6 apart in CIE delta E, which the eye reads as one colour; the house look keeps every pair
+    at least 15 apart (the submitted paper's own blue scale reached 10)."""
+    import itertools
+    labs = [_lab(c) for c in figstyle.HOUSE.clusters]
+    worst = min(sum((p - q) ** 2 for p, q in zip(a, b)) ** 0.5
+                for a, b in itertools.combinations(labs, 2))
+    assert worst >= 15, f"two house cluster colours are only {worst:.1f} apart"
+
+
 def test_out_paths(tmp_path):
     assert figstyle.out_path(tmp_path, "f.pdf", figstyle.PAPER) == tmp_path / "f.pdf"
     assert figstyle.out_path(tmp_path, "f.pdf", figstyle.HOUSE) == tmp_path / "house" / "f.pdf"

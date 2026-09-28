@@ -17,7 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - the threshold shading in Figure 6;
     - the coloured end values in Figures 3 and 8.
   - `house` (`reports/figures/house/`) is the production-paper style of the bond_schedule
-    project: maroon, blue and charcoal, legends outside the data.
+    project: maroon, blue and charcoal, legends outside the data. Its nine cluster colours
+    (Figures IA.3 to IA.6) are kept apart by a test: the palette's teal and green, which the
+    eye reads as one colour, are not both used.
 - Every time-series figure shades the NBER recessions (the Great Recession and COVID-19), from
   one definition, `recessions.py` at the repository root: stage 3's Figures 3, 7A, 7B and 8,
   and the five time-series figures of the stage 2 data report, whose captions now say so.

@@ -40,8 +40,9 @@ MAROON, BLUE, CHARCOAL = "#990F3D", "#0F5499", "#262A33"
 GREY, LIGHTGREY = "#7F7F7F", "#D0D0D0"
 LIGHT_MAROON, LIGHT_BLUE = "#E7C3CF", "#C3D4E6"
 RECESSION_GREY = "#E8E8E8"
-FT = {"teal": "#0F766E", "gold": "#F2B701", "purple": "#6F4E7C", "orange": "#D56F3E",
-      "slate": "#4C78A8", "brown": "#8C6D31", "pink": "#E95D8E", "green": "#0D7680"}
+FT = {"light_blue": "#A7D4E8", "teal": "#0F766E", "gold": "#F2B701", "purple": "#6F4E7C",
+      "orange": "#D56F3E", "slate": "#4C78A8", "brown": "#8C6D31", "pink": "#E95D8E",
+      "green": "#0D7680"}
 
 
 def _tint(hex_colour: str, share: float) -> str:
@@ -212,10 +213,13 @@ HOUSE = Style(
         "baseline": MAROON, "threshold": GREY, "zero": CHARCOAL, "whisker": "black",
         "ink": CHARCOAL, "bar_edge": "white",
     },
-    # nine clusters: tints of the family, maroon left out so the maroon baseline mark shows
+    # nine clusters: tints of the family, maroon left out so the maroon baseline mark shows.
+    # The FT palette's green (#0D7680) is all but its teal (#0F766E), and its slate sits close
+    # to the house blue, so clusters VI and VIII take its light blue and the house grey: every
+    # pair is then at least 15 apart in CIE delta E (tests/test_figstyle.py)
     clusters=tuple(_tint(c, 0.55) for c in (BLUE, FT["teal"], FT["gold"], FT["purple"],
-                                            FT["orange"], FT["slate"], FT["brown"],
-                                            FT["green"], FT["pink"])),
+                                            FT["orange"], FT["light_blue"], FT["brown"],
+                                            GREY, FT["pink"])),
     ramp=_ramp(BLUE, LIGHT_BLUE, 9),
     width=6.5,
     legend={"frameon": False},
