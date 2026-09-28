@@ -17,7 +17,7 @@ Read first: `AGENTS.md` at the repository root. Then `QUICKSTART.md`, which this
 
 - the machine is ready and the user wants a stage run: use `run-wrds`, `build-panel`,
   `reproduce-exhibits` or `build-factors`
-- the question is what the data or code means: use `explain`
+- the question is what the data or code means: use `explain-pipeline`
 
 ## First, find out where you are
 

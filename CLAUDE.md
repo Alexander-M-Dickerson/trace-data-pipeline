@@ -3,7 +3,7 @@
 ## In Claude Code
 
 - The skills above are slash commands: `/onboard`, `/run-wrds`, `/build-panel`,
-  `/reproduce-exhibits`, `/build-factors`, `/explain`, `/add-a-column`. They live in
+  `/reproduce-exhibits`, `/build-factors`, `/explain-pipeline`, `/add-a-column`. They live in
   `.claude/skills/`.
 - `.claude/settings.json` lets the read-only checks run without asking (the tests, the dry
   runs, `doctor.py`, `tools/tags.py --check`) and blocks the usual spellings of a force-push

@@ -122,12 +122,60 @@ def _box_body(out: str) -> str:
     return text.strip()
 
 
+def last_factor_source() -> str | None:
+    """The factor source the last stage 2 build used, from its newest run manifest, or None.
+
+    A pinned build never fetches the public sources' caches, so a dry run with the default
+    source reported it as not ready. Checking with the source the build used answers the
+    question the user has: can I build again as I did.
+    """
+    runs = sorted((ROOT / "stage2" / "manifests").glob("monthly_*.json"),
+                  key=lambda f: f.stat().st_mtime, reverse=True)
+    for f in runs:
+        try:
+            src = json.loads(f.read_text(encoding="utf-8")).get("config_snapshot", {}).get("FACTOR_SOURCE")
+        except (OSError, ValueError):
+            continue
+        if src in ("public", "pinned"):
+            return src
+    return None
+
+
 def check_stage2() -> Check:
-    rc, out = run([sys.executable, "_run_stage2.py", "--dry-run"], ROOT / "stage2")
+    cmd = [sys.executable, "_run_stage2.py", "--dry-run"]
+    src = last_factor_source()
+    if src:
+        cmd += ["--factor-source", src]
+    rc, out = run(cmd, ROOT / "stage2")
+    as_before = f" (factor source {src}, as the last build)" if src else ""
     if rc == 0:
         built = "the panel is built" if PANEL.exists() else "the panel is not built yet"
-        return Check("stage 2 inputs", True, f"ready; {built}")
+        return Check("stage 2 inputs", True, f"ready; {built}{as_before}")
     return Check("stage 2 inputs", False, _box_body(out))
+
+
+def check_machine() -> Check:
+    """Cores, memory and free disk, against what the guides ask for. Never blocks a step.
+
+    Stage 3 recommends 8 cores and 32 GB (stage3/README_stage3.md); stage 2 writes about 10 GB
+    and stage 3 about 5 (stage2/QUICKSTART_stage2.md, stage3/README_stage3.md).
+    """
+    import os
+    import shutil
+    cores = os.cpu_count() or 0
+    free_gb = shutil.disk_usage(ROOT).free / 2**30
+    try:
+        import psutil
+        ram_gb = psutil.virtual_memory().total / 2**30
+    except ImportError:
+        ram_gb = None
+    ram = f"{ram_gb:.0f} GB memory" if ram_gb is not None else "memory unknown (no psutil)"
+    detail = f"{cores} cores, {ram}, {free_gb:.0f} GB free on this drive"
+    short = cores < 8 or (ram_gb is not None and ram_gb < 32) or free_gb < 20
+    if short:
+        detail += ("; below 8 cores, 32 GB or 20 GB free: see 'Out of memory' in "
+                   "stage2/README_stage2.md and 'Disk and memory' in stage3/README_stage3.md")
+    return Check("this computer", None if short else True, detail)
 
 
 def check_stage3() -> Check:
@@ -212,6 +260,7 @@ def local() -> tuple[list[Check], str, bool]:
               "packages": check_packages(ROOT / "requirements-local.txt"),
               "pybondlab": check_pybondlab()}
     env_ok = all(c.ok for c in checks.values())
+    checks["machine"] = check_machine()
     if env_ok:
         checks["stage2"] = check_stage2()
         checks["stage3"] = check_stage3()

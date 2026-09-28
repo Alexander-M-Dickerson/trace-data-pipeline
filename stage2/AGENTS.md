@@ -41,9 +41,11 @@ python make_release.py --what panel                        # 6. optional: the re
 ```
 
 1. **Dry run.** Show the user the resolved paths: the daily panel, the FISD file, the callable
-   flags, and the factor source (with `pinned`, the file or URL it will use). The three input files
-   should carry the same date stamp and come from the user's own stage 0/1 folder. Stage 2 takes
-   the newest of each on its own and does not compare the stamps, so compare them in the list.
+   flags, and the factor source (with `pinned`, the file or URL it will use). The three files come
+   from the user's own stage 0/1 folder, from one WRDS run. They can carry two stamps: stage 1
+   names its files by the day it ran, the FISD file carries the day stage 0 ran (the 2026-09-27
+   run: `stage1_20260927`, `trace_enhanced_fisd_20260926`). Stage 2 takes the newest of each on
+   its own and does not compare them, so check the list shows no file from an older run.
 2. **Build.** Run it in the background with a log. It runs the 7 steps in fresh processes: step
    1, step 2, then steps 3-4 and 5-6 as two processes side by side, then step 7. It prints a
    line as each starts and ends. It checks its own output at the end: the 145

@@ -53,7 +53,7 @@ Each is a step-by-step procedure in `.claude/skills/<name>/SKILL.md`, with the s
 | `build-panel` | build the monthly panel (stage 2) |
 | `reproduce-exhibits` | build the exhibits (stage 3) |
 | `build-factors` | build the TRACE-only factors and compare them with the published ones (stage 4) |
-| `explain` | explain a column, filter, factor, setting, exhibit or trap, from the code |
+| `explain-pipeline` | explain a column, filter, factor, setting, exhibit or trap, from the code |
 | `add-a-column` | add, rename, move or remove a monthly panel column, in every place it must change |
 
 ## Where to look

@@ -374,6 +374,12 @@ PyBondLab 0.3.0 declares `numpy<2` and this repository installs numpy 2, so it g
 its dependency list; `requirements-local.txt` says why that is safe. Stages 2-4 stop at start-up
 and print these two lines if PyBondLab is missing or a different version.
 
+❗**On Windows, before you `git pull` a newer release into this folder**, run
+`git config core.fileMode false` in it once. Unzipping on Windows drops the executable bit from
+every `.sh` file, git then counts each one as changed, and the pull stops with "Please commit your
+changes or stash them before you merge". Nothing in the files changed; the setting tells git to
+ignore the bit.
+
 Then build the panel:
 
 ```bash

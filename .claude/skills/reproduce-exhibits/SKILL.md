@@ -17,7 +17,7 @@ file that makes it.
 ## Do not use when
 
 - stage 2 has not finished: use `build-panel`
-- the user wants to know what an exhibit computes: use `explain`
+- the user wants to know what an exhibit computes: use `explain-pipeline`
 
 ## Steps (from `stage3/`)
 

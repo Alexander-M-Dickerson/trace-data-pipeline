@@ -106,3 +106,36 @@ def test_it_counts_a_placeholder_username_as_stage_2_does(monkeypatch, name):
     assert doctor.check_username().ok == bool(s2.wrds_username())
     for script in ("run_pipeline.sh", "run_smoke_test.sh"):
         assert "[Yy][Oo][Uu][Rr]_*" in (ROOT / script).read_text(encoding="utf-8"), script
+
+
+def test_stage2_is_checked_with_the_factor_source_the_last_build_used(monkeypatch, tmp_path):
+    """After a pinned-only build, a dry run with the default (public) source asks for caches
+    the pinned build never fetched. doctor reads the last build's manifest instead."""
+    import json
+    import os
+    import time
+    man = tmp_path / "stage2" / "manifests"
+    man.mkdir(parents=True)
+    old, new = man / "monthly_1_stage1.json", man / "monthly_2_stage1.json"
+    old.write_text(json.dumps({"config_snapshot": {"FACTOR_SOURCE": "public"}}), encoding="utf-8")
+    new.write_text(json.dumps({"config_snapshot": {"FACTOR_SOURCE": "pinned"}}), encoding="utf-8")
+    t = time.time()
+    os.utime(old, (t - 60, t - 60))
+    os.utime(new, (t, t))
+    monkeypatch.setattr(doctor, "ROOT", tmp_path)
+    assert doctor.last_factor_source() == "pinned"
+    seen = {}
+    monkeypatch.setattr(doctor, "run", lambda cmd, cwd: (seen.setdefault("cmd", cmd), (0, ""))[1])
+    doctor.check_stage2()
+    assert seen["cmd"][-2:] == ["--factor-source", "pinned"]
+
+
+def test_no_manifest_means_the_default_source(monkeypatch, tmp_path):
+    monkeypatch.setattr(doctor, "ROOT", tmp_path)
+    assert doctor.last_factor_source() is None
+
+
+def test_it_reports_the_computer():
+    c = doctor.check_machine()
+    assert c.name == "this computer" and "cores" in c.detail and "free" in c.detail
+    assert c.ok in (True, None)          # informs, never blocks a step

@@ -19,7 +19,7 @@ a public change: a CHANGELOG entry and a new vintage, never a silent edit.
 
 ## Do not use when
 
-- the user asks what an existing column is: use `explain`
+- the user asks what an existing column is: use `explain-pipeline`
 - the variable is for the user's own analysis, not the published panel: compute it from the
   built panel in their own code, and change nothing here
 

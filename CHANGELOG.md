@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.1.2] - 2026-09-28
+
+**An end-to-end test on a new WRDS run, and what it found.** Nothing a stage computes has
+changed. A fresh clone ran stages 0 and 1 on the WRDS grid (2026-09-27) and stages 2 to 4 on
+a separate computer in a fresh environment, as a user would. Stages 0 and 1 reproduce the
+2026-09-21 run on all 31,344,732 bond-days. Stage 2 (`--factor-source pinned`) agrees in 131
+of 143 columns exactly and within 3e-8 in the other 12. Stage 3's 33 tables are
+byte-identical, apart from the definitions corrected in Table IA.VIII. Stage 4 agrees with the
+published TRACE-only factors on every row. `docs/validation/validated_runs.csv` records each
+step.
+
+### Fixed
+- `stage2/AGENTS.md` said the three stage 2 inputs should carry one date stamp. A run whose
+  stage 1 starts on a later day than stage 0 has two: stage 1 names its files by the day it
+  runs, and the FISD file carries stage 0's day (this run: 20260927 and 20260926).
+- `doctor.py` checks stage 2 with the factor source the last build used. After a build with
+  `--factor-source pinned` it reported stage 2 as not ready, asking for caches only the public
+  source needs.
+- Stage 3's `--list` names Section 5's exhibits by the sample in use. It named the paper-sample
+  files, so after a default run it listed those exhibits as missing.
+
+### Added
+- `doctor.py` reports the computer's cores, memory and free disk, and points to the guides when
+  they are below what stages 2 and 3 need.
+- QUICKSTART and FAQ: before a `git pull` in a folder unzipped on Windows, run
+  `git config core.fileMode false`. The unzip drops the executable bit from every `.sh` file,
+  git counts each one as changed, and the pull stops.
+
+### Changed
+- The `explain` skill is now `explain-pipeline`: GitHub Copilot Chat has a built-in `/explain`.
+
 ## [4.1.1] - 2026-09-27
 
 **Stage 3's Table B.1 no longer counts Treasury returns as signals; definitions that now say

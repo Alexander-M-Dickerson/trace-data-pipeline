@@ -105,7 +105,7 @@ file, you just do not get `reports/exhibits.pdf`.
 Yes. Open the assistant in the repository folder and it reads [AGENTS.md](AGENTS.md) by itself:
 what each stage does, what to run, what to check and the mistakes to avoid. Skills walk each task
 step by step: `onboard`, `run-wrds`, `build-panel`, `reproduce-exhibits`, `build-factors`,
-`explain` and `add-a-column`. In Claude Code type `/build-panel`; in Codex, `$build-panel`. Or ask
+`explain-pipeline` and `add-a-column`. In Claude Code type `/build-panel`; in Codex, `$build-panel`. Or ask
 in plain words: "set this repository up", "build the monthly panel", "what is `cs_sprd` and where
 is it computed?".
 
@@ -396,6 +396,12 @@ Reports are saved in `data_reports/[enhanced|standard|144a]/` with:
 - Figures (`.pdf` files)
 
 You can compile the LaTeX to PDF or view the figures directly.
+
+### `git pull` refuses after I unzipped the run on Windows. Why?
+
+Unzipping on Windows drops the executable bit from every `.sh` file, so git counts each one as
+changed and stops with "Please commit your changes or stash them before you merge". Nothing in
+the files changed. Run `git config core.fileMode false` in the folder once, then pull again.
 
 ### How do I download files from WRDS Cloud?
 

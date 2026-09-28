@@ -313,7 +313,7 @@ each rule enforced. `python doctor.py` says what is ready and what to run next.
 
 **With an AI assistant.** Claude Code, Codex, Cursor and Copilot read [AGENTS.md](AGENTS.md) by
 themselves: what to run, what to check, and the traps. Seven skills walk a task step by step:
-`/onboard`, `/run-wrds`, `/build-panel`, `/reproduce-exhibits`, `/build-factors`, `/explain` and
+`/onboard`, `/run-wrds`, `/build-panel`, `/reproduce-exhibits`, `/build-factors`, `/explain-pipeline` and
 `/add-a-column` in Claude Code (`$onboard` and so on in Codex). Ask it to set the repository up,
 to build a stage, what a column is and where it is computed, or to add a column to the panel.
 
@@ -715,4 +715,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Last Updated:** September 2026
-**Version:** 4.1.1 — see [CHANGELOG.md](CHANGELOG.md) for what each release changed.
+**Version:** 4.1.2 — see [CHANGELOG.md](CHANGELOG.md) for what each release changed.

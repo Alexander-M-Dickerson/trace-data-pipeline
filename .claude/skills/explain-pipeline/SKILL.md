@@ -1,5 +1,5 @@
 ---
-name: explain
+name: explain-pipeline
 description: Explain what trace-data-pipeline computes and where - a column of the daily or monthly panel, a cleaning filter, a factor, a setting, a stage 3 exhibit, a check that failed, or a known trap - from the code and the data dictionaries, citing file and line. Use for any "what is", "how is it computed", "where does it come from" or "why does it look like this" question about the data or the code.
 ---
 

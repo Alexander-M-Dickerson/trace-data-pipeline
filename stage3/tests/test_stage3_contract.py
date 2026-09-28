@@ -878,3 +878,15 @@ def test_a_wrong_pybondlab_stops_stage3_with_the_install_lines(monkeypatch):
         assert f"--no-deps pybondlab=={pin.VERSION}" in str(e.value)
         status = R.engine_status()
         assert not status["ok"] and "requirements-local.txt" in status["why"]
+
+
+def test_section5_step_targets_follow_the_sample(monkeypatch):
+    """--list and the skip check look for the file the run writes: `_full` after the default
+    (frontier) run, `_paper` with --sample paper. The table used to hard-code `_paper`, so a
+    default run's Section 5 exhibits were listed as missing."""
+    import _run_stage3 as R
+    targets = [t for _s, kind, _p, _a, t in R.STEPS if "{sample}" in t]
+    assert len(targets) == 6 and not [t for _s, _k, _p, _a, t in R.STEPS if "_paper." in t]
+    for tag in ("full", "paper"):
+        monkeypatch.setattr(R, "_SAMPLE_TAG", tag)
+        assert all(R._target(t).name.endswith(f"_{tag}{Path(t).suffix}") for t in targets)

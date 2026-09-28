@@ -95,17 +95,17 @@ STEPS = [
     ("nse", "producer", "s3_nse/run_dua_grid.py", ["--stats"],
      "data/grids/dua/_stats_complete.json"),
     ("nse", "exhibit", "s3_nse/t05_dua_nse.py", [],
-     "reports/tables/table05_paper.tex"),
+     "reports/tables/table05_{sample}.tex"),
     ("nse", "exhibit", "s3_nse/t06_mua_nse.py", [],
-     "reports/tables/table06_paper.tex"),
+     "reports/tables/table06_{sample}.tex"),
     ("nse", "exhibit", "s3_nse/t17_filter_paths.py", [],
-     "reports/tables/table_ia17_paper.tex"),
+     "reports/tables/table_ia17_{sample}.tex"),
     ("nse", "exhibit", "s3_nse/t18_portfolio_size.py", [],
-     "reports/tables/table_ia18_paper.tex"),
+     "reports/tables/table_ia18_{sample}.tex"),
     ("nse", "exhibit", "s3_nse/t19_mua_improvement.py", [],
-     "reports/tables/table_ia19_paper.tex"),
+     "reports/tables/table_ia19_{sample}.tex"),
     ("nse", "exhibit", "s3_nse/f_nse_figures.py", [],
-     "reports/figures/figIA3_nse_alpha_tstat_dua_paper.pdf"),
+     "reports/figures/figIA3_nse_alpha_tstat_dua_{sample}.pdf"),
 
     # -- the factor zoo -------------------------------------------------------
     ("zoo", "producer", "s4_zoo/run_zoo_sorts.py", [],
@@ -244,7 +244,13 @@ SECTION_INPUTS = {
 }
 
 
+# Section 5's exhibits carry the sample in their name: `_full` after the default (frontier) run,
+# `_paper` with --sample paper. main() sets this from --sample before any target is looked up.
+_SAMPLE_TAG = "full"
+
+
 def _target(rel: str) -> Path:
+    rel = rel.replace("{sample}", _SAMPLE_TAG)
     head, rest = rel.split("/", 1)
     return (S.DATA if head == "data" else S.REPORTS) / rest
 
@@ -384,6 +390,8 @@ def main() -> int:
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
 
+    global _SAMPLE_TAG
+    _SAMPLE_TAG = "paper" if args.sample == "paper" else "full"
     steps = [s for s in STEPS
              if (args.section is None or s[0] == args.section)
              and (args.only is None or s[1] == args.only)]
