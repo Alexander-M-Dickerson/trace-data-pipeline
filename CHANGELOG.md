@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.2.1] - 2026-09-28
+
+**Table IA.VIII is the paper's, row for row.** No number any stage computes changes.
+`docs/validation/validated_runs.csv` records the checks.
+
 ### Changed
 - **Table IA.VIII says what the paper prints.** The signal dictionary
   (`stage3/spec/signal_definitions.json`) now words every definition as the revised paper
