@@ -30,13 +30,16 @@ DRIVERS = ["s1_lib/f_lib_figures.py", "s2_lab/f_lab_figures.py", "s2_lab/f06_dua
 
 @pytest.mark.parametrize("rel", DRIVERS)
 def test_no_driver_types_a_colour(rel):
-    """A hex colour or a named colour in a driver is a look that --style cannot change."""
+    """A hex colour, a named colour or a palette constant in a driver is a look that --style
+    cannot change. White is the page, so it may be typed."""
     src = (STAGE3 / rel).read_text(encoding="utf-8")
     hits = [f"{rel}:{i}: {line.strip()[:80]}"
             for i, line in enumerate(src.splitlines(), 1)
             if not line.lstrip().startswith("#")
             and (re.search(r"['\"]#[0-9a-fA-F]{6}['\"]", line)
-                 or re.search(r"colou?r=['\"](gray|grey|red|black|blue|orange)['\"]", line))]
+                 or re.search(r"['\"](gray|grey|red|black|blue|orange|green|purple)['\"]", line)
+                 or re.search(r"figstyle\.(MAROON|BLUE|CHARCOAL|GREY|LIGHT\w*|RECESSION_GREY|FT)\b",
+                              line))]
     assert not hits, "colours typed in a driver:\n" + "\n".join(hits)
 
 

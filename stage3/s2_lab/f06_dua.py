@@ -130,7 +130,7 @@ def build_figure(panels: dict, out_pdf: Path, st) -> None:
             paper = st.name == "paper"
             ax.bar(x, df["alpha"], yerr=1.96 * df["se"], capsize=(3 if paper else 2.2),
                    color=list(st.ramp[:len(df)]), alpha=(0.85 if paper else 1.0),
-                   edgecolor=("gray" if paper else "white"), linewidth=0.5,
+                   edgecolor=st.c("bar_edge"), linewidth=0.5,
                    error_kw=dict(ecolor=st.c("whisker"), elinewidth=(1.0 if paper else 0.7)))
             labels = ([f"<-{p}%" for p in TRIM_PCTS] if location == "left"
                       else [f">{p}%" for p in TRIM_PCTS])[:len(df)]

@@ -170,6 +170,8 @@ PAPER = Style(
         "all": "#08306b", "ig": "#2171b5", "nig": "#6baed6",
         # Section 5
         "baseline": "red", "threshold": "red", "zero": "gray", "whisker": "black",
+        # boxes, medians and bar edges
+        "ink": "black", "bar_edge": "gray",
     },
     clusters=("#c6dbef", "#9ecae1", "#6baed6", "#4292c6", "#2171b5", "#08519c",
               "#a1d99b", "#fdae6b", "#bcbddc"),
@@ -206,6 +208,7 @@ HOUSE = Style(
         "all": CHARCOAL, "ig": BLUE, "nig": MAROON,
         # Section 5
         "baseline": MAROON, "threshold": GREY, "zero": CHARCOAL, "whisker": "black",
+        "ink": CHARCOAL, "bar_edge": "white",
     },
     # nine clusters: tints of the family, maroon left out so the maroon baseline mark shows
     clusters=tuple(_tint(c, 0.55) for c in (BLUE, FT["teal"], FT["gold"], FT["purple"],

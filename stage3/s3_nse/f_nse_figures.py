@@ -90,7 +90,7 @@ def render(sel, order: list[str], baseline_vals, out_pdf: Path, xlabel: str, st)
 
     paper = st.name == "paper"
     df = sel.set_index("signal").loc[order].reset_index().iloc[::-1].reset_index(drop=True)
-    ink = "black" if paper else figstyle.CHARCOAL
+    ink = st.c("ink")
     with figstyle.use(st) as plt:
         fig, ax = plt.subplots(figsize=((10, 14) if paper else (6.5, 7.2)))
         h = 0.6
