@@ -101,7 +101,7 @@ def build_fig3(data: dict, out_pdf: Path, st) -> None:
         for key, d in data.items():
             ax = axes[order[key]]
             cum = d["cum"]
-            st.recessions(ax)
+            st.recessions(ax, cum.index)
             for c, lab, role, ls in FIG3_SERIES:
                 ax.plot(cum.index, cum[c], color=st.c(role), ls=ls,
                         lw=(1.0 if c == "lib" else 1.2), label=lab)

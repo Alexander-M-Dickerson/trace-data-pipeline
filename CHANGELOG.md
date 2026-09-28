@@ -18,8 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - the coloured end values in Figures 3 and 8.
   - `house` (`reports/figures/house/`) is the production-paper style of the bond_schedule
     project: maroon, blue and charcoal, legends outside the data.
-- Every time-series panel (Figures 3, 7A, 7B and 8) now shades the NBER recessions, from one
-  definition in `figstyle.py`.
+- Every time-series figure shades the NBER recessions (the Great Recession and COVID-19), from
+  one definition, `recessions.py` at the repository root: stage 3's Figures 3, 7A, 7B and 8,
+  and the five time-series figures of the stage 2 data report, whose captions now say so.
+  A panel is shaded only where its own dates reach.
 - Figure 4's decomposition labels the implementable part "Adjusted Return", not "Actual
   Return".
 - Figures IA.5 and IA.6 now mark each signal's baseline t-statistic, as Figures IA.3 and IA.4

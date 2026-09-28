@@ -21,6 +21,13 @@ from datetime import datetime
 import gc
 from pandas.tseries.offsets import MonthEnd
 from typing import Union
+import sys
+
+# the repository root's shared modules (recessions.py: the NBER recessions every time-series
+# figure shades, stage 3's too); appended, so nothing there shadows a stage 2 module
+if str(Path(__file__).resolve().parents[1]) not in sys.path:
+    sys.path.append(str(Path(__file__).resolve().parents[1]))
+import recessions  # noqa: E402
 
 
 # ============================================================================
@@ -44,6 +51,12 @@ class PlotParams:
     line_color: str = "0.05"
     line_alpha: float = 1.0
     line_lw: float = 1.25
+    # the NBER recession shading on every time-series panel (recessions.py)
+    recession: dict = None
+
+    def __post_init__(self):
+        if self.recession is None:
+            self.recession = {"color": "gray", "alpha": 0.15}
 
 
 def apply_plot_params(params: PlotParams):
@@ -1718,6 +1731,7 @@ def create_dynamics_of_default_plot(
     # Panel A: Count of Defaulted Bonds
     ax = axes[0]
     dates = df_monthly['date']
+    recessions.shade(ax, dates, **params.recession)
     values = df_monthly['defaulted_bonds']
 
     ax.plot(
@@ -1742,6 +1756,7 @@ def create_dynamics_of_default_plot(
 
     # Panel B: Defaulted Bonds (%)
     ax = axes[1]
+    recessions.shade(ax, dates, **params.recession)
     values = df_monthly['defaulted_pct']
 
     ax.plot(
@@ -1802,7 +1817,8 @@ def create_dynamics_of_default_plot(
         r"A bond is identified as defaulted if either the S\&P composite rating (\texttt{spc\_rat}) "
         r"or the Moody's composite rating (\texttt{mdc\_rat}) equals 22 (D - Default). "
         r"Panel A shows the count of defaulted bonds each month. "
-        r"Panel B shows the percentage of defaulted bonds relative to the total number of bonds."
+        r"Panel B shows the percentage of defaulted bonds relative to the total number of bonds. "
+        + recessions.CAPTION
     )
 
     return out_path, caption
@@ -1890,6 +1906,7 @@ def create_dynamics_of_144a_plot(
     # Panel A: Count of 144a Bonds
     ax = axes[0]
     dates = monthly['date']
+    recessions.shade(ax, dates, **params.recession)
     values = monthly['n_144a']
 
     ax.plot(
@@ -1914,6 +1931,7 @@ def create_dynamics_of_144a_plot(
 
     # Panel B: 144a Bonds (%)
     ax = axes[1]
+    recessions.shade(ax, dates, **params.recession)
     values = monthly['pct_144a']
 
     ax.plot(
@@ -1973,7 +1991,8 @@ def create_dynamics_of_144a_plot(
         r"Dynamics of Rule 144a bonds over time. "
         r"Uses bond-month observations with non-missing month-end returns (\texttt{ret\_vw}). "
         r"Panel A shows the count of 144a bonds each month. "
-        r"Panel B shows the percentage of 144a bonds relative to the total number of bonds."
+        r"Panel B shows the percentage of 144a bonds relative to the total number of bonds. "
+        + recessions.CAPTION
     )
 
     return out_path, caption
@@ -4094,6 +4113,7 @@ def create_coverage_comparison_plot(
 
     # Panel A: OSBAP vs alternative
     ax = axes[0]
+    recessions.shade(ax, monthly_a[date_col], **params.recession)
     ax.plot(monthly_a[date_col], monthly_a['n_osbap'],
             color='steelblue', lw=1.2, label='OSBAP')
     ax.plot(monthly_a[date_col], monthly_a['n_alt'],
@@ -4108,6 +4128,7 @@ def create_coverage_comparison_plot(
 
     # Panel B: OSBAP exclusions vs alternative
     ax = axes[1]
+    recessions.shade(ax, monthly_b[date_col], **params.recession)
     ax.plot(monthly_b[date_col], monthly_b['n_no_def'],
             color='steelblue', lw=1.2, label='OSBAP (No Def)')
     ax.plot(monthly_b[date_col], monthly_b['n_no_144a'],
@@ -4143,7 +4164,7 @@ def create_coverage_comparison_plot(
         f"Monthly coverage comparison between OSBAP and {alt_ref} TRACE databases. "
         f"Panel A compares full OSBAP vs {alt_name}. Panel B shows OSBAP exclusion variants: "
         r"(No Def) excludes trades in default, (No 144a) excludes Rule 144a bonds, "
-        r"(No Def \& 144a) excludes both."
+        r"(No Def \& 144a) excludes both. " + recessions.CAPTION
     )
 
     return fig_path, caption
@@ -4455,6 +4476,7 @@ def create_return_timeseries_plot(
 
     # Panel A: Monthly returns
     ax = axes[0]
+    recessions.shade(ax, mkt[date_col], **params.recession)
     ax.plot(mkt[date_col], mkt['mktb_osbap'] * 100,
             color='steelblue', lw=1, alpha=0.8, label='OSBAP')
     ax.plot(mkt[date_col], mkt['mktb_alt'] * 100,
@@ -4473,6 +4495,7 @@ def create_return_timeseries_plot(
 
     # Panel B: Cumulative returns
     ax = axes[1]
+    recessions.shade(ax, mkt[date_col], **params.recession)
     ax.plot(mkt[date_col], mkt['cum_osbap'] * 100,
             color='steelblue', lw=1.2, label='OSBAP')
     ax.plot(mkt[date_col], mkt['cum_alt'] * 100,
@@ -4506,7 +4529,8 @@ def create_return_timeseries_plot(
     caption = (
         f"Time-series comparison of equal-weighted market returns between OSBAP (solid blue) and {alt_ref} "
         r"(dashed red) databases. Each database computes MKTB using its own non-missing values. "
-        r"Panel A shows monthly EW market returns. Panel B shows cumulative EW returns."
+        r"Panel A shows monthly EW market returns. Panel B shows cumulative EW returns. "
+        + recessions.CAPTION
     )
 
     return fig_path, caption
@@ -4625,6 +4649,7 @@ def create_return_timeseries_exclusion_plot(
 
     # Panel A: Monthly returns
     ax = axes[0]
+    recessions.shade(ax, mkt[date_col], **params.recession)
     ax.plot(mkt[date_col], mkt['mktb_osbap'] * 100,
             color='steelblue', lw=1, alpha=0.8, label='OSBAP (No Def & 144a)')
     ax.plot(mkt[date_col], mkt['mktb_alt'] * 100,
@@ -4643,6 +4668,7 @@ def create_return_timeseries_exclusion_plot(
 
     # Panel B: Cumulative returns
     ax = axes[1]
+    recessions.shade(ax, mkt[date_col], **params.recession)
     ax.plot(mkt[date_col], mkt['cum_osbap'] * 100,
             color='steelblue', lw=1.2, label='OSBAP (No Def & 144a)')
     ax.plot(mkt[date_col], mkt['cum_alt'] * 100,
@@ -4676,7 +4702,8 @@ def create_return_timeseries_exclusion_plot(
     caption = (
         f"Time-series comparison of equal-weighted market returns between OSBAP (No Def \\& 144a) "
         f"and {alt_ref} databases. OSBAP excludes trades in default and Rule 144a bonds. "
-        r"Panel A shows monthly EW market returns. Panel B shows cumulative EW returns."
+        r"Panel A shows monthly EW market returns. Panel B shows cumulative EW returns. "
+        + recessions.CAPTION
     )
 
     return fig_path, caption

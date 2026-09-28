@@ -97,7 +97,7 @@ def build_fig7(source: dict, vix: pd.Series, out_pdf: Path, st) -> None:
                           ("B", ["mom3_1", "mom6_1", "mom12_1"], [1, 1, 1],
                            "Right-Tail Affected Factors (Momentum)")]):
             src = left if "b_dunc3" in sigs else right
-            st.recessions(ax)
+            st.recessions(ax, src.index)
             for sig, sg, role, ls in zip(sigs, signs, ["series1", "series2", "series3"],
                                          ["-", "--", ":"]):
                 s = src[sig] * sg * 100
@@ -170,7 +170,7 @@ def build_fig8(data: dict, out_pdf: Path, st) -> None:
         for panel, d in data.items():
             ax = axes[order[panel]]
             cum = d["cum"]
-            st.recessions(ax)
+            st.recessions(ax, cum.index)
             for c, lab, role, ls in FIG8_SERIES:
                 ax.plot(cum.index, cum[c], color=st.c(role), ls=ls,
                         lw=(1.0 if c == "bias" else 1.2), label=lab)

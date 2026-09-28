@@ -14,21 +14,25 @@ both`); a style never computes. The paper style writes to reports/figures/<stem>
 house style to reports/figures/house/<stem>.pdf.
 
 Every figure whose x-axis is time shades the NBER recessions it spans, in both styles, from
-NBER below: the Great Recession and COVID-19, peak month to trough month.
+the one definition the whole pipeline uses (recessions.py at the repository root; stage 2's
+data report reads it too): the Great Recession and COVID-19, peak month to trough month.
 """
 from __future__ import annotations
 
 import contextlib
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
+# the repository root's shared modules; appended, so nothing there shadows a stage 3 module
+if str(Path(__file__).resolve().parents[1]) not in sys.path:
+    sys.path.append(str(Path(__file__).resolve().parents[1]))
+import recessions as _recessions  # noqa: E402
+
 STYLES = ("paper", "house")
 
-# NBER business-cycle peaks and troughs inside the sample, as the paper's captions state them
-# (Great Recession 2007:12--2009:06, COVID-19 2020:02--2020:04); shaded from the first day of
-# the peak month to the last day of the trough month.
-NBER = (("2007-12-01", "2009-06-30", "Great Recession"),
-        ("2020-02-01", "2020-04-30", "COVID-19"))
+# the NBER recessions inside the sample, as the paper's captions state them (recessions.py)
+NBER = _recessions.NBER
 
 # the bond_schedule project's house colours and, where a figure needs more categories, the
 # rest of the same family (its FT palette)
@@ -124,12 +128,10 @@ class Style:
                   ncol=len(labels), borderaxespad=0.1, handlelength=1.6, columnspacing=1.0,
                   fontsize=7)
 
-    def recessions(self, ax) -> None:
-        """Shade the NBER recessions on a date axis, behind the data, with no legend entry."""
-        import pandas as pd
-        for start, end, _ in NBER:
-            ax.axvspan(pd.Timestamp(start), pd.Timestamp(end), lw=0, zorder=0, label="_recession",
-                       **self.recession)
+    def recessions(self, ax, dates) -> None:
+        """Shade the NBER recessions inside `dates` (the dates the panel plots), behind the
+        data, with no legend entry."""
+        _recessions.shade(ax, dates, **self.recession)
 
     def size(self, w: float, h: float) -> tuple[float, float]:
         """The figure size: the figure's own in the paper style; the house style's fixed width,
