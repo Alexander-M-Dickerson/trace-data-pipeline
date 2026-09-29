@@ -756,7 +756,7 @@ DEFINITION_ACRONYMS = {"AAA", "AMD", "BAA", "BBW", "CAPMB", "CPI", "CPIAUCSL", "
 
 
 def test_definitions_say_what_the_paper_prints():
-    """A description is the paper's words, because the revised paper renders Table IA.VIII
+    """A description is the paper's words, because the paper renders Table IA.VIII
     from it. Notes for readers of the code -- a file name, capitals for emphasis, "as the code
     computes it" -- belong in `why_corrected`. Nine sat in descriptions until 4.2.1, and the
     paper printed its own wording beside them, so the two tables differed.

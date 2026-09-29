@@ -99,6 +99,32 @@ BANNED_WORD_DIGESTS = frozenset({
     "c483466bcf4be5925ad6f868c6706e507ce9ef8aec9470a6f4ba91816ba15ef0",
 })
 
+# A second list. This package's code, comments, tests, docs and CHANGELOG describe what a
+# change does to the method or an exhibit, never where the request came from; these words say
+# the latter. Digests as above, so this file does not spell them (added 2026-09-29).
+REVIEW_WORD_DIGESTS = frozenset({
+    "81803dd4e410a92bc5d510ea539a5d38493e3fe26b707dbac6a63b9e3a7b4d90",
+    "f9da47b6ea1c414fb0fb0f2516948f296f2fcee5e74b059312311880b766d3aa",
+    "895e8bde950d49da947cb09031a3d637dc2617011ceed6e7cdf884f05ac7c0f0",
+    "b26ed6c1fec883c3d1e803062fc1b97d573e2c1178833999c6385e647fbca25a",
+    "64432b10de6549a3cfe841359250df4f58e5d76d1c9a3efe531462a9ebe2584e",
+    "7616aa5837a030b97cff231b22e5436b40eb30495c099db48e9f1a1b3581f93a",
+    "d764a2aeb0d30f81330412082c861eaccfd59ad95f4a74ee7351283a1297ec93",
+    "4c8709a63b2afbf43067c609c926177c118094cd663c72af517cbc047f01a1e6",
+    "f77b9b98c0984493a61a9fa535cfbe1940aa3fc6b757c6159e917e948445280f",
+    "45805b0c133f5f57ca74e3c66b822b3380f920e0e370fc36197027fbc4c1d763",
+    "a97c407b937e02704d8988143d95f045d78d0bb9aae73d8e1da1af62d8bf0ca4",
+    "cd78a69d6f80defe66074ac2e726a0154f44375e7327ac1336c58c6e3cbf1448",
+    "679ea14b8ea6d7b60201670a0f81f3c0b778252f05a16c72ecd6b9c4ed1d9ef6",
+    "3fb5ae0df969c63535d35614cdb406119a8743082304671086590f5c44a4ef45",
+    "6fae67dfa5027cc5ef21c65fb4504c67f90702658a83578ded9ad974a712ca01",
+    "d84faaa4c1ed6cd076b6d9ad84bc5322d7e002c6f1290b0340a8deb77b81e78a",
+    "45c8b8b5edc67f8d4dd039cd1c8d7987120e1ea0bea794ee45d6973dc5d535c9",
+    "341fc7f2a16ea1127287819855c9ddfe6e91665654ed7688877235d03d36a2b7",
+    "1c7291c2e0b65e2ed0524ab041fd8ef4307218f3c9c1879404d5308aac9a1bf4",
+    "3ffd102f9fbe494b258612b6f53f80073ca090493dc33d999dbbb20e626bfa25",
+})
+
 _TOKEN = re.compile(r"[a-z0-9_./-]+")
 _PART_SEP = re.compile(r"([-_./])")
 
@@ -194,6 +220,9 @@ def _scan(text: str) -> list[tuple[int, str, str]]:
                 hits.append((i, f"a personal identity ({m.group(0)})", line))
         if banned_words_in(line):
             hits.append((i, "a private name, or the retired second PyBondLab path", line))
+        if banned_words_in(line, REVIEW_WORD_DIGESTS):
+            hits.append((i, "a change described by where it came from: say what it does "
+                            "instead", line))
     return hits
 
 

@@ -1,4 +1,4 @@
-"""test_exhibit_fixes.py -- four defects a cold read of the revised paper found (2026-09-28).
+"""test_exhibit_fixes.py -- four defects found by reading the exhibits against the data (2026-09-28).
 
   * the LAB sample span comes from the months that hold data, not the frame's empty first row;
   * Figures IA.5 and IA.6 draw each baseline mark on the boxes' sign, so it lies inside its box;

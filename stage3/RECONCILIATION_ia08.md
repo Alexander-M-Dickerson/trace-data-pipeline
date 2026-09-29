@@ -342,7 +342,7 @@ changed, because changing them changes published numbers.
 
 ## 17. The wording is the paper's, and `vov` says what $\bar{V}$ is (2026-09-28)
 
-The revised paper renders Table IA.VIII from this spec. Until 4.2.1 it could not do so
+The paper renders Table IA.VIII from this spec. Until 4.2.1 it could not do so
 verbatim: nine descriptions carried notes meant for readers of the code (capitals for
 emphasis, "as the code computes it", a file name, a summary statistic, what a column is NOT),
 and the paper printed its own cleaner wording beside them. The descriptions now say what

@@ -200,7 +200,7 @@ def build_fig4(data: dict, out_pdf: Path, st) -> None:
             ax = axes[1, j]
             alpha = 0.9 if st.name == "submitted" else 1.0
             ax.bar(x, df["lib_pct"], 0.6, label="LIB", color=st.c("lib_bar"), alpha=alpha)
-            # Referee 1 (round 2, point B): the implementable part is the ADJUSTED return
+            # the implementable part is the ADJUSTED return
             ax.bar(x, df["actual_pct"], 0.6, bottom=df["lib_pct"], label="Adjusted Return",
                    color=st.c("implementable"), alpha=alpha)
             ax.set_ylabel("Decomposition (%)")

@@ -2,7 +2,7 @@
 
   * no figure driver types a colour of its own: every colour comes from a style's roles, so
     a look is changed in one place;
-  * Figure 4's decomposition says "Adjusted Return" (Referee 1, round 2, point B);
+  * Figure 4's decomposition says "Adjusted Return";
   * the NBER recessions every time-series figure shades are the paper's (peak to trough);
   * each driver draws the same data in both looks, to the paths the runner expects.
 

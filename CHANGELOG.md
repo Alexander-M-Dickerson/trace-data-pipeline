@@ -9,8 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [4.2.1] - 2026-09-28
 
-**Table IA.VIII is the paper's, row for row, and four exhibit defects are fixed.** A cold
-read of the revised paper against the data found them. The published panels and factors do
+**Table IA.VIII is the paper's, row for row, and four exhibit defects are fixed.** Reading the
+exhibits against the data found them. The published panels and factors do
 not change; on a new run, Table IA.V's All column moves by a few counts, the Section 4
 captions start a month later, Figures IA.5 and IA.6 draw their baseline marks where
 they belong, and Table IA.IV prints the latent implementation bias in percent. `docs/validation/validated_runs.csv` records the checks.
@@ -41,7 +41,7 @@ they belong, and Table IA.IV prints the latent implementation bias in percent. `
 
 ### Changed
 - **Table IA.VIII says what the paper prints.** The signal dictionary
-  (`stage3/spec/signal_definitions.json`) now words every definition as the revised paper
+  (`stage3/spec/signal_definitions.json`) now words every definition as the paper
   prints it, so the paper renders the table from it verbatim. Nine descriptions carried notes
   for readers of the code (capitals for emphasis, "as the code computes it", a file name, a
   statistic); each note that carried information is in the row's `why_corrected`.
