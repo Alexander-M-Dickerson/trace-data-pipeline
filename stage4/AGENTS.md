@@ -14,6 +14,9 @@ stage's inputs are ready.
   the blocks beside it, never `stage2/release/` (the released copy is redacted).
 - The `dbns` and `dcls` return types need Stage 2's benchmark blocks:
   `python make_excess_blocks.py --mode stage1 --benchmark all`, run in `stage2/`.
+- The swap that builds a duration-adjusted type's panel is `return_types.py` at the repository
+  root, shared with stage 3's `--returns`: a change to it, or to `return_types` and
+  `swap_columns` in `spec/factors.json`, changes both stages [ref:rule.return_types].
 - PyBondLab 0.3.0 must be installed with the two lines in `requirements-local.txt`. Stage 4 stops
   and prints them if it is missing or a different version.
 

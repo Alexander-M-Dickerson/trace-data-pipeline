@@ -29,6 +29,7 @@ computes, never what the paper concludes.
 | a cleaning filter | its tag, in the `filter` section of `TAGS.md` | the order in `stage0/AGENTS.md` or `stage1/AGENTS.md` |
 | a TRACE-only factor | `stage4/DATA_DICTIONARY.md` | `stage4/spec/factors.json`, `stage4/README_stage4.md` |
 | a table or figure of stage 3 | `stage3/INDEX.md`: exhibit to the file that makes it | that file's docstring, `stage3/DATA_DICTIONARY.md` |
+| a return type (excess, or duration-adjusted with its own signals) | `return_types.py`, tag `rule.return_types` | `stage3/returns.py` and `--returns` in `stage3/README_stage3.md`; `stage4/README_stage4.md` |
 | a setting | the stage's settings file (`INDEX.md`, "Changing settings") | the settings section of the stage's README |
 | a check that failed | its tag, in the `rule` section of `TAGS.md` | the check's own message |
 | a trap | the `trap` section of `TAGS.md` | "Traps" in `AGENTS.md` |

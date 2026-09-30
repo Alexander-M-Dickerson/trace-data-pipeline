@@ -108,9 +108,12 @@ duplicated, or a panel column has no tag.
    the runners (`_run_stage2.py`, `run_stage3.sh`, `run_stage4.sh`). Stages 2 and 3 start each
    step in a fresh process, which the pipeline relies on for speed [ref:rule.fresh_process].
 6. **Ask the user, don't guess**, when a choice changes the numbers: the factor source for
-   stage 2 [ref:trap.factor_source] and the sample for stage 3.
+   stage 2 [ref:trap.factor_source], and for stage 3 the sample and the return (excess, the
+   default, or duration-adjusted with `--returns`, which swaps the beta and momentum signals
+   too [ref:rule.return_types]).
 7. **Outputs are not committed.** `stage2/data/`, `stage2/output/`, `stage2/release/`,
-   `stage3/data/`, `stage3/reports/` and `stage4/output/` are gitignored. Do not add them to git.
+   `stage3/data/`, `stage3/reports/`, `stage3/variants/` and `stage4/output/` are gitignored. Do
+   not add them to git.
 
 ## Stages 0 and 1 on WRDS
 

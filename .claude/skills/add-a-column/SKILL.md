@@ -71,11 +71,12 @@ a public change: a CHANGELOG entry and a new vintage, never a silent edit.
    and in the docs: `git grep -n "145" -- "*.md"` and change each line that counts the panel's
    columns. A new beta or momentum column is also estimated on the duration-adjusted return and
    on the other Treasury benchmarks, so it lands in the `betas_x` or `mom_retx` block and in the
-   `_bns`/`_cls` blocks `stage2/make_excess_blocks.py` writes; check that it does. Stage 4 lists
-   those 68 columns (51 betas, then 17) by name, under `swap_columns` in
-   `stage4/spec/factors.json`, and refuses a block column it does not know
-   (`stage4/factorlib/inputs.py`): add the name there, and change the 68 (and the split at 51,
-   for a beta) in `stage4/tests/test_stage4.py` and in the docs.
+   `_bns`/`_cls` blocks `stage2/make_excess_blocks.py` writes; check that it does. Stages 3 and
+   4 swap those 68 columns (51 betas, then 17) by name, from the list under `swap_columns` in
+   `stage4/spec/factors.json`, and refuse a block column the list does not have
+   (`return_types.py`, shared by stage 3's `--returns` and stage 4): add the name there, add it
+   to its block's `required_columns` in `stage3/spec/inputs.json`, and change the 68 (and the
+   split at 51, for a beta) in `stage4/tests/test_stage4.py` and in the docs.
 9. **Build and check**, from `stage2/`:
    - copy `output/panel/main_panel_stage1.parquet` aside first, if there is one;
    - `python _run_stage2.py --limit-cusips 200`, a quick build that reaches the contract check

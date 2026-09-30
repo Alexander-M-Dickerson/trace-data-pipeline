@@ -8,7 +8,7 @@ file for the tag's name with `tag:` or `group:` in front of it. A group is the s
 in several places, which must be kept in step. The syntax is
 [tagref's](https://github.com/stepchowfun/tagref); `tools/tags.py` explains it and checks it.
 
-251 names in 300 places, and 73 references to them from 19 files.
+251 names in 300 places, and 75 references to them from 20 files.
 
 ## entry
 
@@ -52,7 +52,7 @@ A rule the code enforces. The tag sits on the check, or on the one setting that 
 | `rule.parquet_only` | [stage0/_trace_settings.py](stage0/_trace_settings.py) | every stage reads parquet, so any other OUTPUT_FORMAT stops here | `stage0/AGENTS.md` |
 | `rule.pybondlab_pin` | [pybondlab_pin.py](pybondlab_pin.py) | stages 2-4 stop at start-up unless PyBondLab is the pinned release and numba and numexpr are installed | `AGENTS.md` |
 | `rule.redaction` | [stage2/make_release.py](stage2/make_release.py) | the public panel must have permco and gvkey blank and the ratings reduced to 1 (investment grade) or 11 (high yield) | `AGENTS.md` |
-| `rule.return_types` | [return_types.py](return_types.py) | a duration-adjusted return type swaps the return-based signals for ones estimated on that return; one definition, stages 3 and 4 | `stage3/AGENTS.md`, `stage3/_run_stage3.py`, `stage3/_stage3_settings.py`, `stage3/make_report.py`, `stage3/returns.py`, `stage3/run_stage3.sh`, `stage3/s1_lib/run_lib_sorts.py`, `stage3/s1_lib/run_sorts.py`, `stage3/s2_lab/f06_dua.py`, `stage3/s2_lab/run_lab.py`, `stage3/s3_nse/mua_engines.py`, `stage3/s3_nse/run_dua_grid.py`, `stage3/s4_zoo/run_zoo_sorts.py`, `stage3/tools/check_inputs.py`, `stage4/factorlib/inputs.py` |
+| `rule.return_types` | [return_types.py](return_types.py) | a duration-adjusted return type swaps the return-based signals for ones estimated on that return; one definition, stages 3 and 4 | `AGENTS.md`, `stage3/AGENTS.md`, `stage3/_run_stage3.py`, `stage3/_stage3_settings.py`, `stage3/make_report.py`, `stage3/returns.py`, `stage3/run_stage3.sh`, `stage3/s1_lib/run_lib_sorts.py`, `stage3/s1_lib/run_sorts.py`, `stage3/s2_lab/f06_dua.py`, `stage3/s2_lab/run_lab.py`, `stage3/s3_nse/mua_engines.py`, `stage3/s3_nse/run_dua_grid.py`, `stage3/s4_zoo/run_zoo_sorts.py`, `stage3/tools/check_inputs.py`, `stage4/AGENTS.md`, `stage4/factorlib/inputs.py` |
 | `rule.signal_set` | [stage3/signal_set.py](stage3/signal_set.py) | the signals are the spec's Cluster rows; everything else is never sorted | `stage3/AGENTS.md`, `stage3/s1_lib/run_lib_sorts.py`, `stage3/s1_lib/tB1_lib_summary.py`, `stage3/s4_zoo/run_zoo_sorts.py` |
 
 ## trap
