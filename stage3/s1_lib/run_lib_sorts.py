@@ -14,6 +14,8 @@ The conventions, each one different from `run_sorts.py` and each one deliberate:
   * returns   RAW `ret_vw` / `ret_vw_bgn` -- NOT excess of the bill. The census compares
               a signal against ITSELF on the other return window, so the risk-free rate
               is common to both sides and cancels; subtracting it would only add a step.
+              A duration-adjusted run (STAGE3_RETURNS) sorts both less the Treasury
+              column, on that return's signals (returns.py).
   * sorts     single p10 or within-firm p2 (at least 2 bonds per firm), holding_period=1,
               turnover on, no rating restriction, extract_panel with sign correction.
 
@@ -38,6 +40,7 @@ import _stage3_settings as S   # noqa: E402
 import drrlib as D          # noqa: E402
 import paths                # noqa: E402
 import pblenv               # noqa: E402
+import returns as R         # noqa: E402
 import signal_set as SIG    # noqa: E402
 from bench import Bench     # noqa: E402
 
@@ -78,6 +81,11 @@ def prepare(verbose: bool = True) -> tuple[pd.DataFrame, list[str]]:
     n0 = len(data)
     data = data.merge(mmn, on=["cusip", "date"], how="left")
     assert len(data) == n0, f"mmn merge changed rows {n0} -> {len(data)}"
+
+    # [ref:rule.return_types] the run's signals and returns. The standard run is untouched:
+    # it sorts the raw returns, as above.
+    data = R.signals(data)
+    R.set_returns(data, ("ret_vw", "ret_vw_bgn"))
 
     # [ref:rule.signal_set] by inclusion: a list of columns to leave out once let five Treasury
     # benchmark returns into this census.
@@ -155,7 +163,9 @@ def main() -> int:
             "written_utc": pd.Timestamp.utcnow().isoformat(),
             "git_commit": D._git("rev-parse", "HEAD"),
             "pybondlab": prov, "python": sys.version.split()[0],
-            "inputs": [D.fingerprint(paths.PANEL), D.fingerprint(paths.MMN)],
+            "inputs": [D.fingerprint(p) for p in
+                       [paths.PANEL, paths.MMN, *R.input_paths()]],
+            **R.manifest(),
         }}, indent=2, default=str), encoding="utf-8")
     return 0 if ok else 1
 

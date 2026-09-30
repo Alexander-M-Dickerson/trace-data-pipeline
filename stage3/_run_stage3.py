@@ -25,6 +25,7 @@ daily panel and `--section report` needs nothing at all.
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 import time
@@ -33,7 +34,17 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
+# [ref:rule.return_types] The return type is the whole run's, so `--returns` is read BEFORE the
+# settings load: the runner's own checks must look in the tree its steps write to, and every
+# step inherits it through the environment.
+for _i, _a in enumerate(sys.argv[1:], 1):
+    if _a.startswith("--returns="):
+        os.environ["STAGE3_RETURNS"] = _a.split("=", 1)[1]
+    elif _a == "--returns" and _i + 1 < len(sys.argv):
+        os.environ["STAGE3_RETURNS"] = sys.argv[_i + 1]
+
 import _stage3_settings as S  # noqa: E402
+import return_types as RT     # noqa: E402
 
 SECTIONS = ("data", "lib", "lab", "nse", "zoo", "report")
 
@@ -45,12 +56,13 @@ STEPS = [
     ("data", "exhibit", "s0_data/t_ia_monthly.py", [], "reports/tables/table_ia3.tex"),
 
     # -- Section 3: latent implementation bias -------------------------------
+    # (the sort files are named by the run's return type: exc_... in the standard run)
     ("lib", "producer", "s1_lib/run_sorts.py", [],
-     "data/sorts/exc_wf_all_mmn_bgn_p2.csv"),
+     f"data/sorts/{S.RETURNS}_wf_all_mmn_bgn_p2.csv"),
     ("lib", "producer", "s1_lib/run_sorts.py", ["--rating", "IG"],
-     "data/sorts/exc_wf_ig_mmn_bgn_p2.csv"),
+     f"data/sorts/{S.RETURNS}_wf_ig_mmn_bgn_p2.csv"),
     ("lib", "producer", "s1_lib/run_sorts.py", ["--rating", "NIG"],
-     "data/sorts/exc_wf_nig_mmn_bgn_p2.csv"),
+     f"data/sorts/{S.RETURNS}_wf_nig_mmn_bgn_p2.csv"),
     ("lib", "producer", "s1_lib/run_lib_sorts.py",
      ["--sort", "single", "--timing", "end"],
      "data/sorts/lib/bond_single_sort_lib_all_end_p10_h1.csv"),
@@ -243,6 +255,11 @@ SECTION_INPUTS = {
     "zoo": ("STAGE2_PANEL", "STAGE2_BBW", "STAGE2_FACTORS"),
     "report": (),
 }
+# [ref:rule.return_types] a duration-adjusted run's sorting sections also read its two blocks
+SECTION_INPUTS = {k: tuple(v) + (tuple(S.RETURN_INPUTS) if k in ("lib", "lab", "nse", "zoo")
+                                 else ())
+                  for k, v in SECTION_INPUTS.items()}
+NEEDED = [k for k in S.INPUTS if S.needed(k)]      # every input this run reads
 
 
 # Section 5's exhibits carry the sample in their name: `_full` after the default (frontier) run,
@@ -285,7 +302,7 @@ def _inputs_marker(script: str, sargs) -> Path:
 def inputs_fingerprint(section: str) -> dict:
     """Size and modification time of every input the section reads."""
     fp = {}
-    for k in SECTION_INPUTS.get(section, S.INPUTS):
+    for k in SECTION_INPUTS.get(section, NEEDED):
         v = S.INPUTS.get(k)
         p = Path(v) if v else None
         fp[k] = [str(p), p.stat().st_size, p.stat().st_mtime_ns] if p and p.exists() else None
@@ -320,7 +337,7 @@ def needed_inputs(steps) -> list[str]:
     """The inputs the SELECTED steps read -- not all five."""
     want: set[str] = set()
     for section, *_ in steps:
-        want |= set(SECTION_INPUTS.get(section, S.INPUTS))
+        want |= set(SECTION_INPUTS.get(section, NEEDED))
     return [k for k in S.INPUTS if k in want
             and (S.INPUTS[k] is None or not Path(S.INPUTS[k]).exists())]
 
@@ -348,7 +365,9 @@ def print_config(args, eng: dict, missing: list[str], sample_end: str) -> None:
     print(f"  stage 2 dir    {S.STAGE2_DIR}  (mode {S.MODE})")
     print(f"  data dir       {S.DATA}")
     print(f"  reports dir    {S.REPORTS}")
-    for name, v in S.INPUTS.items():
+    print(f"  returns        {S.RETURNS}  ({RT.RETURN_TYPES[S.RETURNS]['long']})")
+    for name in NEEDED:
+        v = S.INPUTS[name]
         mark = "  " if v and Path(v).exists() else "??"
         print(f"  {mark} {name:15s}{v if v else unset}")
     if eng["ok"]:
@@ -386,6 +405,11 @@ def main() -> int:
                          "the Stage-2 panel reaches; `paper` reproduces the published "
                          "window, 2002-09 to 2024-12, T=268. Every caption states which "
                          "one produced it.")
+    ap.add_argument("--returns", choices=list(RT.RETURN_TYPES), default=S.RETURNS,
+                    help="the return every exhibit sorts: exc (default, the paper's) or a "
+                         "duration-adjusted type -- dur, dbns (tret_bns) or dcls -- whose "
+                         "beta and momentum signals are estimated on that return too. A "
+                         "duration-adjusted run writes its own tree, variants/<type>/.")
     ap.add_argument("--keep-going", action="store_true",
                     help="continue after a failing step instead of stopping")
     args = ap.parse_args()

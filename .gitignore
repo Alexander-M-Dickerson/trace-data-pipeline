@@ -201,6 +201,8 @@ stage2/**/__pycache__/
 # grids are tens of GB. The CODE is committed; the results are not.
 stage3/data/
 stage3/reports/
+# a run on another return type (STAGE3_RETURNS / --returns): its own data/ and reports/
+stage3/variants/
 
 # Stage 3's code lives in section folders and in tools/; the generic Python rules
 # above would swallow some of them, so re-include explicitly.

@@ -22,7 +22,10 @@ file that makes it.
 ## Steps (from `stage3/`)
 
 1. **Ask which sample**: the whole panel (the default, `--sample frontier`) or the paper's
-   window (`--sample paper`, 2002-09 to 2024-12).
+   window (`--sample paper`, 2002-09 to 2024-12). The return is excess of the bill unless the
+   user asks for duration-adjusted returns: then `--returns dbns` (or `dur`, `dcls`), which
+   swaps the beta and momentum signals too, needs stage 2's blocks for that return, and
+   writes to `stage3/variants/<type>/` instead of `stage3/data/` and `stage3/reports/`.
 2. **Inputs**: `python tools/check_inputs.py`. Each input must exist and have the expected
    shape.
 3. **Dry run**: `python _run_stage3.py --dry-run` shows what would run and what exists already.
@@ -32,7 +35,8 @@ file that makes it.
 5. **Tests**: `python -m pytest tests -q`.
 6. **Report** what was written: `stage3/reports/tables/`, `stage3/reports/figures/`,
    `stage3/reports/exhibits.pdf`, and `stage3/reports/timings.jsonl` (one line per step, with
-   its own checks).
+   its own checks); after `--returns <type>`, the same under `stage3/variants/<type>/reports/`,
+   and `python tools/compare_runs.py data variants/<type>/data` says what moved.
 
 ## Things to know
 

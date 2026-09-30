@@ -62,9 +62,11 @@ alternative to exporting any of them.
 |---|---|---|
 | `STAGE0_DIR`, `STAGE1_DIR`, `STAGE2_DIR` | the sibling folders | where the earlier stages live |
 | `STAGE2_PANEL`, `STAGE2_MMN`, `STAGE2_BBW`, `STAGE2_FACTORS`, `STAGE1_DAILY` | derived from the above | one input file each, when the layout is not standard |
+| `STAGE2_BETAS_BNS`, `STAGE2_MOM_RETX_BNS` (and the `_X` and `_CLS` pairs) | derived from `STAGE2_DIR` | a duration-adjusted return type's two blocks, when the layout is not standard |
 | `STAGE3_MODE` | `stage1` | which panel to read: Stage 2 writes `main_panel_<mode>.parquet` |
-| `STAGE3_DATA` | `stage3/data` | where intermediate results are written, including the small input records under `_inputs/`. Point it at a fast disk, or at a scratch area |
-| `STAGE3_REPORTS` | `stage3/reports` | where tables, figures, `timings.jsonl` and the PDF go |
+| `STAGE3_RETURNS` | `exc` | the return every exhibit sorts: `exc`, or duration-adjusted `dur`, `dbns` or `dcls`. `run_stage3.sh --returns` sets it. See **Which return** below |
+| `STAGE3_DATA` | `stage3/data` (`stage3/variants/<type>/data` for a duration-adjusted type) | where intermediate results are written, including the small input records under `_inputs/`. Point it at a fast disk, or at a scratch area |
+| `STAGE3_REPORTS` | `stage3/reports` (`stage3/variants/<type>/reports` for a duration-adjusted type) | where tables, figures, `timings.jsonl` and the PDF go |
 | `STAGE3_WORKERS` | cores, clamped | processes for the two grids. `--workers` overrides per run |
 | `STAGE3_MEMORY_LIMIT` | 60% of free RAM (`4GB` without `psutil`) | DuckDB's memory cap in the data appendix |
 | `STAGE3_WORKER_THREADS` | set by `fastrun.pmap` | internal: how many threads one worker may use. Set by the parent, read by the child; you do not set this |
@@ -138,6 +140,23 @@ python _run_stage3.py --sample paper      # 2002-09 to 2024-12, T = 268
 Every caption states which one produced it, so a PDF is never ambiguous about its own
 sample. One switch fans out to each section's own flag, so running a driver by hand is
 unchanged.
+
+### Which return
+
+By default every exhibit sorts **the return in excess of the one-month bill**, as the paper
+does. To build all of them on duration-adjusted returns instead, with the beta and momentum
+signals estimated on the same return:
+
+```bash
+bash run_stage3.sh --returns dbns          # less tret_bns; also dur (tret) or dcls (tret_cls)
+python tools/compare_runs.py data variants/dbns/data    # what moved against the standard run
+```
+
+It writes its own tree, `variants/dbns/` (tables, figures and `exhibits.pdf` under
+`variants/dbns/reports/`), and cannot overwrite the standard one. It needs Stage 2's two
+blocks for that return, made by `python make_excess_blocks.py --benchmark bns` in `stage2/`;
+the input check names them if they are missing. The flag is explained in
+[README_stage3.md](README_stage3.md#the-flags-that-change-the-answer).
 
 ### Resuming, forcing, and what a failure does
 

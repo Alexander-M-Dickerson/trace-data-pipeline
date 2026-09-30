@@ -38,6 +38,7 @@ import _stage3_settings as S    # noqa: E402
 import drrlib as D              # noqa: E402
 import paths                    # noqa: E402
 import pblenv                   # noqa: E402
+import returns as R             # noqa: E402
 from bench import Bench         # noqa: E402
 
 SIGNAL = "mom6_1"           # 6-month formation, skipping the most recent month
@@ -72,9 +73,12 @@ def run_sweep(end: str | None = None):
         raise SystemExit(f"Figure 6 needs the Stage 2 panel and it is not at "
                          f"{paths.PANEL}.")
     cols = ["cusip", "date", "ret_vw", "mcap_e", "spc_rat", "rfret", SIGNAL]
-    data = pd.read_parquet(paths.PANEL, columns=cols)
+    data = pd.read_parquet(paths.PANEL, columns=cols + R.load_columns())
     data["date"] = pd.to_datetime(data["date"])
-    data["ret_vw"] = data["ret_vw"] - data["rfret"]
+    # [ref:rule.return_types] the run's momentum signal and return: `ret_vw` less the panel's
+    # rfret in the standard run, exactly as before.
+    data = R.signals(data, names=[SIGNAL])
+    R.set_returns(data, ("ret_vw",), rf="rfret")
     data = data[(data["date"] >= S.SAMPLE["lab"]["start"])
                 & (data["date"] <= (end or S.SAMPLE["lab"]["end"]))].copy()
     data["spc_rat"] = data["spc_rat"].astype("float64")

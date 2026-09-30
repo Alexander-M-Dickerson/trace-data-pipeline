@@ -17,6 +17,12 @@ whether this stage's inputs are ready.
   version, and prints the version it used.
 - Ask the user which sample they want: the whole panel (the default, `--sample frontier`) or the
   paper's sample (`--sample paper`, 2002-09 to 2024-12).
+- The return is excess of the bill unless they ask otherwise. For duration-adjusted returns,
+  `bash run_stage3.sh --returns dbns` (or `dur`, `dcls`): it swaps the beta and momentum
+  signals for ones estimated on that return, writes its own tree `variants/<type>/`, and needs
+  stage 2's blocks for it (`python make_excess_blocks.py --benchmark bns` in `stage2/`).
+  `python tools/compare_runs.py data variants/dbns/data` compares it with the standard run.
+  [ref:rule.return_types]
 
 ## The commands, in order
 

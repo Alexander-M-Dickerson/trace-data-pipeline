@@ -26,6 +26,8 @@ For the three duration-adjusted types, the 68 beta and momentum signals are the 
 estimated on that same adjusted return (its blocks `betas_x` and `mom_retx`, or their `_bns`
 and `_cls` versions), and `str` is adjusted too. Holding period one month, value weights from
 the month before, rebalanced monthly. Every choice is in [`spec/factors.json`](spec/factors.json).
+The swap itself is `return_types.py` at the repository root, which Stage 3 uses too: `bash
+run_stage3.sh --returns dbns` builds the paper's exhibits on the same return types.
 
 The series are **unflipped**: a factor whose long-short mean is negative stays negative.
 `flip_set.json` records which factors the full-sample sign rule would flip, per return type.

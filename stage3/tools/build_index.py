@@ -214,6 +214,7 @@ def render(rs: list[dict]) -> str:
         "provenance, result manifests), `captions.py` (every caption title), "
         "`bench.py` (the timing/check ledger), `paths.py`, `fastrun.py` (process "
         "parallelism), `pblenv.py` (checks and records the PyBondLab release), "
+        "`returns.py` (the return every section sorts, in the run's return type), "
         "`_stage3_settings.py` (paths and constants) and `_run_stage3.py` (the "
         "orchestrator). `make_report.py` assembles the PDF.",
         "",

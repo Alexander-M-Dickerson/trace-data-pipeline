@@ -12,7 +12,10 @@ Four return types, from one panel:
 
 ❗A duration-adjusted return type is a different PANEL, not the same panel with another
 return column: sorting `ret_vwx` on betas estimated on `ret_vw` would give plausible
-numbers for the wrong question. The swap below is checked in both directions.
+numbers for the wrong question. The swap is checked in both directions.
+
+[ref:rule.return_types] the swap and the Treasury series are `return_types.py` at the
+repository root, shared with stage 3; which columns are returns is decided here.
 """
 from __future__ import annotations
 
@@ -21,6 +24,7 @@ from pathlib import Path
 import pandas as pd
 
 import _stage4_settings as S
+import return_types as RT   # at the repository root, which _stage4_settings puts on the path
 
 
 def missing_inputs(return_types) -> list[str]:
@@ -29,10 +33,7 @@ def missing_inputs(return_types) -> list[str]:
             (S.RISK_FREE, "python _run_stage2.py (in stage2/)")]
     for rt in return_types:
         for b in S.RETURN_TYPES[rt]["blocks"] or []:
-            tret = S.RETURN_TYPES[rt]["tret"]
-            maker = ("python _run_stage2.py (in stage2/)" if tret == "tret" else
-                     f"python make_excess_blocks.py --benchmark {tret.split('_')[1]} (in stage2/)")
-            need.append((S.block_path(b), maker))
+            need.append((S.block_path(b), RT.block_maker(rt)))
     return [f"{p}\n      made by: {how}" for p, how in need if not Path(p).exists()]
 
 
@@ -42,29 +43,8 @@ def swap(df: pd.DataFrame, blocks: list[str], tret_col: str) -> pd.DataFrame:
     The blocks carry the same 68 names (`b_amd`, not `b_amd_bns`), so the swap is by name.
     Anything dropped and not added back, or added and never dropped, stops the build.
     """
-    names = S.SPEC["swap_columns"]["names"]
-    absent = [c for c in names if c not in df.columns]
-    if absent:
-        raise AssertionError(f"the panel lacks {len(absent)} of the 68 columns to swap: {absent}")
-    df = df.drop(columns=names)
-    added: list[str] = []
-    for name in blocks:
-        blk = pd.read_parquet(S.block_path(name))
-        blk["date"] = pd.to_datetime(blk["date"])
-        cols = [c for c in blk.columns if c not in ("cusip", "date")]
-        added += cols
-        n0 = len(df)
-        df = df.merge(blk[["cusip", "date"] + cols], on=["cusip", "date"], how="left")
-        if len(df) != n0:
-            raise AssertionError(f"{name} changed the row count {n0:,} -> {len(df):,}: it "
-                                 "has duplicate (cusip, date) keys")
-    if set(names) - set(added):
-        raise AssertionError(f"dropped but not added back: {sorted(set(names) - set(added))}")
-    if set(added) - set(names):
-        raise AssertionError(f"added but never dropped: {sorted(set(added) - set(names))}")
-
-    # At ret_vw's precision, whatever precision the panel stores the Treasury column in.
-    t = df[tret_col].astype(df["ret_vw"].dtype)
+    df = RT.swap(df, blocks, S.block_path)
+    t = RT.treasury(df, tret_col)
     df["ret_vwx"] = df["ret_vw"] - t
     df["str"] = df["str"] - t
     return df

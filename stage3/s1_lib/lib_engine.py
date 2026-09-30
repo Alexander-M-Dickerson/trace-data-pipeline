@@ -29,6 +29,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))   # stage3/
 
+import _stage3_settings as S   # noqa: E402
 import drrlib as D          # noqa: E402
 import paths                # noqa: E402
 
@@ -36,7 +37,8 @@ APPROACHES = ("unadjusted", "adj_signal", "adj_return")
 BIAS_PAIRS = {"bias_1_2": ("unadjusted", "adj_signal"),
               "bias_1_3": ("unadjusted", "adj_return")}
 
-# the file grammar: {ret}_{sort}_{rating}_{signal_type}_{timing}_p{N}.csv
+# the file grammar: {ret}_{sort}_{rating}_{signal_type}_{timing}_p{N}.csv, where {ret} is the
+# run's return type (S.RETURNS: `exc`, or a duration-adjusted one such as `dbns`)
 _SIGNAL_TYPE = {"unadjusted": "mmn", "adj_signal": "baseline", "adj_return": "mmn"}
 _TIMING = {"unadjusted": "end", "adj_signal": "end", "adj_return": "bgn"}
 
@@ -53,7 +55,7 @@ def n_portfolios(sort: str, rating: str) -> int:
 
 
 def sort_csv(approach: str, *, sort: str = "single", rating: str = "all",
-             ret_type: str = "exc", root: Path | None = None) -> Path:
+             ret_type: str = S.RETURNS, root: Path | None = None) -> Path:
     """The sort CSV holding one approach's series, by the grammar run_sorts writes."""
     root = Path(root or paths.SORTS)
     name = (f"{ret_type}_{sort}_{rating}_{_SIGNAL_TYPE[approach]}_"
@@ -67,7 +69,7 @@ class LibSpec:
     sort: str = "single"        # 'single' | 'wf'
     rating: str = "all"         # 'all' | 'ig' | 'nig'
     weighting: str = "vw"       # 'vw' | 'ew'
-    ret_type: str = "exc"       # 'exc' (excess) | 'dur' (duration-adjusted)
+    ret_type: str = S.RETURNS   # the run's return type: 'exc', or 'dur' / 'dbns' / 'dcls'
     start: str = D.SAMPLE_START
     end: str = D.SAMPLE_END
 

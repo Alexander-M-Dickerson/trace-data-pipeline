@@ -47,6 +47,7 @@ for _p in (str(Path(__file__).resolve().parents[1]), str(Path(__file__).resolve(
 import _stage3_settings as S   # noqa: E402
 import clusters as C        # noqa: E402
 import paths                # noqa: E402
+import returns as R         # noqa: E402
 
 RATINGS = ("ALL", "IG", "NIG")
 WEIGHTINGS = ("ew", "vw")
@@ -143,13 +144,17 @@ def run_one(item) -> dict:
 
     root = Path(root_s)
     p = Path(paths.PANEL).as_posix()
-    cols = ", ".join(f'"{c}"' for c in PANEL_BASE_COLS + list(signals))
+    cols = ", ".join(f'"{c}"' for c in PANEL_BASE_COLS + list(signals) + R.load_columns())
     # ❗ORDER BY, for the same reason as in mua_engines.load_panel: DuckDB scans
     # parquet in parallel and guarantees no row order without one, and PyBondLab
     # consumes the frame positionally.
     data = duckdb.sql(
         f"SELECT {cols} FROM read_parquet('{p}') ORDER BY date, cusip").df()
     data["date"] = pd.to_datetime(data["date"])
+    # [ref:rule.return_types] the run's signals and return. The standard run's raw `ret_vw`
+    # is left as read; a duration-adjusted run's return filters screen its own return.
+    data = R.signals(data, names=list(signals))
+    R.set_returns(data, ("ret_vw",))
     # the price the filters screen on. `bbtm` is 100/price, so this inverts it --
     # NOT a multiply, which would give a price of 100*100/price and screen nothing.
     data["PRICE"] = 100 / data["bbtm"]

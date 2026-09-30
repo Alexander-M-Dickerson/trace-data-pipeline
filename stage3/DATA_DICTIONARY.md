@@ -49,7 +49,7 @@ pdflatex transcript.
 | `freq` | int | holding period in months |
 | `leg` | text | `l` long, `s` short, `ls` long minus short |
 | `weighting` | text | `ew` or `vw` |
-| `return` | float | portfolio return as a **decimal**, in excess of the one-month T-bill |
+| `return` | float | portfolio return as a **decimal**, in excess of the one-month T-bill (in a duration-adjusted run, `--returns`, in excess of the type's Treasury benchmark instead) |
 | `turnover` | float | two-way turnover for that leg, decimal; null where turnover was not requested |
 | `count` | int | bonds in the leg that month |
 
@@ -65,9 +65,15 @@ header shapes on disk: eight columns, or ten for the month-begin sets.
 {ret_type}_{sort}_{rating}_{signal_type}_{timing}_p{N}.csv
 ```
 
-`ret_type` ∈ {`exc`, `dur`} · `sort` ∈ {`single`, `wf`} · `rating` ∈ {`all`, `ig`, `nig`} ·
+`ret_type` ∈ {`exc`, `dur`, `dbns`, `dcls`}, the run's return type (`exc` in the standard
+run) · `sort` ∈ {`single`, `wf`} · `rating` ∈ {`all`, `ig`, `nig`} ·
 `signal_type` ∈ {`baseline`, `mmn`} · `timing` ∈ {`end`, `bgn`} · `N` = number of
 portfolios (10 all-bond single, 5 rating splits, 2 within-firm).
+
+A duration-adjusted run (`run_stage3.sh --returns <type>`) writes every file on this page
+under `variants/<type>/data/` instead of `data/`, and its reports under
+`variants/<type>/reports/`, with the same names; only the three-approach files carry the
+type in their name.
 
 **The 108-signal census** (`data/sorts/lib/`):
 

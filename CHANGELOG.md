@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**Stage 3 can build every exhibit on duration-adjusted returns.** `bash run_stage3.sh --returns
+dbns` (or `dur`, `dcls`) sorts each bond's return less its Treasury benchmark, with the beta
+and momentum signals replaced by stage 2's blocks estimated on that same return, and writes a
+complete run of its own to `stage3/variants/<type>/`. The standard run (`exc`) is unchanged,
+file for file.
+
+### Added
+- **`--returns` for stage 3** (`STAGE3_RETURNS`). The return types are stage 4's, declared in
+  `stage4/spec/factors.json`: `exc` (the default), `dur` (`tret`), `dbns` (`tret_bns`) and
+  `dcls` (`tret_cls`). In a duration-adjusted run the month-end and month-begin returns both
+  take the type's Treasury column, since both end at the same month-end trade; the 68 beta
+  and momentum signals come from the type's two blocks; short-term reversal (`str`, and its
+  unadjusted twin `str_mmn`) is adjusted like the return; no risk-free rate is subtracted;
+  alphas stay on MKTB. The six places stage 3 forms a return go through one module,
+  `stage3/returns.py`, and a test refuses a new place that does not.
+- **A duration-adjusted run cannot overwrite the standard one.** It writes
+  `stage3/variants/<type>/data/` and `.../reports/`, and stops if pointed at `stage3/data/` or
+  `stage3/reports/`. Its sort files are named by the type (`dbns_...`), its captions and the
+  PDF's title page name the return, and its manifests record it. The input check asks for the
+  type's two blocks, and says which command makes a missing one.
+- **`stage3/tools/compare_runs.py`**: two stage 3 runs, cell by cell. For every result table
+  both hold it reports what moved, which numbers changed sign and which t-statistics crossed
+  1.96, and writes `cells.csv` and `summary.md`.
+
+### Changed
+- **The duration swap has one home, `return_types.py` at the repository root,** used by stages
+  3 and 4. Stage 4's panels are unchanged: for each duration-adjusted type the new code builds
+  the same frame as before on the 2026-09-27 run (1,950,002 rows, every value, dtype and
+  column), and a test holds the old swap beside the new one.
+- `run_sorts.py --ret dur`, which subtracted `tret` from the sorted return without swapping
+  any signal, is replaced by the run's return type.
+
 ## [4.2.1] - 2026-09-28
 
 **Table IA.VIII is the paper's, row for row, and four exhibit defects are fixed.** Reading the

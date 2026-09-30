@@ -180,8 +180,33 @@ from its stored bars without refitting its sweep: `python s2_lab/f06_dua.py --fr
 
 ## The flags that change the answer
 
-Most flags only change speed or scope. These three change what the exhibits say, so they
+Most flags only change speed or scope. These four change what the exhibits say, so they
 are worth understanding before you use them.
+
+### `--returns {exc,dur,dbns,dcls}` on `run_stage3.sh` and `_run_stage3.py`
+
+**`exc` is the default**: each bond's return in excess of the one-month bill, as the paper
+uses it. The other three are duration-adjusted: the return less a Treasury benchmark, `tret`
+(`dur`), `tret_bns` (`dbns`, van Binsbergen, Nozawa and Schwert) or `tret_cls` (`dcls`, Cui,
+Lu and Song). They are stage 4's return types, declared once in `stage4/spec/factors.json`
+and applied by `return_types.py` at the repository root.
+
+A duration-adjusted run is a different panel, not the same panel with another return column:
+
+- the month-end and the month-begin return both take the type's Treasury column, since both
+  end at the same month-end trade;
+- the 68 beta and momentum signals come from stage 2's blocks estimated on that same return
+  (`betas_bns` and `mom_retx_bns` for `dbns`; `python make_excess_blocks.py --benchmark bns`
+  in `stage2/` makes them);
+- short-term reversal, `str`, and its unadjusted twin `str_mmn`, are returns, and are
+  adjusted like the return;
+- no risk-free rate is subtracted, and alphas stay on MKTB.
+
+The run writes its own tree, `stage3/variants/<type>/data/` and `.../reports/`, ending in
+`.../reports/exhibits.pdf`. It refuses the standard `data/` and `reports/`, so it cannot
+overwrite the standard exhibits. Its captions and the PDF's title page name the return.
+`python tools/compare_runs.py data variants/dbns/data` then compares the two runs cell by
+cell: what moved, what changed sign, and which t-statistics crossed 1.96.
 
 ### `--sample {frontier,paper}` on `_run_stage3.py`
 

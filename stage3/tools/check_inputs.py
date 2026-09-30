@@ -13,6 +13,10 @@ a grid.
 
 The contract lives in `spec/inputs.json`, beside this file. Editing that file changes
 what is required; editing this one changes how it is checked.
+
+A duration-adjusted run (STAGE3_RETURNS) also needs its return type's two stage 2 blocks
+and the panel's Treasury column; a missing block names the command that makes it. The
+blocks of other return types are not checked.
 """
 # [tag:entry.stage3_inputs] checks stage 3's inputs exist and have the expected shape
 from __future__ import annotations
@@ -28,6 +32,7 @@ STAGE3 = HERE.parent
 sys.path.insert(0, str(STAGE3))
 
 import _stage3_settings as S  # noqa: E402
+import return_types as RT     # noqa: E402
 
 SPEC = STAGE3 / "spec" / "inputs.json"
 
@@ -57,11 +62,16 @@ def check(verbose: bool = False) -> tuple[list[dict], bool]:
     spec = json.loads(SPEC.read_text(encoding="utf-8"))
     results, ok_all = [], True
     for name, decl in spec["inputs"].items():
+        # [ref:rule.return_types] a block is checked only in a run of its own return type
+        if decl.get("return_types") and S.RETURNS not in decl["return_types"]:
+            continue
         path = S.INPUTS.get(name)
         row = {"input": name, "what": decl["what"], "path": str(path) if path else None,
                "problems": []}
         if path is None or not Path(path).exists():
             row["problems"].append("not found")
+            if decl.get("return_types"):
+                row["problems"].append(f"made by: {RT.block_maker(S.RETURNS)}")
             results.append(row)
             ok_all = False
             continue
@@ -74,8 +84,10 @@ def check(verbose: bool = False) -> tuple[list[dict], bool]:
         if decl.get("min_rows") and meta["rows"] < decl["min_rows"]:
             row["problems"].append(
                 f"{meta['rows']:,} rows, contract wants at least {decl['min_rows']:,}")
-        missing = [c for c in decl.get("required_columns", [])
-                   if c not in meta["columns"]]
+        required = list(decl.get("required_columns", []))
+        if name == "STAGE2_PANEL" and RT.benchmark(S.RETURNS):
+            required.append(RT.benchmark(S.RETURNS))   # the Treasury column the run subtracts
+        missing = [c for c in required if c not in meta["columns"]]
         if missing:
             row["problems"].append(f"{len(missing)} missing column(s): "
                                    + ", ".join(missing[:8])

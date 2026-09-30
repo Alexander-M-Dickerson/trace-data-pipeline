@@ -72,6 +72,52 @@ def test_the_swap_replaces_the_68_and_adjusts_the_returns(tmp_path, monkeypatch)
     np.testing.assert_array_equal(out["str"], df["str"] - t)
 
 
+def _swap_before_it_was_shared(df, blocks, tret_col):
+    """inputs.swap as it stood before the swap moved to return_types.py, verbatim."""
+    names = S.SPEC["swap_columns"]["names"]
+    absent = [c for c in names if c not in df.columns]
+    if absent:
+        raise AssertionError(f"the panel lacks {len(absent)} of the 68 columns to swap: {absent}")
+    df = df.drop(columns=names)
+    added: list[str] = []
+    for name in blocks:
+        blk = pd.read_parquet(S.block_path(name))
+        blk["date"] = pd.to_datetime(blk["date"])
+        cols = [c for c in blk.columns if c not in ("cusip", "date")]
+        added += cols
+        n0 = len(df)
+        df = df.merge(blk[["cusip", "date"] + cols], on=["cusip", "date"], how="left")
+        if len(df) != n0:
+            raise AssertionError(f"{name} changed the row count {n0:,} -> {len(df):,}: it "
+                                 "has duplicate (cusip, date) keys")
+    if set(names) - set(added):
+        raise AssertionError(f"dropped but not added back: {sorted(set(names) - set(added))}")
+    if set(added) - set(names):
+        raise AssertionError(f"added but never dropped: {sorted(set(added) - set(names))}")
+    t = df[tret_col].astype(df["ret_vw"].dtype)
+    df["ret_vwx"] = df["ret_vw"] - t
+    df["str"] = df["str"] - t
+    return df
+
+
+@pytest.mark.parametrize("rt", ["dur", "dbns", "dcls"])
+def test_the_shared_swap_builds_the_same_panel(tmp_path, monkeypatch, rt):
+    """The swap moved to return_types.py: stage 4's panels must be exactly what they were,
+    values, dtypes and column order."""
+    df = _panel(12, 8, seed=3)
+    rng = np.random.default_rng(4)
+    for name, cols in zip(S.RETURN_TYPES[rt]["blocks"], (SWAP[:51], SWAP[51:])):
+        b = df[["cusip", "date"]].copy()
+        for c in cols:
+            b[c] = rng.normal(size=len(b)).astype("float32")
+        b.sample(frac=1.0, random_state=5).to_parquet(tmp_path / f"{name}.parquet", index=False)
+    monkeypatch.setattr(S, "block_path", lambda name: tmp_path / f"{name}.parquet")
+    spec = S.RETURN_TYPES[rt]
+    new = inputs.swap(df.copy(), spec["blocks"], spec["tret"])
+    old = _swap_before_it_was_shared(df.copy(), spec["blocks"], spec["tret"])
+    pd.testing.assert_frame_equal(new, old, check_exact=True)
+
+
 def test_the_swap_refuses_a_block_that_misses_a_column(tmp_path, monkeypatch):
     df = _panel(10, 6)
     _blocks(df, tmp_path, drop="b_amd")

@@ -51,6 +51,7 @@ A task-by-task guide to the docs, for people and for AI assistants. What each co
 | stage 2's settings | `stage2/_stage2_settings.py` | [README_stage2: Configuration](stage2/README_stage2.md#configuration) |
 | stage 3's inputs | `stage3/_stage3_settings.py` or environment variables | [QUICKSTART_stage3: environment variables](stage3/QUICKSTART_stage3.md#every-environment-variable-stage-3-reads) |
 | stage 3's sample (the whole panel or the paper's window) | `--sample frontier` or `--sample paper` on `_run_stage3.py` | [QUICKSTART_stage3: Which sample](stage3/QUICKSTART_stage3.md#which-sample) |
+| stage 3's return (excess, or duration-adjusted with its own signals) | `--returns exc`, `dur`, `dbns` or `dcls` on `run_stage3.sh` | [README_stage3: the flags that change the answer](stage3/README_stage3.md#the-flags-that-change-the-answer) |
 | stage 4's inputs and output folder | environment variables | [README_stage4: Settings](stage4/README_stage4.md#settings) |
 
 ## When something fails

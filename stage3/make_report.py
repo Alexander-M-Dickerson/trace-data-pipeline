@@ -37,6 +37,8 @@ sys.path.insert(0, str(HERE))
 
 import _stage3_settings as S  # noqa: E402
 import paths                  # noqa: E402
+import return_types as RT     # noqa: E402
+import returns as R           # noqa: E402
 
 # (paper's exhibit number, kind, file stem, one-line note or "")
 # Order is the paper's. A stem that is not on disk is reported, never silently dropped.
@@ -249,9 +251,16 @@ def title_page(window: str, prov: dict) -> str:
              r"differ, the data, the sample window or the sorting engine differs -- not "
              r"necessarily anything else." + "\n")
     L.append(r"\vspace{0.5em}\noindent\rule{\textwidth}{0.4pt}" + "\n")
+    # [ref:rule.return_types] a duration-adjusted run says so before anything else
+    if R.adjusted():
+        L.append(r"\textbf{" + latex_escape(R.caption_note()) + r"} The data appendix "
+                 r"describes the panel as built and does not depend on the return type."
+                 + "\n")
 
     L.append(r"\subsection*{What produced these}")
     L.append(r"\begin{tabular}{ll}\toprule")
+    if R.adjusted():
+        L.append(r"Returns & " + latex_escape(RT.RETURN_TYPES[S.RETURNS]["long"]) + r" \\")
     L.append(r"Section 5 window & " + latex_escape(window) + r" \\")
     # ❗Per SECTION, and measured. A single sample line for the whole document was
     # wrong: it claimed 2002-09 to 2024-12 while the data appendix in the same PDF was

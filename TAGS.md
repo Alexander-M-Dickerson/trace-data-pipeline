@@ -8,7 +8,7 @@ file for the tag's name with `tag:` or `group:` in front of it. A group is the s
 in several places, which must be kept in step. The syntax is
 [tagref's](https://github.com/stepchowfun/tagref); `tools/tags.py` explains it and checks it.
 
-249 names in 298 places, and 57 references to them from 7 files.
+251 names in 300 places, and 73 references to them from 19 files.
 
 ## entry
 
@@ -24,6 +24,7 @@ The commands you run: each stage's entry point.
 | `entry.stage2_coverage` | [stage2/validate_coverage.py](stage2/validate_coverage.py) | checks every column reaches the panel's last month |  |
 | `entry.stage2_release` | [stage2/make_release.py](stage2/make_release.py) | writes the redacted, shareable copy of your panel |  |
 | `entry.stage3` | [stage3/run_stage3.sh](stage3/run_stage3.sh) | stage 3, the exhibits: bash run_stage3.sh |  |
+| `entry.stage3_compare` | [stage3/tools/compare_runs.py](stage3/tools/compare_runs.py) | compares two stage 3 runs cell by cell: python tools/compare_runs.py <A> <B> |  |
 | `entry.stage3_inputs` | [stage3/tools/check_inputs.py](stage3/tools/check_inputs.py) | checks stage 3's inputs exist and have the expected shape |  |
 | `entry.stage4` | [stage4/run_stage4.sh](stage4/run_stage4.sh) | stage 4, the factors and the comparison: bash run_stage4.sh |  |
 | `entry.stage4_build` | [stage4/build_factors.py](stage4/build_factors.py) | builds the TRACE-only factors |  |
@@ -51,6 +52,7 @@ A rule the code enforces. The tag sits on the check, or on the one setting that 
 | `rule.parquet_only` | [stage0/_trace_settings.py](stage0/_trace_settings.py) | every stage reads parquet, so any other OUTPUT_FORMAT stops here | `stage0/AGENTS.md` |
 | `rule.pybondlab_pin` | [pybondlab_pin.py](pybondlab_pin.py) | stages 2-4 stop at start-up unless PyBondLab is the pinned release and numba and numexpr are installed | `AGENTS.md` |
 | `rule.redaction` | [stage2/make_release.py](stage2/make_release.py) | the public panel must have permco and gvkey blank and the ratings reduced to 1 (investment grade) or 11 (high yield) | `AGENTS.md` |
+| `rule.return_types` | [return_types.py](return_types.py) | a duration-adjusted return type swaps the return-based signals for ones estimated on that return; one definition, stages 3 and 4 | `stage3/AGENTS.md`, `stage3/_run_stage3.py`, `stage3/_stage3_settings.py`, `stage3/make_report.py`, `stage3/returns.py`, `stage3/run_stage3.sh`, `stage3/s1_lib/run_lib_sorts.py`, `stage3/s1_lib/run_sorts.py`, `stage3/s2_lab/f06_dua.py`, `stage3/s2_lab/run_lab.py`, `stage3/s3_nse/mua_engines.py`, `stage3/s3_nse/run_dua_grid.py`, `stage3/s4_zoo/run_zoo_sorts.py`, `stage3/tools/check_inputs.py`, `stage4/factorlib/inputs.py` |
 | `rule.signal_set` | [stage3/signal_set.py](stage3/signal_set.py) | the signals are the spec's Cluster rows; everything else is never sorted | `stage3/AGENTS.md`, `stage3/s1_lib/run_lib_sorts.py`, `stage3/s1_lib/tB1_lib_summary.py`, `stage3/s4_zoo/run_zoo_sorts.py` |
 
 ## trap

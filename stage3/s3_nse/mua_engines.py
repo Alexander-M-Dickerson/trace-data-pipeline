@@ -38,6 +38,7 @@ for _p in (str(Path(__file__).resolve().parents[1]), str(Path(__file__).resolve(
 
 import paths                # noqa: E402
 import pblenv               # noqa: E402
+import returns as R         # noqa: E402
 
 DATE_START, DATE_END = "2002-08-01", "2024-12-31"
 PANEL_COLS = ["cusip", "date", "ret_vw", "mcap_e", "spc_rat", "tmat"]
@@ -70,7 +71,7 @@ def load_panel(signals: list[str], end: str | None = None) -> pd.DataFrame:
     import duckdb
 
     p = Path(paths.PANEL).as_posix()
-    cols = ", ".join(f'"{c}"' for c in PANEL_COLS + list(signals))
+    cols = ", ".join(f'"{c}"' for c in PANEL_COLS + list(signals) + R.load_columns())
     where = f"WHERE date >= DATE '{DATE_START}'"
     if end:
         where += f" AND date <= DATE '{end}'"
@@ -88,6 +89,10 @@ def load_panel(signals: list[str], end: str | None = None) -> pd.DataFrame:
         raise AssertionError(
             f"{dup} duplicate (date, cusip) rows. Every sort needs one row per\n"
             "  bond-month; checked here so the message names the panel.")
+    # [ref:rule.return_types] the run's signals and return; the standard run's raw `ret_vw`
+    # and signals are left exactly as read.
+    df = R.signals(df, names=list(signals))
+    R.set_returns(df, ("ret_vw",))
     return df
 
 

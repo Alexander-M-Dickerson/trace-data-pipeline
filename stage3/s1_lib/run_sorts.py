@@ -4,8 +4,9 @@ Two steps, matching the paper:
 
   step 1  the monthly panel, left-merged with its unadjusted `*_mmn` signal twins on
           (cusip, date), with the risk-free rate taken from the factor file -- giving
-          ret_vw_exc / ret_vw_bgn_exc (and the duration-adjusted twins) -- then cut to
-          dates on or after the formation start.
+          ret_vw_exc / ret_vw_bgn_exc, or in a duration-adjusted run (STAGE3_RETURNS)
+          ret_vw_<type> / ret_vw_bgn_<type> -- then cut to dates on or after the
+          formation start.
   step 2  per result set: PyBondLab's fast_single_sorts (single sorts, deciles for the
           whole universe and quintiles for a rating split) or fast_within_firm_sorts
           (within-firm, at least 2 bonds per firm), holding_period=1, turnover on, then
@@ -38,6 +39,8 @@ import drrlib as D          # noqa: E402
 import lib_engine as E      # noqa: E402
 import paths                # noqa: E402
 import pblenv               # noqa: E402
+import return_types as RT   # noqa: E402
+import returns as R         # noqa: E402
 from bench import Bench     # noqa: E402
 
 DATE_CUTOFF = S.FORMATION_START     # step 1 keeps data['date'] >= this
@@ -68,7 +71,7 @@ def sorts_root() -> Path:
 # --------------------------------------------------------------------------
 # step 1 -- data prep
 # --------------------------------------------------------------------------
-def prepare_data(signals: list[str], *, ret_types: tuple[str, ...] = ("exc",),
+def prepare_data(signals: list[str], *, ret_types: tuple[str, ...] = (S.RETURNS,),
                  verbose: bool = True) -> pd.DataFrame:
     panel_p, mmn_p, fac_p = paths.PANEL, paths.MMN, paths.FACTORS
     for what, f in (("panel", panel_p), ("mmn twins", mmn_p), ("factors", fac_p)):
@@ -94,12 +97,18 @@ def prepare_data(signals: list[str], *, ret_types: tuple[str, ...] = ("exc",),
     data = data.drop(columns=["rfret"], errors="ignore").merge(fac, on="date", how="left")
     assert len(data) == n0, "rf merge changed rows: duplicate dates in factors file"
 
-    if "exc" in ret_types:
-        data["ret_vw_exc"] = data["ret_vw"] - data["rfret"]
-        data["ret_vw_bgn_exc"] = data["ret_vw_bgn"] - data["rfret"]
-    if "dur" in ret_types:
-        data["ret_vw_dur"] = data["ret_vw"] - data["tret"]
-        data["ret_vw_bgn_dur"] = data["ret_vw_bgn"] - data["tret"]
+    # [ref:rule.return_types] the run's return, named by its type as the sort files are: in
+    # excess of the factor file's rf in the standard run; in a duration-adjusted one, less its
+    # Treasury column, with the return-based signals (and `str_mmn`) of that return.
+    for rt in ret_types:
+        if rt != S.RETURNS:
+            raise SystemExit(f"this run's return type is {S.RETURNS!r}, not {rt!r}: set "
+                             "STAGE3_RETURNS (or run_stage3.sh --returns) so its outputs land "
+                             "in that type's own tree")
+    data = R.signals(data)
+    for rt in ret_types:
+        data[f"ret_vw_{rt}"] = R.ret(data, "ret_vw", rf="rfret")
+        data[f"ret_vw_bgn_{rt}"] = R.ret(data, "ret_vw_bgn", rf="rfret")
 
     data = data[data["date"] >= DATE_CUTOFF].reset_index(drop=True)
 
@@ -122,7 +131,7 @@ def prepare_data(signals: list[str], *, ret_types: tuple[str, ...] = ("exc",),
 # step 2 -- one result set through PyBondLab
 # --------------------------------------------------------------------------
 def run_set(data: pd.DataFrame, *, sort: str, set_name: str, signals: list[str],
-            ret_type: str = "exc", rating: str | None = None) -> pd.DataFrame:
+            ret_type: str = S.RETURNS, rating: str | None = None) -> pd.DataFrame:
     """One (sort, result-set) batch -> the extract_panel frame (sign_correct=True)."""
     from PyBondLab import NamingConfig, extract_panel
     from PyBondLab.fast_sorts import fast_single_sorts, fast_within_firm_sorts
@@ -176,8 +185,9 @@ def main() -> int:
     ap.add_argument("--signals", nargs="+", default=DEFAULT_SIGNALS,
                     help="base mnemonics (default: the 7 LIB factors plus the 5 "
                          "illiquidity ones, which is what the exhibits need)")
-    ap.add_argument("--ret", default="exc", choices=["exc", "dur"],
-                    help="exc = in excess of the one-month bill; dur = duration-adjusted")
+    ap.add_argument("--ret", default=S.RETURNS, choices=list(RT.RETURN_TYPES),
+                    help="the return type; it must be the run's own (STAGE3_RETURNS, default "
+                         "exc = in excess of the one-month bill)")
     ap.add_argument("--rating", default=None, choices=[None, "IG", "NIG"],
                     help="restrict the formation universe to one rating class")
     ap.add_argument("--force", action="store_true", help="recompute even if the CSV exists")
@@ -251,7 +261,8 @@ def main() -> int:
                     "git_branch": D._git("rev-parse", "--abbrev-ref", "HEAD"),
                     "pybondlab": prov,
                     "python": sys.version.split()[0],
-                    "inputs": [D.fingerprint(v) for v in INPUT_PATHS.values()],
+                    "inputs": [D.fingerprint(v) for v in
+                               [*INPUT_PATHS.values(), *R.input_paths()]],
                 }}
     (root / "manifest.json").write_text(json.dumps(manifest, indent=2, default=str),
                                         encoding="utf-8")

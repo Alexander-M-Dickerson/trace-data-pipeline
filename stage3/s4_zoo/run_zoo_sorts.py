@@ -43,6 +43,7 @@ import _stage3_settings as S   # noqa: E402
 import drrlib as D          # noqa: E402
 import paths                # noqa: E402
 import pblenv               # noqa: E402
+import returns as R         # noqa: E402
 import zoo_engine as Z      # noqa: E402
 import signal_set as SIG    # noqa: E402
 from bench import Bench     # noqa: E402
@@ -63,6 +64,8 @@ def prepare_data(*, end: str | None = None,
                          "\n  Run `python tools/check_inputs.py` for the full list.")
     data = pd.read_parquet(paths.PANEL)
     data["date"] = pd.to_datetime(data["date"])
+    # [ref:rule.return_types] the run's signals; the standard run's are left as read
+    data = R.signals(data)
     if excess:
         fac = pd.read_parquet(paths.FACTORS, columns=["date", "rf"])
         fac["date"] = pd.to_datetime(fac["date"])
@@ -70,7 +73,9 @@ def prepare_data(*, end: str | None = None,
         data = (data.drop(columns=["rfret"], errors="ignore")
                 .merge(fac.rename(columns={"rf": "rfret"}), on="date", how="left"))
         assert len(data) == n0, "rf merge changed rows: duplicate dates in the factor file"
-        data["ret_vw"] = data["ret_vw"] - data["rfret"]
+    # the run's return: raw `ret_vw` in the standard run, less the factor file's rf with
+    # --excess; in a duration-adjusted run less the Treasury column, never less rf
+    R.set_returns(data, ("ret_vw",), rf="rfret" if excess else None)
     data = data[data["date"] >= DATE_CUTOFF]
     if end:
         data = data[data["date"] <= end]
@@ -153,7 +158,9 @@ def main() -> int:
                     "git_commit": D._git("rev-parse", "HEAD"),
                     "git_branch": D._git("rev-parse", "--abbrev-ref", "HEAD"),
                     "pybondlab": prov, "python": sys.version.split()[0],
-                    "inputs": [D.fingerprint(paths.PANEL), D.fingerprint(paths.FACTORS)],
+                    "inputs": [D.fingerprint(p) for p in
+                               [paths.PANEL, paths.FACTORS, *R.input_paths()]],
+                    **R.manifest(),
                 }}
     (root / "manifest.json").write_text(json.dumps(manifest, indent=2, default=str),
                                         encoding="utf-8")

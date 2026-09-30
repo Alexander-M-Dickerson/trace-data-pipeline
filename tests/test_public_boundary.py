@@ -258,6 +258,7 @@ FILES_THAT_LIVE_ELSEWHERE = {
     "extract.py": "PyBondLab's own module",
     "illiq_helper_functions.py": "in the reference build a maintainer points STAGE2_REFERENCE_ROOT at",
     "resource_tracker.py": "Python's own module, quoted in a traceback",
+    "summary.md": "written by stage3/tools/compare_runs.py into the comparison folder of a run",
 }
 # A bare name or one written as a path (`docs/CONTRACTS.md`); the last part is what is checked.
 _FILE_REF = re.compile(r"(?<![\w/.*-])((?:[\w.-]+/)*[A-Za-z_][\w-]*\.(?:py|md))\b")

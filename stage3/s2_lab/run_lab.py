@@ -13,6 +13,10 @@ have known at formation -- and read off how much the anomaly improves.
          filter, so the panel's own rate is the right one and swapping in another
          would put the two sides of the paired difference on different rates.
 
+         A duration-adjusted run (STAGE3_RETURNS) sorts `ret_vw` less the Treasury
+         column instead, on that return's signals, and winsorizes that return
+         (returns.py).
+
          Window: [2002-08-31, 2024-12-31] -- one month earlier than the Section-3
          window, T = 269.
   sweep  per (tail, rating): DataUncertaintyAnalysis(signals, holding_periods=[1],
@@ -47,6 +51,7 @@ import drrlib as D          # noqa: E402
 import lab_engine as E      # noqa: E402
 import paths                # noqa: E402
 import pblenv               # noqa: E402
+import returns as R         # noqa: E402
 from bench import Bench     # noqa: E402
 
 DATE_START = S.SAMPLE["lab"]["start"]
@@ -68,8 +73,10 @@ def prepare_data(*, date_start: str = DATE_START, date_end: str = DATE_END,
                          "\n  Run `python tools/check_inputs.py` for the full list.")
     data = pd.read_parquet(paths.PANEL)
     data["date"] = pd.to_datetime(data["date"])
-    if "rfret" in data.columns:
-        data["ret_vw"] = data["ret_vw"] - data["rfret"]
+    # [ref:rule.return_types] the run's signals and return: in the standard run, `ret_vw`
+    # less the panel's own rfret, exactly as before.
+    data = R.signals(data)
+    R.set_returns(data, ("ret_vw",), rf="rfret" if "rfret" in data.columns else None)
     data = data[(data["date"] >= date_start) & (data["date"] <= date_end)].copy()
 
     # PyBondLab traps: a nullable-Int rating breaks numba, and a duplicate (cusip,date)
@@ -222,7 +229,8 @@ def main() -> int:
                     "git_commit": D._git("rev-parse", "HEAD"),
                     "git_branch": D._git("rev-parse", "--abbrev-ref", "HEAD"),
                     "pybondlab": prov, "python": sys.version.split()[0],
-                    "inputs": [D.fingerprint(paths.PANEL)],
+                    "inputs": [D.fingerprint(p) for p in [paths.PANEL, *R.input_paths()]],
+                    **R.manifest(),
                 }}
     (root / "manifest.json").write_text(json.dumps(manifest, indent=2, default=str),
                                         encoding="utf-8")

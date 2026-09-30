@@ -38,6 +38,7 @@ import numpy as np
 import pandas as pd
 
 import paths
+import returns as R   # the run's return type: its caption sentence and manifest record
 # The four naming/lag conventions live in ONE place. They are re-exported here
 # so `drrlib.nw_lags` and `drrlib.base_mnemonic` keep working -- two definitions
 # of a sign-flip rule is exactly the kind of thing that drifts apart.
@@ -266,7 +267,16 @@ def sample_sentence(block: dict | None) -> str:
     ❗Derived, never typed. The titles in `captions.py` are the authors' words and do
     not change; this is the part that has to track whatever data the run was given, so
     that a document whose data appendix reaches 2025-11 says 2025-11.
+
+    A duration-adjusted run (STAGE3_RETURNS) adds one sentence naming its return.
     """
+    note = R.caption_note()
+    if not note:
+        return _sample_sentence(block)
+    return (_sample_sentence(block) + " " + note).strip()
+
+
+def _sample_sentence(block: dict | None) -> str:
     if not block:
         return ""
     def _m(v):
@@ -440,9 +450,11 @@ def write_result(name: str, payload: dict, *, section: str, inputs: list[Path],
         "git_branch": _git("rev-parse", "--abbrev-ref", "HEAD"),
         "code_dirty": bool(_git("status", "--porcelain")),
         "wall_s": round(time.perf_counter() - t0, 3) if t0 is not None else None,
-        "inputs": [fingerprint(p) for p in inputs],
+        # a duration-adjusted run also read its type's blocks; the standard run's list is as it was
+        "inputs": [fingerprint(p) for p in [*inputs, *R.input_paths()]],
         "pybondlab": pbl,
         "python": sys.version.split()[0],
+        **R.manifest(),
         **(extra or {}),
     }
     out = paths.section_results(section) / f"{name}.json"
