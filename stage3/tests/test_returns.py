@@ -93,7 +93,9 @@ def test_a_duration_adjusted_run_swaps_every_signal_and_adjusts_the_returns(dbns
     np.testing.assert_array_equal(R.ret(dbns, "ret_vw", rf="rfret"), dbns["ret_vw"] - t)
     np.testing.assert_array_equal(R.ret(dbns, "ret_vw_bgn"), dbns["ret_vw_bgn"] - t)
     assert R.load_columns() == ["tret_bns"] and R.manifest() == {"returns": "dbns"}
-    assert "tret_bns" in R.caption_note()
+    note = R.caption_note()
+    assert r"tret\_bns" in note
+    assert not re.search(r"(?<!\\)[_%&#$]", note), "the note goes into LaTeX captions"
 
 
 def test_a_loader_that_read_a_few_signals_swaps_only_those_in_place(dbns):
@@ -117,7 +119,7 @@ def test_the_caption_says_which_return(dbns, monkeypatch):
     import drrlib as D
     block = {"first": "2002-09-30", "last": "2025-11-30", "T": 279}
     assert D.sample_sentence(block).startswith("Sample: 2002-09 to 2025-11, T=279.")
-    assert "tret_bns" in D.sample_sentence(block)
+    assert r"tret\_bns" in D.sample_sentence(block)
     monkeypatch.setattr(S, "RETURNS", "exc")
     assert D.sample_sentence(block) == "Sample: 2002-09 to 2025-11, T=279."
 

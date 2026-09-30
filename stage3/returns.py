@@ -92,10 +92,11 @@ def input_paths() -> list[Path]:
 
 
 def caption_note() -> str:
-    """The sentence a caption adds in a duration-adjusted run ("" in the standard run)."""
+    """The sentence a caption adds in a duration-adjusted run ("" in the standard run).
+    LaTeX-ready, since it closes the tables' captions: the benchmark's underscore is escaped."""
     if not adjusted():
         return ""
-    long = RT.RETURN_TYPES[S.RETURNS]["long"]
+    long = RT.RETURN_TYPES[S.RETURNS]["long"].replace("_", r"\_")
     return (f"Returns are {long[0].lower()}{long[1:]}. The beta and momentum signals are "
             "estimated on the same return; alphas are on MKTB.")
 

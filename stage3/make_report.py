@@ -253,7 +253,7 @@ def title_page(window: str, prov: dict) -> str:
     L.append(r"\vspace{0.5em}\noindent\rule{\textwidth}{0.4pt}" + "\n")
     # [ref:rule.return_types] a duration-adjusted run says so before anything else
     if R.adjusted():
-        L.append(r"\textbf{" + latex_escape(R.caption_note()) + r"} The data appendix "
+        L.append(r"\textbf{" + R.caption_note() + r"} The data appendix "
                  r"describes the panel as built and does not depend on the return type."
                  + "\n")
 
