@@ -126,6 +126,21 @@ def test_blocks_on_different_axes_are_refused(tmp_path):
         mr._bbw_trace(blocks)
 
 
+def test_twin_blocks_older_than_the_plain_block_are_refused(tmp_path):
+    """A twin built before the plain block comes from an earlier panel, whatever its values."""
+    import os
+    blocks = _write_blocks(tmp_path / "blocks")
+    t = (blocks / "bbw_factors.parquet").stat().st_mtime
+    for name in ("bbw_factors_bns.parquet", "bbw_factors_cls.parquet"):
+        os.utime(blocks / name, (t, t))
+    mr._bbw_trace(blocks)                                    # built at the same moment: fine
+    os.utime(blocks / "bbw_factors_cls.parquet", (t - 3600, t - 3600))
+    with pytest.raises(SystemExit, match="bbw_factors_cls.parquet .* older than bbw_factors.parquet"):
+        mr._bbw_trace(blocks)
+    os.utime(blocks / "bbw_factors_cls.parquet", (t + 3600, t + 3600))
+    mr._bbw_trace(blocks)                                    # a twin built later: fine
+
+
 def test_the_original_series_is_pinned_and_present(tmp_path):
     """The file shipped as the authors' original must hash as pinned, and the pin must be
     the sha256 of a real file with the authors' columns and their 209 months."""

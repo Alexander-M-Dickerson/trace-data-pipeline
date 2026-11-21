@@ -38,6 +38,10 @@ file for file.
   column), and a test holds the old swap beside the new one.
 - `run_sorts.py --ret dur`, which subtracted `tret` from the sorted return without swapping
   any signal, is replaced by the run's return type.
+- **`make_release.py --what bbw` refuses benchmark twin blocks older than the plain BBW block.**
+  `make_excess_blocks.py` writes `bbw_factors_bns.parquet` and `bbw_factors_cls.parquet` after
+  step 3 writes `bbw_factors.parquet`. A twin with an earlier file time was built from an earlier
+  panel, and the release now stops and names the command that rebuilds it.
 
 ## [4.2.1] - 2026-09-28
 

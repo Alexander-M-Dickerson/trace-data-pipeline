@@ -29,7 +29,7 @@ panel never depends on which stage 1 run it was built from.
 window would let this module fall back to the evidence window and reproduce the original bug
 silently. It does not fall back: a cache without `i0`/`i1` is stale by definition and is replaced,
 and a DOWNLOAD without them is a hard error -- because it would mean the URL points at a linker
-built before FL-DR44 and no join here can be trusted.
+built before the identity window was added and no join here can be trusted.
 """
 from __future__ import annotations
 
@@ -83,7 +83,7 @@ def load_linker(force_fetch: bool = False) -> pd.DataFrame:
         gone = _missing(df)
         if gone:
             print(f"[linker] cached {LINKER_CACHE.name} is missing {gone} -- refetching from "
-                  f"LINKER_URL. The cache predates the identity window (FL-DR44).", flush=True)
+                  f"LINKER_URL. The cache predates the identity window.", flush=True)
             df = None
 
     if df is None:
@@ -95,7 +95,7 @@ def load_linker(force_fetch: bool = False) -> pd.DataFrame:
                 f"  url    : {cfg.LINKER_URL}\n"
                 f"  window : {cfg.LINKER_WINDOW}  (SCHEMA.md inside the zip says which window is which)\n"
                 f"  This build joins the IDENTITY window because a bond-month panel labels firms.\n"
-                f"  A linker without it predates FL-DR44; falling back to w0/w1 would silently\n"
+                f"  A linker without it predates that window; falling back to w0/w1 would silently\n"
                 f"  reintroduce the 2.14% firm-membership disagreement that gate exists to stop.")
         cfg.ensure_dirs()
         df.to_parquet(LINKER_CACHE, index=False)

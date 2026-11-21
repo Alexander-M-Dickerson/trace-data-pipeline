@@ -649,6 +649,24 @@ def bbw_columns() -> list[tuple[str, str, str]]:
     return out
 
 
+def _refuse_stale_twins(blocks: Path) -> None:
+    """The benchmark twins must not be older than the plain block.
+
+    Step 3 writes `bbw_factors.parquet`; `make_excess_blocks.py` writes the `_bns` and `_cls`
+    twins afterwards, from the same panel. A twin older than the plain block was built from an
+    earlier panel, and the bundle would print its columns beside factors of a later one. The
+    two can agree to rounding and still come from different runs, so the file times decide.
+    """
+    plain = blocks / "bbw_factors.parquet"
+    stale = [n for n in ("bbw_factors_bns.parquet", "bbw_factors_cls.parquet")
+             if (blocks / n).stat().st_mtime < plain.stat().st_mtime]
+    if stale:
+        raise SystemExit(
+            f"ERROR: {' and '.join(stale)} in {blocks} older than bbw_factors.parquet: the "
+            "plain block was rebuilt and the benchmark twins were not. Run `python "
+            "make_excess_blocks.py --benchmark all`, then build the release again.")
+
+
 def _bbw_trace(blocks: Path) -> pd.DataFrame:
     """The TRACE-built factors, 2002-08 on: date + 16 columns, from the three step-3 blocks."""
     parts = []
@@ -662,6 +680,7 @@ def _bbw_trace(blocks: Path) -> pd.DataFrame:
             b = b.reset_index()
         b["date"] = pd.to_datetime(b["date"])
         parts.append(b.set_index("date").sort_index())
+    _refuse_stale_twins(blocks)
     axes = [tuple(p.index) for p in parts]
     if any(a != axes[0] for a in axes[1:]):
         raise SystemExit("ERROR: the three BBW blocks do not share one date axis -- they were "
