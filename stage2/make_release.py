@@ -14,6 +14,7 @@ published number checkable.
     python make_release.py --what panel         # just the panel
     python make_release.py --out-dir dist       # somewhere else
     python make_release.py --what bbw           # the BBW four-factor bundle
+    python make_release.py --what monthly_factors   # every monthly factor, spliced, one file
     python make_release.py --what daily         # the Stage 1 daily panel, public layout
     python make_release.py --mode <mode>        # a build other than the default stage1
 
@@ -723,14 +724,19 @@ def _bbw_extended(blocks: Path) -> pd.DataFrame:
     return out[have].reset_index(drop=True)
 
 
-def _factor_matrix(blocks: Path) -> pd.DataFrame:
-    """Step 4's factor matrix (what it writes as factors_merged), built from `blocks` now."""
+def _step(name: str):
+    """Import a module from steps/, which the runner puts on the path and this script does not."""
+    import importlib
     import sys
     steps = str(Path(__file__).resolve().parent / "steps")
     if steps not in sys.path:
         sys.path.insert(0, steps)
-    import step4_betas
-    return step4_betas.build_factor_matrix(blocks)
+    return importlib.import_module(name)
+
+
+def _factor_matrix(blocks: Path) -> pd.DataFrame:
+    """Step 4's factor matrix (what it writes as factors_merged), built from `blocks` now."""
+    return _step("step4_betas").build_factor_matrix(blocks)
 
 
 def _gate_bbw(trace: pd.DataFrame, ext: pd.DataFrame) -> None:
@@ -963,6 +969,280 @@ def release_bbw(mode: str, out_dir: Path, vintage: str) -> int:
 
 
 # =============================================================================================
+# The monthly factors, in one file
+#
+# Every monthly factor the Stage 2 betas are estimated on, as step 4 assembles them
+# (steps/step4_betas.build_factor_matrix, written as factors_merged.parquet). The bond factors
+# are spliced, Lehman-ICE before 2002-08 and TRACE from it. The liquidity and volatility factors
+# are built from TRACE. The stock market, macroeconomic and uncertainty series come from their
+# public sources. The osbap_stage2_factors bundle above is the input Stage 2 pins, with the
+# unspliced Lehman-ICE copies. This bundle is what the betas used.
+# =============================================================================================
+
+# Columns step 4 derives from others (mktb split at zero and squared, dvix split at zero). Left
+# out: a user rebuilds them in one line, and mktb_down and mktb_up read 0, not missing, in the
+# months mktb is missing, which a published file must not do.
+MONTHLY_DERIVED = ("mktb_down", "mktb_up", "mktb_sq", "dvix_down", "dvix_up")
+
+# Every published column, in the order and groups the README prints. A column step 4 gains
+# later is refused until it is placed here, so nothing is published undescribed.
+MONTHLY_GROUPS = [
+    ("Bond market factors on the excess return (over the one-month T-bill)",
+     ["mktb", "drf", "crf", "lrf", "term", "defb", "termb"]),
+    ("Bond market factors on the duration-adjusted return (over `tret`, Andreani, Palhares and "
+     "Richardson)", ["mktbx", "drfx", "crfx", "lrfx"]),
+    ("Bond market factors over the van Binsbergen, Nozawa and Schwert Treasury",
+     ["mktb_bns", "drf_bns", "crf_bns", "lrf_bns", "term_bns"]),
+    ("Bond market factors over the Cui, Lu and Song Treasury",
+     ["mktb_cls", "drf_cls", "crf_cls", "lrf_cls", "term_cls"]),
+    ("Bond liquidity and volatility, from TRACE",
+     ["psb", "amd", "lix", "illiq", "roll", "sprd", "css", "ars", "fhts", "vov", "rvol", "rsj"]),
+] + [(name, cols) for name, cols in COLUMN_GROUPS if name != "Bond market (BBW)"]
+
+MONTHLY_README = """# OSBAP monthly factors, {vintage} vintage
+
+Every monthly factor the Stage 2 betas are estimated on, in one file, {span_start} to
+{span_end} ({rows} months, one row per month-end). It is step 4's factor matrix,
+`factors_merged.parquet`, without the five columns step 4 derives from others
+({derived}).
+
+The bond factors are spliced. Before 2002-08 they are the Lehman Brothers and ICE series
+published on openbondassetpricing.com. From 2002-08 Stage 2 builds them from TRACE. The
+liquidity and volatility factors need transaction prices, so they start in 2002-08, and so
+does every `lrf` column. The stock market, macroeconomic and uncertainty series run to each
+source's latest month, so the columns end in different months (table below). Before 2002-08
+`mktb` is empty in {n_gaps} months: {gaps}.
+
+## Files
+
+| file | what |
+|---|---|
+| `monthly_factors_{vintage}.parquet` / `.csv` | the factors, `date` (calendar month-end) then {n_series} columns |
+| `PROVENANCE.json` | the blocks the file was cut from, with hashes, and the first and last month of every column |
+| `MANIFEST.json` | every file with its sha256, checked by `verify_release.py` |
+
+## Columns
+
+{coltable}
+
+The bond market factors are the Bai, Bali and Wen (2019) factors with the corrections of
+Dickerson, Mueller and Robotti (2023): `mktb` the market, `drf` downside risk, `crf` credit risk
+and `lrf` liquidity risk. `term` is the market's total return minus its duration-adjusted
+return. `defb` is the long-term corporate minus the long-term government total return and
+`termb` the long-term government total return minus the risk-free rate. The suffix names the
+benchmark each return is measured over. The duration-adjusted factors are re-sorted on the
+duration-adjusted return, so they are not the excess factors with a benchmark subtracted.
+Before 2002-08 `crf` averages two sorts, value-at-risk and short-term reversal, because the
+third, on illiquidity, needs transaction prices. The corrected BBW download on
+openbondassetpricing.com has the same four factors, named `<factor>_<return definition>`.
+
+Each liquidity and volatility factor is the equal-weighted mean, across US-domiciled bonds, of
+one bond-level measure in the monthly panel ({liq_map}). {liq_diff} are monthly changes in that
+mean, and `psb` and `rsj` are levels. The Stage 2 data dictionary defines each measure.
+
+The bond and stock market factors are decimal monthly returns, 0.01 = 1%. The Stage 2 data
+dictionary describes the other series with the betas estimated on them.
+
+## Months with data, by column
+
+{months}
+
+## Citation
+
+Dickerson, A., Robotti, C., & Rossetti, G. (2026). *The Corporate Bond Factor Replication
+Crisis.* Working Paper.
+
+Dickerson, A., Mueller, P., & Robotti, C. (2023). Priced risk in corporate bonds. *Journal of
+Financial Economics*, 150(2), 103707.
+"""
+
+
+def _same(a: pd.Series, b: pd.Series) -> float | None:
+    """Largest |a - b| where both have a value, or None when one has a value the other lacks."""
+    x, y = a.to_numpy(dtype=float), b.to_numpy(dtype=float)
+    if not np.array_equal(np.isnan(x), np.isnan(y)):
+        return None
+    d = np.abs(x - y)[~np.isnan(x)]
+    return float(d.max()) if d.size else 0.0
+
+
+def _read_block(path: Path) -> pd.DataFrame:
+    b = pd.read_parquet(path)
+    if "date" not in b.columns:
+        b = b.reset_index()
+    b["date"] = pd.to_datetime(b["date"])
+    b.columns = [c if c == "date" else c.lower() for c in b.columns]
+    return b.sort_values("date").reset_index(drop=True)
+
+
+def _gate_monthly(blocks: Path, fm: pd.DataFrame, ext: pd.DataFrame) -> list[str]:
+    """Refuse a matrix that is not exactly the blocks on disk, spliced as step 4 splices them.
+
+    Step 4 writes factors_merged from these blocks, so every published value must equal its
+    source block on the block's own months, and the bond factors before 2002-08 must equal the
+    Lehman-ICE series. A difference of any size means a block from another run. Returns the
+    blocks it compared, for PROVENANCE."""
+    ice_map = _step("step4_betas").ICE_MAP
+    ice = {k.lower(): v for k, v in ice_map.items()}
+
+    bad: list[str] = []
+    if fm["date"].duplicated().any() or not fm["date"].is_monotonic_increasing:
+        raise SystemExit("ERROR: factors_merged.parquet is not one row per month, in order")
+
+    def check(name: str, block: pd.DataFrame, cols: list[str], since=None) -> None:
+        m = block if since is None else block[block["date"] >= since]
+        j = m[["date"] + cols].merge(fm[["date"] + cols], on="date", how="left",
+                                     suffixes=("_b", "_m"))
+        for c in cols:
+            worst = _same(j[f"{c}_b"], j[f"{c}_m"])
+            if worst is None or worst != 0.0:
+                bad.append(f"{c}: factors_merged differs from {name} "
+                           f"({'a value missing on one side' if worst is None else f'max |d| = {worst:.3g}'})")
+
+    used = []
+    fac = _read_block(blocks / "factors.parquet")
+    check("factors.parquet", fac, [c for c in fac.columns if c != "date" and c not in ice.values()])
+    used.append("factors.parquet")
+    for name in ("bbw_factors.parquet", "bbw_factors_bns.parquet", "bbw_factors_cls.parquet"):
+        if (blocks / name).exists():
+            b = _read_block(blocks / name)
+            check(name, b, [c for c in b.columns if c != "date"], since=BBW_TRACE_START)
+            used.append(name)
+    il = _read_block(blocks / "illiq_factors.parquet")
+    il_cols = [c for c in il.columns if c != "date"]
+    check("illiq_factors.parquet", il, il_cols)
+    used.append("illiq_factors.parquet")
+
+    # The loader returns the BBW names (MKTB, MKTBx, ...). Step 4 renames them with ICE_MAP
+    # before it splices, and so does this check, or no column would match and nothing be checked.
+    pre = fm["date"] < BBW_TRACE_START
+    ext = ext.rename(columns=ice_map)
+    ext["date"] = pd.to_datetime(ext["date"])
+    e = fm.loc[pre, ["date"]].merge(ext, on="date", how="left")
+    checked = 0
+    for col, ext_col in ice.items():
+        if col not in fm.columns:
+            continue
+        if ext_col not in e.columns:
+            # Step 4 splices only what the series has. A column it lacks stays TRACE-only.
+            if fm.loc[pre, col].notna().any():
+                bad.append(f"{col}: values before 2002-08 and no Lehman-ICE column to come from")
+            continue
+        worst = _same(fm.loc[pre, col].reset_index(drop=True), e[ext_col])
+        checked += 1
+        if worst is None or worst != 0.0:
+            bad.append(f"{col}: before 2002-08 it is not the Lehman-ICE series")
+    from lib import extended_factors
+    if checked < len(extended_factors.COLS):
+        bad.append(f"only {checked} bond factors were checked against the Lehman-ICE series, "
+                   f"which always has {len(extended_factors.COLS)}")
+    late = [c for c in fm.columns if (c.startswith("lrf") or c in il_cols) and fm.loc[pre, c].notna().any()]
+    if late:
+        bad.append(f"{late} have values before 2002-08, and they need TRACE prices")
+    if not pre.any() or fm.loc[pre, "mktb"].isna().all():
+        bad.append("no Lehman-ICE history before 2002-08: the backfill did not reach factors_merged")
+    if bad:
+        raise SystemExit("ERROR: the monthly factors would not be what the betas used:\n  "
+                         + "\n  ".join(bad))
+    return used
+
+
+def release_monthly_factors(mode: str, out_dir: Path, vintage: str) -> int:
+    blocks = cfg.BLOCKS_DIR / mode
+    src = blocks / "factors_merged.parquet"
+    for need in (src, blocks / "factors.parquet", blocks / "bbw_factors.parquet",
+                 blocks / "illiq_factors.parquet"):
+        if not need.exists():
+            raise FileNotFoundError(f"no {need}; build it first: python _run_stage2.py")
+    fm = pd.read_parquet(src)
+    fm["date"] = pd.to_datetime(fm["date"])
+    fm = fm.sort_values("date").reset_index(drop=True)
+
+    from lib import extended_factors
+    used = _gate_monthly(blocks, fm, extended_factors.load_extended_bbw())
+
+    order = [c for _, cols in MONTHLY_GROUPS for c in cols if c in fm.columns]
+    unplaced = sorted(set(fm.columns) - set(order) - set(MONTHLY_DERIVED) - {"date"})
+    if unplaced:
+        raise SystemExit(f"ERROR: factors_merged has columns no group describes: {unplaced}. "
+                         "Add them to MONTHLY_GROUPS with a line in the README first.")
+    out = fm[["date"] + order]
+
+    stage = out_dir / f"osbap_monthly_factors_{vintage}"
+    if stage.exists():
+        shutil.rmtree(stage)
+    stage.mkdir(parents=True)
+    base = stage / f"monthly_factors_{vintage}"
+    out.to_parquet(base.with_suffix(".parquet"), index=False)
+    csv = out.copy()
+    csv["date"] = csv["date"].dt.strftime("%Y-%m-%d")
+    csv.to_csv(base.with_suffix(".csv"), index=False, float_format="%.10g")
+
+    def first_last(c: str) -> tuple[str, str]:
+        d = out.loc[out[c].notna(), "date"]
+        return (str(d.min())[:7], str(d.max())[:7]) if not d.empty else ("", "")
+
+    spans = {c: first_last(c) for c in order}
+    groups = ["| group | columns |", "|---|---|"]
+    for name, cols in MONTHLY_GROUPS:
+        present = [c for c in cols if c in order]
+        if present:
+            groups.append(f"| {name} | {', '.join(f'`{c}`' for c in present)} |")
+    months = ["| column | first month | last month |", "|---|---|---|"]
+    months += [f"| `{c}` | {a} | {b} |" for c, (a, b) in spans.items()]
+    gaps = out.loc[(out["date"] < BBW_TRACE_START) & out["mktb"].isna(), "date"].dt.strftime("%Y-%m")
+    s2 = _step("step2_illiquidity")
+    liq_map = ", ".join(f"`{f.lower()}` from `{sig}`" for sig, f in s2.FACTOR_MAP)
+    liq_diff = ", ".join(f"`{f.lower()}`" for _, f in s2.FACTOR_MAP if f in s2.DIFF_FACTORS)
+
+    prov = {
+        "vintage": vintage,
+        "built_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "mode": mode,
+        "trace_start": str(BBW_TRACE_START)[:10],
+        "source": _public_path(src), "source_sha256": _sha256(src),
+        # source + source_sha256 per block, so a release check can tell the file went stale
+        # when any block it was checked against is rebuilt.
+        "checked_against": {n: _source(blocks / n) for n in used},
+        "extended_backfill": {"url": cfg.BBW_EXTENDED_URL,
+                              "sha256": _sha256(cfg.BBW_EXTENDED_CACHE)
+                              if cfg.BBW_EXTENDED_CACHE.exists() else None},
+        "left_out": list(MONTHLY_DERIVED),
+        "rows": int(len(out)),
+        "span": [str(out["date"].min())[:10], str(out["date"].max())[:10]],
+        "column_months": {c: list(v) for c, v in spans.items()},
+    }
+    (stage / "PROVENANCE.json").write_text(json.dumps(prov, indent=1), encoding="utf-8")
+    (stage / "README.md").write_text(
+        MONTHLY_README.format(vintage=vintage, span_start=prov["span"][0][:7],
+                              span_end=prov["span"][1][:7], rows=len(out),
+                              derived=", ".join(f"`{c}`" for c in MONTHLY_DERIVED),
+                              n_series=len(order), coltable="\n".join(groups),
+                              months="\n".join(months), liq_map=liq_map, liq_diff=liq_diff,
+                              n_gaps=len(gaps), gaps=", ".join(gaps) or "none"),
+        encoding="utf-8", newline="\n")
+
+    members = {f.name: {"bytes": f.stat().st_size, "sha256": _sha256(f)}
+               for f in sorted(stage.iterdir()) if f.name != "MANIFEST.json"}
+    manifest = {"archive": f"osbap_monthly_factors_{vintage}.zip", "vintage": vintage,
+                "built_utc": prov["built_utc"], "data_span": prov["span"], "members": members}
+    (stage / "MANIFEST.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+
+    zip_path = out_dir / f"osbap_monthly_factors_{vintage}.zip"
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
+        for f in sorted(stage.iterdir()):
+            z.write(f, f.name)
+
+    print(f"vintage        : {vintage}")
+    print(f"factors        : {len(order)} columns, {len(out)} months, {prov['span'][0][:7]} to "
+          f"{prov['span'][1][:7]} (left out: {', '.join(MONTHLY_DERIVED)})")
+    print(f"checked        : equal to {', '.join(used)} and, before 2002-08, the Lehman-ICE series")
+    print(f"\nBUNDLE  {zip_path}")
+    print(f"        {zip_path.stat().st_size/1e3:.0f} KB, sha256 {_sha256(zip_path)}")
+    return 0
+
+
+# =============================================================================================
 # The daily panel
 #
 # Stage 1's bond-day panel, in the layout we publish. The file Stage 1 builds has the
@@ -1141,7 +1421,8 @@ def main() -> int:
     ap.add_argument("--mode", default=cfg.INPUT_MODE,
                     help="the build to publish (its blocks/<mode>/ and panel); default "
                          f"{cfg.INPUT_MODE!r}, the mode _run_stage2.py builds")
-    ap.add_argument("--what", choices=("all", "panel", "factors", "bbw", "daily"), default="all",
+    ap.add_argument("--what", choices=("all", "panel", "factors", "bbw", "monthly_factors", "daily"),
+                    default="all",
                     help="which bundles to build (default all, which includes daily)")
     ap.add_argument("--out-dir", type=Path, default=None,
                     help="where to write the bundles (default stage2/release/)")
@@ -1173,6 +1454,15 @@ def main() -> int:
                 raise
             print(f"[bbw] SKIPPED: {exc}\n"
                   "      Run `python make_excess_blocks.py --benchmark all` first to build it.")
+            rc |= 1
+    if args.what in ("all", "monthly_factors"):
+        print("\n" + "=" * 78 + f"\nMONTHLY FACTORS, ONE FILE ({vintage})\n" + "=" * 78)
+        try:
+            rc |= release_monthly_factors(args.mode, out_dir, vintage)
+        except FileNotFoundError as exc:
+            if args.what == "monthly_factors":
+                raise
+            print(f"[monthly_factors] SKIPPED: {exc}")
             rc |= 1
     if args.what in ("all", "daily"):
         print("\n" + "=" * 78 + f"\nDAILY PANEL, PUBLIC LAYOUT ({vintage})\n" + "=" * 78)

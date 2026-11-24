@@ -30,6 +30,13 @@ file for file.
 - **`stage3/tools/compare_runs.py`**: two stage 3 runs, cell by cell. For every result table
   both hold it reports what moved, which numbers changed sign and which t-statistics crossed
   1.96, and writes `cells.csv` and `summary.md`.
+- **`make_release.py --what monthly_factors`**: every monthly factor the stage 2 betas are
+  estimated on, in one file (`osbap_monthly_factors_<vintage>.zip`, parquet and CSV). It is
+  step 4's `factors_merged.parquet`. The bond market, downside, credit, term and default factors
+  are the Lehman-ICE series before 2002-08 and the TRACE factors from it, beside the TRACE
+  liquidity factors and the stock market, macroeconomic and uncertainty series. The release
+  refuses a file whose values differ in any digit from the blocks they came from, or from the
+  Lehman-ICE series before 2002-08, and a column no group in its README describes.
 
 ### Changed
 - **The duration swap has one home, `return_types.py` at the repository root,** used by stages
