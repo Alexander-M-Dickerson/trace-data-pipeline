@@ -1,4 +1,4 @@
-"""duration_adjusted.py -- Treasury benchmark returns built from each bond's own cash flows.
+"""Treasury benchmark returns built from each bond's own cash flows.
 
 Adds five columns beside the incumbent `tret`, each a Treasury benchmark you can subtract from
 `ret_vw` to get a duration-adjusted (credit) return:
@@ -9,54 +9,54 @@ Adds five columns beside the incumbent `tret`, each a Treasury benchmark you can
     tret_cfm    the same ladder, future-value weights
                 same paper, Internet Appendix A1, Eq. (19). Over-weights long-dated cash flows and
                 so overstates interest-rate risk, which is why the authors prefer PV weighting.
-    tret_gprs   the EXACT duration match
+    tret_gprs   the exact duration match
                 Ghaderi, M., Plante, S., Roussanov, N. and Seo, S.B. (2026), "Reconstructing a
                 Century of U.S. Corporate Bonds: Credit Risk in Historical Perspective", App. B.2.
-    tret_cls    the CASH-FLOW match: the same ladder discounted on the Treasury curve itself
+    tret_cls    the cash-flow match: the same ladder discounted on the Treasury curve itself
                 Cui, S., Lu, Y. and Song, Y. (2026), "Understanding Corporate Bond Excess Returns",
-                Eqs. (3)-(6). Where tret_bns discounts at the bond's OWN yield, this discounts at
-                the zero yields, so it replicates the cash flows rather than the duration. Their
-                Section 7.1 works the comparison out: both are value-weighted averages of the SAME
+                Eqs. (3)-(6). Where tret_bns discounts at the bond's own yield, this discounts at
+                the zero yields, so it replicates the cash flows and not the duration. Their
+                Section 7.1 works the comparison out: both are value-weighted averages of the same
                 zero returns, and only the weights differ.
-    tret_mat    key-rate index returns interpolated at MATURITY rather than duration
+    tret_mat    key-rate index returns interpolated at maturity, not at duration
                 Bessembinder, H., Kahle, K., Maxwell, W. and Xu, D. (2009). The twin of `tret`,
                 which interpolates the same series at modified duration (Andreani, M., Palhares, D.
                 and Richardson, S. (2024), Rev Account Stud 29, 3887-3906, Eq. (1)).
 
-THE METHOD. For bond i at t with cash flows CF_k at times t_k and own yield y compounded f times a
+The method. For bond i at t with cash flows CF_k at times t_k and own yield y compounded f times a
 year, and z_t(.) the Gurkaynak-Sack-Wright zero curve:
 
     w_k         = PV_k / SUM_j PV_j ,     PV_k = CF_k / (1 + y/f)^(f*t_k)
     tret_bns    = SUM_k w_k * r_k
     r_k         = exp( t_k*z_t(t_k) - t'_k*z_{t+1}(t'_k) ) - 1 ,   t'_k = max(t_k - delta, 0)
 
-t_k is measured from the START of the return window and t'_k from its END, so t'_k = t_k - delta
+t_k is measured from the start of the return window and t'_k from its end, so t'_k = t_k - delta
 falls out of the dates. t'_k = 0 handles a cash flow paid inside the window: that zero matured, so
 its leg is held to maturity. tret_cfm swaps w_k for CF_k / SUM_j CF_j. tret_gprs solves
 SUM_k w_k*exp((y*-z_k)t_k) = 1 for the Treasury yield y* and reweights by w_k*exp((y*-z_k)t_k).
-tret_cls swaps w_k for v_k = CF_k*exp(-z_k*t_k) / SUM_j CF_j*exp(-z_j*t_j) -- the cash flows priced
+tret_cls swaps w_k for v_k = CF_k*exp(-z_k*t_k) / SUM_j CF_j*exp(-z_j*t_j), the cash flows priced
 on the Treasury curve. Note v_k is tret_gprs's weight without its exp((y*-yhat)t_k) tilt: the tilt
-is what re-prices the portfolio to the CORPORATE bond's price, and tret_cls is the untilted case.
+is what re-prices the portfolio to the corporate bond's price, and tret_cls is the untilted case.
 A single cash flow therefore gets weight 1 under all four schemes, so they agree exactly on a
-zero-coupon bond -- which is a cheap, exact test that each weight normalised over the right rows.
+zero-coupon bond, which is a cheap, exact test that each weight normalised over the right rows.
 
-TWO INPUTS THIS REPO DID NOT HAVE, both in stage2/data/ beside crsp_treasury_returns.parquet:
+Two inputs this repo did not have, both in stage2/data/ beside crsp_treasury_returns.parquet:
   gsw_svensson.parquet        the Fed's curve parameters (feds200628), plus its published SVENYnn
-                              columns, which tell us the longest tenor GSW actually ANCHORED each
-                              day. Beyond that tenor the yield is held FLAT -- the convention of
+                              columns, which tell us the longest tenor GSW anchored each
+                              day. Beyond that tenor the yield is held flat, the convention of
                               Gurkaynak-Sack-Wright and of Ghaderi et al. (their App. A: "we
                               conservatively apply flat extrapolation when necessary"). This matters
                               only before 1986, when no Treasury long enough existed to price.
   fisd_cashflow_terms.parquet first_interest_date / last_interest_date / coupon_change_indicator,
-                              which the stage0 FISD extract does not carry. Coupon, frequency and
-                              maturity still come from the stage0 extract; this file supplies only
+                              which the stage0 FISD extract does not have. Coupon, frequency and
+                              maturity still come from the stage0 extract. This file supplies only
                               the schedule anchors, so the two vintages cannot disagree on terms.
 
-TWO TRAPS IN THE GSW FILE, both of which change results:
-  1. TAU2 = -999.99 is a SENTINEL, not a parameter. BETA3 is exactly 0 on every such row, so the
-     fourth Svensson term must be switched OFF, not evaluated: n/TAU2 with a negative TAU2 returns
-     a finite, wrong number rather than raising.
-  2. Recent rows carry BETA2 ~ +3475 against BETA3 ~ -3476 with TAU1 ~ TAU2 -- two huge terms that
+Two traps in the GSW file, both of which change results:
+  1. TAU2 = -999.99 is a sentinel, not a parameter. BETA3 is exactly 0 on every such row, so the
+     fourth Svensson term must be switched off, not evaluated: n/TAU2 with a negative TAU2 returns
+     a finite, wrong number and does not raise.
+  2. Recent rows have BETA2 ~ +3475 against BETA3 ~ -3476 with TAU1 ~ TAU2, two huge terms that
      nearly cancel. float64 throughout.
 """
 from __future__ import annotations
@@ -83,7 +83,7 @@ WINDOW_DAYS_LO, WINDOW_DAYS_HI = 15, 45
 NEW_COLS = ("tret_bns", "tret_cfm", "tret_gprs", "tret_cls", "tret_mat")
 
 # Newton steps for the tret_gprs root-find. The equation is strictly increasing in y*, so six is
-# generous; measured max residual |SUM omega - 1| = 7.8e-16.
+# generous. Measured max residual |SUM omega - 1| = 7.8e-16.
 NEWTON_STEPS = 6
 
 # Longest tenor GSW actually anchor, derived from the first non-null of each published SVENYnn.
@@ -92,28 +92,28 @@ _ANCHOR_STEPS = ((30.0, "SVENY30"), (25.0, "SVENY25"), (20.0, "SVENY20"),
 
 _STEP_CASE = "CASE freq WHEN '1' THEN 12 WHEN '2' THEN 6 WHEN '4' THEN 3 WHEN '12' THEN 1 END"
 
-# FISD's date tail is wild -- stale first_interest_dates reach back to 1930 and out past 2120.
+# FISD's date tail is wild. Stale first_interest_dates reach back to 1930 and out past 2120.
 _CF_LO, _CF_HI = "1960-01-01", "2130-01-01"
 
 REQUIRED_COLS = ("cusip_id", "dt_s", "dt", "ytm", "mod_dur", "bond_maturity")
 
 
 def required_cols(start_col: str = "dt_s") -> tuple:
-    """REQUIRED_COLS with the window-start column named. The END frame calls it `dt_s`; the
-    BEGIN frame calls the same thing `date_start`, and both are attached now that `all_returns`
-    -- which the rolling betas read -- is a union of the two."""
+    """REQUIRED_COLS with the window-start column named. The end frame calls it `dt_s` and the
+    begin frame calls the same thing `date_start`. Both are attached now that `all_returns`,
+    which the rolling betas read, is a union of the two."""
     return tuple(start_col if c == "dt_s" else c for c in REQUIRED_COLS)
 
 
 GSW_URL = "https://www.federalreserve.gov/data/yield-curve-tables/feds200628.csv"
-_GSW_SKIP = 9   # the Fed prepends a provenance preamble before the real header row
+_GSW_SKIP = 9   # the Fed prepends a provenance preamble before the header row
 
-# first_interest_date anchors the coupon grid on FISD's own dated cycle; last_interest_date caps it;
-# coupon_change_indicator marks step-ups, whose dates are right but whose constant amount is not.
+# first_interest_date anchors the coupon grid on FISD's own dated cycle, last_interest_date caps it,
+# and coupon_change_indicator marks step-ups, whose dates are right but whose constant amount is not.
 # Coupon / frequency / maturity / coupon_type / dated_date / offering_date come along for two
 # reasons: so a consumer can assert this file agrees with the stage0 extract it augments (the
-# extract stays the source of truth for a bond's terms in stage 2), and because the PRE-TRACE engine
-# has no such extract -- its bond universe reaches back to 1973 and is not TRACE-limited -- so for
+# extract stays the source of truth for a bond's terms in stage 2), and because the pre-TRACE engine
+# has no such extract. Its bond universe reaches back to 1973 and is not TRACE-limited, so for
 # that engine this file is the only source of the terms the cash-flow ladder needs.
 _FISD_TERMS_SQL = """
     SELECT complete_cusip, first_interest_date, last_interest_date,
@@ -183,9 +183,9 @@ def ensure_inputs(gsw_path: Path | None = None, terms_path: Path | None = None) 
 def sven_macro_sql() -> str:
     """Svensson zero yield, DECIMAL and continuously compounded, flat beyond `cap`.
 
-    The internal alias is `_svx`, not `x`: a macro's inner names resolve in the CALLER's scope, so a
-    plain `x` silently captures any caller whose own CTE or column is named `x`, and the binder
-    error names neither side.
+    The internal alias is `_svx`, not `x`: a macro's inner names resolve in the caller's scope, so a
+    plain `x` captures any caller whose own CTE or column is named `x`, without a warning, and the
+    binder error names neither side.
     """
     return """
     CREATE OR REPLACE TEMP MACRO sven(n, cap, b0, b1, b2, b3, t1, t2) AS (
@@ -218,8 +218,8 @@ def _anchor_case(gsw_path: Path) -> str:
 def build_curve(con, gsw_path: Path, table: str = "da_curve") -> None:
     """One row per fitted day: the Svensson parameters and the longest anchored tenor.
 
-    Unfitted days are dropped rather than carried, so the ASOF join lands on the last day that
-    actually HAS a curve -- necessary because most calendar month-ends are weekends or holidays.
+    Unfitted days are dropped, not kept, so the ASOF join lands on the last day that
+    has a curve. This is necessary because most calendar month-ends are weekends or holidays.
     """
     con.execute(f"""
         CREATE OR REPLACE TEMP TABLE {table} AS
@@ -239,13 +239,13 @@ def build_curve(con, gsw_path: Path, table: str = "da_curve") -> None:
 def build_cashflows(con, fisd_path: Path, terms_path: Path, table: str = "da_cf") -> None:
     """Whole-life cash-flow ladder per cusip: coupons, the principal, and a zero-coupon branch.
 
-    Terms (coupon, frequency, maturity) come from the stage0 FISD extract; only the schedule
-    ANCHORS come from the WRDS terms file, so a vintage difference between the two cannot change a
+    Terms (coupon, frequency, maturity) come from the stage0 FISD extract. Only the schedule
+    anchors come from the WRDS terms file, so a vintage difference between the two cannot change a
     bond's economics. Two coupon grids, preferring the first:
       A  forward from first_interest_date, capped at coalesce(last_interest_date, maturity).
-         Authoritative on cycle PHASE.
+         Authoritative on cycle phase.
       B  backward from maturity, used where first_interest_date is missing (about 7% of the
-         extract's bonds -- FISD did not record it for older issues).
+         extract's bonds, because FISD did not record it for older issues).
     """
     con.execute(f"""
         CREATE OR REPLACE TEMP TABLE _da_bonds AS
@@ -306,11 +306,11 @@ def build_cashflows(con, fisd_path: Path, terms_path: Path, table: str = "da_cf"
 def _ladder_sql(table: str, date_col: str, daily_path: Path, start_col: str = "dt_s") -> str:
     """(bond-month x remaining cash flow), materialised.
 
-    The discount yield is the bond's own YTM observed on `dt_s` -- the day the return window opens,
-    which is the day whose price starts the return. It is read from the DAILY stage-1 file at that
+    The discount yield is the bond's own YTM observed on `dt_s`, the day the return window opens,
+    which is the day whose price starts the return. It is read from the daily stage-1 file at that
     exact date, not lagged off the monthly frame: `dt_s` is the previous row's `dt`, so `lag(ytm)`
     is usually the same number, but the monthly frame has already been filtered (hprd > 0, start
-    date) and a dropped predecessor silently costs the row. Measured: the lag reaches 89.3% of
+    date) and a dropped predecessor costs the row without an error. Measured: the lag reaches 89.3% of
     bond-months, the direct lookup 99.996%. `y0_lag` remains as the fallback where the daily file
     has no row, and the window screen still guards the pairing.
 
@@ -411,8 +411,8 @@ def _gprs_statements(ladder: str = "da_lad", steps: int = NEWTON_STEPS) -> list[
 def _attach_tret_mat(con, table: str, date_col: str, treasury_mod, mode: str | None) -> None:
     """tret_mat: the incumbent `tret` machinery fed MATURITY instead of modified duration.
 
-    Deliberately identical to `_attach_tret` in every other respect -- same function, same nodes,
-    same flat ends, same 2dp rounding of the argument -- so the pair isolates the duration-vs-
+    Identical to `_attach_tret` in every other respect, on purpose (same function, same nodes,
+    same flat ends, same 2dp rounding of the argument), so the pair isolates the duration-vs-
     maturity choice and nothing else. Attached at the same point in the window as `tret`, not
     lagged, for the same reason.
     """

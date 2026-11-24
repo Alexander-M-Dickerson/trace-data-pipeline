@@ -5,14 +5,14 @@ test_chunk_scheduler.py
 The scheduler's job is to run every chunk and hand the results back in chunk order.
 Both halves of that matter and neither is self-evident:
 
-  * Out of order, the audit tables are corrupted rather than merely untidy -- the data
-    report reconstructs each chunk's filter sequence from ROW ORDER
+  * Out of order, the audit tables are wrong, because the data report reconstructs each
+    chunk's filter sequence from row order
     (_error_plot_helpers.py: groupby("chunk").cumcount()).
   * A lost chunk is lost bonds, in a file that looks entirely normal and that stage 1
-    will happily consume. It has to abort the run, loudly.
+    will consume without complaint. It has to abort the run with an error.
 
-These run without WRDS: the pool tasks here are pure arithmetic. What they exercise is
-the reassembly and the failure handling, which is the part that can silently drop data.
+These run without WRDS, because the pool tasks here are pure arithmetic. They exercise
+the reassembly and the failure handling, which is the part that can drop data without an error.
 
     python3 tests/test_chunk_scheduler.py
 """
@@ -39,7 +39,7 @@ def check(name, cond, detail=""):
 def _task_ok(task):
     chunk_id, cusips, n_chunks = task
     # Sleep in reverse order, so completions arrive scrambled and any reliance on
-    # arrival order shows up as a failure rather than passing by luck.
+    # arrival order shows up as a failure and cannot pass by luck.
     time.sleep(0.02 * (n_chunks - chunk_id))
     return CR.ChunkResult(chunk_id=chunk_id, data=list(cusips),
                           audit_rows=[{"chunk": chunk_id, "seq": k} for k in range(3)],
@@ -97,7 +97,7 @@ def main():
     check("pool: audit rows come back grouped and in sequence",
           ok and seqs == [0, 1, 2] * len(chunks), f"{len(audit)} rows")
 
-    # Same input, same output -- twice.
+    # Same input, same output, twice.
     a = CR.run_chunks(chunks, _serial, n_workers=4, pool_task=_task_ok)
     b = CR.run_chunks(chunks, _serial, n_workers=4, pool_task=_task_ok)
     check("pool: deterministic across runs",

@@ -1,7 +1,7 @@
-"""validate_core.py -- the golden-diff engine (`_diff` is the contract).
+"""The golden-diff engine (`_diff` is the contract).
 
-Compares OUR step output to the matching golden intermediate on a key, with per-column tolerances:
-exact for counts/codes/flags/strings/dates; FLOAT_TOL for prices/returns/signals; RATE_TOL for
+Compares our step output to the matching golden intermediate on a key, with per-column tolerances:
+exact for counts/codes/flags/strings/dates, FLOAT_TOL for prices/returns/signals, RATE_TOL for
 rate-like winsorized float32 columns (ytm, cs, betas). PASS iff no key gaps and every shared column
 within tolerance. The report is JSON-serializable and lands verbatim in the run manifest.
 """
@@ -15,7 +15,7 @@ import pandas as pd
 
 import _stage2_settings as cfg
 
-# dtypes compared exactly (mismatch count must be 0); floats get a tolerance
+# dtypes compared exactly (mismatch count must be 0), and floats get a tolerance
 _EXACT_KINDS = "iubOSUM"  # int, uint, bool, object, bytes/str, unicode, datetime
 
 
@@ -48,20 +48,20 @@ def diff_frames(
     join: str = "outer",
     col_tols: dict[str, float] | None = None,
 ) -> tuple[bool, dict[str, Any]]:
-    """Join `ours` vs `golden` on `key`; return (passed, report).
+    """Join `ours` vs `golden` on `key` and return (passed, report).
 
     join='outer' (default): both key sets must coincide (key_gaps == 0 both sides).
-    join='golden': golden's keys must all exist in ours (key_gaps_golden == 0); extra keys on our
-    side are reported but allowed -- for blocks whose grain is wider than the golden target
+    join='golden': golden's keys must all exist in ours (key_gaps_golden == 0). Extra keys on our
+    side are reported but allowed, for blocks whose grain is wider than the golden target
     (e.g. per-bond signals vs the panel-key mmn file).
 
-    passed  iff the key condition holds AND every shared non-key column passes:
-      - float columns: max|d| <= tol on both-non-null rows AND nan_mismatch == 0
+    passed  iff the key condition holds and every shared non-key column passes:
+      - float columns: max|d| <= tol on both-non-null rows and nan_mismatch == 0
         (tol = rate_tol for rate_cols, else float_tol)
       - exact columns (ints/flags/strings/dates or listed in exact_cols): 0 mismatches
         (both-null counts as equal)
-    Columns present on only one side are reported (never silently dropped) but don't fail the
-    diff -- the caller decides whether the column set itself is part of the gate.
+    Columns present on only one side are reported (never dropped unreported) but don't fail the
+    diff. The caller decides whether the column set itself is part of the gate.
     """
     key = list(key)
     rate_cols, exact_cols, ignore_cols = set(rate_cols), set(exact_cols), set(ignore_cols)
@@ -120,7 +120,7 @@ def diff_frames(
 
 
 def format_report(report: dict[str, Any], max_rows: int = 200) -> str:
-    """Human-readable verdict table for logs; the JSON report stays the machine record."""
+    """Human-readable verdict table for logs. The JSON report stays the machine record."""
     lines = [
         f"rows ours={report['rows_ours']:,} golden={report['rows_golden']:,} "
         f"| key gaps ours={report['key_gaps_ours']:,} golden={report['key_gaps_golden']:,}",

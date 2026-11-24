@@ -42,24 +42,24 @@ ROOT_PATH = ""  # Auto-detect from current working directory
 
 # --- Execution Settings ---
 # Number of worker processes for the joblib passes (bond analytics, credit spreads).
-# Leave as None to pick a safe value automatically; set an integer to force one.
+# Leave as None to pick a safe value automatically, or set an integer to force one.
 N_CORES = None    # Set to None for auto-detection, or specify a number (e.g., 10)
 N_CHUNKS = 10      # Number of chunks for parallel operations
 
 # Default worker count when N_CORES is not set explicitly.
 #
 # This used to be multiprocessing.cpu_count(), which reports the cores of the whole
-# HOST -- WRDS Cloud compute nodes have up to 24 -- so it spawned one worker per host
-# core regardless of what the job was actually granted, and joblib's process backend
+# host (WRDS Cloud compute nodes have up to 24), so it spawned one worker per host
+# core whatever the job had been granted, and joblib's process backend
 # copies the data each worker touches.
 #
 # The resolution order below reads $NSLOTS, so it now tracks the grant: since v2.2.1
 # run_stage1.sh requests `-pe onenode 4` with `-l m_mem_free=10G`, and N_CORES resolves
 # to 4 to match.
 #
-# ❗m_mem_free is charged PER SLOT, so the total is slots x mem and must stay within the
+# m_mem_free is charged per slot, so the total is slots x mem and must stay within the
 # WRDS caps of 8 cores and 48 GB per job. 4 x 10G = 40 GB. Raising one without dividing
-# the other does not error -- the job pends forever, silently.
+# the other does not raise an error. The job pends forever with no message.
 STAGE1_DEFAULT_N_CORES = 4
 
 if N_CORES is None:
@@ -74,34 +74,34 @@ if N_CORES is None:
     N_CORES = max(1, min(N_CORES, multiprocessing.cpu_count()))
 
 # --- Date Filter ---
-# Only include data on or before this date. Two forms are accepted:
+# Only include data on or before this date. Three forms are accepted:
 #
 #   "YYYY-MM-DD"  a fixed date, used exactly as given.
 #   "auto:-Nmo"   the last day of the month N months before the last trade date
 #                 in the stage0 data. Resolved at run time, so the sample end
-#                 tracks the data instead of needing an edit every vintage.
+#                 tracks the data and needs no edit every vintage.
 #
-#   "auto:complete" the last month for which EVERY source has data through the
+#   "auto:complete" the last month for which every source has data through the
 #                 month's final trading session. This is the default.
 #
-# Why "auto:complete" rather than a trailing buffer. The buffer existed because
-# TRACE is revised after the fact -- cancellations, corrections and reversals
-# arrive for weeks -- but a WRDS pull is a settled historical file, and stepping
+# Why "auto:complete" and not a trailing buffer. The buffer existed because
+# TRACE is revised after the fact (cancellations, corrections and reversals
+# arrive for weeks), but a WRDS pull is a settled historical file, and stepping
 # back three whole months from a date that is itself mid-month throws away
 # complete months. Measured on the 2026-09-10 run: Enhanced ends 2025-12-04, so
 # "auto:-3mo" cut at 2025-09-30 and discarded October and November, both of which
-# are ordinary months -- 11,848 and 11,612 bonds, 10.9 and 11.1 trades per
-# bond-day, against a 2025 range of 11.3-11.9k bonds and 10-12 trades. Only
+# are ordinary months (11,848 and 11,612 bonds, 10.9 and 11.1 trades per
+# bond-day, against a 2025 range of 11.3-11.9k bonds and 10-12 trades). Only
 # December is unusable, and "auto:complete" is exactly what excludes it.
 #
-# Standard TRACE (db_type=2) is kept only for dates AFTER the last Enhanced date, and
-# CUT_OFF_POPULATIONS below counts it with Enhanced, so when Standard is run it can carry
+# Standard TRACE (db_type=2) is kept only for dates after the last Enhanced date, and
+# CUT_OFF_POPULATIONS below counts it with Enhanced, so when Standard is run it can take
 # "auto:complete" past the last Enhanced month and its rows survive.
 DATE_CUT_OFF = "auto:complete"  # [tag:rule.complete_months] the sample ends at the last complete month
 
 # --- Output Settings ---
 # OUTPUT_FORMAT is imported from shared config.py
-# NOTE: Stage 1 always generates comprehensive reports and figures.
+# Stage 1 always generates its reports and figures.
 # These outputs are essential for data quality assessment and cannot be disabled.
 
 # ============================================================================
@@ -162,30 +162,30 @@ LIU_WU_URL = "https://docs.google.com/spreadsheets/d/11HsxLl_u2tBNt3FyN5iXGsIKLw
 
 # Bond-firm linker: bond (cusip9) -> PERMNO / PERMCO / GVKEY, with a validity window.
 #
-# The mapping is DATED. A bond outlives its issuer's independence -- firms are
-# acquired, spun off and renamed -- so each row carries [w0, w1], the window over
+# The mapping is dated. A bond outlives its issuer's independence (firms are
+# acquired, spun off and renamed), so each row has [w0, w1], the window over
 # which that firm owned that bond. Joining without the window attributes a bond to a
 # firm in years it did not own it, and it does not throw.
 #
-# ZIPKEY is the path INSIDE the archive, which is nested under a folder; the member is
+# ZIPKEY is the path inside the archive, which is nested under a folder. The member is
 # read by exact name, so the folder prefix is required. run_pipeline.sh extracts to
-# stage1/data/, giving stage1/data/bond_firm_linker_2026/fl_linker.parquet -- the same
+# stage1/data/, giving stage1/data/bond_firm_linker_2026/fl_linker.parquet, the same
 # path the offline fallback in step 7 builds from LINKER_ZIPKEY.
 #
-# The archive also ships fl_verdicts.parquet (every refusal and its reason -- how you
-# tell a refusal from a gap) and firm_names.parquet (permno -> dated firm name).
+# The archive also ships fl_verdicts.parquet (every refusal and its reason, which is how
+# you tell a refusal from a gap) and firm_names.parquet (permno -> dated firm name).
 # Stage 1 reads only fl_linker.parquet.
 LINKER_URL = "https://openbondassetpricing.com/wp-content/uploads/2026/09/bond_firm_linker_2026.zip"
 LINKER_ZIPKEY = "bond_firm_linker_2026/fl_linker.parquet"
 
 # Which of the linker's two dated windows this stage joins.
-#   ("i0", "i1")  IDENTITY -- whose bond is this. The default, and what Stage 2 joins too, so the
-#                 daily and monthly panels carry the same firm for the same bond.
-#   ("w0", "w1")  EVIDENCE -- when the mapping is provable (the firm's CRSP listing). Use this
+#   ("i0", "i1")  identity: whose bond this is. The default, and what Stage 2 joins too, so the
+#                 daily and monthly panels have the same firm for the same bond.
+#   ("w0", "w1")  evidence: when the mapping is provable (the firm's CRSP listing). Use this
 #                 only if you want ids exactly where equity data exists.
 # The identity window contains the evidence window on every row of the linker, so the
 # identity join never changes an id the evidence join gives. It adds labels outside it.
-LINKER_WINDOW = ("i0", "i1")  # [group:rule.linker_window] firm ids join the linker's identity window; stages 1 and 2 must agree
+LINKER_WINDOW = ("i0", "i1")  # [group:rule.linker_window] firm ids join the linker's identity window, and stages 1 and 2 must agree
 
 # ============================================================================
 # PRE-DOWNLOADED EXTERNAL FILES (DO NOT EDIT)
@@ -219,7 +219,7 @@ if not ROOT_PATH or ROOT_PATH == "":
     if current_dir.name == "stage1":
         ROOT_PATH = current_dir.parent
     else:
-        # Otherwise, assume current directory IS the root path
+        # Otherwise, assume the current directory is the root path
         ROOT_PATH = current_dir
 else:
     # User specified ROOT_PATH, convert to Path object if needed
@@ -332,9 +332,9 @@ except (FileNotFoundError, ValueError) as e:
 # CONFIGURATION GETTER FUNCTION
 # ============================================================================
 
-# An `auto:-Nmo` cut-off is measured from the frontier of the LEAST current source.
-# TRACE Enhanced and 144A/BTDS are different populations reported on different lags --
-# 144A runs months ahead -- so resolving the spec against the POOLED maximum lands the
+# An `auto:-Nmo` cut-off is measured from the frontier of the least current source.
+# TRACE Enhanced and 144A/BTDS are different populations reported on different lags
+# (144A runs months ahead), so resolving the spec against the pooled maximum lands the
 # cut in a month where 144A is complete and Enhanced has only a few days. Stage 1 still
 # emits that month, but it is no longer a cross-section: a bond needs a trade near
 # month-end to get a month-end price, so the survivors are 144A issues alone.
@@ -343,9 +343,9 @@ except (FileNotFoundError, ValueError) as e:
 # pooled max the final monthly cross-section is 1,914 bonds and 100% 144A, against a
 # trailing median of ~10,700 at ~22% 144A.
 #
-# Standard (db_type 2) is NOT a separate population: it is the same public tape, and
-# stage 1 clips it to start where Enhanced ends, so it EXTENDS the Enhanced frontier
-# rather than bounding it. The two are taken together.
+# Standard (db_type 2) is the same population as Enhanced: it is the same public data, and
+# stage 1 clips it to start where Enhanced ends, so it extends the Enhanced frontier
+# and does not bound it. The two are taken together.
 CUT_OFF_POPULATIONS = {"TRACE (Enhanced/Standard)": (1, 2), "144A/BTDS": (3,)}
 
 
@@ -375,13 +375,13 @@ def last_complete_month(df, db_type_col="db_type", date_col="trd_exctn_dt",
                         min_days_share=0.8, trailing=12):
     """The last month-end every population covers to the end of the month.
 
-    A month is COMPLETE for a population when that population has a trade on or after the
-    month's last trading day. The last trading day is taken from the data itself -- the
-    maximum trade date observed in that month across all sources -- so no exchange calendar
+    A month is complete for a population when that population has a trade on or after the
+    month's last trading day. The last trading day is taken from the data itself (the
+    maximum trade date observed in that month across all sources), so no exchange calendar
     is needed and a month whose last session is the 28th is not mistaken for a short one.
 
     A month is only a candidate if it has at least `min_days_share` of the trailing median
-    number of trading days. That is what stops a frontier month in which EVERY source
+    number of trading days. That is what stops a frontier month in which every source
     happens to stop on the same mid-month day from being called complete.
 
     Returns a "YYYY-MM-DD" string, or None if no month qualifies.
@@ -414,12 +414,12 @@ def last_complete_month(df, db_type_col="db_type", date_col="trd_exctn_dt",
 
 def resolve_cut_off_from_data(value, df, db_type_col="db_type",
                               date_col="trd_exctn_dt"):
-    """Resolve any DATE_CUT_OFF spec against the loaded tape.
+    """Resolve any DATE_CUT_OFF spec against the loaded trades.
 
-    "auto:complete"  the last month every source covers to its final session -- the
+    "auto:complete"  the last month every source covers to its final session. This is the
                      default, because it keeps every usable month and no unusable one.
     "auto:-Nmo"      N whole months back from the least current source's last trade date.
-                     Kept for reproducing an older vintage; note it measures from a date
+                     Kept for reproducing an older vintage. Note it measures from a date
                      that is itself mid-month, so it discards complete months.
     anything else    returned unchanged (a literal date, or None).
     """
@@ -476,8 +476,8 @@ def resolve_date_cut_off(value, raw_max):
 
 def get_config() -> dict:
     """
-    Returns a full configuration dictionary for Stage 1 processing.
-    This centralizes all settings in one place for easy modification.
+    Returns a full configuration dictionary for Stage 1 processing,
+    with every setting in one place.
     """
     config = {
         # User settings
@@ -555,10 +555,10 @@ def validate_config(config: dict) -> None:
             "Please ensure stage0 has been run with the correct date stamp."
         )
 
-    # Check the externally-downloaded inputs BEFORE the pipeline starts. These are
+    # Check the externally-downloaded inputs before the pipeline starts. These are
     # fetched by run_pipeline.sh on the login node (WRDS compute nodes have no
-    # internet). Steps 1, 3 and 7 need them; without this check the run fails hours
-    # in -- after the QuantLib pass -- for want of a file we could catch in the
+    # internet). Steps 1, 3 and 7 need them. Without this check the run fails hours
+    # in, after the QuantLib pass, for want of a file we could catch in the
     # first second.
     missing_external = []
     for label, filename in config.get("external_files", {}).items():

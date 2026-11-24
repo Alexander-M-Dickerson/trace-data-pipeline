@@ -43,7 +43,7 @@ def test_the_pinned_pybondlab_passes(monkeypatch):
 
 
 def test_pandas_computes_as_the_published_build_did():
-    """With numexpr, pandas compares a float32 column with a Python number in float64; numpy
+    """With numexpr, pandas compares a float32 column with a Python number in float64. numpy
     alone compares in float32, so a value stored as float32(-0.2) is below -0.2 one way and not
     the other. The published panels were built with numexpr, so it is required and used."""
     import importlib.util
@@ -51,6 +51,6 @@ def test_pandas_computes_as_the_published_build_did():
     numeric_setup.apply()
     assert pd.get_option("compute.use_numexpr") is True
     assert pd.get_option("compute.use_bottleneck") is False
-    # pandas hands arrays over 1,000,000 elements to numexpr; smaller ones never reach it
+    # pandas hands arrays over 1,000,000 elements to numexpr, and smaller ones never reach it
     s = pd.Series(np.full(2_000_000, -0.2, dtype="float32"))
     assert int((s < -0.2).sum()) == 2_000_000

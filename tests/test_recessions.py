@@ -81,7 +81,7 @@ def _functions(path: Path) -> dict[str, str]:
 
 def test_every_stage2_date_axis_is_shaded_and_says_so():
     """Each report plot that formats a date axis shades every such panel, and its caption
-    carries the sentence that says the shading is there."""
+    has the sentence that says the shading is there."""
     fns = _functions(ROOT / "stage2" / "_report_helpers.py")
     dated = {name: body for name, body in fns.items() if "DateFormatter(" in body}
     assert len(dated) >= 5, sorted(dated)

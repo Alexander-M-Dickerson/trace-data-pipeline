@@ -1,14 +1,14 @@
-"""betas.py -- rolling-beta / systematic-momentum / iskew orchestrators (upstream
+"""Rolling-beta / systematic-momentum / iskew orchestrators (upstream
 the reference implementation). The numba kernels (lib/rolling_kernels) and the model
 spec (BETA_MODELS) are verbatim.
 
 The fast path: the old code re-merged, re-dropna'd and re-mergesorted the 2.3M-row
-panel for EVERY model x return-type (~76 times) and combined results through ~76 outer merges. Now
-one merged (cusip,date)-sorted base is built per return column (`_PanelBase`); each model takes a
-NaN-mask view of it -- PROVABLY the same row sequence the old merge+dropna+sort produced, because
-the base is block-sorted and masking preserves order -- and results scatter into base-aligned
+panel for every model x return-type (~76 times) and combined results through ~76 outer merges. Now
+one merged (cusip,date)-sorted base is built per return column (`_PanelBase`). Each model takes a
+NaN-mask view of it, which is provably the same row sequence the old merge+dropna+sort produced,
+because the base is block-sorted and masking preserves order. Results scatter into base-aligned
 arrays (union-of-masks presence == the old outer-merge key union). Kernel calls fan out on a thread
-pool (the kernels are nogil). Values are bit-identical on keys; only the output ROW ORDER changed
+pool (the kernels are nogil). Values are bit-identical on keys, and only the output row order changed
 (now fully (cusip,date)-sorted). Faithfulness is arbitrated by the beta validator
 (betas_x 2,282,733 x 53). `compute_rolling_betas_panel` is the earlier reference path, kept as the
 arbitration baseline."""
@@ -29,10 +29,10 @@ logger = logging.getLogger(__name__)
 # ----------------------------------------------------------------------------------------------
 # BENCHMARK VARIANTS
 #
-# A duration-adjusted beta is not just "the same regression on a different y". The four bond-market
-# factors are swapped for twins estimated on the SAME excess return -- step 3 builds them by
-# re-running the BBW double-sorts. So a variant is a (return column, factor swap) pair, and adding
-# a benchmark means adding both halves, not just the left-hand side.
+# A duration-adjusted beta is more than the same regression on a different y. The four bond-market
+# factors are swapped for twins estimated on the same excess return (step 3 builds them by
+# re-running the BBW double-sorts). So a variant is a (return column, factor swap) pair, and adding
+# a benchmark means adding both halves.
 #
 # `tret` is the incumbent and its twins are the historical `*x` names. Any other benchmark uses
 # `<factor>_<benchmark>`, which is what steps 3 emits for it.
@@ -40,10 +40,10 @@ logger = logging.getLogger(__name__)
 SWAPPED_FACTORS = ("mktb", "drf", "crf", "lrf")
 FACTOR_SWAP_TRET = {f: f + "x" for f in SWAPPED_FACTORS}
 
-# TERM is MKTB_raw - MKTBx, so it moves with the benchmark as well -- and `dcapm`, `psbm` and
-# `amdm` all regress on `term` ALONGSIDE `mktbx`, so leaving it behind would put two different
+# TERM is MKTB_raw - MKTBx, so it moves with the benchmark as well. `dcapm`, `psbm` and
+# `amdm` all regress on `term` alongside `mktbx`, so leaving it behind would put two different
 # benchmarks on one right-hand side. The tret variant needs no entry for it: there was never a
-# `termx`, because the historical `term` IS the tret-adjusted one.
+# `termx`, because the historical `term` is the tret-adjusted one.
 BENCHMARK_FACTORS = SWAPPED_FACTORS + ("term",)
 
 
@@ -56,20 +56,20 @@ def factor_swap(benchmark: str | None) -> dict:
     return {f: f"{f}_{benchmark}" for f in BENCHMARK_FACTORS}
 
 
-# (key, return column, benchmark) -- the default reproduces the historical (betas_std, betas_x).
+# (key, return column, benchmark). The default reproduces the historical (betas_std, betas_x).
 DEFAULT_VARIANTS = (("std", "ret_vw", None), ("x", "ret_vwx", "tret"))
 
-# thread fan-out for the per-model kernel calls (kernels are nogil; pandas glue is brief)
+# thread fan-out for the per-model kernel calls (kernels are nogil, pandas glue is brief)
 N_JOBS = min(12, os.cpu_count() or 1)
 RIDGE_DEFAULT = 1e-12   # K>1 rolling-OLS regularization (upstream compute_rolling_betas_panel default)
 # group-aligned slices per model run: without chunking, the wall clock is pinned by the largest
-# single model (the K=7 ring-buffer kernels run ~40-60 s alone); every kernel resets ALL state at a
-# group boundary, so running the SAME kernel on group-aligned slices is value-identical
+# single model (the K=7 ring-buffer kernels run ~40-60 s alone). Every kernel resets all state at a
+# group boundary, so running the same kernel on group-aligned slices is value-identical
 N_CHUNKS = N_JOBS
 
 
 def _group_chunks(gid: np.ndarray, n_chunks: int) -> list[tuple[int, int]]:
-    """~Equal-row [(start, end)) slices that NEVER split a gid group (kernel state resets there)."""
+    """~Equal-row [(start, end)) slices that never split a gid group (kernel state resets there)."""
     n = len(gid)
     if n == 0:
         return [(0, 0)]
@@ -86,12 +86,12 @@ def _group_chunks(gid: np.ndarray, n_chunks: int) -> list[tuple[int, int]]:
 
 
 class _PanelBase:
-    """One merged (cusip,date)-sorted returns x factors panel; models take NaN-masked views.
+    """One merged (cusip,date)-sorted returns x factors panel. Models take NaN-masked views.
 
     Replaces the per-model merge+dropna+factorize+mergesort: `combined_returns` ships
     (cusip,date)-sorted, a how='left' merge preserves left order, and first-appearance factorize
-    codes are then non-decreasing -- so the old per-model sort was an identity permutation. The
-    assert guards that invariant loudly instead of paying it 76 times.
+    codes are then non-decreasing, so the old per-model sort was an identity permutation. The
+    assert checks that invariant once, where the sort used to be paid 76 times.
     """
 
     def __init__(self, combined_returns: pd.DataFrame, factors: pd.DataFrame,
@@ -117,7 +117,7 @@ class _PanelBase:
         self.n = len(merged)
 
     def view(self, fac_cols: list[str]) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[np.ndarray]]:
-        """(row_idx, gid, y, [x per factor]) for rows where y and ALL fac_cols are non-NaN --
+        """(row_idx, gid, y, [x per factor]) for rows where y and all fac_cols are non-NaN,
         the exact row set the old dropna(subset=[ret]+facs) kept, in the same order."""
         m = np.ones(self.n, dtype=bool)
         for c in fac_cols:
@@ -353,7 +353,7 @@ def compute_all_betas(
         If True, log progress
     variants : tuple, default DEFAULT_VARIANTS
         One (key, return column, benchmark) triple per set of betas to produce. The benchmark
-        selects the factor twins via `factor_swap`; None means the raw factors. Pass a single
+        selects the factor twins via `factor_swap`. None means the raw factors. Pass a single
         triple to compute one set and pay a fraction of the default's cost.
 
     Returns
@@ -457,21 +457,21 @@ def compute_all_betas(
         {"name": "coskew", "factors": ["mktb", "mktb_sq"], "keep": ["mktb_sq"], "sum": None, "ivol": False,
          "out": {"mktb_sq": "coskew"}, "iskew": True},
         # Univariate models
-        # DEF / TERM -- Gebhardt, Hvidkjaer & Swaminathan (2005); factors as in Fama-French
+        # DEF / TERM follow Gebhardt, Hvidkjaer & Swaminathan (2005), with factors as in Fama-French
         # (1993). One two-factor regression yields both loadings:
         #
         #     r = a + b_term * TERMB + b_def * DEFB + e
         #
-        # TERMB = long-term government return - risk free; DEFB = long-term corporate
+        # TERMB = long-term government return - risk free, and DEFB = long-term corporate
         # return - long-term government return (built in step3_bbw).
         #
-        # ! These were previously TWO UNIVARIATE models -- `def` on mktbx and `term` on
-        #   term -- and neither estimated what its name claimed. No `defb` series existed;
-        #   "defb" was only an output rename of the mktbx loading. Worse, in the
-        #   duration-adjusted world FACTOR_SWAP rewrites mktb -> mktbx, which made the
-        #   `def` and `mktb` models the SAME regression: b_defb and b_mktb came out
-        #   bit-identical on every row. See the DEF/TERM entry in DATA_DICTIONARY.md.
-        # `keep` fixes the OUTPUT column order and `factors` the design matrix, so keeping
+        # These were previously two univariate models, `def` on mktbx and `term` on
+        # term, and neither estimated what its name claimed. No `defb` series existed, and
+        # "defb" was only an output rename of the mktbx loading. Worse, in the
+        # duration-adjusted world FACTOR_SWAP rewrites mktb -> mktbx, which made the
+        # `def` and `mktb` models the same regression: b_defb and b_mktb came out
+        # bit-identical on every row. See the DEF/TERM entry in DATA_DICTIONARY.md.
+        # `keep` fixes the output column order and `factors` the design matrix, so keeping
         # defb first here preserves the panel's historical b_defb/b_termb ordering while
         # leaving the regression itself untouched (bit-identical betas).
         # [tag:col.b_defb] beta on the default factor DEFB, from one regression on TERMB and DEFB
@@ -515,7 +515,7 @@ def compute_all_betas(
 
     swaps = {key: factor_swap(bm) for key, _ret, bm in variants}
 
-    # every factor column any model can touch, raw + every variant's twins (one base carries them
+    # every factor column any model can touch, raw + every variant's twins (one base holds them
     # all, so the merge is paid once however many variants are asked for)
     factor_cols_all = sorted({f for m in BETA_MODELS for f in m["factors"]}
                              | {sw.get(f, f) for sw in swaps.values()
@@ -546,8 +546,8 @@ def compute_all_betas(
 
     def _finish_model(base: _PanelBase, model: dict, swap: dict, ret_col: str,
                       idx: np.ndarray, facs_use: list[str], futs: list):
-        """Stage B: concatenate the chunk outputs (value-identical to one full-pass kernel call --
-        every kernel resets at group boundaries) and apply the model's naming spec."""
+        """Stage B: concatenate the chunk outputs (value-identical to one full-pass kernel call,
+        because every kernel resets at group boundaries) and apply the model's naming spec."""
         parts = [f.result() for f in futs]
         if len(facs_use) == 1:
             beta = np.concatenate([p[1] for p in parts])
@@ -558,8 +558,8 @@ def compute_all_betas(
             sig_idi = np.concatenate([p[2] for p in parts])
             beta_by_fac = {c: betas_arr[:, j + 1] for j, c in enumerate(facs_use)}
 
-        # SUM operation (e.g. dvix = dvix + dvixlag); overwrites the regression coefficient of the
-        # same name, exactly like the old `betas[f"beta_{out_name}"] = beta_sum`
+        # SUM operation (e.g. dvix = dvix + dvixlag). It overwrites the regression coefficient of
+        # the same name, exactly like the old `betas[f"beta_{out_name}"] = beta_sum`
         sum_op = model["sum"]
         if sum_op is not None:
             out_name, sum_cols = sum_op
@@ -623,7 +623,7 @@ def compute_all_betas(
                    for model, key, (idx, facs_use, futs) in submitted]
 
     # scatter-assembly: union-of-masks presence + base-aligned columns reproduce the old outer-merge
-    # chain exactly (values on keys identical; row order now fully (cusip,date)-sorted)
+    # chain exactly (values on keys identical, row order now fully (cusip,date)-sorted)
     frames: dict[str, pd.DataFrame] = {}
     for side, _ret, _bm in variants:
         base = bases[side]
@@ -665,10 +665,10 @@ def compute_sys_momentum(
     """
     Compute systematic and idiosyncratic momentum using rolling factor model.
 
-    Momentum signals are computed INSIDE the rolling OLS loop: at each position
-    where we have valid alpha/beta, we use the CURRENT alpha/beta to compute
-    fitted values for ALL positions in the rolling window, then sum to get
-    momentum. This ensures momentum is available exactly when beta is available.
+    Momentum signals are computed inside the rolling OLS loop. At each position
+    where we have valid alpha/beta, we use the current alpha/beta to compute
+    fitted values for all positions in the rolling window, then sum to get
+    momentum. Momentum is therefore available exactly when beta is available.
 
     Parameters
     ----------
@@ -763,7 +763,7 @@ def compute_sys_momentum(
         results[_key] = mom_df
 
     # The historical contract is a (std, x) pair. For any other variant set, return the frames in
-    # the order asked for -- the caller knows which benchmark it requested.
+    # the order asked for, because the caller knows which benchmark it requested.
     if tuple(k for k, _r, _b in variants) == ("std", "x"):
         mom_std = results.get("std", pd.DataFrame())
         mom_x = results.get("x", pd.DataFrame())

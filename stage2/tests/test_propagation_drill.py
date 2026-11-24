@@ -13,12 +13,12 @@ drill skips each in turn and proves the matching gate fires.
     added in the wrong POSITION                    assert_panel_contract
     price-based signal shipped without its twin    assert_mmn_twins
 
-The position case is not hypothetical. Collapsing the degenerate DEF and TERM regressions into
+The position case has happened. Collapsing the degenerate DEF and TERM regressions into
 one two-factor model swapped `b_defb` and `b_termb` in the output, because emission follows the
-model's `keep` order -- the same 140 columns in a different file, which nothing would have
-caught until a downstream positional read broke.
+model's `keep` order. The result was the same 140 columns in a different file, which nothing
+would have caught until a downstream positional read broke.
 
-`test_column_contract.py` covers the fourth step (panel = report = dictionary); it needs a built
+`test_column_contract.py` covers the fourth step (panel = report = dictionary). It needs a built
 panel, so most of it skips on a fresh clone.
 
 Author: Open Source Bond Asset Pricing
@@ -40,7 +40,7 @@ from lib import contract as C  # noqa: E402
 
 
 def _panel(columns) -> pd.DataFrame:
-    """A frame carrying exactly `columns`, in that order."""
+    """A frame with exactly `columns`, in that order."""
     columns = list(dict.fromkeys(columns))
     if "date" not in columns:
         columns = ["date"] + columns
@@ -129,8 +129,8 @@ def test_an_undeclared_twin_in_the_sidecar_fails():
     """A NEW price-based signal nobody added to MMN_TWINNED must not slip past.
 
     The twin gate iterates the declared set, so a name outside it is invisible to it. This is
-    the other direction: the sidecar is checked against the set, not only the set against the
-    sidecar.
+    the other direction, in which the sidecar is checked against the set as well as the set
+    against the sidecar.
     """
     sidecar = [f"{c}_mmn" for c in C.MMN_TWINNED] + ["brandnew_mmn"]
     with pytest.raises(AssertionError, match="brandnew"):
@@ -154,17 +154,17 @@ def _mmn_pair(panel_values, sidecar_values, col="cs"):
 def test_the_unadjusted_form_in_the_main_panel_fails():
     """`assert_mmn_twins` passes happily when the WRONG form is in the panel.
 
-    This is the basrev v1 failure -- AR(1) -0.05 adjusted vs -0.22 unadjusted, four fifths of
-    the raw reversal being bid-ask bounce -- and it produces a complete, normal-looking panel.
+    This is the basrev v1 failure (AR(1) -0.05 adjusted vs -0.22 unadjusted, four fifths of
+    the raw reversal being bid-ask bounce), and it produces a complete, normal-looking panel.
     """
     vals = [0.01 * i for i in range(2000)]
-    panel, sidecar = _mmn_pair(vals, vals)          # the panel IS the sidecar's column
+    panel, sidecar = _mmn_pair(vals, vals)          # the panel is the sidecar's column
     with pytest.raises(AssertionError, match="UNADJUSTED"):
         C.assert_main_panel_is_adjusted(panel, sidecar)
 
 
 def test_the_adjusted_form_passes_even_when_many_rows_coincide():
-    """Coincidence is normal and must NOT fire: `lix` matches on 23.8% of real rows."""
+    """Coincidence is normal and must not fire. `lix` matches on 23.8% of real rows."""
     n = 2000
     panel_v = [0.01 * i for i in range(n)]
     side_v = [v if i % 4 else v + 0.5 for i, v in enumerate(panel_v)]   # 75% identical

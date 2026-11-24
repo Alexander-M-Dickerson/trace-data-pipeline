@@ -84,4 +84,4 @@ def test_column_set_reported_not_fatal():
     passed, report = vc.diff_frames(a, b, key=("cusip", "date"))
     assert report["cols_only_golden"] == ["flag", "extra"] or \
            set(report["cols_only_golden"]) == {"flag", "extra"}
-    assert passed  # shared columns all match; the caller owns column-set policy
+    assert passed  # shared columns all match, and the caller owns column-set policy

@@ -1,11 +1,11 @@
-"""step4_betas.py -- upstream step 4: the merged factor matrix, combined returns, rolling 36-month
+"""Upstream step 4: the merged factor matrix, combined returns, rolling 36-month
 betas (min 12 obs) for ~38 factor models x 2 return types, and systematic/idiosyncratic momentum.
 
 Ground truth: the reference implementation's beta step (factor merging incl. the extended-BBW pre-2002-08-31
 backfill and the derived asymmetric factors) + `process_bond_data.{concat_data, compute_all_betas,
-compute_sys_momentum}` (verbatim in lib/betas). Inputs: the pinned factors.parquet, our
-the validated bbw_factors, illiq_factors and all_returns, the cached quote panel, and the
-PUBLISHED extended-BBW series (lib/extended_factors -- the public seam).
+compute_sys_momentum}` (verbatim in lib/betas). Inputs: the pinned factors.parquet, the
+validated bbw_factors, illiq_factors and all_returns, the cached quote panel, and the
+published extended-BBW series (lib/extended_factors, the public seam).
 
 Outputs under blocks/<mode>/: betas_x.parquet (the beta validation target, 2,282,733 x 53),
 betas_std.parquet (feeds the final panel), factors_merged.parquet (feeds steps 5-6 + rfret).
@@ -25,21 +25,21 @@ from lib import extended_factors, quote
 from lib.phase_timer import PhaseTimer
 
 # Pre-2002-08-31 backfill: BBW factor column -> its extended-series name. Upstream fills these from
-# the lowercase LHM/ICE columns inside factors.parquet (in the reference implementation); we fill them from
-# the PUBLISHED extended series (== those columns at max|d|=0), so the BBW backfill needs only
-# public inputs. Post-cutoff stays the pure-TRACE build.
+# the lowercase LHM/ICE columns inside factors.parquet (in the reference implementation). We fill
+# them from the published extended series (== those columns at max|d|=0), so the BBW backfill needs
+# only public inputs. Post-cutoff stays the pure-TRACE build.
 ICE_MAP = {"MKTB": "mktb", "DRF": "drf", "CRF": "crf",
            "MKTBx": "mktbx", "DRFx": "drfx", "CRFx": "crfx", "TERM": "term",
            # DEFB/TERMB are spliced the same way. They were added to the published extended
-           # series alongside the DEF/TERM beta fix; a file published before that carries only
+           # series alongside the DEF/TERM beta fix. A file published before that has only
            # the seven, and these two then fall through the `if ... in factors.columns` guard
            # below, leaving b_defb/b_termb TRACE-era only. Either file builds.
            "DEFB": "defb", "TERMB": "termb"}
 
 # The same splice for the alternative benchmarks. Built into the published series alongside the
 # tret twins, and mapped here so a rolling beta on ret_vw - tret_bns has the same pre-2002 factor
-# history the tret one has -- without this the extended file arrives and its twins are DROPPED by
-# the rename/select below, which looks exactly like the file not carrying them.
+# history the tret one has. Without this the extended file arrives and its twins are dropped by
+# the rename/select below, which looks exactly like a file that does not have them.
 ICE_MAP.update({f"{f}_{bm}": f"{f.lower()}_{bm}"
                 for bm in ("bns", "cls") for f in ("MKTB", "DRF", "CRF", "TERM")})
 ICE_CUTOFF = pd.Timestamp("2002-08-31")
@@ -50,8 +50,8 @@ def build_factor_matrix(blocks_dir: Path) -> pd.DataFrame:
     illiq (outer), lowercase, dedup dates, asymmetric mktb/dvix columns. Grain: one row per month."""
     factors = pd.read_parquet(blocks_dir / "factors.parquet")
     factors["date"] = pd.to_datetime(factors["date"])
-    # The pinned panel's own copies of the extended-BBW columns are dropped UNREAD -- the backfill
-    # below comes from the published series instead.
+    # The pinned panel's own copies of the extended-BBW columns are dropped unread. The backfill
+    # below comes from the published series.
     factors = factors.drop(columns=[c for c in ICE_MAP.values() if c in factors.columns])
 
     bbw = pd.read_parquet(blocks_dir / "bbw_factors.parquet")
@@ -61,12 +61,12 @@ def build_factor_matrix(blocks_dir: Path) -> pd.DataFrame:
     factors = factors.merge(bbw, on="date", how="outer")
 
     # The per-benchmark BBW blocks, when make_excess_blocks has built them. Merged here so the
-    # pre-2002 splice below has something to splice INTO: the extended series carries MKTB_bns and
+    # pre-2002 splice below has something to splice into. The extended series has MKTB_bns and
     # friends, but the splice only fires where the TRACE-native column is also present.
     #
-    # Discovered rather than declared, because a benchmark whose block is absent must NOT silently
-    # fall back to the tret twins -- compute_all_betas raises on a missing twin instead, which is
-    # the loud half of this pair.
+    # The blocks are discovered, not declared, because a benchmark whose block is absent must
+    # not fall back to the tret twins without an error. compute_all_betas raises on a missing
+    # twin, which is the half of this pair that reports the problem.
     for bm_path in sorted(blocks_dir.glob("bbw_factors_*.parquet")):
         bm = pd.read_parquet(bm_path)
         if "date" not in bm.columns:
@@ -106,10 +106,10 @@ def build_factor_matrix(blocks_dir: Path) -> pd.DataFrame:
 
 
 def build_combined_returns(blocks_dir: Path, tret_col: str = "tret") -> pd.DataFrame:
-    """concat_data: quote panel (pre-2002-07) + all_returns, end rows win; + ret_vwx.
+    """concat_data: quote panel (pre-2002-07) + all_returns, end rows win, plus ret_vwx.
 
     `tret_col` selects the benchmark subtracted to form the excess return. The default is the
-    incumbent `tret`; both the quote panel and all_returns carry the alternatives too, which is
+    incumbent `tret`. Both the quote panel and all_returns have the alternatives too, which is
     what lets a rolling window reach back to 1997 for any of them."""
     q = quote.load_quote()
     q.columns = q.columns.str.lower()
@@ -131,7 +131,7 @@ def build_combined_returns(blocks_dir: Path, tret_col: str = "tret") -> pd.DataF
 
 
 def build(con=None, mode: str | None = None, limit_cusips: int | None = None) -> dict[str, Path]:
-    """Build betas_x / betas_std / factors_merged blocks (pandas+numba step; `con` unused)."""
+    """Build betas_x / betas_std / factors_merged blocks (pandas+numba step, `con` unused)."""
     mode = mode or cfg.INPUT_MODE
     t0 = time.time()
     pt = PhaseTimer()

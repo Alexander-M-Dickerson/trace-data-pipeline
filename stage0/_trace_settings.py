@@ -53,9 +53,9 @@ FILTER_SWITCHES =  dict(
     trading_calendar        = True,  # 4: filter_by_calendar()
     price_filters           = True,  # 5: > 0 (not neg) & <= 1000 price screens
     volume_filter_toggle    = False, # 6: dollar_vol >= threshold. OFF by default: the
-                                     #    published OSBAP data keeps trades of ALL sizes,
-                                     #    and a floor here silently makes a rebuild
-                                     #    irreproducible against it. See volume_filter.
+                                     #    published OSBAP data keeps trades of all sizes,
+                                     #    and with a floor here a rebuild no longer
+                                     #    reproduces it, with no error. See volume_filter.
     bounce_back_filter      = True,  # 7: flag_price_change_errors() [note:see bb_params]
     yld_price_filter        = True,  # 8: rptd_pr != yld_pt
     amtout_volume_filter    = True,  # 9: entrd_vol_qt < 0.5*offamt*1000
@@ -106,19 +106,19 @@ INIT_ERROR = {
 # Process only the first N CUSIP chunks. None = the full universe (production).
 # Overridable from the environment so a smoke run needs no edit here:
 #     STAGE0_LIMIT_CHUNKS=5 ./run_smoke_test.sh
-# A limited run logs a loud warning; its output is NOT the full universe.
+# A limited run logs a warning. Its output is not the full universe.
 LIMIT_CHUNKS = int(os.environ.get("STAGE0_LIMIT_CHUNKS", "0")) or None
 
 # --- Chunk sizing ------------------------------------------------------
-# Work units are packed to about this many TRADE ROWS rather than a fixed count of
+# Work units are packed to about this many trade rows, not to a fixed count of
 # CUSIPs. Activity is enormously skewed, so 250-CUSIP chunks ranged from 7,806 rows
-# to 3,392,802 over the Enhanced universe -- and the memory a job must reserve is set
+# to 3,392,802 over the Enhanced universe, and the memory a job must reserve is set
 # by the worst chunk, not the average.
 #
-# Measured on the real universe (111,727 CUSIPs / 345,874,974 trades):
+# Measured on the full universe (111,727 CUSIPs / 345,874,974 trades):
 #   fixed 250 CUSIPs   447 chunks, max 3,392,802 rows (~2.7 GB raw frame)
 #   packed to 750,000  474 chunks, max   749,992 rows (~0.6 GB raw frame)
-# Nearly the same number of chunks, but a 4.5x smaller worst case -- which is what
+# Nearly the same number of chunks, but a 4.5x smaller worst case, which is what
 # makes running several at once affordable.
 #
 # This does not change the cleaned data: every per-chunk filter groups by cusip_id
@@ -131,23 +131,23 @@ LIMIT_CHUNKS = int(os.environ.get("STAGE0_LIMIT_CHUNKS", "0")) or None
 TARGET_ROWS_PER_CHUNK = int(os.environ.get("STAGE0_TARGET_ROWS", "0")) or 750_000
 
 # --- WRDS connection budget -------------------------------------------
-# WRDS publishes a limit of 5 CONCURRENT JOBS but does NOT publish a per-user limit
-# on database CONNECTIONS. There is one, and hitting it is nasty: the wrds package's
+# WRDS publishes a limit of 5 concurrent jobs but does not publish a per-user limit
+# on database connections. There is one, and hitting it is nasty: the wrds package's
 # connect-failure path calls input() to re-prompt for a username, so in a batch job
-# the error arrives as "EOFError: EOF when reading a line" -- a rate limit disguised
-# as a keyboard error.
+# the error arrives as "EOFError: EOF when reading a line", a rate limit that looks
+# like a keyboard error.
 #
-# MEASURED 2026-09-09 with tests/probe_wrds_connections.py (one WRDS account):
-#   * 7 connections held simultaneously; the 8th failed with exactly that EOFError.
-#   * Opening 6 AT ONCE, with no stagger and no lock, succeeded -- so the ceiling is
-#     on connections HELD, not on how fast they are opened.
+# Measured 2026-09-09 with tests/probe_wrds_connections.py (one WRDS account):
+#   * 7 connections held simultaneously, and the 8th failed with exactly that EOFError.
+#   * Opening 6 at once, with no stagger and no lock, succeeded, so the ceiling is
+#     on connections held, not on how fast they are opened.
 #   * A connect costs about 5 s, so a pool of N costs ~5N seconds to start.
 # Re-measure on your own account before changing these:
 #     python3 tests/probe_wrds_connections.py --max 10
 MAX_WRDS_CONNECTIONS = 7
 
 # How many connections each stage0 job may hold. Enhanced and 144A run at the same
-# time, so their sum is what must fit; Standard is held behind them and runs alone,
+# time, so their sum is what must fit. Standard is held behind them and runs alone,
 # so it may use the whole budget. One connection is deliberately left spare beneath
 # MAX_WRDS_CONNECTIONS so a mid-run reconnect cannot be refused.
 CONCURRENCY = {
@@ -157,9 +157,9 @@ CONCURRENCY = {
 }
 
 
-# The data-report job re-runs the filters over the FLAGGED CUSIPs to draw the figures.
-# It runs AFTER the stage0 data jobs (which have released their connections) but now
-# ALONGSIDE stage 1, which holds one -- so 5 here plus stage 1's 1 is 6 against the
+# The data-report job re-runs the filters over the flagged CUSIPs to draw the figures.
+# It runs after the stage0 data jobs (which have released their connections) but now
+# alongside stage 1, which holds one, so 5 here plus stage 1's 1 is 6 against the
 # measured ceiling of 7, the same one spare the stage0 phase leaves.
 #
 # Only Enhanced is parallelised: measured 2026-09-09, its report loop was 45.5 of the
@@ -177,7 +177,7 @@ def reports_workers() -> int:
 def workers(member: str) -> int:
     """Chunks a stage0 member fetches at once: STAGE0_WORKERS if set, else CONCURRENCY.
 
-    ❗STAGE0_WORKERS applies to EVERY member. Until 2026-09-24 only the runners read it, so
+    STAGE0_WORKERS applies to every member. Until 2026-09-24 only the runners read it, so
     the connection check and the qsub request below still used CONCURRENCY: with
     STAGE0_WORKERS=4, Enhanced and 144A held 8 connections against a ceiling of 7 and the
     check passed.
@@ -188,7 +188,7 @@ def workers(member: str) -> int:
 def validate_connection_budget(members) -> None:
     """Fail at submit time, not four hours into a run, if the budget is over the cap.
 
-    Only Enhanced and 144A overlap; Standard is scheduled after them.
+    Only Enhanced and 144A overlap. Standard is scheduled after them.
     """
     concurrent = [m for m in members if m in ("enhanced", "144a")]
     total = sum(workers(m) for m in concurrent)
@@ -203,39 +203,39 @@ def validate_connection_budget(members) -> None:
 
 # --- Grid resource requests -------------------------------------------
 # A serial job could live on the WRDS batch default (2 cores / 16 GB). A pool of five
-# worker processes cannot, so each stage0 job now asks for what it will actually use.
+# worker processes cannot, so each stage0 job now asks for what it will use.
 #
-# ❗m_mem_free is charged PER SLOT, not per job. Ask for 4 slots at 24G and you have
-# asked for 96 GB, the scheduler can never satisfy it, and the job PENDS FOREVER --
-# silently, with no error anywhere. WRDS hard caps are 8 cores and 48 GB TOTAL per
+# m_mem_free is charged per slot, not per job. Ask for 4 slots at 24G and you have
+# asked for 96 GB, the scheduler can never satisfy it, and the job pends forever
+# with no error anywhere. WRDS hard caps are 8 cores and 48 GB total per
 # job, so what must hold is:  slots x mem_per_slot <= 48.
 #
-# These are passed on the qsub COMMAND LINE, not written into the job scripts, so the
-# request follows CONCURRENCY automatically instead of drifting away from it. The
+# These are passed on the qsub command line, not written into the job scripts, so the
+# request follows CONCURRENCY automatically and cannot drift away from it. The
 # scripts' own #$ directives are untouched.
 #
 # Slots match the worker count: the parent mostly waits while workers do the fetching
 # and cleaning. Memory per slot is sized for the peak inside decimal_shift_corrector,
-# which copies a chunk and adds columns -- roughly 2.5x a ~750k-row frame, so ~1.5 GB
-# per worker -- plus headroom for the parent, which holds every chunk's daily frame
-# until the end and is the real consumer.
+# which copies a chunk and adds columns (roughly 2.5x a ~750k-row frame, so ~1.5 GB
+# per worker), plus headroom for the parent, which holds every chunk's daily frame
+# until the end and uses the most memory.
 MAX_SLOTS_PER_JOB = 8
 MAX_MEM_GB_PER_JOB = 48
 
 MEM_PER_SLOT_GB = {
     "enhanced": 8,    # 5 slots x 8G = 40 GB
     "standard": 8,    # 6 slots x 8G = 48 GB, exactly the cap
-    "144a":     16,   # 1 slot -- same 16 GB it has always had
+    "144a":     16,   # 1 slot, the same 16 GB it has always had
 }
 
 
-# [tag:rule.memory_per_slot] memory is charged per slot and a job may use 8 slots and 48 GB; a larger request would wait in the queue forever, so this refuses it
+# [tag:rule.memory_per_slot] memory is charged per slot and a job may use 8 slots and 48 GB, and a larger request would wait in the queue forever, so this refuses it
 def qsub_resources(member: str) -> str:
     """qsub flags for one stage0 member, derived from its worker count.
 
-    Returns e.g. "-pe onenode 5 -l m_mem_free=8G". Raises rather than emit a request
-    the scheduler can never satisfy, because that failure mode is an invisible
-    permanent pend.
+    Returns e.g. "-pe onenode 5 -l m_mem_free=8G". Raises on a request
+    the scheduler can never satisfy, because otherwise the job pends
+    forever and nothing reports it.
     """
     slots = max(1, workers(member))
     mem = int(MEM_PER_SLOT_GB.get(member, 16))
@@ -253,22 +253,22 @@ def qsub_resources(member: str) -> str:
 
 
 # --- Price-scale normalization ----------------------------------------
-# TRACE rptd_pr is a PERCENT OF PAR for the standard $1,000-principal bond: at par
-# it prints 100. Small-denomination issues -- retail and structured notes with a
-# principal of $10, $25 or $100 -- are quoted in UNIT dollars, so a $10 note at par
+# TRACE rptd_pr is a percent of par for the standard $1,000-principal bond: at par
+# it prints 100. Small-denomination issues (retail and structured notes with a
+# principal of $10, $25 or $100) are quoted in unit dollars, so a $10 note at par
 # prints 10.00. Every filter downstream assumes percent of par (price bounds, the
 # decimal-shift gates, the bounce-back point threshold, stage 1's ultra-distressed
 # thresholds, dollar volume, QuantLib), so left alone those bonds read as deeply
 # distressed with tenfold-understated volume.
 #
 # When on, each non-$1,000 CUSIP is rescaled by 100/principal_amt if that puts its
-# MEDIAN price nearer par -- decided once per bond, so distressed prints cannot flip
-# the regime. $1,000-principal bonds are never touched.
+# median price nearer par. That is decided once per bond, so distressed prints cannot
+# flip the regime. $1,000-principal bonds are never touched.
 #
-# This is a NO-OP under the default screens: FISD_PARAMS["principal_amt_eq_1000_only"]
+# This does nothing under the default screens: FISD_PARAMS["principal_amt_eq_1000_only"]
 # is True, so no such bond is in the universe and every factor resolves to 1.0. It
-# earns its keep the moment you turn that screen off -- which is exactly when the
-# tape fills with unit-quoted notes.
+# matters once you turn that screen off, which is when unit-quoted notes
+# enter the data.
 PRICE_NORM = {
     "normalize_nonpar1000": True,
 }
@@ -281,10 +281,10 @@ COMMON_KWARGS = dict(
     target_rows_per_chunk = TARGET_ROWS_PER_CHUNK,
     limit_chunks  = LIMIT_CHUNKS,   # dev/test only: process just the first N CUSIP
                                     # chunks (None = the full universe). Lets a config
-                                    # change be checked in minutes rather than a full run of hours.
+                                    # change be checked in minutes, where a full run takes hours.
     clean_agency  = True,
     out_dir       = "",
-    # The threshold used only when volume_filter_toggle is True, which it is NOT by
+    # The threshold used only when volume_filter_toggle is True, which it is not by
     # default. Turning it on removes about 26% of Enhanced trades per bond-day and moves
     # every volume-weighted price, so a panel built with it on will not reconcile against
     # the published OSBAP data. Measured: trades per Enhanced bond-day 8.34 -> 6.15, and
@@ -307,12 +307,12 @@ COMMON_KWARGS = dict(
 # `workers()` above applies it, so the connection check and the qsub request see it too.
 
 PER_DATASET = {
-    # Enhanced is the long pole -- ~4 hours, and its chunk loop was strictly serial on
+    # Enhanced is the longest job (~4 hours), and its chunk loop was strictly serial on
     # one connection while the job held a whole node. CONCURRENCY holds the budget.
     "enhanced": dict(n_workers=workers("enhanced")),
-    # Standard runs AFTER the other two, so it may use the whole budget. 144A is
+    # Standard runs after the other two, so it may use the whole budget. 144A is
     # small (22 chunks on the 2026-09-21 run, against Enhanced's 485) and runs alongside
-    # Enhanced, so it takes one connection -- see CONCURRENCY and validate_connection_budget.
+    # Enhanced, so it takes one connection. See CONCURRENCY and validate_connection_budget.
     "standard": dict(start_date="2024-10-01", data_type="standard",
                      n_workers=workers("standard")),
     "144a":     dict(start_date="2002-07-01", data_type="144a",

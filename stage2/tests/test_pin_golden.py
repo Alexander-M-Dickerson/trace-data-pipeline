@@ -2,8 +2,8 @@
 golden tree) on a 200-cusip sample of the golden daily input, and require our DuckDB pin to match
 it column-for-column (floats to 1e-6, counters exactly).
 
-Skips cleanly when the golden tree (or its import deps) is unavailable -- this is the integration
-test; the unit tests (test_validate_core / test_nyse_calendar) never skip.
+Skips cleanly when the golden tree (or its import deps) is unavailable. This is the integration
+test. The unit tests (test_validate_core / test_nyse_calendar) never skip.
 """
 import sys
 
@@ -14,9 +14,9 @@ from pathlib import Path
 
 import _stage2_settings as cfg
 
-# This test diffs our daily projection against the ORIGINAL implementation's, which only
-# exists in the development tree. Point STAGE2_REFERENCE_ROOT at that tree to run it;
-# without it the test skips, which is the normal case for anyone outside development.
+# This test diffs our daily projection against the original implementation's, which only
+# exists in the development tree. Point STAGE2_REFERENCE_ROOT at that tree to run it.
+# Without it the test skips, which is the normal case for anyone outside development.
 import os
 _REF = os.environ.get("STAGE2_REFERENCE_ROOT")
 GOLDEN_STAGE2_SRC = Path(_REF) / "stage2" if _REF else None
@@ -87,7 +87,7 @@ def test_pin_matches_upstream_streamline(upstream, sample_cusips, tmp_path):
     out = pinlib.build_pin(con, mode="golden", limit_cusips=N_CUSIPS, force=True)
     ours = pd.read_parquet(out)
 
-    # duplicate (cusip, date) twins have arbitrary within-tie order; drop those cusips from both
+    # duplicate (cusip, date) twins have arbitrary within-tie order, so drop those cusips from both
     dup_cusips = set(ref.loc[ref.duplicated(["cusip_id", "trd_exctn_dt"], keep=False),
                              "cusip_id"].astype(str))
     if dup_cusips:

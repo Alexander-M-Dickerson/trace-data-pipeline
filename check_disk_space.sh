@@ -1,13 +1,13 @@
 #!/bin/bash
-# check_disk_space.sh -- is there room for a run? Called by run_pipeline.sh.
+# Is there room for a run? Called by run_pipeline.sh.
 #
 #   bash check_disk_space.sh              exit 0 when there is room, 1 when there is not
 #   FORCE_RUN=1 bash check_disk_space.sh  report, and never refuse
 #
-# On WRDS the limit that matters is your HOME QUOTA (10 GB on most accounts), not the free
-# space on the filesystem, which is terabytes and tells you nothing.
+# On WRDS the limit that counts is your home quota (10 GB on most accounts). The free
+# space on the filesystem is terabytes and tells you nothing.
 #
-# The quota's LIMIT is taken from `quota`. The space USED is MEASURED, with `du`, at the moment
+# The quota's limit is taken from `quota`. The space used is measured with `du` at the moment
 # you run this. It is not taken from `quota`, because WRDS refreshes that figure only every 30
 # minutes. The usual way to start a run is to delete the last one first, and for the next half
 # hour `quota` still counts the folder you just removed. This check used to trust it, and

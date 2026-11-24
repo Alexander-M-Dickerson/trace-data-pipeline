@@ -1,4 +1,4 @@
-"""ff5.py -- Fama-French 5 factors + RF from WRDS (ff.fivefactors_monthly), fetch-once cached.
+"""Fama-French 5 factors + RF from WRDS (ff.fivefactors_monthly), fetch-once cached.
 Faithful to the reference implementation's FF5 fetch (decimal units, MonthEnd dates)."""
 from __future__ import annotations
 

@@ -1,14 +1,14 @@
-"""factor_fetch.py -- the PUBLIC factor fetchers behind steps/compute_factors.
+"""The public factor fetchers behind steps/compute_factors.
 
 Each fetcher reproduces the transforms the published factor panel was built with (same source,
 same transforms, same output columns) and is fetch-once: the normalized frame is cached under
 `cfg.FACTOR_CACHE_DIR/<name>.parquet` with a sidecar `<name>.meta.json` (url, fetched_utc, rows,
-span, sha256) so any manifest can prove which vintage a build consumed. `force=True` re-pulls --
-that is how a repo user updates factors; bump the vintage URLs in `_stage2_settings` for sources that
-version their filenames (HKM, Ludvigson).
+span, sha256) so any manifest can prove which vintage a build consumed. `force=True` re-pulls,
+which is how a repo user updates factors. Bump the vintage URLs in `_stage2_settings` for sources
+that version their filenames (HKM, Ludvigson).
 
-A fresh pull does NOT bit-match the golden pinned vintage: FRED CPIAUCSL is re-seasonally-adjusted
-and EPU back-renormalized every release; HKM and Ludvigson revise history. See
+A fresh pull does not bit-match the golden pinned vintage: FRED CPIAUCSL is re-seasonally-adjusted
+and EPU back-renormalized every release, and HKM and Ludvigson restate history. See
 the divergence report written by this step. No pandas_datareader dependency: the French zip and FRED's
 fredgraph CSV endpoint parse directly.
 """
@@ -53,8 +53,8 @@ def _get(url: str) -> bytes:
 def _cached(name: str, url: str | Callable[[], str], builder: Callable[[str], pd.DataFrame],
             force: bool) -> pd.DataFrame:
     """Fetch-once framework: cache the normalized frame + a sidecar meta fingerprint.
-    `url` may be a callable (lazy discovery for sources that rotate filenames); it resolves only on
-    a cache miss and the RESOLVED url is what lands in the sidecar meta."""
+    `url` may be a callable (lazy discovery for sources that rotate filenames). It resolves only on
+    a cache miss and the resolved url is what lands in the sidecar meta."""
     cache = cfg.FACTOR_CACHE_DIR / f"{name}.parquet"
     if cache.exists() and not force:
         return pd.read_parquet(cache)
@@ -64,7 +64,7 @@ def _cached(name: str, url: str | Callable[[], str], builder: Callable[[str], pd
     assert "date" in df.columns and df["date"].notna().all(), \
         f"{name}: fetched frame must be non-null on 'date'"
     if not df["date"].is_unique:
-        # e.g. the 2026 HKM vintage ships 2025-01 twice; the frame is kept verbatim and the
+        # e.g. the 2026 HKM vintage ships 2025-01 twice. The frame is kept verbatim and the
         # panel-level drop_duplicates(keep='first') resolves it
         n_dup = int(df["date"].duplicated().sum())
         print(f"[factor_fetch] {name}: {n_dup} duplicate month(s) kept verbatim "
@@ -95,7 +95,7 @@ def _fred_csv(series: tuple[str, ...], start: str) -> pd.DataFrame:
 # --- the six upstream fetchers ----------------------------------------------------------------------
 
 def fetch_ff5(force: bool = False) -> pd.DataFrame:
-    """['date','mktrf','smb','hml','rf'] decimal, month-end -- Ken French 5-factor monthly table
+    """['date','mktrf','smb','hml','rf'] decimal, month-end. Ken French 5-factor monthly table
     (rmw/cma dropped, /100)."""
     def build(url: str) -> pd.DataFrame:
         raw = _get(url)
@@ -117,7 +117,7 @@ def fetch_ff5(force: bool = False) -> pd.DataFrame:
 
 
 def fetch_vix_monthly(force: bool = False) -> pd.DataFrame:
-    """['date','vix','dvix','dvixlag'] -- EOM VIX (VXO fallback pre-1990) scaled /100/sqrt(12);
+    """['date','vix','dvix','dvixlag']. EOM VIX (VXO fallback pre-1990) scaled /100/sqrt(12),
     dvix = first diff (first month: intra-month last-first)."""
     def build(url: str) -> pd.DataFrame:
 
@@ -152,8 +152,8 @@ def fetch_vix_monthly(force: bool = False) -> pd.DataFrame:
 
 
 def fetch_cpi_credit(force: bool = False) -> pd.DataFrame:
-    """['date','dcpi','cpi_vol6','credit','dcredit','lvl','ysp'] -- FRED CPIAUCSL + AAA/BAA + DGS
-    curve (CPI lag-then-diff + 6m vol; (BAA-AAA)/12; EW lvl; 5y-1y)."""
+    """['date','dcpi','cpi_vol6','credit','dcredit','lvl','ysp']. FRED CPIAUCSL + AAA/BAA + DGS
+    curve (CPI lag-then-diff + 6m vol, (BAA-AAA)/12, EW lvl, 5y-1y)."""
     def build(url: str) -> pd.DataFrame:
         cpi = _fred_csv(("CPIAUCSL",), "1947-01-01").rename(columns={"CPIAUCSL": "cpi"})
         cpi["date"] = cpi["date"] + MonthEnd(0)
@@ -184,7 +184,7 @@ def fetch_cpi_credit(force: bool = False) -> pd.DataFrame:
 
 
 def fetch_intermediary_capital(force: bool = False) -> pd.DataFrame:
-    """['date','cptl','cptlt'] -- He-Kelly-Manela intermediary capital factors
+    """['date','cptl','cptlt']. He-Kelly-Manela intermediary capital factors
     (cptlt has RF subtracted later, at the merge)."""
     def build(url: str) -> pd.DataFrame:
         df = pd.read_csv(io.BytesIO(_get(url)))
@@ -199,14 +199,14 @@ def fetch_intermediary_capital(force: bool = False) -> pd.DataFrame:
 def _hkm_url() -> str:
     """The current He-Kelly-Manela monthly-factor URL.
 
-    The authors publish under a DATED filename (..._250627.csv) and change it on each
-    release, so a hard-coded URL silently pins the panel to an old vintage -- and because
-    a factor series that stops short truncates every beta estimated on it, that shows up
-    as columns dying early rather than as an error. Same discovery approach as Ludvigson:
+    The authors publish under a dated filename (..._250627.csv) and change it on each
+    release, so a hard-coded URL pins the panel to an old vintage without an error. A
+    factor series that stops short truncates every beta estimated on it, so the symptom
+    is columns that end early, not an error message. Same discovery approach as Ludvigson:
     use the configured URL while it is live, otherwise find the current one on the data
     page.
 
-    As of 2026-09-10 the configured URL IS the current one -- the authors have not
+    As of 2026-09-10 the configured URL is the current one. The authors have not
     published past 2025-05, so `b_cptlt` legitimately lags a later frontier.
     """
     import requests
@@ -230,7 +230,7 @@ def _hkm_url() -> str:
 
 def _ludvigson_url() -> str:
     """The current uncertainty-zip URL: the configured vintage if still live, else discovered from
-    the index page (the site ROTATES the filename every update -- the golden's 202508 zip now 404s)."""
+    the index page (the site rotates the filename every update, and the golden's 202508 zip now 404s)."""
     import requests
     try:
         r = requests.head(cfg.LUDVIGSON_URL, timeout=60, allow_redirects=True)
@@ -249,7 +249,7 @@ def _ludvigson_url() -> str:
 
 
 def fetch_uncertainty(force: bool = False) -> pd.DataFrame:
-    """['date','uncf','unc','uncr','duncf','dunc','duncr','dunc3','dunc6'] -- Ludvigson macro/
+    """['date','uncf','unc','uncr','duncf','dunc','duncr','dunc3','dunc6']. Ludvigson macro/
     financial/real uncertainty + first differences + 3/6-month changes."""
     def build(url: str) -> pd.DataFrame:
         frames = []
@@ -274,7 +274,7 @@ def fetch_uncertainty(force: bool = False) -> pd.DataFrame:
 
 
 def fetch_epu(force: bool = False) -> pd.DataFrame:
-    """['date','epu','epum','eput'] -- policyuncertainty.com categorical EPU indices, /1000
+    """['date','epu','epum','eput']. policyuncertainty.com categorical EPU indices, /1000
     (last sheet row is a text footnote, dropped)."""
     def build(url: str) -> pd.DataFrame:
         df = pd.read_excel(io.BytesIO(_get(url)), sheet_name="Indices")

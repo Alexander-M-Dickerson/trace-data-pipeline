@@ -1,4 +1,4 @@
-"""nyse_calendar.py -- the ONE NYSE session calendar for the monthly port.
+"""The one NYSE session calendar for the monthly port.
 
 Faithful to the reference implementation's `streamline_data`: sessions come from
 `pandas_market_calendars.get_calendar('NYSE')` over a fixed range, and business-day gaps are
@@ -29,7 +29,7 @@ CALENDAR_PARQUET = cfg.DATA_DIR / "nyse_calendar.parquet"
 def build_calendar_frame(start: str = cfg.CAL_START, end: str = cfg.CAL_END) -> pd.DataFrame:
     """One row per calendar day in [start, end]: (day, is_session, cum_before).
 
-    `cum_before` counts NYSE sessions strictly before `day` -- the prefix sum that turns
+    `cum_before` counts NYSE sessions strictly before `day`, the prefix sum that turns
     np.busday_count into a join. Uses pandas_market_calendars, same as the upstream golden.
     """
     import pandas_market_calendars as mcal
@@ -43,7 +43,7 @@ def build_calendar_frame(start: str = cfg.CAL_START, end: str = cfg.CAL_END) -> 
 
 
 def ensure_calendar(path: Path = CALENDAR_PARQUET) -> Path:
-    """Materialize the calendar parquet if absent or stale (range mismatch); return its path."""
+    """Materialize the calendar parquet if absent or stale (range mismatch) and return its path."""
     if path.exists():
         head = pd.read_parquet(path, columns=["day"])
         if (str(head["day"].min().date()) == cfg.CAL_START
@@ -63,7 +63,7 @@ def non_business_days(start: str = cfg.CAL_START, end: str = cfg.CAL_END) -> np.
 
 def cal_lut_frame() -> pd.DataFrame:
     """Calendar-day LUT for SQL joins: cday, cum_before (sessions < cday), prev_session
-    (last session strictly < cday -- the CustomBusinessDay(-1) roll for any calendar day)."""
+    (last session strictly < cday, the CustomBusinessDay(-1) roll for any calendar day)."""
     cal = build_calendar_frame()
     sessions = cal.loc[cal["is_session"], "day"].to_numpy()
     idx = np.searchsorted(sessions, cal["day"].to_numpy(), side="left") - 1

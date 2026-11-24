@@ -61,7 +61,7 @@ def Date2Timestamp(d):
 # [tag:daily.prfull] the dirty price: clean price plus accrued interest
 # [tag:daily.acclast] interest accrued since the last coupon
 # [tag:daily.accpmt] the coupons paid since issue
-# [tag:daily.accall] accrued interest plus coupons paid; the returns use it
+# [tag:daily.accall] accrued interest plus coupons paid, which the returns use
 # [tag:daily.mod_dur] modified duration
 # [tag:daily.mac_dur] Macaulay duration
 # [tag:daily.convexity] convexity
@@ -330,7 +330,7 @@ def ComputeCredit(x):
     x : pandas.Series
         Must contain:
             - tmt          : time-to-maturity in months
-            - oneyr -- thirtyr : key-rate yields
+            - oneyr to thirtyr : key-rate yields
             - cusip_id, trd_exctn_dt
 
     Returns
@@ -453,7 +453,7 @@ def fast_join_vectorized(df_src, ffi_tbl, ind_label):
     df = df_src.copy()
     ffi = ffi_tbl.copy()
 
-    # Ensure numeric dtype
+    # Make sure the dtype is numeric
     df["sic_code"]     = pd.to_numeric(df["sic_code"],    errors="coerce")
     ffi["sic_low"]     = pd.to_numeric(ffi["sic_low"],    errors="coerce")
     ffi["sic_high"]    = pd.to_numeric(ffi["sic_high"],   errors="coerce")
@@ -590,7 +590,7 @@ def extend_and_ffill_linker(
     if me_ffill <= me_link_max:
         return out
 
-    # Ensure all id columns exist
+    # Make sure all id columns exist
     missing = [c for c in id_cols if c not in out.columns]
     if missing:
         raise KeyError(f"Missing ID columns in dataframe: {missing}")
@@ -620,7 +620,7 @@ def extend_and_ffill_linker(
     if "year_month" in out.columns:
         ext["year_month"] = ext[date_col].dt.strftime("%Y-%m")
 
-    # Ensure all original columns exist in ext (fill with NA if not derivable)
+    # Make sure all original columns exist in ext (fill with NA if not derivable)
     for c in out.columns:
         if c not in ext.columns:
             ext[c] = pd.NA
@@ -1031,7 +1031,7 @@ def ultra_distressed_filter(
     enable_plateau_filter: bool = True,
     plateau_ultra_low_threshold: float = 0.15,
     min_plateau_days: int = 2,
-    # Mirrors ULTRA_DISTRESSED_CONFIG["suspicious_round_numbers"]; 0.75 is
+    # Mirrors ULTRA_DISTRESSED_CONFIG["suspicious_round_numbers"]. 0.75 is
     # deliberately absent (a plausible distressed price, not a placeholder).
     suspicious_round_numbers: List[float] = [0.001, 0.01, 0.05, 0.10,
                                              0.25,  0.50, 1.00],
@@ -1052,14 +1052,14 @@ def ultra_distressed_filter(
     keep_flag_columns: bool = False,
 ) -> pd.DataFrame:
     """
-    Apply all refined filters with implementation.
-    Uses enhanced Numba compilation with fastmath and nogil for maximum speed.
+    Apply all refined filters.
+    The detectors are Numba kernels compiled with fastmath and nogil.
 
     The defaults here mirror ULTRA_DISTRESSED_CONFIG in stage1/_stage1_settings.py,
-    which is what the pipeline passes. Tune the config, not these -- and note that
-    changing either moves the sample, because flag_refined_any drives a row filter.
+    which is what the pipeline passes. Tune the config, not these. Changing either
+    moves the sample, because flag_refined_any drives a row filter.
 
-    `n_jobs` is accepted for backwards compatibility and is NOT used: the detectors
+    `n_jobs` is accepted for backwards compatibility and is not used: the detectors
     are numba kernels, not joblib workers.
     """
     
@@ -1433,7 +1433,7 @@ def create_time_series_plots(
             df_plot[col] = df_plot[col].astype('float64')
     
     # Resample to weekly using Monday week-start
-    # For market_cap (defaulted bonds), use SUM aggregation; for others use MEAN
+    # For market_cap (defaulted bonds) use SUM aggregation, for the others use MEAN
     if rating_filter == 'defaulted' and 'market_cap' in df_plot.columns:
         # Separate market_cap for SUM aggregation
         df_weekly_mean = df_plot.drop(columns=['market_cap']).set_index('trd_exctn_dt').resample('W-MON').mean()
@@ -1873,7 +1873,7 @@ def compute_trade_counts_by_month(df: pd.DataFrame, rating_filter: str = None) -
     cols_needed = ['trd_exctn_dt', 'cusip_id', 'pr', 'prc_bid', 'prc_ask', 'spc_rating']
     df = df[cols_needed]
 
-    # Apply rating filter BEFORE copying (reduces by 40-95% depending on rating)
+    # Apply the rating filter before copying (reduces by 40-95% depending on rating)
     if rating_filter == 'investment_grade':
         df = df[(df['spc_rating'] >= 1) & (df['spc_rating'] <= 10)]
     elif rating_filter == 'non_investment_grade':
@@ -1924,7 +1924,7 @@ def compute_trade_counts_by_month(df: pd.DataFrame, rating_filter: str = None) -
         total_bid = month_trades['bid_days'].sum()
         total_ask = month_trades['ask_days'].sum()
 
-        # Average including zeros (divide by ALL alive bonds, not just traded)
+        # Average including zeros (divide by all alive bonds, traded or not)
         avg_pr = total_pr / num_alive
         avg_bid = total_bid / num_alive
         avg_ask = total_ask / num_alive
@@ -2320,7 +2320,7 @@ def compute_concentration_stats(df: pd.DataFrame, rating_filter: str = None) -> 
     cols_needed = ['cusip_id', 'dvolume', 'spc_rating']
     df = df[cols_needed]
 
-    # Apply rating filter BEFORE copying (reduces by 40-95%)
+    # Apply the rating filter before copying (reduces by 40-95%)
     if rating_filter == 'investment_grade':
         df = df[(df['spc_rating'] >= 1) & (df['spc_rating'] <= 10)]
     elif rating_filter == 'non_investment_grade':
@@ -2425,7 +2425,7 @@ def create_trade_frequency_histogram(
         cols_needed = ['trd_exctn_dt', 'cusip_id', 'pr', 'spc_rating']
         df_filt = df[cols_needed]
 
-        # Apply rating filter BEFORE copying (reduces by 40-95%)
+        # Apply the rating filter before copying (reduces by 40-95%)
         if rating_filter == 'investment_grade':
             df_filt = df_filt[(df_filt['spc_rating'] >= 1) & (df_filt['spc_rating'] <= 10)]
         elif rating_filter == 'non_investment_grade':
@@ -2788,7 +2788,7 @@ def create_concentration_over_time_plot(
         cols_needed = ['trd_exctn_dt', 'cusip_id', 'dvolume', 'spc_rating']
         df_filt = df[cols_needed]
 
-        # Apply rating filter BEFORE copying (reduces by 40-95%)
+        # Apply the rating filter before copying (reduces by 40-95%)
         if rating_filter == 'investment_grade':
             df_filt = df_filt[(df_filt['spc_rating'] >= 1) & (df_filt['spc_rating'] <= 10)]
         elif rating_filter == 'non_investment_grade':
@@ -3212,7 +3212,7 @@ def create_herfindahl_over_time_plot(
         
         df_hhi = pd.DataFrame(monthly_hhi)
         df_hhi['date'] = pd.to_datetime(df_hhi['year_month'] + '-01')
-        df_hhi = df_hhi.sort_values('date')  # CRITICAL: ensure sorted!
+        df_hhi = df_hhi.sort_values('date')  # must be sorted
         hhi_data[rating_filter] = df_hhi
     
     # Create figure
@@ -3292,7 +3292,7 @@ def create_trading_intensity_heatmap(
     params: PlotParams = None,
 ) -> Path:
     """
-    Create Figure 13: Heatmap of trading intensity (month -- rating group).
+    Create Figure 13: Heatmap of trading intensity (month by rating group).
     
     Rows: 5 rating groups (1-5, 6-10, 11-15, 16-21, 22)
     Columns: Year-Month
@@ -3383,7 +3383,7 @@ def create_trading_intensity_heatmap(
             month_trades = trade_counts[trade_counts['year_month'] == month]
             total_days = month_trades['days_traded'].sum()
             
-            # Average including zeros (divide by ALL alive bonds, not just traded)
+            # Average including zeros (divide by all alive bonds, traded or not)
             avg_days = total_days / num_alive
             
             results.append({
@@ -3769,7 +3769,7 @@ def compute_cross_sectional_stats_fixed(df: pd.DataFrame, stat_vars: list) -> pd
             'P99': daily_p99.mean(),
         }
         
-        # Scale YTM and Spread by 100 AFTER computation
+        # Scale YTM and Spread by 100 after computation
         if var_name in ['ytm', 'credit_spread']:
             for key in ['Mean', 'Median', 'SD', 'P1', 'P5', 'P95', 'P99']:
                 stats[key] = stats[key] * 100
@@ -4360,7 +4360,7 @@ def add_ff_industries(fisd_df: pd.DataFrame, verbose: bool = True):
 
     Downloads and parses the FF12, FF17 and FF30 industry classification files, then
     matches SIC codes to industries using fast vectorized operations. Returns only numeric
-    codes (ff12num, ff17num, ff30num) to save RAM; mappings returned separately for plotting.
+    codes (ff12num, ff17num, ff30num) to save RAM. The mappings are returned separately for plotting.
 
     If internet is not available (e.g., on WRDS compute nodes), falls back to local files.
 
@@ -4486,10 +4486,10 @@ def add_ff_industries(fisd_df: pd.DataFrame, verbose: bool = True):
         if verbose:
             print(f"  Parsed {len(industries)} SIC code ranges across 12 industries")
         
-        # FF12 differs from FF17/FF30: its "Other" bucket (12) lists NO SIC ranges,
+        # FF12 differs from FF17/FF30: its "Other" bucket (12) lists no SIC ranges,
         # so industry 12 is reached purely by fallback. A failed parse would then
-        # produce a uniform, plausible-looking ff12num=12 column rather than an
-        # obvious error. Assert the file really parsed.
+        # produce a uniform, plausible-looking ff12num=12 column and no
+        # obvious error. Assert the file parsed.
         if len(industries) < 40:
             raise ValueError(
                 f"Siccodes12 parsed to only {len(industries)} SIC ranges (expected ~49). "
@@ -5473,7 +5473,7 @@ def create_bond_characteristics_evolution_plot(
     # Pivot to get Y and N as columns
     df_144a_pivot = df_144a.pivot(index='week', columns='rule_144a', values='pct').fillna(0)
     
-    # Ensure both Y and N exist
+    # Make sure both Y and N exist
     if 'Y' not in df_144a_pivot.columns:
         df_144a_pivot['Y'] = 0
     if 'N' not in df_144a_pivot.columns:

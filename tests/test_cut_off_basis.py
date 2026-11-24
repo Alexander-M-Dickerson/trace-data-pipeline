@@ -6,7 +6,7 @@ test_cut_off_basis.py
 
 Stage 1 pools TRACE Enhanced with 144A/BTDS. They are different populations reported on
 different lags, and 144A runs months ahead. The spec used to be resolved against the
-POOLED last trade date, which is 144A's, so the sample end landed where 144A was complete
+pooled last trade date, which is 144A's, so the sample end landed where 144A was complete
 and Enhanced had stopped months earlier.
 
 From the 2026-09-10 production log, verbatim:
@@ -16,12 +16,12 @@ From the 2026-09-10 production log, verbatim:
     Resolved DATE_CUT_OFF auto:-3mo -> 2026-03-31
 
 Everything from 2025-12 to 2026-03 is therefore a month in which no TRACE Enhanced bond
-can have a month-end price. The monthly panel still emits those months; they are just not
-cross-sections any more. The final one held 1,914 bonds, 100% 144A, against a trailing
+can have a month-end price. The monthly panel still emits those months, but they are no
+longer cross-sections. The final one held 1,914 bonds, 100% 144A, against a trailing
 median of ~10,700 at ~22% 144A.
 
-Measured from Enhanced instead, the same spec gives 2025-09-30 -- three months of real
-cross-sections traded for four months of 144A-only ones.
+Measured from Enhanced instead, the same spec gives 2025-09-30. Three months of real
+cross-sections are traded for four months of 144A-only ones.
 
 Author: Open Source Bond Asset Pricing
 """
@@ -67,7 +67,7 @@ def test_a_single_source_run_is_unchanged():
 
 
 def test_standard_extends_enhanced_rather_than_bounding_it():
-    """db_type 2 is the same public tape, clipped to start where Enhanced ends."""
+    """db_type 2 is the same public data, clipped to start where Enhanced ends."""
     tape = _tape([(ENHANCED, "2025-12-04"), (STANDARD, "2026-02-20"), (A144, "2026-06-05")])
     assert st.cut_off_basis(tape) == pd.Timestamp("2026-02-20")
 
@@ -80,14 +80,14 @@ def test_the_frontiers_are_reported_per_population():
 
 
 def test_an_empty_population_is_omitted_not_null():
-    """A NaT would silently poison the min and cut the sample to nothing."""
+    """A NaT would poison the min without an error and cut the sample to nothing."""
     tape = _tape([(A144, "2026-06-05")])
     assert list(st.source_frontiers(tape)) == ["144A/BTDS"]
     assert st.cut_off_basis(tape) == pd.Timestamp("2026-06-05")
 
 
 def test_whichever_source_is_behind_wins():
-    """It is not 'Enhanced always'; it is the least current, whichever that is."""
+    """The basis is the least current member, whichever that is, and not always Enhanced."""
     tape = _tape([(ENHANCED, "2026-06-05"), (A144, "2025-12-04")])
     assert st.cut_off_basis(tape) == pd.Timestamp("2025-12-04")
 
@@ -104,7 +104,7 @@ def test_an_explicit_cut_off_is_the_users_choice(spec):
 
 
 # ---------------------------------------------------------------------------
-# auto:complete -- the default. See `last_complete_month` in _stage1_settings.py.
+# auto:complete, the default. See `last_complete_month` in _stage1_settings.py.
 #
 # `auto:-3mo` measures back from a date that is itself mid-month, so it discards
 # complete months. On the 2026-09-10 run it cut at 2025-09-30 and threw away October
@@ -129,7 +129,7 @@ def _tape_with_sessions(spans: dict[int, tuple[str, str]]) -> pd.DataFrame:
 
 
 def test_auto_complete_on_the_production_frontier():
-    """Enhanced stops 2025-12-04; 144A runs to month end. November is the answer."""
+    """Enhanced stops 2025-12-04 and 144A runs to month end. November is the answer."""
     tape = _tape_with_sessions({ENHANCED: ("2024-01-01", "2025-12-04"),
                                 A144: ("2024-01-01", "2025-12-31")})
     assert st.last_complete_month(tape) == "2025-11-30"

@@ -1,17 +1,17 @@
-"""step1_returns.py -- DuckDB port of upstream step 1: monthly returns (6 price types), month-end
+"""DuckDB port of upstream step 1: monthly returns (6 price types), month-end
 signals, adjusted signals, LIB, default handling, and duration-matched Treasury returns.
 
 Ground truth: the reference implementation's monthly builder (the chunked wrapper is
 semantics-neutral) + `normalize_default_returns` + the returns_alt slice of `wrangle_returns`. Each
 stage below cites the upstream step it reproduces. Two-trap reminders:
   - R = (fp_t - fp_s) / prfull_s with fp = pr + accall (coupons retained), prfull = pr + acclast.
-  - float32 fidelity: price arithmetic stays FLOAT end-to-end exactly like pandas float32 Series;
+  - float32 fidelity: price arithmetic stays FLOAT end-to-end exactly like pandas float32 Series.
     mcap is BIGINT * float32 -> float64 (numpy promotion), reproduced with explicit DOUBLE casts.
 
 Outputs (parquet blocks under output/blocks/<mode>/), grain one row per (cusip, calendar month-end):
   end_returns, bgn_returns, end_signals, adj_signals, all_returns, returns_alt
-returns_alt is the returns validation target. all_returns keeps the PRE-normalization ret_vw
-(the runner normalizes end/bgn AFTER all_returns is built inside process_bond_data).
+returns_alt is the returns validation target. all_returns keeps the ret_vw from before normalization
+(the runner normalizes end/bgn after all_returns is built inside process_bond_data).
 """
 from __future__ import annotations
 
@@ -26,8 +26,9 @@ import _stage2_settings as cfg
 from lib import duration_adjusted, linker, month_boundaries, nyse_calendar, treasury
 from lib import pin as pinlib
 
-# price column (pin name) -> return column. Upstream PRICE_MAP; its 'last_bid' key never matches the
-# golden input (whose column is bid_last), so ret_lbd never materializes -- 6 return types, not 7.
+# price column (pin name) -> return column. This is upstream's PRICE_MAP. Its 'last_bid' key never
+# matches the golden input (whose column is bid_last), so ret_lbd never materializes and there are
+# 6 return types, not 7.
 PRICE_MAP = {
     "pr": "ret_vw",
     "prc_vw_par": "ret_vwp",
@@ -62,7 +63,7 @@ LEFT JOIN _tret_rows r ON r.cusip_id = t.cusip_id AND r.date = t.{date_col}
 
 
 def build(con, mode: str | None = None, limit_cusips: int | None = None) -> dict[str, Path]:
-    """Build all step-1 blocks; returns {block_name: parquet_path}. Idempotent, ~O(pin) work."""
+    """Build all step-1 blocks and return {block_name: parquet_path}. Idempotent, ~O(pin) work."""
     mode = mode or cfg.INPUT_MODE
     t0 = time.time()
     pin_path = pinlib.build_pin(con, mode, limit_cusips)
@@ -74,7 +75,7 @@ def build(con, mode: str | None = None, limit_cusips: int | None = None) -> dict
     con.register("month_bounds", month_boundaries.build_month_bounds(months["month_start"]))
     con.register("cal_lut", nyse_calendar.cal_lut_frame())
 
-    # [tag:col.ret_vw] the month-end return: the change in clean price plus accrued interest plus coupons paid, over the dirty price at the start; defaulted bonds are handled below
+    # [tag:col.ret_vw] the month-end return: the change in clean price plus accrued interest plus coupons paid, over the dirty price at the start. Defaulted bonds are handled below
     fp_defs, lag_defs, ret_defs = [], [], []
     for px in PRICE_MAP:
         sfx = "" if px == "pr" else f"_{px}"
@@ -145,7 +146,7 @@ FROM (
     # [tag:col.dt_s_bgn] the date of the month's first trade, which starts the month-begin return
     # [tag:col.dt_e_bgn] the date of the month's last trade, which ends the month-begin return
     # ============ upstream step 10: within-month (bgn) frame ======================================
-    # cnt=2 months hold exactly [begin-row, end-row]; the end-row's cusip-lag is its month's begin row
+    # cnt=2 months hold exactly [begin-row, end-row], and the end-row's cusip-lag is its month's begin row
     con.execute("""
 CREATE OR REPLACE TEMP TABLE t_bgn_full AS
 SELECT * FROM (
@@ -163,7 +164,7 @@ WHERE end_dummy = 1
 
     # [tag:col.ret_type] how the return was measured: standard, default_evnt (the month the bond defaults) or trad_in_def (trading while in default)
     # ============ upstream steps 10.5/11.5: default-return handling (event_based) =================
-    # ratings lag AFTER the n<=31 filter (end) / on the bgn-returns frame, per pandas shift order.
+    # ratings lag after the n<=31 filter (end) / on the bgn-returns frame, per pandas shift order.
     # pandas NaN==22 -> False is COALESCE(..., FALSE). ret_std snapshots the pre-adjustment ret_vw.
     default_case = """
   CASE WHEN NOT in_def_lag AND in_def THEN 'default_evnt'
@@ -202,16 +203,16 @@ FROM (
     # [tag:col.hprd_bgn] the holding period of the month-begin return: NYSE sessions from its first trade to its last
     # [tag:col.igap_bgn] NYSE sessions from the last session of last month to this month's first trade
     # ============ upstream steps 12-13: hprd / igap via the session LUT ===========================
-    # end hprd: sessions in [prev month-end TRADE, this month-end TRADE); bgn hprd: [first, last
-    # trade); igap: [previous business month-end, first trade)
+    # end hprd is the sessions in [prev month-end trade, this month-end trade), bgn hprd is
+    # [first, last trade), and igap is [previous business month-end, first trade)
     #
-    # ! `hprd` is the return's REAL window: NYSE sessions from the start trade (dt_s) to the end
-    #   trade (dt, published as dt_e). The reference implementation measured to the CALENDAR
-    #   month-end instead, which is not a date the return uses -- it overstated the window (mean
-    #   21.8 against a true 21.0) and disagreed with `hprd_bgn`, which has always run trade to
-    #   trade. Changed 2026-09-21. The `hprd > 0` filter below is unaffected: the end trade is in a
-    #   later month than the start trade on every row, so both definitions are positive together
-    #   and NULL together (no start trade).
+    # `hprd` is the window the return covers: NYSE sessions from the start trade (dt_s) to the
+    # end trade (dt, published as dt_e). The reference implementation measured to the calendar
+    # month-end, which is not a date the return uses. It overstated the window (mean 21.8
+    # against a true 21.0) and disagreed with `hprd_bgn`, which has always run trade to
+    # trade. Changed 2026-09-21. The `hprd > 0` filter below is unaffected, because the end
+    # trade is in a later month than the start trade on every row, so both definitions are
+    # positive together and NULL together (no start trade).
     con.execute("""
 CREATE OR REPLACE TEMP TABLE t_end_ret2 AS
 SELECT e.*, (ce.cum_before - cs.cum_before) AS hprd
@@ -259,15 +260,15 @@ SELECT * FROM t_bgn_ret2 WHERE hprd > 0 AND month_end_cal >= DATE '{cfg.START_DA
     _attach_tret(con, "t_end_f", "date_end_ref", mode=mode)
     _attach_tret(con, "t_bgn_f", "month_end_cal", mode=mode)
 
-    # Five more Treasury benchmarks, built from each bond's own cash flows -- see
-    # lib/duration_adjusted.py for the equations and citations.
+    # Five more Treasury benchmarks, built from each bond's own cash flows (see
+    # lib/duration_adjusted.py for the equations and citations).
     #
-    # Attached to BOTH frames, exactly as `tret` is. It was the end frame only while these were
-    # just panel columns -- the shipped ones are end-timed, so a `_bgn` twin had no reader. That
-    # stopped being true when `all_returns` became the input to duration-adjusted rolling betas:
-    # it unions the two frames, and 8.1% of its rows come from bgn alone. Leaving those without a
-    # benchmark would estimate the alternative-benchmark betas on a non-random 92% subsample of
-    # the rows the `tret` ones use, which is a confound in precisely the comparison the
+    # Attached to both frames, exactly as `tret` is. It was the end frame only while these were
+    # just panel columns, because the shipped ones are end-timed and a `_bgn` twin had no reader.
+    # That stopped being true when `all_returns` became the input to duration-adjusted rolling
+    # betas. It unions the two frames, and 8.1% of its rows come from bgn alone. Leaving those
+    # without a benchmark would estimate the alternative-benchmark betas on a non-random 92%
+    # subsample of the rows the `tret` ones use, which is a confound in the very comparison the
     # alternatives exist to support. The bgn frame calls its window start `date_start`.
     _da = duration_adjusted.attach(
         con, "t_end_f_t", "date_end_ref", "t_end_f_td",
@@ -288,7 +289,7 @@ SELECT * FROM t_bgn_ret2 WHERE hprd > 0 AND month_end_cal >= DATE '{cfg.START_DA
     # [tag:col.mcap_s] market value at the start trade: amount outstanding x dirty price, in $ millions
     # [tag:col.mcap_e] market value at the month-end trade: amount outstanding x dirty price, in $ millions
     # ============ upstream steps 16/16.6: end_signals (PRE n<=31 frame, point-in-time) ============
-    # bbtm = 100/pr (float32); sze = mcap; fce_val = round(ao); short-name renames per SIGNAL_NAME_MAP
+    # bbtm = 100/pr (float32), sze = mcap, fce_val = round(ao), short-name renames per SIGNAL_NAME_MAP
     con.execute(f"""
 CREATE OR REPLACE TEMP TABLE t_sig AS
 SELECT cusip_id AS cusip, date_end_ref AS date, dt_s, dt AS dt_e,
@@ -305,14 +306,14 @@ QUALIFY row_number() OVER (PARTITION BY cusip_id, date_end_ref ORDER BY dt) = 1
 """)
 
     # [tag:col.sig_dt] the date of the signal trade: the trade in the month closest to the session before the month-end trade
-    # [tag:col.ytm] yield to maturity, read at the signal trade rather than the month-end trade
+    # [tag:col.ytm] yield to maturity, read at the signal trade, not at the month-end trade
     # [tag:col.md_dur] modified duration, read at the signal trade
     # [tag:col.convx] convexity, read at the signal trade
     # [tag:col.cs] credit spread, read at the signal trade
     # ============ upstream step 16 (adj machinery): pick the lagged in-month signal trade =========
-    # candidates: same-month trades STRICTLY before the month-end trade, within adj_window sessions
-    # of the CALENDAR month-end; pick the trade with min |calendar days to cut_off_adj| where
-    # cut_off_adj = last session strictly before the month-end trade; ties -> earliest trade.
+    # candidates are same-month trades strictly before the month-end trade, within adj_window
+    # sessions of the calendar month-end. Pick the trade with min |calendar days to cut_off_adj|,
+    # where cut_off_adj = last session strictly before the month-end trade. Ties -> earliest trade.
     # Lookup values are float32-downcast upstream (price_df_for_signals), hence the FLOAT casts.
     con.execute(f"""
 CREATE OR REPLACE TEMP TABLE t_adj_best AS
@@ -342,8 +343,8 @@ QUALIFY row_number() OVER (PARTITION BY cusip_id, month_end_cal ORDER BY ddiff, 
     # [tag:col.sig_gap] NYSE sessions from the signal trade to the month-end trade
     # [tag:col.bbtm] book-to-market: 100 over the clean price at the signal trade
     # [tag:col.sze] size: market value at the signal trade, in $ millions
-    # str1_adj = (fp_adj - fp_s)/prfull_s (prev MONTH-END lags); str2_adj uses the BGN frame's lags;
-    # bbtm_adj/sze_adj are float32 values stored float64 (np.asarray(..., 'float64') upstream);
+    # str1_adj = (fp_adj - fp_s)/prfull_s (prev month-end lags). str2_adj uses the bgn frame's lags.
+    # bbtm_adj/sze_adj are float32 values stored float64 (np.asarray(..., 'float64') upstream).
     # sig_gap = sessions in [sig_dt, month-end trade)
     con.execute("""
 CREATE OR REPLACE TEMP TABLE t_adj AS
@@ -361,12 +362,12 @@ LEFT JOIN cal_lut css ON css.cday = a.sig_dt
 LEFT JOIN cal_lut cse ON cse.cday = a.dt_e
 """)
 
-    # [tag:col.cusip] the bond's 9-character CUSIP; with date, the panel's key
+    # [tag:col.cusip] the bond's 9-character CUSIP, which with date is the panel's key
     # [tag:col.date] the calendar month-end the row belongs to
     # [tag:col.spc_rat] the S&P rating, filled from Moody's where missing (stage 1's spc_rating), at the month-end trade
-    # [tag:col.mdc_rat] the Moody's rating, filled from S&P where missing (stage 1's mdc_rating); renamed from mdyc_rat in lib/wrangle.py
+    # [tag:col.mdc_rat] the Moody's rating, filled from S&P where missing (stage 1's mdc_rating), renamed from mdyc_rat in lib/wrangle.py
     # ============ final frames: normalize (runner) + block outputs ================================
-    # end_returns: ret_vw = default-adjusted then capped at ret_std for trad_in_def; alt returns are
+    # end_returns: ret_vw = default-adjusted then capped at ret_std for trad_in_def. Alt returns are
     # aligned to the normalized ret_vw on default rows (normalize_default_returns, is_end=True).
     alt_norm = ",\n       ".join(
         f"""CASE WHEN ret_type = 'default_evnt' THEN ret_vw_n
@@ -402,9 +403,9 @@ SELECT cusip_id AS cusip, month_end_cal AS date, date_start AS dt_s, dt AS dt_e,
 FROM t_bgn_f_td
 """)
 
-    # all_returns: PRE-normalization ret_vw, end rows take precedence over bgn on (cusip, date)
+    # all_returns: ret_vw from before normalization, end rows take precedence over bgn on (cusip, date)
     # end_returns / bgn_returns are shipped blocks with fixed projections, so the benchmarks are
-    # taken from the extended frames rather than by widening those two.
+    # taken from the extended frames and those two are not widened.
     con.execute("""
 CREATE OR REPLACE TEMP TABLE t_end_f_td_ar AS
 SELECT cusip_id AS cusip, date_end_ref AS date,
@@ -467,24 +468,24 @@ SELECT cusip, date, ret_vw, tret, tret_bns, tret_cls, ret_std, ret_type FROM (
         SELECT cusip, date::TIMESTAMP AS date, ret_vw, tret, tret_bns, tret_cls, ret_std, ret_type
         FROM all_returns ORDER BY cusip, date""")
     # firm_ids: permno/permco/gvkey at one row per bond-month, taken at the month-end t_sig uses.
-    # Stage 7 merges this block; nothing else in stage 2 reads the identifiers.
+    # Stage 7 merges this block. Nothing else in stage 2 reads the identifiers.
     #
-    # ! Joined into its OWN block, never carried through t_src. Adding columns to t_src changes the
-    #   physical row order, and several float32 illiquidity kernels downstream are order-sensitive
-    #   -- doing it that way moved six unrelated columns by ~1e-13 relative. Identifiers must not
-    #   perturb the numeric path.
+    # They are joined into their own block and never passed through t_src. Adding columns to
+    # t_src changes the physical row order, and several float32 illiquidity kernels downstream
+    # are order-sensitive. Doing it that way moved six unrelated columns by ~1e-13 relative.
+    # Identifiers must not perturb the numeric path.
     #
-    # ❗THE IDS COME FROM THE PUBLISHED LINKER, JOINED ON THE DECLARED WINDOW -- not from the pin.
-    #   Stage 1 and stage 2 both join the IDENTITY window (i0/i1, "whose bond is this"), stage 1
-    #   since 2026-09-21. Stage 2 still makes its own join rather than inheriting stage 1's ids, so
-    #   the monthly panel's firm labels never depend on which stage 1 run it was built from: they
-    #   come from the linker, at the month-end date this block keys on. The rule is
-    #   cfg.LINKER_WINDOW; its authority is the linker bundle's own README.md and SCHEMA.md.
-    #   History: until 2026-09-21 stage 1 joined the EVIDENCE window (w0/w1), and inheriting those
-    #   ids made the panels disagree about firm membership on 2.14% of bond-months (lib/linker.py).
+    # The ids come from the published linker, joined on the declared window, and not from the pin.
+    # Stage 1 and stage 2 both join the identity window (i0/i1, "whose bond is this"), stage 1
+    # since 2026-09-21. Stage 2 still makes its own join and does not inherit stage 1's ids, so
+    # the monthly panel's firm labels never depend on which stage 1 run it was built from. They
+    # come from the linker, at the month-end date this block keys on. The rule is
+    # cfg.LINKER_WINDOW, and its authority is the linker bundle's own README.md and SCHEMA.md.
+    # History: until 2026-09-21 stage 1 joined the evidence window (w0/w1), and inheriting those
+    # ids made the panels disagree about firm membership on 2.14% of bond-months (lib/linker.py).
     # [tag:col.permno] the issuer's CRSP PERMNO, from the published bond-firm linker on its identity window
-    # [tag:col.permco] the issuer's CRSP PERMCO, from the published bond-firm linker on its identity window; blank in the public release
-    # [tag:col.gvkey] the issuer's Compustat GVKEY, from the published bond-firm linker on its identity window; blank in the public release
+    # [tag:col.permco] the issuer's CRSP PERMCO, from the published bond-firm linker on its identity window (blank in the public release)
+    # [tag:col.gvkey] the issuer's Compustat GVKEY, from the published bond-firm linker on its identity window (blank in the public release)
     lo, hi = linker.register(con, "_linker")
     _copy("firm_ids", f"""
         SELECT e.cusip_id AS cusip, e.date_end_ref::TIMESTAMP AS date,
@@ -499,7 +500,7 @@ SELECT cusip, date, ret_vw, tret, tret_bns, tret_cls, ret_std, ret_type FROM (
          AND e.date_end_ref >= l.{lo} AND e.date_end_ref <= l.{hi}
         ORDER BY cusip, date""")
     # Step 7 merges this with validate="1:1", so a duplicate here would surface far from its cause.
-    # The linker's own G39c proves identity windows are disjoint per cusip9; assert it landed.
+    # The linker's own G39c proves identity windows are disjoint per cusip9. Assert that it held here.
     _dup = con.execute(
         f"SELECT count(*) FROM (SELECT cusip, date FROM read_parquet("
         f"'{(out_dir / 'firm_ids.parquet').as_posix()}') GROUP BY 1,2 HAVING count(*) > 1)"

@@ -1,12 +1,12 @@
-r"""doctor.py -- is this machine ready to run the pipeline, and what is the next step?
+r"""Is this machine ready to run the pipeline, and what is the next step?
 
     python doctor.py            your own computer: stages 2, 3 and 4
     python doctor.py --wrds     the WRDS login node: stages 0 and 1
 
-It only looks: it downloads nothing, opens no WRDS connection and writes nothing of its own. Each stage
-is asked through its own check -- stage 2's `_run_stage2.py --dry-run`, stage 3's
+It only looks. It downloads nothing, opens no WRDS connection and writes nothing of its own. Each
+stage is asked through its own check (stage 2's `_run_stage2.py --dry-run`, stage 3's
 `tools/check_inputs.py`, stage 4's `build_factors.py --dry-run`, and on WRDS
-`download_inputs.sh --check` and `check_disk_space.sh` -- so this file keeps no second copy
+`download_inputs.sh --check` and `check_disk_space.sh`), so this file keeps no second copy
 of what a stage needs. It exits 1 when the Python environment itself is not ready, else 0.
 """
 # [tag:entry.doctor] python doctor.py: what is ready, what is missing, and the next step
@@ -24,7 +24,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
-# The Python versions stages 2-4 install on; requirements-local.txt says why, and
+# The Python versions stages 2-4 install on. requirements-local.txt says why, and
 # tests/test_doctor.py fails if the two disagree.
 PYTHON_RANGE = ((3, 11), (3, 13))
 PLACEHOLDER_USERNAME = "your_wrds_username"
@@ -53,7 +53,7 @@ def run(cmd: list[str], cwd: Path) -> tuple[int, str]:
 
 def marker_holds(marker: str) -> bool:
     """Does an environment marker (`python_version<"3.14"`) hold for this Python? pip always
-    ships `packaging`; without it, assume it holds."""
+    ships `packaging`. Without it, assume the marker holds."""
     try:
         from packaging.markers import Marker
     except ImportError:
@@ -157,7 +157,7 @@ def check_stage2() -> Check:
 def check_machine() -> Check:
     """Cores, memory and free disk, against what the guides ask for. Never blocks a step.
 
-    Stage 3 recommends 8 cores and 32 GB (stage3/README_stage3.md); stage 2 writes about 10 GB
+    Stage 3 recommends 8 cores and 32 GB (stage3/README_stage3.md). Stage 2 writes about 10 GB
     and stage 3 about 5 (stage2/QUICKSTART_stage2.md, stage3/README_stage3.md).
     """
     import os

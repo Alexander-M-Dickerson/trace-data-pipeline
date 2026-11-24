@@ -1,4 +1,4 @@
-"""numeric_setup.py -- make pandas compute the same way on every machine.
+"""Make pandas compute the same way on every machine.
 
 pandas hands large arithmetic and comparisons (over a million elements) to `numexpr` when it is
 installed, and some sums to `bottleneck`, and neither computes exactly as numpy does. numexpr
@@ -19,7 +19,7 @@ from __future__ import annotations
 
 def apply() -> None:
     import pandas as pd
-    pd.set_option("compute.use_numexpr", True)  # [tag:rule.numexpr] pandas uses numexpr, as the published build did; it changes float32 results
+    pd.set_option("compute.use_numexpr", True)  # [tag:rule.numexpr] pandas uses numexpr, as the published build did, and it changes float32 results
     pd.set_option("compute.use_bottleneck", False)
 
 

@@ -1,9 +1,9 @@
-"""rolling_kernels.py -- VERBATIM numba kernels for rolling betas / momentum / skew, extracted
+"""Verbatim numba kernels for rolling betas / momentum / skew, extracted
 mechanically from the reference implementation (read-only). Do not edit the
-kernel bodies; faithfulness is arbitrated by the beta validator. Orchestrators live in steps/step4.
+kernel bodies. Faithfulness is arbitrated by the beta validator. Orchestrators live in steps/step4.
 
 `nogil=True` is on every decorator so lib/betas can fan the independent
-per-model calls out on a thread pool. nogil changes GIL handling only -- the generated machine code
+per-model calls out on a thread pool. nogil changes GIL handling only. The generated machine code
 and numerics are untouched (validator-arbitrated)."""
 import numpy as np
 from numba import njit
@@ -111,7 +111,7 @@ def _panel_rolling_ols_k1_with_mom(gid, y, x, window, min_obs):
     Rolling OLS for K=1 factor with momentum signals.
 
     At each position where we have valid alpha/beta:
-    - Compute fitted values for ALL positions in the rolling window using CURRENT alpha/beta
+    - Compute fitted values for all positions in the rolling window using the current alpha/beta
     - Sum fitted values for systematic momentum (sysmom)
     - Sum residuals for idiosyncratic momentum (idimom)
 
@@ -249,7 +249,7 @@ def _panel_rolling_ols_k1_with_fitted(gid, y, x, window, min_obs):
     """
     Rolling OLS for K=1 factor, also returning fitted values and residuals.
 
-    Same as _panel_rolling_ols_k1 but additionally computes:
+    Same as _panel_rolling_ols_k1 but also computes:
     - fitted[i] = alpha[i] + beta[i] * x[i]
     - residual[i] = y[i] - fitted[i]
 
@@ -339,7 +339,7 @@ def _panel_rolling_ols_kgt1_with_fitted(gid, y, X, window, min_obs, ridge):
     """
     Rolling OLS for K>=2 factors, also returning fitted values and residuals.
 
-    Same as _panel_rolling_ols_kgt1 but additionally computes:
+    Same as _panel_rolling_ols_kgt1 but also computes:
     - fitted[i] = alpha[i] + sum(beta_k[i] * X[i,k])
     - residual[i] = y[i] - fitted[i]
     """
@@ -434,7 +434,7 @@ def _panel_rolling_ols_kgt1_with_mom(gid, y, X, window, min_obs, ridge):
     Rolling OLS for K>=2 factors with momentum signals.
 
     At each position where we have valid betas:
-    - Compute fitted values for ALL positions in the rolling window using CURRENT betas
+    - Compute fitted values for all positions in the rolling window using the current betas
     - Sum fitted values for systematic momentum (sysmom)
     - Sum residuals for idiosyncratic momentum (idimom)
 
@@ -731,7 +731,7 @@ def _panel_rolling_ols_kgt1(gid, y, X, window, min_obs, ridge):
         for d in range(K1):
             A[d, d] += ridge
 
-        # if singular, solve may fail; ridge usually prevents that
+        # if singular, solve may fail. The ridge usually prevents that
         try:
             b = np.linalg.solve(A, Zy)
         except:

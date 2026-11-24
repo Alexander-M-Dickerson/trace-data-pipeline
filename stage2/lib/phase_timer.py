@@ -1,4 +1,4 @@
-"""phase_timer.py -- lightweight per-phase wall-clock accounting for the step modules.
+"""Lightweight per-phase wall-clock accounting for the step modules.
 
 Usage:
     pt = PhaseTimer()
@@ -16,7 +16,7 @@ from contextlib import contextmanager
 
 
 class PhaseTimer:
-    """Accumulates named wall-clock phases in call order; re-entering a name accumulates."""
+    """Accumulates named wall-clock phases in call order. Re-entering a name accumulates."""
 
     def __init__(self) -> None:
         self.phases: dict[str, float] = {}

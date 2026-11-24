@@ -10,7 +10,7 @@ whether each file EXISTED. Stage 1 then failed hours later on the grid. It now d
 beside the file and moves it into place only when it arrived whole, and the final check
 refuses an empty file.
 
-The tests run the real script, copied into a scratch tree, under bash with a fake `wget`
+The tests run the script itself, copied into a scratch tree, under bash with a fake `wget`
 and a fake `python3` first on PATH.
 
 Author: Open Source Bond Asset Pricing
@@ -40,7 +40,7 @@ FILES = {"liu_wu_yields.xlsx": b"the yields",
          "bond_firm_linker_2026/fl_linker.parquet": b"the linker",
          "Siccodes12.txt": b"ff12", "Siccodes17.txt": b"ff17", "Siccodes30.txt": b"ff30"}
 
-# `wget -O FILE URL` empties FILE, then fails -- what GNU wget does when the network drops.
+# `wget -O FILE URL` empties FILE, then fails, which is what GNU wget does when the network drops.
 WGET_EMPTIES_THEN_FAILS = ('while [ $# -gt 0 ]; do [ "$1" = -O ] && : > "$2"; shift; done; '
                            'exit 4')
 WGET_WRITES_NOTHING = ('while [ $# -gt 0 ]; do [ "$1" = -O ] && : > "$2"; shift; done; exit 0')

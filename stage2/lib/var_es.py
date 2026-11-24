@@ -1,4 +1,4 @@
-"""var_es.py -- rolling historical VaR/ES, verbatim port of upstream
+"""Rolling historical VaR/ES, verbatim port of upstream
 the reference implementation's rolling VaR/ES kernels (loss-side, empirical quantile
 floor(p*(T-1)) over an expanding-then-36m window, min 12 obs). Used by step 3 (var_95/var_95x) and
 step 6 (var_90/es_90/var_95)."""
@@ -81,7 +81,7 @@ def _rolling_var_es_numba(rets, ids_codes, min_obs, window, alphas):
 def compute_rolling_var_es(df: pd.DataFrame, *, id_col: str = "cusip_id", date_col: str = "date",
                            ret_col: str = "ret_vw", min_obs: int = 12, window: int = 36,
                            alphas: Sequence[float] = (0.90, 0.95)) -> pd.DataFrame:
-    """Per-id rolling VaR/ES; returns df_clean keys + var_<a>/es_<a> columns (NaN rets purged)."""
+    """Per-id rolling VaR/ES. Returns df_clean keys + var_<a>/es_<a> columns (NaN rets purged)."""
     alphas = tuple(float(a) for a in alphas)
     df_clean = df.dropna(subset=[ret_col]).loc[:, [id_col, date_col, ret_col]].copy()
     df_clean = df_clean.sort_values([id_col, date_col], kind="mergesort").reset_index(drop=True)

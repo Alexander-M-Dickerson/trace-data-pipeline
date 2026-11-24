@@ -1,4 +1,4 @@
-"""treasury.py -- duration-matched Treasury returns (`tret`), faithful to upstream
+"""Duration-matched Treasury returns (`tret`), faithful to upstream
 the reference implementation's treasury load + interpolation.
 
 Source series (upstream fetches live from WRDS every run):
@@ -7,10 +7,10 @@ Source series (upstream fetches live from WRDS every run):
   - Fama-French monthly rf (ff.factors_monthly) as the 1/12-year tenor
 Wide frame: index=month-end date, columns=[1/12, 1, 2, 5, 7, 10, 20, 30].
 
-We fetch ONCE and cache to data/crsp_treasury_returns.parquet (fingerprinted in the run manifest);
-the series is historical and stable. `interpolate_tret` is a verbatim numpy port: flat below the
+We fetch once and cache to data/crsp_treasury_returns.parquet (fingerprinted in the run manifest).
+The series is historical and stable. `interpolate_tret` is a verbatim numpy port: flat below the
 shortest / above the longest tenor, linear in between, one-sided fallback when a bracket is NaN.
-mod_dur is rounded to 2dp by the CALLER with numpy (pandas .round semantics), never in SQL.
+mod_dur is rounded to 2dp by the caller with numpy (pandas .round semantics), never in SQL.
 """
 from __future__ import annotations
 

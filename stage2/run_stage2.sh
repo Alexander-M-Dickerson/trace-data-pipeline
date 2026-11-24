@@ -1,10 +1,10 @@
 #!/bin/bash
 # =============================================================================
-# run_stage2.sh -- build the monthly asset-pricing panel
+# Build the monthly asset-pricing panel
 # =============================================================================
 #
-# Stage 2 runs on YOUR OWN MACHINE, not on the WRDS cluster. It is NOT an SGE job
-# and must NOT be submitted with qsub: it needs more memory than a grid slot
+# Stage 2 runs on your own machine, not on the WRDS cluster. It is not an SGE job
+# and must not be submitted with qsub: it needs more memory than a grid slot
 # allows and no TRACE database access at all.
 #
 # Before running, download the stage0/ and stage1/ folders from WRDS so the tree
@@ -24,7 +24,7 @@
 # Any arguments are passed straight through to _run_stage2.py.
 #
 # PY overrides the interpreter (default `python`, the one an activated environment puts
-# first -- a Windows venv has no `python3`). PYTHON is read too, for older instructions.
+# first, since a Windows venv has no `python3`). PYTHON is read too, for older instructions.
 # =============================================================================
 
 set -euo pipefail

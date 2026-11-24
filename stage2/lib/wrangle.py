@@ -1,8 +1,8 @@
-"""wrangle.py -- VERBATIM final-wrangle machinery from the reference implementation:
+"""Verbatim final-wrangle machinery from the reference implementation:
 extend_and_ffill_linker, load_linker, wrangle_returns, wrangle_signals,
 build_main_panel, swap_adj_signals, reorder_panel_cols. Arbitrated by the final-wrangle validator
-(main_panel 1,859,546 x 140). load_bond_data_from_url is shimmed to the LOCAL fingerprinted
-OSBAP linker (cfg.AUX[linker]) -- same published artifact upstream downloads."""
+(main_panel 1,859,546 x 140). load_bond_data_from_url is shimmed to the local fingerprinted
+OSBAP linker (cfg.AUX[linker]), the same published artifact upstream downloads."""
 import gc
 import logging
 from typing import Iterable, List, Optional, Sequence, Tuple, Union
@@ -17,8 +17,8 @@ import _stage2_settings as cfg
 
 def save_parquet(df, path, cusip_col='cusip', compress=True):
     """Upstream pbd.save_parquet: cusip -> category, zstd parquet. The compression
-    LEVEL is ours (cfg.PANEL_ZSTD_LEVEL; upstream hardcoded 9) -- an encoding knob, values identical
-   ."""
+    level is ours (cfg.PANEL_ZSTD_LEVEL, upstream hardcoded 9). It is an encoding setting and
+    the values are identical."""
     if cusip_col in df.columns and df[cusip_col].dtype != 'category':
         df = df.copy()
         df[cusip_col] = df[cusip_col].astype('category')
@@ -140,7 +140,7 @@ def extend_and_ffill_linker(
     if "yyyymm" in out.columns:
         ext["yyyymm"] = (ext[date_col].dt.year * 100 + ext[date_col].dt.month).astype("Int64")
 
-    # Ensure all original columns exist in ext (fill with NA if not derivable)
+    # Make sure all original columns exist in ext (fill with NA if not derivable)
     for c in out.columns:
         if c not in ext.columns:
             ext[c] = pd.NA
@@ -984,7 +984,7 @@ def build_main_panel(
                     f"{n_before:,}", f"{n_after:,}", n_after - n_before, dup_after)
 
     # =========================================================================
-    # 5. Ensure identifier columns remain category dtype
+    # 5. Keep identifier columns as category dtype
     # =========================================================================
     if verbose:
         logger.info("[Step 5] Re-converting identifier columns to category...")
@@ -1157,7 +1157,7 @@ def reorder_panel_cols(
     """
     Reorder DataFrame columns with consistent ID/metadata prefix and signal order.
 
-    Ensures both main_panel and main_panel_adj have consistent column ordering
+    Gives both main_panel and main_panel_adj the same column ordering
     for the first ~31 columns (identifiers, returns, metadata up to sig_gap),
     with signal columns following in the specified order.
 

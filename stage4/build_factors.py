@@ -1,4 +1,4 @@
-r"""build_factors.py -- Stage 4: the TRACE-only bond factors, from Stage 2's panel.
+r"""Stage 4 builds the TRACE-only bond factors from Stage 2's panel.
 
     python build_factors.py                     # both sorts, all four return types
     python build_factors.py --sort single       # one sort
@@ -6,9 +6,9 @@ r"""build_factors.py -- Stage 4: the TRACE-only bond factors, from Stage 2's pan
     python build_factors.py --signals cs mom6_1 # a quick run on two signals (-> output/_subset)
 
 108 signals x 4 return types (exc, dur, dbns, dcls) x 3 rating bands (all, ig, nig), as
-single sorts and within-firm sorts, through PyBondLab. The series are published unflipped;
-flip_set.json records the flips the full-sample sign rule would make. Everything is
-declared in spec/factors.json.
+single sorts and within-firm sorts, through PyBondLab. The series are published without
+sign correction, and flip_set.json records the flips the full-sample sign rule would make.
+Everything is declared in spec/factors.json.
 
 Each return type's panel is loaded once and sorted both ways. Writes, per sort, the folders
 described in factorlib/release.py under stage4/output/, each with a MANIFEST.json naming its

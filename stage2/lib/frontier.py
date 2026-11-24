@@ -1,8 +1,8 @@
-"""frontier.py -- refuse to publish a final month that is not a real cross-section.
+"""Refuse to publish a final month that is not a cross-section.
 
 Stage 1 pools two sources with different reporting lags: TRACE Enhanced (db_type 1) and
 144A/BTDS (db_type 3). 144A reaches closer to today. Stage 1's `DATE_CUT_OFF = "auto:-Nmo"`
-is resolved against the LAST trade date in the pooled data, which is 144A's -- so the cut
+is resolved against the last trade date in the pooled data, which is 144A's, so the cut
 can land in a month where Enhanced has only a handful of days.
 
 The monthly panel then still produces that month. It just is not a cross-section any more:
@@ -15,13 +15,13 @@ Measured on the 2026-09-09 production run, which is exactly this case:
     2025-12-31     1,914 bonds   100.0% 144A     <- Enhanced ends 2025-12-04
 
 Sorting on that month gives a portfolio of Rule 144A issues and nothing else. The
-published 2025 vintage does not have this -- it ends at 2025-03-31 with 11,248 bonds and
-22.8% 144A -- so it is a defect of a particular run, not a standing property, which is why
-it needs a check rather than a fixed cut-off.
+published 2025 vintage does not have this (it ends at 2025-03-31 with 11,248 bonds and
+22.8% 144A), so it is a defect of a particular run, not a standing property. That is why
+it needs a check and not a fixed cut-off.
 
-What this does NOT do: judge whether a month is economically unusual. A genuine market
+What this does not do: judge whether a month is economically unusual. A market
 event that halves trading would look similar. It compares a month against its own recent
-history and says the coverage collapsed; a human decides what to do about it.
+history and says the coverage collapsed. A human decides what to do about it.
 
 Author: Open Source Bond Asset Pricing
 """
@@ -31,7 +31,7 @@ from __future__ import annotations
 import pandas as pd
 
 # A month whose bond count falls below this share of the trailing median is not a
-# cross-section. Real months sit within a few percent of each other; the failure mode
+# cross-section. Normal months sit within a few percent of each other. The failure
 # this catches is an order-of-magnitude collapse, so the threshold is not delicate.
 MIN_COVERAGE_SHARE = 0.75
 TRAILING_MONTHS = 12          # history each candidate month is judged against

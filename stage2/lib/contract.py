@@ -1,25 +1,25 @@
-"""contract.py -- the panel's published column list, frozen.
+"""The panel's published column list, frozen.
 
-`main_panel_<mode>.parquet` is a public artifact. Its column NAMES and their ORDER are part
+`main_panel_<mode>.parquet` is a public artifact. Its column names and their order are part
 of what is published: people index into it positionally, diff it against last year's vintage,
-and write code against the names. Nothing in this repository pinned either of those --
+and write code against the names. Nothing in this repository pinned either of those.
 `wrangle.reorder_panel_cols` fixes a ~31-name prefix and everything after it fell out of
-merge order, so a change to the beta model list could silently permute the panel.
+merge order, so a change to the beta model list could permute the panel without an error.
 
-That is not hypothetical. Collapsing the two degenerate DEF and TERM regressions into the
+That has happened. Collapsing the two degenerate DEF and TERM regressions into the
 single two-factor model that produces a real default beta also swapped `b_defb` and `b_termb`
-in the output -- emission follows the model's `keep` order. Same 145 columns, different file.
-Nobody would have noticed until a downstream positional read broke.
+in the output, because emission follows the model's `keep` order. Same 145 columns, different
+file. Nobody would have noticed until a downstream positional read broke.
 
 So the list below is the contract, and `assert_panel_contract` enforces it at the end of the
 build. It is deliberately a literal: a list generated from the panel could not catch the case
 it exists for.
 
-CHANGING THIS LIST IS A PUBLIC API CHANGE. Adding a column, removing one, or moving one is a
-CHANGELOG entry and a new vintage -- not a silent edit. Update it in the same commit as the
-code that changes the panel, and say why in the commit message.
+Changing this list is a public API change. Adding a column, removing one, or moving one is a
+CHANGELOG entry and a new vintage, never an unannounced edit. Update it in the same commit as
+the code that changes the panel, and say why in the commit message.
 
-What this does NOT check: dtypes, row counts, the index, or whether any column is populated.
+What this does not check: dtypes, row counts, the index, or whether any column is populated.
 `validate_coverage.py` covers the last of those.
 
 Author: Open Source Bond Asset Pricing
@@ -51,11 +51,11 @@ PANEL_COLUMNS: tuple[str, ...] = (
 
 
 # ---------------------------------------------------------------------------
-# What each column is COMPUTED FROM
+# What each column is computed from
 # ---------------------------------------------------------------------------
 # Not every column can be built from every kind of bond data. These four groups say what a
 # column needs, which tells you at a glance whether a panel built from a different source could
-# carry it -- and, when one is unexpectedly empty, which input to go and look at.
+# have it and, when one is unexpectedly empty, which input to go and look at.
 #
 # Measured on the 2026 vintage: 51 of the 145 need something beyond a month-end price.
 
@@ -75,7 +75,7 @@ REQUIRES_TRADE_DATES: tuple[str, ...] = (
     "ret_vw_bgn", "sig_dt", "sig_gap")
 
 REQUIRES_TRACE_FACTORS: tuple[str, ...] = (
-    # betas and idiosyncratic vols on factors that are themselves built from the trade tape
+    # betas and idiosyncratic vols on factors that are themselves built from the TRACE trades
     "b_amd", "b_amd_m", "b_dvix_va", "b_dvix_vp", "b_dvixd", "b_illiq", "b_lrf", "b_psb",
     "b_psb_m", "b_rsj", "b_rvol", "b_vix", "ivol_bbw", "ivol_vp")
 
@@ -102,26 +102,26 @@ def column_input(col: str) -> str | None:
 
 
 # ---------------------------------------------------------------------------
-# ❗Every price-based signal ships TWICE
+# Every price-based signal ships twice
 # ---------------------------------------------------------------------------
 # A signal computed from a month-end price inherits that price's microstructure noise, and the
 # noise is correlated with the return you go on to use it against. So each one is built in two
 # forms:
 #
-#   main panel        MMN-adjusted -- the signal is read from a price at least one business day
+#   main panel        MMN-adjusted: the signal is read from a price at least one business day
 #                     before the return window opens. Use it with `ret_vw`.
-#   `_mmn` sidecar    unadjusted -- signal and return share the same month-end price. Use it
+#   `_mmn` sidecar    unadjusted: signal and return share the same month-end price. Use it
 #                     with `ret_vw_bgn`, the month-begin-timed return.
 #
-# Both are published, and pairing them the other way around is the mistake this exists to stop:
-# on short-term reversal the unadjusted form has AR(1) -0.22 against the adjusted form's -0.05,
-# so roughly four fifths of the raw reversal is bid-ask bounce rather than a return pattern.
+# Both are published, and pairing them the other way around is the mistake this exists to stop.
+# On short-term reversal the unadjusted form has AR(1) -0.22 against the adjusted form's -0.05,
+# so roughly four fifths of the raw reversal is bid-ask bounce and not a return pattern.
 # DATA_DICTIONARY.md has the full treatment under "The Three Approaches".
 #
 # This split needs month-begin-timed returns (`ret_vw_bgn`, `hprd_bgn`, `igap_bgn`), which in
-# turn need trade dates -- see REQUIRES_TRADE_DATES above.
+# turn need trade dates (see REQUIRES_TRADE_DATES above).
 
-# The signals that MUST have an unadjusted `_mmn` twin. Measured off the shipped sidecar: 38
+# The signals that must have an unadjusted `_mmn` twin. Measured off the shipped sidecar: 38
 # twins, every one named `<col>_mmn`. Ship a signal without its twin and a user has only the
 # adjusted form, so they pair it with the wrong return and import the bounce described above.
 MMN_TWINNED: frozenset[str] = frozenset((
@@ -148,10 +148,10 @@ def assert_mmn_twins(sidecar_columns, *, what: str = "mmn sidecar") -> None:
     )
 
 
-# ❗A twinned signal's two forms COINCIDE on some rows and that is not a defect: a bond whose
+# A twinned signal's two forms coincide on some rows and that is not a defect: a bond whose
 # price did not move between the two windows gives the same value either way. Measured on the
-# golden panel -- cs 0.000%, ytm 0.020%, str 0.021%, ami 2.020%, dvol 2.020%, and `lix` on
-# 23.819% of rows. A WHOLE COLUMN matching is the failure, so the bar sits four times above the
+# golden panel: cs 0.000%, ytm 0.020%, str 0.021%, ami 2.020%, dvol 2.020%, and `lix` on
+# 23.819% of rows. A whole column matching is the failure, so the bar sits four times above the
 # worst honest column.
 MMN_IDENTICAL_MAX = 0.99
 
@@ -159,10 +159,10 @@ MMN_IDENTICAL_MAX = 0.99
 def assert_mmn_twins_are_declared(sidecar_columns, *, what: str = "mmn sidecar") -> None:
     """Every `<col>_mmn` shipped must have its base declared in MMN_TWINNED.
 
-    ❗The other direction of `assert_mmn_twins`, and the one that catches a NEW signal.
+    The other direction of `assert_mmn_twins`, and the one that catches a new signal.
     MMN_TWINNED is hand-written, so a price-based signal nobody adds to it is examined by
     nothing: the twin gate iterates the set and a name outside it is invisible. This makes the
-    set self-auditing against the file that was actually written.
+    set self-auditing against the file that was written.
     """
     twins = {c[:-4] for c in sidecar_columns if c.endswith("_mmn")}
     undeclared = sorted(twins - MMN_TWINNED)
@@ -176,14 +176,14 @@ def assert_mmn_twins_are_declared(sidecar_columns, *, what: str = "mmn sidecar")
     )
 
 
-# [tag:rule.adjusted_in_panel] the main panel carries the gap-adjusted form of each signal, never the unadjusted twin
+# [tag:rule.adjusted_in_panel] the main panel has the gap-adjusted form of each signal, never the unadjusted twin
 def assert_main_panel_is_adjusted(panel, sidecar, *, what: str = "main panel") -> None:
-    """The main panel must carry the MMN-ADJUSTED form, not the unadjusted twin.
+    """The main panel must hold the MMN-adjusted form, not the unadjusted twin.
 
-    ❗`assert_mmn_twins` proves a twin EXISTS. It cannot tell the two forms apart, so the
+    `assert_mmn_twins` proves a twin exists. It cannot tell the two forms apart, so the
     unadjusted form sitting in the main panel passes it. That pairing is the basrev v1 failure
-    -- AR(1) -0.05 adjusted against -0.22 unadjusted, four fifths of the raw reversal being
-    bid-ask bounce -- and it produces a complete, normal-looking panel.
+    (AR(1) -0.05 adjusted against -0.22 unadjusted, four fifths of the raw reversal being
+    bid-ask bounce), and it produces a complete, normal-looking panel.
 
     Compared on a (cusip, date) JOIN, never positionally: the panel and the sidecar are written
     by different steps and nothing guarantees a shared row order.
@@ -259,9 +259,9 @@ def assert_holding_period_is_the_window(panel, cal_lut, *, what: str = "main pan
             "  longer describes the return printed beside it.")
 
 
-# [tag:rule.column_contract] the panel's 145 column names and their order are fixed; a build that changes them fails
+# [tag:rule.column_contract] the panel's 145 column names and their order are fixed, and a build that changes them fails
 def assert_panel_contract(df, *, what: str = "main panel") -> None:
-    """Raise unless `df` carries exactly PANEL_COLUMNS, in exactly that order."""
+    """Raise unless `df` has exactly PANEL_COLUMNS, in exactly that order."""
     actual = list(df.columns)
     expected = list(PANEL_COLUMNS)
     if actual == expected:

@@ -1,21 +1,21 @@
-"""pin.py -- the Phase-0 daily projection: the streamlined daily panel, built ONCE, reused by every step.
+"""The Phase-0 daily projection: the streamlined daily panel, built once, reused by every step.
 
 Faithful DuckDB port of the reference implementation's `streamline_data()` (the step-2 prep), widened
 into the shared base every step reads (the step-1 signal columns ride along so no step re-reads the
 multi-GB daily input). Grain: one row per input row (the 210 duplicate (cusip, date) twins in the
-golden input are KEPT, as upstream does; they are exact-price duplicates).
+golden input are kept, as upstream does, and they are exact-price duplicates).
 
 Upstream semantics reproduced exactly:
-  - drop rows where BOTH sp_rating and mdy_rating are NULL (step 1.2b / streamline step 1)
-  - fp = pr + accall;  ret_d = (fp - fp_lag) / prfull_lag;  ret_c = (pr - pr_lag) / pr_lag
+  - drop rows where both sp_rating and mdy_rating are NULL (step 1.2b / streamline step 1)
+  - fp = pr + accall,  ret_d = (fp - fp_lag) / prfull_lag,  ret_c = (pr - pr_lag) / pr_lag
   - day_gap = NYSE sessions in [prev_trd_dt, trd_exctn_dt)  (np.busday_count == cum_before diff)
-  - returns AND dvol_lag are NULLed where day_gap > max_day_gap; the LAGGED returns are shifts of the
-    ALREADY-gated series (no second gate)
-  - Nret / Npair per (cusip, month) on ret_c; lst_txn = 1 unless last row of the (cusip, month) group
+  - returns and dvol_lag are NULLed where day_gap > max_day_gap. The lagged returns are shifts of the
+    already-gated series (no second gate)
+  - Nret / Npair per (cusip, month) on ret_c, and lst_txn = 1 unless last row of the (cusip, month) group
   - renames: prc_first->prc_1st, prc_last->prc_lst, dvolume->dvol, bond_amt_outstanding->ao
 
 The pin is cached to output/_cache/pin_<mode>[_limitN]_<fp8>.parquet keyed by a content fingerprint
-(input identity + the knobs that affect it + PIN_VERSION); a knob change rebuilds only this layer.
+(input identity + the knobs that affect it + PIN_VERSION), so a knob change rebuilds only this layer.
 """
 from __future__ import annotations
 
@@ -27,10 +27,10 @@ from pathlib import Path
 import _stage2_settings as cfg
 from lib import nyse_calendar
 
-# Bump when the pin SQL changes shape/semantics -- invalidates every cached pin.
+# Bump when the pin SQL changes shape/semantics. That invalidates every cached pin.
 # v2: + prc_vw_par, prc_ew (step-1 return types ret_vwp / ret_ew)
-# v3: + frn (input file_row_number) carried through, and ALL per-cusip windows tie-break on it --
-#     needed for the one bond whose whole tape is duplicated (dup (cusip,date) twins): pandas'
+# v3: + frn (input file_row_number) passed through, and all per-cusip windows tie-break on it.
+#     Needed for the one bond whose whole history is duplicated (dup (cusip,date) twins): pandas'
 #     near-sorted sorts preserve raw file order on ties, so window lags/lst_txn must too
 PIN_VERSION = 3
 
@@ -135,7 +135,7 @@ WINDOW mwin AS (PARTITION BY cusip_id, month_start)
 
 def build_pin(con, mode: str | None = None, limit_cusips: int | None = None,
               force: bool = False) -> Path:
-    """Build (or reuse) the cached pin parquet; return its path. Logs wall time + rows."""
+    """Build (or reuse) the cached pin parquet and return its path. Logs wall time + rows."""
     mode = mode or cfg.INPUT_MODE
     out = pin_path(mode, limit_cusips)
     if out.exists() and not force:

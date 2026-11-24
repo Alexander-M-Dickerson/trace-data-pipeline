@@ -1,13 +1,13 @@
-"""return_types.py -- what a return type is, and the swap that builds its panel, defined once.
+"""What a return type is, and the swap that builds its panel, defined once.
 
 Stage 3 (the exhibits) and stage 4 (the factors) both sort a return, and both can sort it in
 four forms. The forms are declared in `stage4/spec/factors.json` (`return_types`), read here:
 
-  exc    the return as built, in excess of the one-month T-bill;
-  dur    duration-adjusted: the return minus `tret`, the duration-matched Treasury return;
+  exc    the return as built, in excess of the one-month T-bill
+  dur    duration-adjusted: the return minus `tret`, the duration-matched Treasury return
   dbns   the same, against `tret_bns` (the Treasury return of the bond's own cash flows,
-         van Binsbergen, Nozawa and Schwert);
-  dcls   the same, against `tret_cls` (Cui, Lu and Song).
+         van Binsbergen, Nozawa and Schwert)
+  dcls   the same, against `tret_cls` (Cui, Lu and Song)
 
 A duration-adjusted return type is a different PANEL, not the same panel with another
 return column: the 68 beta and momentum signals (`swap_columns`) are
@@ -16,7 +16,7 @@ return, and any signal that is itself a return (short-term reversal) is adjusted
 an adjusted return on signals estimated on the unadjusted one gives plausible numbers for the
 wrong question.
 
-Each stage decides which of its columns are returns; this module gives the swap and the
+Each stage decides which of its columns are returns. This module gives the swap and the
 Treasury series, so the two stages cannot disagree about either.
 """
 from __future__ import annotations
@@ -36,7 +36,7 @@ DEFAULT = "exc"
 
 
 def check(rt: str) -> str:
-    """`rt` if it is a declared return type; otherwise stop, naming the ones there are."""
+    """`rt` if it is a declared return type. Otherwise stop, naming the ones there are."""
     if rt not in RETURN_TYPES:
         raise SystemExit(f"unknown return type {rt!r}: the declared ones are "
                          f"{', '.join(RETURN_TYPES)} (stage4/spec/factors.json)")
@@ -74,12 +74,12 @@ def treasury(df: pd.DataFrame, col: str) -> pd.Series:
     return df[col].astype(df["ret_vw"].dtype)
 
 
-# [tag:rule.return_types] a duration-adjusted return type swaps the return-based signals for ones estimated on that return; one definition, stages 3 and 4
+# [tag:rule.return_types] a duration-adjusted return type swaps the return-based signals for ones estimated on that return, defined once for stages 3 and 4
 def swap(df: pd.DataFrame, block_names: list[str], block_path: Callable[[str], Path],
          names: list[str] | None = None) -> pd.DataFrame:
     """Replace the beta and momentum signals with the blocks' versions.
 
-    The blocks carry the same names as the panel (`b_amd`, not `b_amd_bns`), so the swap is by
+    The blocks use the same names as the panel (`b_amd`, not `b_amd_bns`), so the swap is by
     name.
 
     names=None  all 68: the frame must hold every one, they are dropped, and each block's

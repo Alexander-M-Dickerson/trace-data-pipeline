@@ -6,9 +6,9 @@ Attach permno / permco / gvkey to the daily panel from the published bond-firm l
 
 The linker ships TWO dated windows and they answer different questions:
 
-    w0 / w1   EVIDENCE -- when is the mapping provable. The bond's life intersected with
+    w0 / w1   evidence: when the mapping is provable. The bond's life intersected with
               the firm's CRSP listing.
-    i0 / i1   IDENTITY -- whose bond is this. Contains the evidence window and stays open
+    i0 / i1   identity: whose bond this is. Contains the evidence window and stays open
               where no dated successor or acquisition contradicts it.
 
 A bond panel LABELS the issuer, so both the daily panel (here) and the monthly panel
@@ -38,8 +38,8 @@ def prepare_linker(dfl: pd.DataFrame, window: tuple[str, str]) -> pd.DataFrame:
     """Validate and type the linker. Refuses a file that lacks the declared window.
 
     A linker without `i0`/`i1` predates the identity window. Falling back to `w0`/`w1`
-    would silently bring back the daily/monthly disagreement this module exists to end, so
-    it is an error, not a warning.
+    would bring back the daily/monthly disagreement this module exists to end, with nothing
+    to report it, so it is an error, not a warning.
     """
     lo, hi = window
     dfl = dfl.copy()
@@ -53,8 +53,8 @@ def prepare_linker(dfl: pd.DataFrame, window: tuple[str, str]) -> pd.DataFrame:
             f"window shipped (2026-09) -- download the current bundle with "
             f"`bash download_inputs.sh`. Columns found: {sorted(dfl.columns)}")
 
-    # confidence / window_src / rung describe HOW each link was earned. They stay in the
-    # published file for anyone auditing a link and are not carried into the daily panel.
+    # confidence / window_src / rung describe how each link was earned. They stay in the
+    # published file for anyone auditing a link and are not passed into the daily panel.
     keep = ["cusip_id", lo, hi] + [c for c in ID_COLS if c in dfl.columns]
     dfl = dfl[keep].copy()
     for c in (lo, hi):
@@ -64,7 +64,7 @@ def prepare_linker(dfl: pd.DataFrame, window: tuple[str, str]) -> pd.DataFrame:
         dfl["permco"] = pd.to_numeric(dfl["permco"], errors="coerce").astype("Int64")
     if "gvkey" in dfl.columns:
         # GVKEY ships as a zero-padded string ('013557'). Kept numeric for schema continuity
-        # with previous releases -- re-pad to 6 characters before joining to Compustat.
+        # with previous releases. Re-pad to 6 characters before joining to Compustat.
         dfl["gvkey"] = pd.to_numeric(dfl["gvkey"], errors="coerce").astype("Int32")
     dfl["cusip_id"] = dfl["cusip_id"].astype(str)
     dfl = dfl.dropna(subset=["cusip_id", lo, hi])
@@ -87,21 +87,21 @@ def attach_firm_ids(panel: pd.DataFrame, dfl: pd.DataFrame,
 
     A bond with two owners over its life has two rows in the linker. A plain merge on
     cusip_id would fan every trade day of such a bond out to two rows before the window
-    could be applied -- millions of transient rows on a small node. merge_asof takes the
-    latest window that OPENED at or before the trade date and cannot fan out; rows dated
-    after that window CLOSED are then cleared. The windows of one bond do not overlap, so
+    could be applied (millions of transient rows on a small node). merge_asof takes the
+    latest window that opened at or before the trade date and cannot fan out. Rows dated
+    after that window closed are then cleared. The windows of one bond do not overlap, so
     this is the same answer as `date BETWEEN lo AND hi`.
     """
     lo, hi = window
     out = panel.copy()
-    # cusip_id is a category upstream; merge_asof matches `by` keys by value, and a
-    # category against a str silently matches NOTHING -- cast first.
+    # cusip_id is a category upstream. merge_asof matches `by` keys by value, and a
+    # category against a str matches nothing and raises no error, so cast first.
     out["cusip_id"] = out["cusip_id"].astype(str)
     out[date_col] = pd.to_datetime(out[date_col], errors="coerce")
 
-    # merge_asof requires both `on` keys at the SAME datetime resolution and raises
+    # merge_asof requires both `on` keys at the same datetime resolution and raises
     # MergeError otherwise. The panel comes back from parquet as datetime64[us] and the
-    # linker as [ns], so align the linker to the panel rather than assuming either.
+    # linker as [ns], so the linker is aligned to the panel, whatever either arrives in.
     ts_dtype = out[date_col].dtype
     dfl = dfl.copy()
     for c in (lo, hi):

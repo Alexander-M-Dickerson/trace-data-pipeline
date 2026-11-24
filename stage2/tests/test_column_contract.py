@@ -4,19 +4,18 @@ test_column_contract.py
 =======================
 The panel's column list is documented in two other places, and all three must agree.
 
-    the panel          main_panel_<mode>.parquet -- what a user actually downloads
-    the report         _report_helpers.get_signal_definitions() -- the appendix table
-    the dictionary     DATA_DICTIONARY.md -- the reference document
+    the panel          main_panel_<mode>.parquet, what a user downloads
+    the report         _report_helpers.get_signal_definitions(), the appendix table
+    the dictionary     DATA_DICTIONARY.md, the reference document
 
-Two sources of truth in agreement is a drift waiting to happen: nothing makes them
-move together, so the first time a column is added, renamed or dropped, two of the
-three silently disagree and the published documentation starts lying. This test is
-what makes them move together.
+Nothing makes these sources move together, so the first time a column is added, renamed or
+dropped, two of the three disagree without an error and the published documentation is
+wrong. This test makes them move together.
 
-It is not hypothetical. The report requested `mod_dur`, `conv` and `pr` while the
-panel carried `md_dur`, `convx` and no price at all; the statistics helper skipped a
-name it could not find, so thirty rows vanished from the shipped report with no error
-anywhere. That class of defect is what this file exists to catch.
+It has happened. The report requested `mod_dur`, `conv` and `pr` while the panel had
+`md_dur`, `convx` and no price at all. The statistics helper skipped a name it could not
+find, so thirty rows vanished from the shipped report with no error anywhere. This file
+exists to catch that class of defect.
 
 The dictionary is deliberately BROADER than the panel: it also documents the exogenous
 factor series (`mktb`, `defb`, `epu`, ...), which live in factors_merged.parquet rather
@@ -44,9 +43,9 @@ sys.path.insert(0, str(STAGE2))
 
 import _stage2_settings as cfg  # noqa: E402
 
-# Factor series carried by factors_merged that DATA_DICTIONARY.md does not define.
+# Factor series in factors_merged that DATA_DICTIONARY.md does not define.
 # Empty, and meant to stay that way: a new factor series added without a dictionary entry
-# fails the test below. If one genuinely cannot be documented, name it here with a reason.
+# fails the test below. If one cannot be documented, name it here with a reason.
 UNDOCUMENTED_FACTORS: set[str] = set()
 
 
@@ -85,7 +84,7 @@ def test_report_definitions_have_no_duplicates():
 
 
 def test_report_definitions_match_the_panel_exactly():
-    """The appendix table must describe the shipped panel -- every column, only columns."""
+    """The appendix table must describe every column of the shipped panel and nothing else."""
     panel = _panel_path()
     if panel is None:
         pytest.skip("no built panel under output/panel/; run a build first")
@@ -116,7 +115,7 @@ def test_every_panel_column_is_in_the_data_dictionary():
 def test_the_dictionary_documents_nothing_that_does_not_exist():
     """Every dictionary entry must be a real column of a real published artifact.
 
-    Four artifacts carry documented names: the panel, the factor series it was estimated
+    Four artifacts have documented names: the panel, the factor series it was estimated
     on, the `_mmn` sidecar of unadjusted twins, and returns_alt. Anything else is an
     invention or a leftover from a column that has since been renamed or dropped.
     """
@@ -154,7 +153,7 @@ def test_the_dictionary_documents_nothing_that_does_not_exist():
 
 
 def test_the_undocumented_factor_backlog_has_not_grown():
-    """A NEW undocumented factor series fails here; the known backlog stays visible."""
+    """A new undocumented factor series fails here, and the known backlog stays visible."""
     panel = _panel_path()
     if panel is None:
         pytest.skip("no built panel under output/panel/; run a build first")
@@ -175,9 +174,9 @@ def test_the_undocumented_factor_backlog_has_not_grown():
 def test_no_two_panel_columns_are_bit_identical():
     """Two columns with identical bytes are one column shipped twice under two names.
 
-    That is not hypothetical either: before the DEF/TERM model was fixed, `b_defb` was
-    bit-identical to `b_mktb` in the duration-adjusted panel over 1.8 M rows -- a "default
-    beta" that was a market beta, and nothing caught it.
+    That has happened too. Before the DEF/TERM model was fixed, `b_defb` was bit-identical
+    to `b_mktb` in the duration-adjusted panel over 1.8 M rows. It was a "default beta"
+    that was a market beta, and nothing caught it.
 
     Hashing each column is O(columns), not O(pairs), so this stays fast on the full panel.
     Near-duplicates are a separate question: DATA_DICTIONARY.md lists the pairs above 0.97

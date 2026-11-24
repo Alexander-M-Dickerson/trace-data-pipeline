@@ -10,7 +10,7 @@ This module contains all the core processing logic for Stage 1:
 - Computing bond analytics (duration, convexity, spreads)
 - Merging credit ratings and external identifiers
 - Applying ultra-distressed filters
-- Generating comprehensive data quality reports
+- Generating data quality reports
 
 IMPORTANT: This module is designed to be configured dynamically.
 All configuration variables (WRDS_USERNAME, ROOT_PATH, etc.) are set
@@ -63,7 +63,7 @@ timestamp_log = datetime.now().strftime("%Y%m%d_%H%M%S")
 # One stamp for every artifact this run produces. Previously variable_drop() named
 # the ratings/call-dummy exports with STAGE0_DATE_STAMP while save_outputs() called
 # datetime.now() separately, so a single run could emit stage1_20251206.parquet
-# beside sp_ratings_20251118.parquet -- and a run crossing midnight could stamp its
+# beside sp_ratings_20251118.parquet, and a run crossing midnight could stamp its
 # own outputs with two different dates. Fixed once, here.
 RUN_STAMP = timestamp_log[:8]
 log_path = LOG_DIR / f"stage1_{timestamp_log}.log"
@@ -153,11 +153,11 @@ FF30_MAPPING   = None
 # ============================================================================
 
 def _merge_1to1(left, right, *, on, how="left", label=""):
-    """Left-join a lookup that MUST have one row per key, and say so if it does not.
+    """Left-join a lookup that must have one row per key, and say so if it does not.
 
     Every merge in this pipeline that joins a per-bond or per-issue lookup onto the
-    bond-day panel is many-to-ONE by intent. If the right frame has a duplicate key the
-    join silently multiplies panel rows instead of failing -- and the panel is not
+    bond-day panel is many-to-one by intent. If the right frame has a duplicate key the
+    join multiplies panel rows and does not fail, and the panel is not
     re-checked for uniqueness until step 7, several steps and (on a full run) more than
     an hour later. The 2026-09-09 run lost ~1.5 hours of stage-1 work to exactly that:
     a single CUSIP with two FISD issue records duplicated 268 bond-days in step 6, and
@@ -180,9 +180,9 @@ def _merge_1to1(left, right, *, on, how="left", label=""):
 def _offering_amt_by_cusip(issues_for_amt):
     """Collapse fisd_mergedissue to ONE row per CUSIP, keeping the largest offering.
 
-    fisd_mergedissue is keyed by issue_id. A bond can hold more than one issue record --
-    29357JAC0 has an ABS row and a CDEB row with the same issuer, maturity and coupon --
-    so this frame is NOT safe to join on cusip_id as it stands.
+    fisd_mergedissue is keyed by issue_id. A bond can hold more than one issue record
+    (29357JAC0 has an ABS row and a CDEB row with the same issuer, maturity and coupon),
+    so this frame is not safe to join on cusip_id as it stands.
 
     Largest offering_amt is the tie-break, matching the mergent_amounts dedup in step 6
     and, on the known case, selecting the same issue record stage 0's FISD screen keeps.
@@ -243,10 +243,10 @@ def step2_load_trace_data():
     logger.info("STEP 2: Loading TRACE Data from Stage0")
     logger.info("=" * 80)
 
-    # db_type is a PUBLISHED code, documented in stage1/DATA_DICTIONARY.md as
+    # db_type is a published code, documented in stage1/DATA_DICTIONARY.md as
     # "1=Enhanced, 2=Standard, 3=144A", and downstream research keys on 3 meaning 144A.
-    # It used to be the member's POSITION in TRACE_MEMBERS, which meant dropping a
-    # member silently renumbered the rest: with TRACE_MEMBERS = ["enhanced", "144a"],
+    # It used to be the member's position in TRACE_MEMBERS, which meant dropping a
+    # member renumbered the rest without an error: with TRACE_MEMBERS = ["enhanced", "144a"],
     # 144A became 2, and the overlap clip below then deleted it as though it were
     # Standard. The job succeeded and the file looked normal. Bind the code to the
     # member, never to its position.
@@ -290,31 +290,31 @@ def step2_load_trace_data():
 
     # The data's last trade date. Computed here, unconditionally, because the
     # DATE_CUT_OFF resolution below needs it even when only one TRACE member is
-    # loaded -- max_enhanced_date inside the branch below would be undefined then.
+    # loaded. max_enhanced_date inside the branch below would be undefined then.
     raw_max = final_df["trd_exctn_dt"].max()
     logger.info("Last trade date in the stage0 data: %s", raw_max)
 
-    # The auto cut-off is measured from the least current SOURCE, not the pooled max --
-    # see `cut_off_basis` in _stage1_settings.py for the failure it prevents.
+    # The auto cut-off is measured from the least current source, not the pooled max.
+    # See `cut_off_basis` in _stage1_settings.py for the failure it prevents.
     for _label, _dt in source_frontiers(final_df).items():
         logger.info("  frontier, %-26s %s", _label + ":", _dt)
 
-    # Handle overlaps: Only clip STANDARD to be after Enhanced max date
-    # Keep ALL 144a data (do not clip)
+    # Handle overlaps: clip only Standard to start after the last Enhanced date.
+    # Keep all 144A data (do not clip).
     if len(TRACE_MEMBERS) > 1 and "enhanced" in TRACE_MEMBERS:
-        # Find max enhanced date first
+        # Find the last Enhanced date first
         max_enhanced_date = final_df.loc[final_df["db_type"] == 1, "trd_exctn_dt"].max()
 
         if pd.notna(max_enhanced_date):
             logger.info("Enhanced max date: %s", max_enhanced_date)
 
-            # Create mask for rows to keep (more memory efficient than creating separate dfs)
-            # Keep: all enhanced (db_type==1) + standard after max_enhanced_date (db_type==2) + all 144a (db_type==3)
+            # Build a mask of the rows to keep (uses less memory than separate frames).
+            # Keep: all Enhanced (db_type==1) + Standard after max_enhanced_date (db_type==2) + all 144A (db_type==3)
             before = len(final_df)
             mask = (
-                (final_df["db_type"] == 1) |  # Keep all enhanced
+                (final_df["db_type"] == 1) |  # Keep all Enhanced
                 (final_df["db_type"] == 3) |  # Keep all 144a
-                ((final_df["db_type"] == 2) & (final_df["trd_exctn_dt"] > max_enhanced_date))  # Keep only standard after enhanced
+                ((final_df["db_type"] == 2) & (final_df["trd_exctn_dt"] > max_enhanced_date))  # Keep only Standard after Enhanced
             )
             final_df = final_df[mask].copy()
             after = len(final_df)
@@ -326,9 +326,9 @@ def step2_load_trace_data():
     logger.info("After clipping: %d rows", len(final_df))
 
     # Apply date cutoff filter (in-place to save memory).
-    # DATE_CUT_OFF may be a literal date or an "auto:-Nmo" spec; resolve it against
+    # DATE_CUT_OFF may be a literal date or an "auto:-Nmo" spec. Resolve it against
     # the data now, and rebind the module global so every later consumer (the data
-    # report, the log lines) sees the concrete date rather than the spec.
+    # report, the log lines) sees the concrete date and not the spec.
     global DATE_CUT_OFF
     spec = DATE_CUT_OFF
     resolved = resolve_cut_off_from_data(spec, final_df)
@@ -336,13 +336,13 @@ def step2_load_trace_data():
         logger.info("Resolved DATE_CUT_OFF %s -> %s (pooled last trade %s)",
                     spec, resolved, raw_max)
 
-        # The sample end is bounded by EVERY input's frontier, not just TRACE's.
+        # The sample end is bounded by every input's frontier, not only TRACE's.
         # credit_spread needs a treasury yield for the trade date, and the Liu-Wu
         # curve is a separate source with its own end. 144A runs months ahead of
-        # Enhanced, so an auto cutoff derived from the combined tape can land past
-        # the curve -- which would leave the tail with a NULL credit_spread.
-        # Clamp, loudly. An explicit literal cutoff is the user's choice and is left
-        # alone; the coverage guard at the end of this step still checks it.
+        # Enhanced, so an auto cutoff derived from the combined data can land past
+        # the curve, which would leave the tail with a NULL credit_spread.
+        # Clamp, with a message. An explicit literal cutoff is the user's choice and is
+        # left alone. The coverage guard at the end of this step still checks it.
         try:
             yld_max = pd.to_datetime(ylds["trd_exctn_dt"]).max()
             if pd.notna(yld_max) and pd.to_datetime(resolved) > yld_max:
@@ -362,8 +362,8 @@ def step2_load_trace_data():
     after = len(final_df)
     logger.info("Applied date cutoff (<= %s): -%d rows", DATE_CUT_OFF, before - after)
 
-    # Drop duplicates with preference: Enhanced > Standard > 144a
-    # db_type: 1=enhanced, 2=standard, 3=144a
+    # Drop duplicates with preference: Enhanced > Standard > 144A
+    # db_type: 1=Enhanced, 2=Standard, 3=144A
     before = len(final_df)
     final_df = final_df.sort_values(["cusip_id", "trd_exctn_dt", "db_type"])
     final_df = final_df.drop_duplicates(subset=["cusip_id", "trd_exctn_dt"], keep="first").reset_index(drop=True)
@@ -382,9 +382,9 @@ def step2_load_trace_data():
     # --- Treasury-curve coverage guard -------------------------------------------
     # credit_spread = ytm - (treasury yield interpolated at the bond's maturity), and
     # the curve is joined on the exact trade date. The Liu-Wu curve is a third-party
-    # spreadsheet: if it ever stops being updated it will end BEFORE the TRACE
-    # frontier, and every trade past its last date silently gets a NULL
-    # credit_spread instead of an error. Catch that here, while it is still cheap.
+    # spreadsheet. If it ever stops being updated it will end before the TRACE
+    # frontier, and every trade past its last date gets a NULL credit_spread and
+    # no error. Catch that here, while it is still cheap.
     try:
         yld_max = pd.to_datetime(ylds["trd_exctn_dt"]).max()
         panel_max = final_df["trd_exctn_dt"].max()
@@ -452,8 +452,8 @@ def step3_load_fisd_data():
     fisd, FF12_MAPPING, FF17_MAPPING, FF30_MAPPING = hf.add_ff_industries(fisd, verbose=False)
     logger.info("FF17 and FF30 industries added: ff17num and ff30num columns created")
     # FF12's "Other" bucket (12) lists no SIC ranges of its own, so a failed download
-    # or parse yields a uniform ff12num=12 column that looks perfectly plausible --
-    # unlike FF17/FF30, whose collapse is obvious. Fail loudly instead.
+    # or parse yields a uniform ff12num=12 column that looks plausible. A collapse of
+    # FF17 or FF30 is obvious. Stop with an error here.
     if len(FF12_MAPPING) < 12 or fisd["ff12num"].nunique() < 2:
         raise RuntimeError(
             f"FF12 industry assignment collapsed: {len(FF12_MAPPING)} industries mapped, "
@@ -512,7 +512,7 @@ def step4_merge_fisd():
 
     # Merge FISD and calculate bond_maturity/bond_age.
     # _merge_1to1: the stage-0 FISD artifact is one row per CUSIP today, and this
-    # asserts it stays that way rather than silently multiplying the panel.
+    # asserts it stays that way, so the panel cannot be multiplied unnoticed.
     traced_pre_filter = _merge_1to1(
         final_df, fisd[available_cols], on="cusip_id", label="stage0 FISD universe")
 
@@ -527,8 +527,8 @@ def step4_merge_fisd():
     traced_pre_filter["bond_age"] = (traced_pre_filter["trd_exctn_dt"] - traced_pre_filter["offering_date"]).dt.days / 365.25
 
     # Convert interest_frequency to int for filtering.
-    # A plain .astype(int) raises on ANY NaN, so a single bond-day whose CUSIP is missing
-    # from the FISD universe would abort the run here -- roughly 40 minutes in, with a
+    # A plain .astype(int) raises on any NaN, so a single bond-day whose CUSIP is missing
+    # from the FISD universe would abort the run here, roughly 40 minutes in, with a
     # bare "cannot convert" and nothing naming the cause. Report and drop instead: a
     # bond-day with no coupon frequency cannot be priced downstream anyway.
     n_missing_freq = int(traced_pre_filter["interest_frequency"].isna().sum())
@@ -574,7 +574,7 @@ def step4_merge_fisd():
     # ----- Split for parallel processing -------------------------------------
     logger.info("Splitting data for parallel processing...")
 
-    # Columns that will NOT be processed in parallel (keep aside)
+    # Columns that will not be processed in parallel (keep aside)
     selected_cols = [
         "pr", "offering_date", "dated_date",
         "maturity", "bond_maturity", "day_count_basis", "interest_frequency",
@@ -686,8 +686,8 @@ def step5_compute_bond_analytics():
         )
 
     # Paths for the per-chunk outputs. Each chunk is written once and read back once
-    # at the end. The previous version grew a single file -- every chunk after the
-    # first read the whole accumulated parquet back, concatenated, and rewrote it --
+    # at the end. The previous version grew a single file (every chunk after the
+    # first read the whole accumulated parquet back, concatenated, and rewrote it),
     # which for 10 chunks and a ~2.5 GB result meant roughly 25 GB of I/O and held
     # three copies of the data (existing + chunk + combined) inside a 40 GB job.
     # Writing parts mirrors what step 4 already does for temp_trace_other_chunk_*.
@@ -768,7 +768,7 @@ def step5_compute_bond_analytics():
     # ----- Load final merged result -------------------------------------------
     logger.info("=" * 80)
     logger.info("All chunks processed. Loading final merged dataset...")
-    # Concatenate the parts in chunk order -- the same row order the incremental
+    # Concatenate the parts in chunk order, the same row order the incremental
     # append produced.
     written_parts = [pp for pp in part_paths if pp.exists()]
     if not written_parts:
@@ -923,17 +923,17 @@ def step6_merge_ratings():
     # [tag:daily.bond_amt_outstanding] amount outstanding in $ thousands: the latest FISD figure on or before the trade date, else the offering amount
     # Fill remaining gaps with the original offering amount.
     #
-    # ❗fisd_mergedissue is one row per ISSUE, not per CUSIP, and this frame comes
-    # straight from it -- the drop_duplicates above operates on mergent_amounts, a
-    # different frame. A bond can carry two issue records: 29357JAC0 has an ABS row and
+    # fisd_mergedissue is one row per issue, not per CUSIP, and this frame comes
+    # straight from it. The drop_duplicates above operates on mergent_amounts, a
+    # different frame. A bond can have two issue records: 29357JAC0 has an ABS row and
     # a CDEB row with the same issuer, maturity and coupon. Joining that on cusip_id
-    # duplicates EVERY bond-day of such a CUSIP.
+    # duplicates every bond-day of such a CUSIP.
     #
     # That is what happened on the 2026-09-09 run: 268 duplicated bond-days, which
     # surfaced ~1.5 hours later as a duplicate-key abort in step 7 and cost the whole
     # stage-1 run. Collapse to one row per CUSIP first, keeping the largest offering
-    # amount -- the same rule the mergent_amounts dedup above uses, and the one that
-    # picks the same issue record stage 0's FISD screen keeps.
+    # amount. That is the same rule the mergent_amounts dedup above uses, and the one
+    # that picks the same issue record stage 0's FISD screen keeps.
     offer_by_cusip = _offering_amt_by_cusip(issues_for_amt)
     n_collapsed = len(issues_for_amt) - len(offer_by_cusip)
     if n_collapsed:
@@ -1000,7 +1000,7 @@ def step6_merge_ratings():
     """)
     
     fisd_r.dropna(inplace=True)
-    # dropna() above makes this safe today; be explicit so a schema change cannot turn
+    # dropna() above makes this safe today. Be explicit so a schema change cannot turn
     # it into a bare "cannot convert float NaN to integer" three hours into a run.
     fisd_r = fisd_r[fisd_r['issue_id'].notna()]
     fisd_r['issue_id'] = fisd_r['issue_id'].astype(int)
@@ -1217,10 +1217,10 @@ def step7_merge_linker():
         dfl = pd.read_parquet(local_path).copy()
         logger.info(f"Successfully loaded the bond-firm linker from {local_file}")
 
-    # window-choice: IDENTITY (i0/i1) -- "whose bond is this". The linker also ships an EVIDENCE
+    # window-choice: IDENTITY (i0/i1), "whose bond is this". The linker also ships an evidence
     # window (w0/w1, "when is this mapping provable"), which is the one to use when joining
-    # equity-side data. A bond panel LABELS the issuer, so this stage and Stage 2
-    # (stage2/lib/linker.py) both join the identity window and carry the same firm for the
+    # equity-side data. A bond panel labels the issuer, so this stage and Stage 2
+    # (stage2/lib/linker.py) both join the identity window and have the same firm for the
     # same bond. The window is named once, in _stage1_settings.LINKER_WINDOW, and the join
     # lives in _linker_join.py so it can be tested without WRDS.
     import _linker_join
@@ -1232,8 +1232,8 @@ def step7_merge_linker():
                 *LINKER_WINDOW)
     before = len(final_df)
     # [tag:daily.permno] the issuer's CRSP PERMNO, from the bond-firm linker's identity window
-    # [tag:daily.permco] the issuer's CRSP PERMCO, from the bond-firm linker's identity window; not in the public download
-    # [tag:daily.gvkey] the issuer's Compustat GVKEY, from the bond-firm linker's identity window; not in the public download
+    # [tag:daily.permco] the issuer's CRSP PERMCO, from the bond-firm linker's identity window, not in the public download
+    # [tag:daily.gvkey] the issuer's Compustat GVKEY, from the bond-firm linker's identity window, not in the public download
     final_df, n_past = _linker_join.attach_firm_ids(final_df, dfl, LINKER_WINDOW)
     after = len(final_df)
     logger.info("Linker merge: %d -> %d rows", before, after)
@@ -1244,11 +1244,11 @@ def step7_merge_linker():
         if c not in final_df.columns:
             logger.warning("%s column not found in linker file - will be NaN in output", c)
 
-    # A DIFFERENT property from the row-count check inside the linker join, and it is not
-    # about the linker: this is simply the first place the panel's uniqueness is re-checked after
+    # A different property from the row-count check inside the linker join, and it is not
+    # about the linker: this is the first place the panel's uniqueness is re-checked after
     # step 2's dedup. A duplicate here was created by an earlier many-to-one merge whose
-    # right frame had a duplicate key -- on the 2026-09-09 run, one CUSIP with two FISD
-    # issue records. Say so, and name the keys, so the next reader does not begin by
+    # right frame had a duplicate key (on the 2026-09-09 run, one CUSIP with two FISD
+    # issue records). Say so, and name the keys, so the next reader does not begin by
     # investigating the linker, as we did.
     dups = final_df.loc[final_df.duplicated(subset=["cusip_id", "trd_exctn_dt"],
                                             keep=False)]
@@ -1263,8 +1263,8 @@ def step7_merge_linker():
             "now goes through _merge_1to1, so suspect anything added since. "
             f"Examples: {sample}")
 
-    # issuer_cusip is no longer the join key -- the linker is bond-level. Kept because
-    # downstream code still expects the column; variable_drop() removes it shortly.
+    # issuer_cusip is no longer the join key, because the linker is bond-level. Kept because
+    # downstream code still expects the column. variable_drop() removes it shortly.
     final_df["issuer_cusip"] = final_df["cusip_id"].astype(str).str[:6]
 
     # Re-convert to category after merge to maintain memory optimization
@@ -1420,7 +1420,7 @@ def variable_drop():
     # ========================================================================
     logger.info("Exporting auxiliary objects to free memory...")
 
-    timestamp = RUN_STAMP  # one stamp per run -- see RUN_STAMP above
+    timestamp = RUN_STAMP  # one stamp per run, see RUN_STAMP above
 
     # Export S&P ratings
     if sp_ratings is not None:
@@ -1592,7 +1592,7 @@ def step8_ultra_distressed():
 
     # ========================================================================
     # DELETE ORIGINAL final_df BEFORE CONCAT
-    # This is critical - we no longer need the original data
+    # The original data is no longer needed
     # ========================================================================
     logger.info("=" * 80)
     logger.info("Freeing original final_df before concatenation...")
@@ -1853,7 +1853,7 @@ def step8b_build_distressed_report(
         # Prepare data subset for plotting (only flagged CUSIPs)
         df_plot = final_df[final_df['cusip_id'].isin(flagged_cusips_list)].copy()
 
-        # Ensure date column is datetime
+        # Make sure the date column is datetime
         if not pd.api.types.is_datetime64_any_dtype(df_plot['trd_exctn_dt']):
             df_plot['trd_exctn_dt'] = pd.to_datetime(df_plot['trd_exctn_dt'], errors='coerce')
 
@@ -2255,7 +2255,7 @@ def step10a_build_filter_tables():
 
 def step10_generate_reports():
     """
-    Generate comprehensive LaTeX data report with descriptive statistics and figures.
+    Generate the LaTeX data report with descriptive statistics and figures.
     
     This function:
     1. Uses Tables 1 and 2 from global variables (set by step10a)
@@ -2264,7 +2264,7 @@ def step10_generate_reports():
     4. Drops all filter/flag columns
     5. Saves LaTeX report to STAGE1_DIR/data_reports/
     
-    Note: step10a_build_filter_tables() must be called BEFORE this function.
+    Note: step10a_build_filter_tables() must be called before this function.
     """
     mem_start = hf.log_memory_usage("step10_generate_reports_start")
     global final_df, table1_tex, table2_tex, fisd

@@ -5,41 +5,39 @@ _wrds_pool.py
 One WRDS connection per worker process, opened safely.
 
 Stage 0 fetches its CUSIP chunks from WRDS. Running several chunks at once means
-several connections, and there are two traps in that which are worth stating plainly
-because neither announces itself.
+several connections, and there are two traps in that. Neither gives a clear error.
 
-FIRST: a connection failure does not look like one. Whenever the wrds package cannot
-connect -- for ANY reason -- it falls through to re-prompting for a username, and in a
+First: a connection failure does not look like one. Whenever the wrds package cannot
+connect, for any reason, it falls through to re-prompting for a username, and in a
 batch job, where stdin is closed, that prompt dies as
 
     EOFError: EOF when reading a line
 
 So a server-side refusal and a missing password arrive as the same keyboard error, and
-neither says which it is. That ambiguity is the real trap: it is easy to read every
-EOFError as the connection cap and go hunting a limit that is not the problem. Two
-causes, in the order worth checking:
+neither says which it is. It is easy to read every EOFError as the connection cap and
+go hunting a limit that is not the problem. Two causes, in the order to check them:
 
-  * No usable username -- WRDS_USERNAME unset, so config.py falls back to the
+  * No usable username: WRDS_USERNAME unset, so config.py falls back to the
     literal "your_wrds_username" (jobs on the WRDS Cloud need no password file).
-    Ruled out FIRST below, before a connection is even attempted, because it is much
+    Ruled out first below, before a connection is even attempted, because it is much
     the commoner cause and costs nothing to check.
   * The per-user connection limit, once several workers are open at once.
 
-SECOND: never inherit a connection across a fork. A psycopg2 socket shared between a
+Second: never inherit a connection across a fork. A psycopg2 socket shared between a
 parent and its children corrupts the protocol in ways that surface much later as
-unrelated errors. Every worker therefore builds its OWN connection inside the child,
+unrelated errors. Every worker therefore builds its own connection inside the child,
 in the pool initializer, and never receives one as an argument.
 
-MEASURED on this account, 2026-09-09 (tests/probe_wrds_connections.py):
+Measured on this account, 2026-09-09 (tests/probe_wrds_connections.py):
 
-  * 7 connections can be held simultaneously; the 8th fails.
-  * Opening 6 AT ONCE, with no stagger and no lock, succeeded -- so the ceiling is on
-    connections HELD, not on how fast they are opened.
+  * 7 connections can be held simultaneously, and the 8th fails.
+  * Opening 6 at once, with no stagger and no lock, succeeded, so the ceiling is on
+    connections held, not on how fast they are opened.
   * A connect costs about 5 s, so a pool of N takes roughly 5N seconds to start.
 
 The handshake is still serialised and staggered here. It costs a few seconds once,
-it makes start-up deterministic rather than a race, and it means a lower cap on
-someone else's account degrades into slow rather than broken.
+it makes start-up deterministic where it would otherwise be a race, and it means a
+lower cap on someone else's account makes the run slow, not broken.
 
 Author: Open Source Bond Asset Pricing
 """
@@ -60,7 +58,7 @@ import wrds
 _CONNECTION = None
 _USERNAME = None
 
-# Serialise the handshake. Query execution stays fully parallel; only connecting is
+# Serialise the handshake. Query execution stays fully parallel. Only connecting is
 # one-at-a-time.
 _CONNECT_LOCK = threading.Lock()
 _CONNECT_STAGGER_S = 0.4
@@ -114,7 +112,7 @@ limit, and is not.""" % user)
             with _CONNECT_LOCK:
                 time.sleep(_CONNECT_STAGGER_S)
                 return wrds.Connection(wrds_username=user)
-        except Exception as exc:      # EOFError included -- it IS an Exception
+        except Exception as exc:      # EOFError included, since it is an Exception
             last = exc
             if not _is_connection_limit(exc) or attempt == attempts:
                 break
@@ -175,9 +173,9 @@ def raw_sql(sql: str, params=None, *, max_retries: int = 3, base_sleep: float = 
     """Run a query on this process's connection, reconnecting on transient failures.
 
     Mirrors the engines' _raw_sql_with_retry, with two differences that matter for a
-    pool: it operates on this PROCESS's connection rather than a shared attribute --
-    so one worker reconnecting cannot close a connection another is mid-query on --
-    and it treats a refused connection as retryable rather than fatal.
+    pool. It operates on this process's connection, not a shared attribute, so one
+    worker reconnecting cannot close a connection another is mid-query on. And it
+    treats a refused connection as retryable, not fatal.
     """
     from sqlalchemy.exc import OperationalError as SAOperationalError
     try:

@@ -1,13 +1,13 @@
-"""validate_coverage.py -- guard against silent column staleness in the built panel.
+"""Guard against columns of the built panel that stop early without an error.
 
 The golden-vintage pins (the treasury cutoff, the pinned factor panel, the frozen AUX merges) can
-silently cap a column several months before the panel end. The `TRET_MAX_DATE` pin once did exactly
-this: `tret` -> `ret_vwx` -> the BBW x-factors -> the whole bbw_factors block (inner join) -> every
-rolling beta / ivol / sysmom -- 43 columns died 6 months before the panel's own last month, while
-the panel still reported rows there.
+cap a column several months before the panel end without any error. The `TRET_MAX_DATE` pin once
+did exactly this: `tret` -> `ret_vwx` -> the BBW x-factors -> the whole bbw_factors block (inner
+join) -> every rolling beta / ivol / sysmom. 43 columns died 6 months before the panel's own last
+month, while the panel still reported rows there.
 
-The golden validators CANNOT catch this: they diff against the golden, which is capped the same way,
-so both sides agree on NULL. This guard is orthogonal -- it asserts, on the ours panel ALONE, that
+The golden validators cannot catch this. They diff against the golden, which is capped the same way,
+so both sides agree on NULL. This guard is orthogonal. It asserts, on the ours panel alone, that
 every column that is healthy mid-panel still reaches within `max_lag` months of the panel's own max
 month. A column empty >= max_lag+1 months early, despite being populated earlier, is a straggler.
 
@@ -16,10 +16,10 @@ month. A column empty >= max_lag+1 months early, despite being populated earlier
     validate_coverage.py --panel output/panel/main_panel_stage1.parquet
 
 Why max_lag=1 by default: forward-difference columns (`lib`, `libd`, and the *_bgn terminal returns)
-legitimately cannot compute the panel's FINAL month (they need month t+1), so they lose exactly one
-month -- that is correct, not a straggler. Anything that dies 2+ months early is the bug shape.
+legitimately cannot compute the panel's final month (they need month t+1), so they lose exactly one
+month. That is correct, not a straggler. Anything that dies 2+ months early is the bug shape.
 A column is only judged if it was "healthy" (coverage >= HEALTHY_FRAC) at its own last populated
-month -- naturally-sparse or always-empty columns are reported separately, never failed.
+month. Naturally-sparse or always-empty columns are reported separately, never failed.
 """
 # [tag:entry.stage2_coverage] checks every column reaches the panel's last month
 from __future__ import annotations
@@ -43,12 +43,12 @@ def _month_diff(a: pd.Timestamp, b: pd.Timestamp) -> int:
     return (a.year - b.year) * 12 + (a.month - b.month)
 
 
-# Columns whose sample legitimately ends early because the SOURCE data does, not because
-# anything here is wrong. Each entry names the upstream limit so it can be re-checked; a
+# Columns whose sample legitimately ends early because the source data does, not because
+# anything here is wrong. Each entry names the upstream limit so it can be re-checked, and a
 # column is only excused while the reason still holds.
 #
-# Keeping these out of the failure set matters: a guard that always reports FAIL is a
-# guard people stop reading, and then a REAL straggler goes unnoticed. Anything not listed
+# Keeping these out of the failure set matters. A guard that always reports FAIL is a
+# guard people stop reading, and then a true straggler goes unnoticed. Anything not listed
 # here still fails.
 UPSTREAM_LIMITED = {
     "b_cptlt": "He-Kelly-Manela intermediary capital: published data ends 2025-05",
@@ -87,7 +87,7 @@ def check_coverage(panel: Path, max_lag: int = 1,
         if lag <= max_lag:
             ok_cols.append(c)
             continue
-        # ends early -- is it a real straggler (healthy at its last month) or just sparse?
+        # ends early. Is it a straggler (healthy at its last month) or just sparse?
         n, nn = con.execute(
             f'SELECT COUNT(*), COUNT("{c}") FROM read_parquet(\'{panel}\') WHERE {DATE_COL} = ?',
             [lm.to_pydatetime()]).fetchone()
@@ -138,7 +138,7 @@ def format_report(report: dict) -> str:
 def main() -> None:
     ap = argparse.ArgumentParser(description="ours-panel column-coverage guard")
     # Default to the configured build, not a mode name inherited from the reference
-    # engine -- a public run has INPUT_MODE = "stage1" and no main_panel_ours.parquet.
+    # engine. A public run has INPUT_MODE = "stage1" and no main_panel_ours.parquet.
     ap.add_argument("--panel", type=Path,
                     default=cfg.PANEL_DIR / f"main_panel_{cfg.INPUT_MODE}.parquet")
     ap.add_argument("--max-lag", type=int, default=1,
@@ -151,8 +151,8 @@ def main() -> None:
     ok, report = check_coverage(args.panel, args.max_lag, allow_upstream=not args.strict)
     print(format_report(report))
 
-    # Column coverage says every VARIABLE reaches the frontier. It says nothing about
-    # whether the frontier month is a cross-section: a month carried by 144A alone
+    # Column coverage says every variable reaches the frontier. It says nothing about
+    # whether the frontier month is a cross-section: a month that 144A alone covers
     # passes every column check and is still unusable. Check that separately.
     import pandas as pd
     import pyarrow.parquet as pq

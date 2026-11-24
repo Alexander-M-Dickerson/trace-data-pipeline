@@ -1,12 +1,12 @@
-"""illiq_pandas.py -- verbatim pandas/numba ports of the FLOAT32-ORDER-SENSITIVE illiquidity metrics.
+"""Verbatim pandas/numba ports of the illiquidity metrics that depend on float32 order.
 
 Why these four live in pandas while the rest of step 2 is SQL (see below): upstream computes
-pi / amihud / ilq-roll with float32 Series arithmetic and float32 groupby SUMS whose value depends on
+pi / amihud / ilq-roll with float32 Series arithmetic and float32 groupby sums whose value depends on
 in-group accumulation order, and the risk kernel divides by near-singular denominators that amplify
-any reassociation noise. DuckDB sums in parallel double precision -- close, but the near-singular
+any reassociation noise. DuckDB sums in parallel double precision. That is close, but the near-singular
 tail (pi up to 0.187, b_dvixd up to 4.9) cannot meet tolerance. These ports reproduce the upstream
 arithmetic operation-for-operation (source: the reference implementation, functions of the same
-name); the only residual is numpy-version libm ulps.
+name). The only residual is numpy-version libm ulps.
 
 All functions take the pin-derived frame in UPSTREAM column names:
   cusip_id (category), trd_exctn_dt, month_year (Period[M]), ret_c, ret_c_lag, ret_d, dvol,
@@ -25,7 +25,7 @@ MIN_OBS_DEFAULT = 5
 
 
 def _is_sorted_by(df: pd.DataFrame, id_col: str, date_col: str) -> bool:
-    """O(n) check that df is (id, date)-block-sorted -- the pin pull already ships this order, so
+    """O(n) check that df is (id, date)-block-sorted. The pin pull already ships this order, so
     the risk function's mergesorts are identity permutations we can skip."""
     ids = pd.factorize(df[id_col], sort=False)[0]
     d = df[date_col].to_numpy()
@@ -331,7 +331,7 @@ def compute_within_month_risk(df, vix_df, id_col="cusip_id", date_col="trd_exctn
     vix_df = vix_df.dropna(subset=["date", "vix"])
 
     df = df.merge(vix_df.rename(columns={"date": date_col}), on=date_col, how="left")
-    if not _is_sorted_by(df, id_col, date_col):        # identity permutation in the pipeline; the
+    if not _is_sorted_by(df, id_col, date_col):        # identity permutation in the pipeline. The
         df = df.sort_values([id_col, date_col], kind="mergesort")   # sort stays as the fallback
     df["dvix"] = df.groupby(id_col, observed=True)["vix"].diff()
     if day_gap_col in df.columns:

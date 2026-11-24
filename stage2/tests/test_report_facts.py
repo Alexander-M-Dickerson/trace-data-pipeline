@@ -9,7 +9,7 @@ The Stage 2 data report printed two things that looked like data errors and were
     trade does not have. The price a return is computed from is the month-end one, and every
     return has it. The report now prints that, and the signal-date price on its own row.
 
-    Its prose carried typed numbers ("the average signal gap is approximately 1.68"), which
+    Its prose had typed numbers ("the average signal gap is approximately 1.68"), which
     outlive the data they came from. They are computed from the panel the report describes.
 
 These tests hold the two fixes, and the one invariant behind the first: a row with a

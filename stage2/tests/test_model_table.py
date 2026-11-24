@@ -3,7 +3,7 @@
 test_model_table.py
 ===================
 DATA_DICTIONARY.md prints a table of every rolling-beta factor model. That table is
-maintained by hand and the models live in code, so the two drift -- and they had:
+maintained by hand and the models live in code, so the two drift, and they had:
 
     7 models were missing from the table entirely (coskew, defterm, dvix_asym, illiq,
       unc3, unc6, uncl)
@@ -17,7 +17,7 @@ wrong specification, or believes a beta loads on a factor it never saw.
 This test derives the table from `lib.betas.BETA_MODELS` and requires the document to
 agree, model for model and regressor for regressor.
 
-What it does NOT check: the LaTeX equations further down the appendix, the "Outputs Kept"
+What it does not check: the LaTeX equations further down the appendix, the "Outputs Kept"
 and "ivol" columns, or whether the prose around the table is true. Those are still read by
 eye.
 
@@ -43,7 +43,7 @@ HEADER = "| Model | Factors | Outputs Kept"
 def _models_from_code() -> dict[str, str]:
     """{MODEL NAME: 'factor, factor, ...'} straight out of the BETA_MODELS literal.
 
-    Read through the AST rather than by importing and running anything, so the test
+    Read through the AST, without importing or running anything, so the test
     reports what the source says and cannot be fooled by a value assembled at run time.
     """
     tree = ast.parse((STAGE2 / "lib" / "betas.py").read_text(encoding="utf-8"))

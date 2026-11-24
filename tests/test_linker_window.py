@@ -14,8 +14,8 @@ No WRDS, no network: every frame here is built by hand.
 
     python -m pytest tests/test_linker_window.py -q
 
-What this does NOT check: that the linker's content is right. That is the linker's own
-release verification. This checks the JOIN.
+What this does not check: that the linker's content is right. That is the linker's own
+release verification. This checks the join.
 
 Author: Open Source Bond Asset Pricing
 """

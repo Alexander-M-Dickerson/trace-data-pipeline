@@ -1,19 +1,18 @@
 #!/bin/bash
 # [tag:entry.wrds] stages 0 and 1 on WRDS: ./run_pipeline.sh submits every job in order
-# TRACE Data Pipeline Orchestrator
+# TRACE data pipeline orchestrator
 #
-# This script orchestrates the entire multi-stage TRACE data pipeline:
-#   - Pre-Stage: Download required data files (Liu-Wu yields, OSBAP linker, FF industries)
-#   - Stage 0: Data extraction (Enhanced, Standard, 144A TRACE) + Report building
-#   - Stage 1: Daily aggregation and analytics
-#   - Stage 2: Monthly panel (runs on your own machine -- see stage2/README_stage2.md)
+# This script submits the multi-stage TRACE data pipeline in order.
+#   - Pre-stage: download the required data files (Liu-Wu yields, OSBAP linker, FF industries)
+#   - Stage 0: data extraction (Enhanced, Standard, 144A TRACE) and report building
+#   - Stage 1: daily aggregation and analytics
+#   - Stage 2: the monthly panel, which runs on your own machine (see stage2/README_stage2.md)
 #
-# IMPORTANT: This script MUST be executed from the project ROOT directory.
-#            All paths are relative to ROOT and jobs are submitted with
-#            working directories set appropriately for each stage.
+# Run this script from the project root directory. All paths are relative to the root, and
+# each job is submitted with the working directory its stage needs.
 #
-# NOTE: Pre-stage downloads happen on the login node (internet access required).
-#       This is necessary because WRDS compute nodes have no internet access.
+# The pre-stage downloads happen on the login node, which has internet access. WRDS compute
+# nodes have none.
 
 set -euo pipefail
 
@@ -37,12 +36,12 @@ mkdir -p stage0/logs
 mkdir -p stage1/logs
 mkdir -p stage1/data
 
-# Stage 1's external inputs. Must happen on the LOGIN NODE -- compute nodes have no
-# internet. Kept in its own script so the smoke test can point at the same command.
+# Stage 1's external inputs. This must happen on the login node, because compute nodes have
+# no internet. It is kept in its own script so the smoke test can point at the same command.
 echo ""
-# Invoked through bash rather than as ./download_inputs.sh so this does not depend
-# on the executable bit surviving the clone -- it has not, historically, because
-# these scripts are authored on Windows where core.filemode is false.
+# Invoked through bash, not as ./download_inputs.sh, so this does not depend on the
+# executable bit surviving the clone. It has not survived in the past, because these
+# scripts are written on Windows, where core.filemode is false.
 bash ./download_inputs.sh || { echo "[error] input download failed"; exit 1; }
 
 
@@ -55,7 +54,7 @@ bash ./download_inputs.sh || { echo "[error] input download failed"; exit 1; }
 echo ""
 echo "=== STAGE 0: TRACE Data Extraction ==="
 
-# python3 on WRDS; overridable so the submission graph can be dry-run elsewhere.
+# python3 on WRDS. It can be overridden so the submission graph can be dry-run elsewhere.
 PY="${PYTHON:-python3}"
 
 MEMBERS=$("${PY}" -c "import sys; sys.path.insert(0,'.'); from config import TRACE_MEMBERS; print(' '.join(TRACE_MEMBERS))") || {
@@ -85,11 +84,11 @@ declare -A RUNNER=( [enhanced]=stage0/run_enhanced_trace.sh \
                     [144a]=stage0/run_144a_trace.sh )
 declare -A JOBNAME=( [enhanced]=trace_enhanced [standard]=trace_standard [144a]=trace_144a )
 
-# Cores and memory, DERIVED from each member's worker count rather than written into
-# the job scripts, so the request cannot drift away from CONCURRENCY. The scripts' own
-# resource directives stay untouched. qsub_resources refuses to emit anything above
-# the WRDS caps, because an unsatisfiable request does not fail -- it pends forever,
-# in silence -- and m_mem_free is charged PER SLOT, so asking for 96 GB by accident
+# Cores and memory are derived from each member's worker count. They are not written
+# into the job scripts, so the request cannot drift away from CONCURRENCY. The scripts'
+# own resource directives stay untouched. qsub_resources refuses to emit anything above
+# the WRDS caps, because a request that cannot be satisfied does not fail. It pends for
+# ever without a message. m_mem_free is charged per slot, so asking for 96 GB by accident
 # is a two-character mistake.
 res_for() {
     "${PY}" -c "
@@ -102,7 +101,7 @@ print(qsub_resources('$1'))
 STAGE0_IDS=()          # every stage0 job, for the report job's hold list
 CONCURRENT_IDS=()      # enhanced + 144a, which Standard waits on
 
-# Enhanced and 144A first: they run side by side and their connection budgets are
+# Enhanced and 144A go first. They run side by side and their connection budgets are
 # sized to co-exist.
 for member in enhanced 144a; do
     [[ " ${MEMBERS} " == *" ${member} "* ]] || continue
@@ -113,8 +112,8 @@ for member in enhanced 144a; do
     echo "         job ${jid}"
 done
 
-# Standard, if asked for, runs AFTER them -- so it gets the whole connection budget
-# rather than a slice, and the peak memory of two big jobs never overlaps.
+# Standard, if asked for, runs after them, so it gets the whole connection budget
+# and the peak memory of two big jobs never overlaps.
 if [[ " ${MEMBERS} " == *" standard "* ]]; then
     res=$(res_for standard) || { echo "[error] bad resource request for standard"; exit 1; }
     echo "[submit] standard TRACE  (${res}, held until enhanced/144a finish) ..."
@@ -138,17 +137,17 @@ HOLD_STAGE0=$(IFS=,; echo "${STAGE0_IDS[*]}")
 echo "[submit] Build data reports (waits for ${HOLD_STAGE0}) ..."
 J4=$(qsub -terse -N build_reports -hold_jid "${HOLD_STAGE0}" stage0/run_build_data_reports.sh)
 
-# Stage 1: daily aggregation, as soon as the stage-0 DATA is ready.
+# Stage 1, the daily aggregation, starts as soon as the stage-0 data is ready.
 #
-# It holds on the stage-0 jobs, NOT on the report job, so the reports and stage 1 run
-# side by side. Stage 1 does not read anything the reports produce -- it reads exactly
-# two paths, stage0/<member>/trace_<member>_<stamp>.parquet and
+# It holds on the stage-0 jobs and not on the report job, so the reports and stage 1 run
+# side by side. Stage 1 reads nothing the reports produce. It reads exactly two paths,
+# stage0/<member>/trace_<member>_<stamp>.parquet and
 # stage0/enhanced/trace_enhanced_fisd_<stamp>.parquet (both named in stage1_pipeline.py).
-# The data_reports directory stage 1 refers to is its OWN. Chaining it behind the
+# The data_reports directory stage 1 refers to is its own. Chaining it behind the
 # reports put ~50 minutes of report generation on the critical path for nothing.
 #
-# The two overlap safely: the stage-0 jobs have released their WRDS connections by then,
-# so the reports (up to 5) plus stage 1 (1) sit at 6 against the measured ceiling of 7 --
+# The two overlap safely. The stage-0 jobs have released their WRDS connections by then,
+# so the reports (up to 5) plus stage 1 (1) sit at 6 against the measured ceiling of 7,
 # the same one spare the stage-0 phase leaves. They write to separate trees and both read
 # stage 0's parquet read-only.
 echo ""
@@ -156,10 +155,11 @@ echo "=== STAGE 1: Daily Aggregation & Analytics ==="
 echo "[submit] Stage 1 pipeline (waits for stage0 data; runs alongside the reports) ..."
 J5=$(qsub -terse -N stage1_pipeline -hold_jid "${HOLD_STAGE0}" stage1/run_stage1.sh)
 
-# Stage 2 is deliberately NOT submitted here. It builds the monthly panel on the
-# USER'S OWN MACHINE, not on the grid: it needs more memory than a WRDS slot allows
-# and reads no TRACE data (its first run fetches a few series from WRDS and caches them). Download stage0/ and stage1/ when this pipeline
-# finishes, then run ./run_stage2.sh locally. See stage2/README_stage2.md.
+# Stage 2 is not submitted here, on purpose. It builds the monthly panel on your own
+# machine, because it needs more memory than a WRDS slot allows and reads no TRACE data
+# (its first run fetches a few series from WRDS and caches them). Download stage0/ and
+# stage1/ when this pipeline finishes, then run ./run_stage2.sh locally. See
+# stage2/README_stage2.md.
 
 # Summary
 echo ""

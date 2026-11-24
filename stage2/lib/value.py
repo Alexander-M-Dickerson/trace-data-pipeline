@@ -1,4 +1,4 @@
-"""value.py -- VERBATIM value-signal machinery from the reference implementation:
+"""Verbatim value-signal machinery from the reference implementation:
 _apply_dts_quintile_overlay, compute_value, within_firm_demean,
 compute_lagged_values, make_value_signals, build_d_spreads. Arbitrated by the value and wrangle validators."""
 import gc
@@ -55,7 +55,7 @@ def _apply_dts_quintile_overlay(
     mean_col: str = "sig_mean_dtsQ",
     return_details: bool = False,
 ) -> pd.DataFrame:
-    """Within-date DtS quintiles; demean sig within (date,Q)."""
+    """Within-date DtS quintiles, then demean sig within (date,Q)."""
     w = panel[[id_col, date_col, cs_col, dur_col, sig_col]].copy()
     w[date_col] = pd.to_datetime(w[date_col])
 
@@ -88,7 +88,7 @@ def compute_value(
     date_col: str = "date",
     cs_col: str = "cs",
     rating_col: str = "spc_rat",
-    # ALL non-rating / non-industry regressors go here:
+    # All non-rating / non-industry regressors go here:
     x_cols: Sequence[str],
     # Naming
     out_col: Optional[str] = None,          # default: f"val_{model_type}"
@@ -119,7 +119,7 @@ def compute_value(
     log_min_cs: float = 1e-12,
 ) -> pd.DataFrame:
     """
-    Monthly cross-sectional regression; output a value signal.
+    Monthly cross-sectional regression that outputs a value signal.
 
     Regression each month t:
       - y is cs (level) or log(cs) (log)
@@ -550,7 +550,7 @@ def make_value_signals(
     adj = adj_signals.copy()
     end = end_signals.copy()
 
-    # Ensure date is datetime
+    # Convert date to datetime
     adj['date'] = pd.to_datetime(adj['date'])
     end['date'] = pd.to_datetime(end['date'])
 

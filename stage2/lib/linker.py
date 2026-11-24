@@ -1,35 +1,35 @@
-"""linker.py -- the published bond->firm linker, and the WINDOW the panel joins it on.
+"""The published bond->firm linker, and the window the panel joins it on.
 
 Stage 1 attaches `permno`/`permco`/`gvkey` from this same file and Stage 2 has inherited those ids
 through the pin ever since. That was fine while there was one window. There are two:
 
-    w0 / w1   EVIDENCE window -- WHEN the mapping is provable.
+    w0 / w1   evidence window: when the mapping is provable.
               greatest(bond life start, crsp_begdt) .. least(bond life end, crsp_enddt).
-              Right when you are joining EQUITY-side data: outside it there is no listed firm.
+              Right when you are joining equity-side data: outside it there is no listed firm.
 
-    i0 / i1   IDENTITY window -- WHOSE bond this is. Contains the evidence window and opens
+    i0 / i1   identity window: whose bond this is. Contains the evidence window and opens
               outward only where no dated successor or acquisition contradicts it.
-              Right when the firm id is a LABEL: grouping, within-firm sorts, issuer fixed effects.
+              Right when the firm id is a label: grouping, within-firm sorts, issuer fixed effects.
 
 A bond-month panel LABELS firms. It does not join equity data. So this module joins `i0`/`i1`,
 which is what the linker bundle's own SCHEMA.md and README.md name as the default for panel
 work (both ship inside the zip at LINKER_URL).
 
-❗WHY THIS MODULE EXISTS AT ALL. Until 2026-09 the identity window shipped only on an unpublished
-file, and the published README showed `BETWEEN w0 AND w1` as the join. Stage 1 followed it; our own
-relink used the identity window. Same linker, different question, and the two panels disagreed about
-firm membership on 2.14% of TRACE-era bond-months -- 43,779 rows where one carried a firm id and the
-other did not. Single sorts never touch `permno` and matched exactly; within-firm sorts group by it,
+Why this module exists. Until 2026-09 the identity window shipped only on an unpublished
+file, and the published README showed `BETWEEN w0 AND w1` as the join. Stage 1 followed it, and our
+own relink used the identity window. Same linker, different question, and the two panels disagreed
+about firm membership on 2.14% of TRACE-era bond-months (43,779 rows where one had a firm id and the
+other did not). Single sorts never touch `permno` and matched exactly. Within-firm sorts group by it,
 so 8,479 firm-months existed in one panel and not the other and every within-firm portfolio moved.
 Stage 1 has joined the identity window too since 2026-09-21 (commit 706c7b1, stage1/_linker_join.py),
-so every stage now labels a bond with the same firm; this module keeps its own join so the monthly
+so every stage now labels a bond with the same firm. This module keeps its own join so the monthly
 panel never depends on which stage 1 run it was built from.
 
-❗THE CACHE IS THE TRAP, exactly as in lib/quote.py. A cached linker that predates the identity
+The cache is the trap, exactly as in lib/quote.py. A cached linker that predates the identity
 window would let this module fall back to the evidence window and reproduce the original bug
-silently. It does not fall back: a cache without `i0`/`i1` is stale by definition and is replaced,
-and a DOWNLOAD without them is a hard error -- because it would mean the URL points at a linker
-built before the identity window was added and no join here can be trusted.
+without an error. It does not fall back: a cache without `i0`/`i1` is stale by definition and is
+replaced, and a download without them is a hard error, because it would mean the URL points at a
+linker built before the identity window was added and no join here can be trusted.
 """
 from __future__ import annotations
 
@@ -61,11 +61,11 @@ def _fetch() -> pd.DataFrame:
 
 # [group:trap.stale_cache] a cached download is used whenever it exists, so each loader checks it before trusting it
 def load_linker(force_fetch: bool = False) -> pd.DataFrame:
-    """The linker, guaranteed to carry the window this panel joins on.
+    """The linker, guaranteed to have the window this panel joins on.
 
-    `STAGE2_LINKER_FILE` points at a local parquet and wins over both cache and URL -- the same
+    `STAGE2_LINKER_FILE` points at a local parquet and wins over both cache and URL, the same
     override convention the other stage-2 inputs use. It exists because a bundle published before
-    the identity window shipped is correctly REFUSED below, which would otherwise make it
+    the identity window shipped is correctly refused below, which would otherwise make it
     impossible to build at all in the window between fixing the linker and uploading it.
     """
     override = os.environ.get("STAGE2_LINKER_FILE")
@@ -106,7 +106,7 @@ def load_linker(force_fetch: bool = False) -> pd.DataFrame:
 def register(con, table: str = "_linker") -> tuple[str, str]:
     """Register the linker on `con` and return the declared window's (lo, hi) column names.
 
-    The caller writes its own SQL -- step 1 must join identifiers into their OWN block, never
+    The caller writes its own SQL. Step 1 must join identifiers into their own block, never
     through `t_src`, because adding columns there changes physical row order and several
     order-sensitive float32 illiquidity kernels downstream move with it.
     """

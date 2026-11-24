@@ -4,11 +4,11 @@ db.py
 =====
 DuckDB access for Stage 2.
 
-Stage 2 uses DuckDB purely as a compute engine over parquet files -- it never opens a
+Stage 2 uses DuckDB purely as a compute engine over parquet files. It never opens a
 database file and never queries a stored table. Every query reads through
-``read_parquet(...)``, so the connection here is IN-MEMORY.
+``read_parquet(...)``, so the connection here is in-memory.
 
-Threads and memory default to a fraction of the machine rather than fixed numbers, so
+Threads and memory default to a fraction of the machine, not to fixed numbers, so
 the same code is comfortable on a laptop and on a workstation. Override with the
 ``STAGE2_DUCKDB_THREADS`` / ``STAGE2_DUCKDB_MEMORY_LIMIT`` environment variables, or by
 setting ``DUCKDB_THREADS`` / ``DUCKDB_MEMORY_LIMIT`` in ``_stage2_settings.py``.
@@ -59,7 +59,7 @@ def connect(
 ) -> duckdb.DuckDBPyConnection:
     """Open a tuned in-memory DuckDB connection.
 
-    Stage 2 stores nothing in DuckDB; results go to parquet via :func:`to_parquet`.
+    Stage 2 stores nothing in DuckDB. Results go to parquet via :func:`to_parquet`.
     """
     if threads is None:
         threads = int(os.environ.get("STAGE2_DUCKDB_THREADS", "0")) or _default_threads()

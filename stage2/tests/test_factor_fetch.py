@@ -1,8 +1,8 @@
-"""test_factor_fetch.py -- the fetch-once framework behind the public factor build (offline).
+"""The fetch-once framework behind the public factor build (offline).
 
 Covers lib/factor_fetch._cached: cache hit/miss/force semantics, lazy URL resolution (rotating
-vintages), the sidecar meta fingerprint, and the date-seam checks (null dates fail loudly; duplicate
-months pass verbatim -- the panel-level dedup resolves them, matching upstream)."""
+vintages), the sidecar meta fingerprint, and the date-seam checks (null dates raise an error,
+duplicate months pass verbatim and the panel-level dedup resolves them, matching upstream)."""
 from __future__ import annotations
 
 import json
@@ -81,5 +81,5 @@ def test_cached_rejects_null_dates_but_keeps_duplicates(cache_dir, capsys):
 
     dup = _frame(("2025-01-31", "2025-01-31"))   # the 2026 HKM vintage ships 2025-01 twice
     out = ffetch._cached("t5", "u", lambda url: dup, force=False)
-    assert len(out) == 2                         # kept verbatim; panel dedup keep-first resolves
+    assert len(out) == 2                         # kept verbatim, and panel dedup keep-first resolves
     assert "duplicate month" in capsys.readouterr().out

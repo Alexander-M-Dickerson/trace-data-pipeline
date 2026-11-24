@@ -1,4 +1,4 @@
-"""pybondlab_pin.py -- the PyBondLab release Stages 2, 3 and 4 run on, and the check for it.
+"""The PyBondLab release Stages 2, 3 and 4 run on, and the check for it.
 
 Stage 2's BBW factors and every portfolio sort in Stages 3 and 4 come out of PyBondLab, so
 its version is part of every number those stages write. It is pinned exactly, here and
@@ -11,8 +11,8 @@ PyBondLab is installed in a second step, without its dependency list:
     python -m pip install --no-deps pybondlab==0.3.0
 
 PyBondLab 0.3.0 declares `numpy<2`. This repository installs numpy 2, so pip would refuse
-to install the two together. PyBondLab's code runs on numpy 2 -- its test suite passes on
-numpy 2.5.3 -- and everything else it needs is already in `requirements-local.txt`.
+to install the two together. PyBondLab's code runs on numpy 2 (its test suite passes on
+numpy 2.5.3), and everything else it needs is already in `requirements-local.txt`.
 
     check()        None when the environment can run Stages 2-4 (this PyBondLab, and numba and
                    numexpr installed), else what is wrong and the fix
@@ -40,9 +40,9 @@ def installed_version() -> str | None:
 
 # [tag:rule.pybondlab_pin] stages 2-4 stop at start-up unless PyBondLab is the pinned release and numba and numexpr are installed
 def check() -> str | None:
-    """None when PyBondLab is the pinned release and numba and numexpr are present; else the fix.
+    """None when PyBondLab is the pinned release and numba and numexpr are present, else the fix.
 
-    numexpr changes numbers, not just speed: see numeric_setup.py."""
+    numexpr changes numbers as well as speed (see numeric_setup.py)."""
     problems = []
     try:
         got = installed_version()
@@ -63,7 +63,7 @@ def check() -> str | None:
 
 
 def tree_sha256(pkg: Path) -> str:
-    """Content hash of the package source -- the same PyBondLab gives the same hash."""
+    """Content hash of the package source. The same PyBondLab gives the same hash."""
     h = hashlib.sha256()
     for p in sorted(pkg.rglob("*")):
         if p.is_file() and p.suffix in (".py", ".csv", ".json") and "__pycache__" not in p.parts:

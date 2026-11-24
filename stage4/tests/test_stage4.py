@@ -2,9 +2,9 @@
 
     python -m pytest stage4/tests -q
 
-The check against the real published factors is `compare_published.py`, which needs a full
-Stage 2 build; these tests cover what that comparison cannot isolate: the duration swap,
-the flip set, the CSV pivot, the grid in the spec, and one small run through PyBondLab.
+The check against the published factors themselves is `compare_published.py`, which needs a
+full Stage 2 build. These tests cover what that comparison cannot isolate, namely the duration
+swap, the flip set, the CSV pivot, the grid in the spec, and one small run through PyBondLab.
 """
 from __future__ import annotations
 

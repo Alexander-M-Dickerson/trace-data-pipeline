@@ -1,4 +1,4 @@
-"""vix.py -- daily VIX from WRDS (cboe.cboe), faithful to upstream `_fetch_vix_from_wrds`:
+"""Daily VIX from WRDS (cboe.cboe), faithful to upstream `_fetch_vix_from_wrds`:
 vix_scaled = vix / sqrt(12) / 100. Fetched once, cached to data/cboe_vix.parquet (fingerprinted in
 the manifest). No vintage truncation needed: the risk step only uses VIX at trade dates present in
 the daily input (<= 2025-03-31), and the CBOE history is static.

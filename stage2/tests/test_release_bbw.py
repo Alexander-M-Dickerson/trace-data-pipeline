@@ -4,15 +4,14 @@ test_release_bbw.py
 ===================
 The BBW four-factor bundle, `make_release.py --what bbw`.
 
-Two claims travel with that zip and both are tested rather than trusted. First, that the
-extended series equals the TRACE series from 2002-08 -- step 4 keeps the TRACE-native
-factors after the cutoff and splices the Lehman-ICE backfill only before it, so any
-difference means the bundle was built from blocks of different runs. Second, that the file
-shipped as the authors' original series IS that file: it is pinned by sha256, and a changed
-copy is refused.
+Two claims travel with that zip and both are tested. First, that the extended series equals
+the TRACE series from 2002-08. Step 4 keeps the TRACE-native factors after the cutoff and
+splices the Lehman-ICE backfill only before it, so any difference means the bundle was built
+from blocks of different runs. Second, that the file shipped as the authors' original series
+is that file. It is pinned by sha256, and a changed copy is refused.
 
 The gates are exercised on small synthetic blocks written to a temporary directory, with
-the real pinned original, so the test needs no build on disk.
+the pinned original itself, so the test needs no build on disk.
 
 Author: Open Source Bond Asset Pricing
 """
@@ -63,7 +62,7 @@ def _write_blocks(root: Path, *, poison: str | None = None) -> Path:
         if pub.startswith("lrf_"):
             pre = np.full(151, np.nan)                     # no LRF before TRACE
         merged[ext_col] = np.concatenate([pre, trace_vals[pub]])
-    merged["mktrf"] = 0.0                                  # a macro column, as the real file has
+    merged["mktrf"] = 0.0                                  # a macro column, as the actual file has
 
     if poison == "shifted":
         merged.loc[merged["date"] >= "2002-08-31", "drf_bns"] += 1e-6   # the block name
@@ -105,7 +104,7 @@ def test_clean_blocks_pass_and_the_extended_series_carries_the_backfill(tmp_path
 
 
 def test_an_extended_series_that_differs_after_the_cutoff_is_refused(tmp_path):
-    """❗One millionth on one column in one era. This is what blocks from two different runs
+    """One millionth on one column in one era. This is what blocks from two different runs
     look like, and the bundle must not ship it as one history."""
     blocks = _write_blocks(tmp_path / "blocks", poison="shifted")
     with pytest.raises(SystemExit, match="differs from the TRACE series"):
@@ -201,7 +200,7 @@ def test_what_all_includes_the_bundle():
 def test_a_factors_merged_without_the_twins_is_rebuilt_not_refused(tmp_path, monkeypatch):
     """Step 4 writes factors_merged before make_excess_blocks.py builds the _bns/_cls twins, so
     on a normal build the file lacks their columns. Until 2026-09-23 the release stopped there
-    unless step 4 ran again; it now builds step 4's matrix itself, and the gate still checks it."""
+    unless step 4 ran again. It now builds step 4's matrix itself, and the gate still checks it."""
     blocks = _write_blocks(tmp_path / "stage1")
     full = pd.read_parquet(blocks / "factors_merged.parquet")
     twins = [c for c in full.columns if c.endswith(("_bns", "_cls"))]
@@ -216,7 +215,7 @@ def test_a_factors_merged_without_the_twins_is_rebuilt_not_refused(tmp_path, mon
 
 def test_what_all_skips_a_bbw_bundle_it_cannot_build_and_still_builds_daily(monkeypatch, tmp_path):
     """Most users never build the benchmark twins. `--what all` used to stop at the BBW bundle,
-    before the daily one; it now skips it, says so, and exits non-zero."""
+    before the daily one. It now skips it, says so, and exits non-zero."""
     done = []
     monkeypatch.setattr(mr, "release_panel", lambda *a: done.append("panel") or 0)
     monkeypatch.setattr(mr, "release_factors", lambda *a: done.append("factors") or 0)

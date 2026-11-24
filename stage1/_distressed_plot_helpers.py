@@ -619,7 +619,7 @@ the within-day return using min and max transaction prices exceeds $\lvert 75\% 
     tex_lines.append(r"\bibliography{references}")
     tex_lines.append(r"\end{document}")
 
-    # Ensure references.bib exists
+    # Make sure references.bib exists
     out_dir.mkdir(parents=True, exist_ok=True)
     bib_path = write_references_bib(out_dir, overwrite=True)
     logging.info("Wrote/confirmed BibTeX at: %s", bib_path)

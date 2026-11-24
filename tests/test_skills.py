@@ -2,8 +2,8 @@
 
     python -m pytest tests/test_skills.py -q
 
-Claude Code reads skills from .claude/skills/; Codex and Gemini read .agents/skills/; Cursor and
-Copilot read both. The two copies must be the same file, or one tool follows a procedure the
+Claude Code reads skills from .claude/skills/, Codex and Gemini read .agents/skills/, and Cursor
+and Copilot read both. The two copies must be the same file, or one tool follows a procedure the
 other has already corrected.
 """
 from __future__ import annotations

@@ -5,56 +5,56 @@
 #$ -cwd
 #$ -pe onenode 1
 #$ -l m_mem_free=16G
-# Written to the REPO ROOT, not smoke/logs/, on purpose: SGE opens these before the
-# script runs, and smoke/logs/ does not exist in a fresh clone -- the job would go
+# Written to the repo root on purpose, not to smoke/logs/. SGE opens these before the
+# script runs, and smoke/logs/ does not exist in a fresh clone, so the job would go
 # straight to Eqw without executing a line. The root always exists.
 #$ -o smoke_test.out
 #$ -e smoke_test.err
 #
-# run_smoke_test.sh -- whole-chain validation on a handful of CUSIP chunks.
+# Whole-chain validation on a handful of CUSIP chunks.
 #
-# Runs stage0 -> (reports) -> stage1 end to end in minutes rather than hours, then
-# asserts the cross-stage invariants. Use it before committing, and before spending
-# four hours on a real run.
+# Runs stage0 -> (reports) -> stage1 end to end in minutes, where a full run takes hours,
+# then asserts the cross-stage invariants. Use it before committing, and before spending
+# four hours on a full run.
 #
 #   ./run_smoke_test.sh                      # default: 5 chunks per member
 #   ./run_smoke_test.sh --chunks 2           # faster
 #   ./run_smoke_test.sh --members "enhanced 144a"
 #   ./run_smoke_test.sh --with-reports       # also exercise the data-report job
-#   ./run_smoke_test.sh --with-figures       # ...INCLUDING its re-clean and figures
+#   ./run_smoke_test.sh --with-figures       # ...including its re-clean and figures
 #   ./run_smoke_test.sh --target-rows 40000  # trade rows packed per chunk (default 40000)
 #   ./run_smoke_test.sh --root DIR           # where the outputs go (default: smoke/ in the repo)
 #
 # The flags set STAGE0_LIMIT_CHUNKS, STAGE0_TARGET_ROWS and STAGE0_OUTPUT_FIGURES for the
-# run; an exported value of those is replaced by the flag's. --root is DELETED and rebuilt
+# run, and an exported value of those is replaced by the flag's. --root is deleted and rebuilt
 # on every run, so it must be smoke/, a new or empty folder, or one an earlier smoke run
 # made.
 #
-# On the WRDS Cloud this must be SUBMITTED, not run on the login node -- CPU- and
-# memory-intensive work is not permitted on the head nodes:
+# On the WRDS Cloud this must be submitted, not run on the login node, because work that
+# is heavy on CPU or memory is not permitted on the head nodes.
 #
-#   ./download_inputs.sh          # once, on the login node -- needs internet
-#   qsub run_smoke_test.sh        # from the REPO ROOT
+#   ./download_inputs.sh          # once, on the login node, which has internet
+#   qsub run_smoke_test.sh        # from the repo root
 #
-# It runs the REAL stage0/stage1 code straight out of this repo. Nothing is copied,
-# so the run can never be validating a stale duplicate. Outputs are redirected purely
-# by the working directory: both settings modules derive their root from the cwd, so
-# running from smoke/stage0 and smoke/stage1 puts every artifact under smoke/ and
-# leaves production outputs untouched.
+# It runs the stage0 and stage1 code straight out of this repo. Nothing is copied, so the
+# run cannot be validating a stale duplicate. Outputs are redirected by the working
+# directory alone. Both settings modules derive their root from the cwd, so running from
+# smoke/stage0 and smoke/stage1 puts every artifact under smoke/ and leaves production
+# outputs untouched.
 
 set -uo pipefail
 
-# Find the repo. This is not as simple as dirname "$0", because under qsub SGE COPIES
-# the job script into its spool directory and runs the copy -- so BASH_SOURCE points at
+# Find the repo. dirname "$0" is not enough, because under qsub SGE copies the job
+# script into its spool directory and runs the copy. BASH_SOURCE then points at
 # something like /gridware/sge/default/spool/<node>/job_scripts, and every path built
 # from it lands nowhere. That made the submitted run, which is the documented way to
 # run this on WRDS, report the repo's own inputs as missing.
 #
-# So: try the candidates in order and take the first that actually LOOKS like the repo,
-# rather than trusting any single one of them.
-#   SGE_O_WORKDIR  the directory qsub was invoked from -- correct under a job
+# So try the candidates in order and take the first that looks like the repo. No single
+# one of them can be trusted.
+#   SGE_O_WORKDIR  the directory qsub was invoked from, correct under a job
 #   PWD            "#$ -cwd" starts the job there too, and it is right for a local run
-#   BASH_SOURCE    correct locally; the spool copy under qsub
+#   BASH_SOURCE    correct locally, the spool copy under qsub
 _looks_like_repo() { [[ -d "$1/stage0" && -d "$1/stage1" ]]; }
 
 REPO=""
@@ -74,9 +74,9 @@ CHUNKS=5
 MEMBERS=""
 WITH_REPORTS=0
 WITH_FIGURES=0
-# Production packs chunks to ~750k trade rows. That is the right size for a real run
-# and far too big for a smoke run, where the point is to exercise every code path
-# quickly. Pack small instead: the packing logic is still exercised, the volume is not.
+# Production packs chunks to ~750k trade rows. That is the right size for a full run
+# and far too big for a smoke run, which exists to exercise every code path quickly.
+# So pack small. The packing logic is still exercised, the volume is not.
 TARGET_ROWS=40000
 
 while [[ $# -gt 0 ]]; do
@@ -101,11 +101,11 @@ if [[ -z "${WRDS_USERNAME:-}" ]]; then
     WRDS_USERNAME="$(cd "${REPO}" && "${PY}" -B -c 'import config; print(config.WRDS_USERNAME)' 2>/dev/null)"
 fi
 
-# Check the credentials BEFORE spending anything on them. Without WRDS_USERNAME,
+# Check the credentials before spending anything on them. Without WRDS_USERNAME,
 # config.py falls back to the literal "your_wrds_username", the wrds package prompts on
-# stdin, and the run dies minutes in with "EOFError: EOF when reading a line" -- which
-# reads exactly like the connection limit and sends you hunting the wrong thing
-# entirely. Two seconds here saves that.
+# stdin, and the run dies minutes in with "EOFError: EOF when reading a line". That
+# reads exactly like the connection limit and sends you looking in the wrong place.
+# The check takes two seconds.
 if [[ -z "${WRDS_USERNAME:-}" || "${WRDS_USERNAME}" == [Yy][Oo][Uu][Rr]_* ]]; then   # as stage 2 counts it
     echo "[error] WRDS_USERNAME is not set (got: ${WRDS_USERNAME:-<unset>})"
     echo "        export WRDS_USERNAME=\"your_id\", or set it in config.py, then re-run"
@@ -119,10 +119,10 @@ export STAGE0_TARGET_ROWS="${TARGET_ROWS}"
 # Figures are the slowest part of stage0 and prove nothing about the cross-stage seams,
 # so they are off by default.
 #
-# ❗But the report job's error_checks -- the re-clean that this harness is otherwise
-# blind to -- sits INSIDE `if STAGE0_OUTPUT_FIGURES:`. With figures off, --with-reports
-# goes green having executed none of it. --with-figures turns it on AND forces the
-# flagged universe into several small chunks, so the concurrent path actually runs.
+# But the report job's error_checks, the re-clean this harness otherwise never sees,
+# sits inside `if STAGE0_OUTPUT_FIGURES:`. With figures off, --with-reports passes
+# having executed none of it. --with-figures turns it on and also forces the flagged
+# universe into several small chunks, so the concurrent path runs.
 if [[ ${WITH_FIGURES} -eq 1 ]]; then
     export STAGE0_OUTPUT_FIGURES=1
     export STAGE0_REPORT_CHUNK_SIZE="${STAGE0_REPORT_CHUNK_SIZE:-3}"
@@ -148,12 +148,12 @@ echo "================================================================"
 
 # ---------------------------------------------------------------- scratch root
 # Keep the CUSIP row counts across runs. The aggregate that produces them scans the
-# whole source table -- 93 s for Enhanced -- which is nothing against a real run but
+# whole source table (93 s for Enhanced). That is nothing against a full run but
 # dominates a smoke run, and re-measuring it on every iteration makes this tool
 # annoying enough that people stop using it.
 # The whole of ROOT is deleted below. Refuse anything but the default smoke/, a folder that
-# does not exist or is empty, and one an earlier smoke run marked as its own. Compared as real
-# paths, so `--root smoke` is the default too.
+# does not exist or is empty, and one an earlier smoke run marked as its own. The paths are
+# compared as real paths, so `--root smoke` is the default too.
 _real() { (cd "$1" 2>/dev/null && pwd -P); }
 if [[ -e "${ROOT}" && ! -d "${ROOT}" ]]; then
     echo "[error] --root ${ROOT} is a file, and this script deletes what --root names."
@@ -190,8 +190,8 @@ fi
 rm -rf "${CACHE_KEEP}"
 
 # Stage 1 needs the files run_pipeline.sh fetches on the login node. Reuse the
-# repo's copies if they are already there; otherwise say so plainly rather than
-# failing thirty minutes in.
+# repo's copies if they are already there. Otherwise say so now, before the run
+# fails thirty minutes in.
 MISSING=0
 for f in liu_wu_yields.xlsx Siccodes12.txt Siccodes17.txt Siccodes30.txt; do
     if [[ -f "${REPO}/stage1/data/${f}" ]]; then

@@ -16,7 +16,7 @@ This stage:
 7. Merges equity identifiers via the dated bond-firm linker
 8. Applies ultra-distressed bond filters
 9. Applies final price and date filters
-10. Generates comprehensive data quality reports 
+10. Generates data quality reports
 
 Author: Alex Dickerson
 Created: 2025-11-17
@@ -43,8 +43,8 @@ def run_stage1(config: dict):
 
     # Import stage1_pipeline as a module.
     #
-    # Resolve it next to THIS file, not under ROOT_PATH. ROOT_PATH says where the DATA
-    # lives -- _stage1_settings explicitly documents pointing it at a data directory --
+    # Resolve it next to this file, not under ROOT_PATH. ROOT_PATH says where the data
+    # lives (_stage1_settings explicitly documents pointing it at a data directory),
     # while stage1_pipeline.py always sits beside create_daily_stage1.py. Deriving the
     # code location from the data location breaks any run whose outputs live outside
     # the checkout: a separate results tree, or the smoke test's scratch root.
@@ -106,13 +106,13 @@ def run_stage1(config: dict):
     pipeline_module.LINKER_ZIPKEY = config["linker_zipkey"]
     pipeline_module.LINKER_WINDOW = tuple(config["linker_window"])
 
-    # DATE_CUT_OFF may be an "auto:-Nmo" spec; step 2 resolves it once the data's
+    # DATE_CUT_OFF may be an "auto:-Nmo" spec. Step 2 resolves it once the data's
     # last trade date is known.
     from _stage1_settings import (resolve_date_cut_off, resolve_cut_off_from_data,
                                   cut_off_basis, last_complete_month, source_frontiers)
     pipeline_module.resolve_date_cut_off = resolve_date_cut_off
-    # "auto:complete" needs the tape, not just its last date, so the pipeline resolves
-    # the spec through resolve_cut_off_from_data rather than resolve_date_cut_off.
+    # "auto:complete" needs the trades and not only their last date, so the pipeline resolves
+    # the spec through resolve_cut_off_from_data, not resolve_date_cut_off.
     pipeline_module.resolve_cut_off_from_data = resolve_cut_off_from_data
     pipeline_module.cut_off_basis = cut_off_basis
     pipeline_module.last_complete_month = last_complete_month

@@ -1,13 +1,14 @@
 """The 1997-2002 quote panel: its column contract, and the stale-cache guard.
 
 `lib/quote.py` caches its download, so repointing QUOTE_URL at a new file changes nothing on a
-machine that already holds the old one -- the build keeps running on stale data and every number
-it produces looks reasonable. That is the failure these tests exist to prevent.
+machine that already holds the old one. The build keeps running on stale data and every number
+it produces looks reasonable. These tests exist to prevent that failure.
 
 The 2026 file widened the panel from 9 columns to 14 by adding the five Treasury benchmarks.
-Measured at the time: steps 3, 4 and 5 all consume byte-identical frames either way, because each
+Measured at the time, steps 3, 4 and 5 all consume byte-identical frames either way, because each
 one selects its columns by name and then sorts by (cusip, date). `test_widening_cannot_reach_the_
-steps` pins the property that makes that true, so a future widening cannot quietly stop being safe.
+steps` pins the property that makes that true, so a future widening cannot stop being safe
+without a test failing.
 """
 import pandas as pd
 import pytest
@@ -22,7 +23,7 @@ def _frame(cols):
 
 # --------------------------------------------------------------- the declared contract
 def test_settings_declare_a_column_contract():
-    """QUOTE_URL alone is not a contract -- the columns it must deliver are."""
+    """QUOTE_URL alone is not a contract. The columns it must deliver are."""
     assert cfg.QUOTE_REQUIRED_COLS, "QUOTE_REQUIRED_COLS must not be empty"
     for c in ("cusip_id", "date", "ret_vw", "tret", "cs", "bbtm"):
         assert c in cfg.QUOTE_REQUIRED_COLS, f"{c} is read by a step and must be required"
@@ -59,7 +60,7 @@ def test_missing_accepts_the_extended_file():
 
 
 def test_missing_flags_a_dropped_required_column():
-    """Widening is safe; NARROWING is what breaks the rolling windows."""
+    """Widening is safe. Narrowing is what breaks the rolling windows."""
     short = _frame([c for c in cfg.QUOTE_REQUIRED_COLS if c != "tret"]
                    + list(cfg.QUOTE_BENCHMARK_COLS))
     assert "tret" in quote._missing(short)
@@ -90,7 +91,7 @@ def test_a_stale_cache_is_not_returned(tmp_path, monkeypatch):
 
 
 def test_a_download_that_disagrees_with_the_settings_raises(tmp_path, monkeypatch):
-    """Silently building on the wrong file is worse than stopping."""
+    """Building on the wrong file without an error is worse than stopping."""
     if not getattr(cfg, "QUOTE_HAS_BENCHMARKS", False):
         pytest.skip("nine-column panel configured")
     monkeypatch.setattr(quote, "QUOTE_CACHE", tmp_path / "absent.parquet")
@@ -105,8 +106,8 @@ def test_widening_cannot_reach_the_steps():
     """Steps 3/4/5 select quote columns BY NAME and then sort by (cusip, date).
 
     Those two properties together are what make a wider file a no-op. If a step ever starts
-    consuming the frame wholesale, or stops sorting, this test is the thing that should have
-    caught it -- so it reads the step sources rather than trusting a comment.
+    consuming the frame wholesale, or stops sorting, this test should catch it, so it reads
+    the step sources and does not trust a comment.
     """
     from pathlib import Path
     steps = Path(__file__).resolve().parents[1] / "steps"

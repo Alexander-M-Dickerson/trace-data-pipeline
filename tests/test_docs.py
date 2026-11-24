@@ -10,8 +10,8 @@ This exists because a single audit found, in docs that all read plausibly:
   * Two repository trees listing a Stage 0 quickstart named `QUICKSTART_stage0` and a
     `requirements.txt` in `stage1/`, neither of which exists, while omitting `config.py`,
     `FAQ.md` and `stage1/stage1_pipeline.py`, which do.
-  * "Edit `_trace_settings.py` and change `WRDS_USERNAME`" -- an instruction that
-    silently does nothing, because that module imports the value from `config.py`.
+  * "Edit `_trace_settings.py` and change `WRDS_USERNAME`", an instruction that
+    does nothing and raises no error, because that module imports the value from `config.py`.
   * `OSBAP_Linker_*.parquet`, renamed a release earlier.
   * Feature lists still saying "Fama-French 17 and 30" after FF12 shipped.
 
@@ -21,23 +21,23 @@ docs name are checked to exist.
 
     python3 tests/test_docs.py
 
-CHANGELOG.md is deliberately EXEMPT from the file-existence check. Its old entries
-record what was true at the time -- an entry naming a since-deleted script is correct
-history, not drift.
+CHANGELOG.md is exempt from the file-existence check on purpose. Its old entries
+record what was true at the time, so an entry naming a script that was later deleted is
+correct history, not drift.
 
-WHAT THIS FILE DOES NOT DO
+What this file does not do
 --------------------------
-It cannot tell whether a sentence is TRUE. The 2.2.3 audit found nine worked examples
-whose arithmetic was reasoned out rather than run; two taught the OPPOSITE of what the
-code does, and one example's stated verdict flipped when the real function was executed
+It cannot tell whether a sentence is true. The 2.2.3 audit found nine worked examples
+whose arithmetic was reasoned out and never run. Two taught the opposite of what the
+code does, and one example's stated verdict flipped when the function itself was executed
 on its own input. Every check here passed throughout. Prose about behaviour is verified
-by RUNNING the function on the documented input and reading the output -- there is no
-substitute, and no check below attempts one.
+by running the function on the documented input and reading the output. Nothing else
+does that job, and no check below attempts it.
 
 The structural checks added in 2.2.3 cover the classes that came back twice: output
-trees vs what the writer actually writes, `qsub <script>` paths, TOC completeness,
-in-page anchors, and OUTPUT_FORMAT. They are deliberately narrow. Each was
-mutation-tested -- break the thing it guards and the suite must go red.
+trees vs what the writer writes, `qsub <script>` paths, TOC completeness,
+in-page anchors, and OUTPUT_FORMAT. They are narrow on purpose. Each was
+mutation-tested, which means breaking the thing it guards must make the suite fail.
 
 Author: Open Source Bond Asset Pricing
 """
@@ -60,7 +60,7 @@ def check(name, cond, detail=""):
 
 
 # Docs whose claims must track the code. CHANGELOG is loaded but exempt from the
-# file-existence rule; see the module docstring.
+# file-existence rule (see the module docstring).
 DOC_FILES = [
     "README.md", "QUICKSTART.md", "FAQ.md", "CONTRIBUTING.md",
     "stage0/README_stage0.md", "stage0/quickstart.md", "stage0/DATA_DICTIONARY.md",
@@ -78,7 +78,7 @@ DOC_FILES = [
     "stage0/AGENTS.md", "stage1/AGENTS.md", "tests/AGENTS.md", "CLAUDE.md", "TAGS.md",
     ".github/copilot-instructions.md", "GEMINI.md",
 ]
-# Every skill, found rather than listed: a list kept by hand missed the seventh.
+# Every skill, found by a search and not listed, because a list kept by hand missed the seventh.
 DOC_FILES += sorted(p.relative_to(ROOT).as_posix() for p in (ROOT / ".agents" / "skills").glob("*/SKILL.md"))
 
 # Named in prose but produced at runtime or shipped inside a download, so they are
@@ -105,10 +105,10 @@ BANNED = {
 def check_output_trees(docs):
     """Every basename stage 0 writes must appear in the docs' output trees.
 
-    These trees were corrected in 2.2.0 and had drifted again within days; 2.2.3 found
+    These trees were corrected in 2.2.0 and had drifted again within days. 2.2.3 found
     QUICKSTART advertising a `stage0/<member>/reports/` folder that does not exist and
-    listing 2 of the 9 files a member actually produces. Reading cannot catch that --
-    only comparing the tree against the dict the writer loops over.
+    listing 2 of the 9 files a member produces. Reading cannot catch that. Only comparing
+    the tree against the dict the writer loops over can.
     """
     import ast
     src = (ROOT / "stage0" / "create_daily_enhanced_trace.py").read_text(encoding="utf-8")
@@ -119,7 +119,7 @@ def check_output_trees(docs):
     check("found the stage-0 output filename table in the code", len(names) >= 8,
           f"{len(names)} basenames")
 
-    # Checked PER FILE. Pooling the docs lets one tree cover another's omission --
+    # Checked per file. Pooling the docs lets one tree cover another's omission,
     # which is how QUICKSTART kept passing while listing 2 of the 9 files.
     missing, trees = [], ""
     for f in ("QUICKSTART.md", "stage0/README_stage0.md"):
@@ -133,7 +133,7 @@ def check_output_trees(docs):
         missing += [f"{f}: {n}" for n in names if n not in this]
     check("output trees name every file stage 0 writes", not missing, str(missing))
 
-    # A member folder never holds a reports/ subfolder -- reports live in data_reports/.
+    # A member folder never holds a reports/ subfolder. Reports live in data_reports/.
     bad = re.findall(r"^\W*(enhanced|standard|144a)/.*\n(?:^\W*\w[^\n]*\n){0,10}?^\W*reports/",
                      trees, re.M)
     check("no output tree puts reports/ under a member folder", not bad, str(bad))
@@ -163,7 +163,7 @@ def slug(h):
 
 def check_toc(docs):
     """Every `## ` section must appear in its file's table of contents, and every
-    in-page anchor must resolve. Both drifted silently across three releases."""
+    in-page anchor must resolve. Both drifted unnoticed across three releases."""
     SKIP = {"Table of Contents", "Contents"}
     missing_all, dead_all = [], []
     for fname, text in docs_all.items():
@@ -187,9 +187,9 @@ def check_toc(docs):
 def check_output_format(docs):
     """OUTPUT_FORMAT accepts only 'parquet'. No doc may offer csv as a working option.
 
-    Stage 0 writes .csv.gzip happily; Stage 1 and the report builder read a hard-coded
-    '*.parquet'. The run then failed hours in. _trace_settings.py refuses it at import
-    since 2.2.3, and the docs must not contradict that.
+    Stage 0 writes .csv.gzip without complaint, but Stage 1 and the report builder read a
+    hard-coded '*.parquet'. The run then failed hours in. _trace_settings.py refuses it at
+    import since 2.2.3, and the docs must not contradict that.
     """
     ts = (ROOT / "stage0" / "_trace_settings.py").read_text(encoding="utf-8")
     check("_trace_settings.py rejects a non-parquet OUTPUT_FORMAT",
@@ -203,7 +203,7 @@ def check_output_format(docs):
 def check_fences(docs):
     """Code fences must balance, and a fence must not open while one is already open.
 
-    2.2.3 found a stray closing ``` that silently swallowed the next three paragraphs
+    2.2.3 found a stray closing ``` that swallowed the next three paragraphs
     of stage0/quickstart.md into a code block, and an empty ```python immediately
     followed by another ```python in stage1/README_stage1.md. Both render wrong and
     neither is visible in the source.
@@ -312,7 +312,7 @@ def _tracked_code():
 def check_code_map(docs):
     """Every code file is in CODE_MAP.md, by its full path.
 
-    The README and QUICKSTART each carried a hand-kept file tree; both drifted in 2.2.0, again
+    The README and QUICKSTART each had a hand-kept file tree. Both drifted in 2.2.0, again
     in 2.2.3, and again by 2026-09-23 (13 Stage 2 files missing). The trees were replaced by
     CODE_MAP.md and this check. Full paths, because names repeat: helper_functions.py is in
     both stage1/ and stage3/. Stage 3's drivers may be listed in stage3/INDEX.md instead,
@@ -355,7 +355,7 @@ def check_links(docs):
     """Every relative link resolves, and every anchor in a link to another page names a
     real heading.
 
-    check_toc covers anchors inside one page; this covers links between files, which is what
+    check_toc covers anchors inside one page. This covers links between files, which is what
     a moved or renamed doc breaks.
     """
     broken = []
@@ -382,8 +382,8 @@ def main():
     absent = [f for f in DOC_FILES if not (ROOT / f).exists()]
     check("every doc this file checks exists", not absent, str(absent))
     docs = {f: (ROOT / f).read_text(encoding="utf-8") for f in DOC_FILES if f not in absent}
-    # A wider set for the structural checks: they apply to every doc that
-    # carries a tree, a TOC, a qsub line or a config snippet.
+    # A wider set for the structural checks. They apply to every doc that
+    # has a tree, a TOC, a qsub line or a config snippet.
     docs_all = dict(docs)
     for extra in ("stage0/README_bounce_back_filter.md",
                   "stage0/README_decimal_shift_corrector.md",
@@ -420,8 +420,8 @@ def main():
     imports_it = "from config import" in ts and "WRDS_USERNAME" in ts.split("from config import")[1][:120]
     check("_trace_settings.py imports WRDS_USERNAME from config.py", imports_it)
     if imports_it:
-        # Any verb, not just "edit": two real instances said "Open `_trace_settings.py`"
-        # and "default fallback in `_trace_settings.py`" and slipped through a check
+        # Any verb counts. Two instances said "Open `_trace_settings.py`" and
+        # "default fallback in `_trace_settings.py`" and slipped through a check
         # written around the word "Edit".
         near = re.compile(
             r"`?_trace_settings\.py`?.{0,80}?WRDS_USERNAME"

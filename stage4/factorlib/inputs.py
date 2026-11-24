@@ -1,21 +1,21 @@
-"""inputs.py -- Stage 2's panel, in the form each return type sorts.
+"""Stage 2's panel, in the form each return type sorts.
 
 Four return types, from one panel:
 
-  exc    the panel as built, with `ret_vw` made EXCESS of the one-month T-bill (Stage 2's
-         factor file, column `rf`). The published leg levels are excess returns; the
+  exc    the panel as built, with `ret_vw` in excess of the one-month T-bill (Stage 2's
+         factor file, column `rf`). The published leg levels are excess returns. The
          long-short leg would not notice the difference, the long and short legs would.
   dur    duration-adjusted: `ret_vwx = ret_vw - tret`, `str = str - tret` (short-term
   dbns   reversal is a return, so it moves too), and the 68 beta and momentum columns
   dcls   replaced by Stage 2's blocks estimated on that same adjusted return. dbns and dcls
          do the same against `tret_bns` and `tret_cls`.
 
-❗A duration-adjusted return type is a different PANEL, not the same panel with another
-return column: sorting `ret_vwx` on betas estimated on `ret_vw` would give plausible
+A duration-adjusted return type is a different panel. Changing the return column is not
+enough, because sorting `ret_vwx` on betas estimated on `ret_vw` would give plausible
 numbers for the wrong question. The swap is checked in both directions.
 
 [ref:rule.return_types] the swap and the Treasury series are `return_types.py` at the
-repository root, shared with stage 3; which columns are returns is decided here.
+repository root, shared with stage 3. Which columns are returns is decided here.
 """
 from __future__ import annotations
 
@@ -38,9 +38,9 @@ def missing_inputs(return_types) -> list[str]:
 
 
 def swap(df: pd.DataFrame, blocks: list[str], tret_col: str) -> pd.DataFrame:
-    """Replace the 68 beta and momentum columns with the blocks' versions; adjust the returns.
+    """Replace the 68 beta and momentum columns with the blocks' versions and adjust the returns.
 
-    The blocks carry the same 68 names (`b_amd`, not `b_amd_bns`), so the swap is by name.
+    The blocks use the same 68 names (`b_amd`, not `b_amd_bns`), so the swap is by name.
     Anything dropped and not added back, or added and never dropped, stops the build.
     """
     df = RT.swap(df, blocks, S.block_path)
@@ -51,7 +51,7 @@ def swap(df: pd.DataFrame, blocks: list[str], tret_col: str) -> pd.DataFrame:
 
 
 def add_risk_free(df: pd.DataFrame, excess: bool) -> pd.DataFrame:
-    """Merge the one-month T-bill by date, replacing the panel's own `rfret`; `excess`
+    """Merge the one-month T-bill by date, replacing the panel's own `rfret`. `excess`
     subtracts it from `ret_vw` (the exc return type only)."""
     rf = pd.read_parquet(S.RISK_FREE, columns=["date", S.RISK_FREE_COLUMN])
     rf["date"] = pd.to_datetime(rf["date"])

@@ -1,19 +1,19 @@
 #!/bin/bash
 # [tag:entry.download_inputs] fetches stage 1's inputs: bash download_inputs.sh, on the login node
-# download_inputs.sh -- fetch the external files stage 1 needs.
+# Fetch the external files stage 1 needs.
 #
 # Stage 1 needs three things this repo does not ship: the Liu-Wu zero-coupon treasury
 # curve, the bond-firm linker, and the Fama-French industry classifications (three files). They come
-# off the internet, and WRDS COMPUTE NODES HAVE NO INTERNET -- so this has to run on
+# off the internet, and WRDS compute nodes have no internet, so this has to run on
 # the login node, before anything is submitted.
 #
 #   ./download_inputs.sh
-#   ./download_inputs.sh --check    say which of the files are already here; download nothing
+#   ./download_inputs.sh --check    say which of the files are already here, and download nothing
 #
 # run_pipeline.sh calls this for you. Run it yourself before ./run_smoke_test.sh,
 # which is submitted straight to the grid and so cannot fetch anything.
 #
-# Safe to re-run: each file is downloaded beside its destination and moved into place only
+# Safe to re-run. Each file is downloaded beside its destination and moved into place only
 # when it arrived whole, so a failed download leaves the previous copy exactly as it was.
 
 set -uo pipefail
@@ -23,9 +23,9 @@ CHECK_ONLY=0
 [[ "${1:-}" == "--check" ]] && CHECK_ONLY=1
 [[ $CHECK_ONLY -eq 1 ]] || mkdir -p stage1/data
 
-# fetch URL DEST [zip]: download to DEST.part, check it is non-empty (and, for a zip -- an
-# .xlsx is one -- that it opens), then move it over DEST. `wget -O DEST` would empty DEST before the download starts,
-# so a failed re-run would replace a good file with an empty one.
+# fetch URL DEST [zip]: download to DEST.part, check it is non-empty (and, for a zip, that it
+# opens, an .xlsx being a zip too), then move it over DEST. `wget -O DEST` would empty DEST before
+# the download starts, so a failed re-run would replace a good file with an empty one.
 fetch() {
     local url="$1" dest="$2" kind="${3:-}" part="$2.part"
     rm -f "$part"
@@ -109,11 +109,10 @@ for file in "liu_wu_yields.xlsx" "bond_firm_linker_2026/fl_linker.parquet" "Sicc
 done
 
 if [[ $MISSING_FILES -gt 0 ]]; then
-    # Exit non-zero rather than warn-and-continue, which is what this used to do inside
-    # run_pipeline.sh. Every one of these files is required for stage 1's 44-column
-    # output -- the yields for credit_spread, the linker for permno, the FF files for
-    # the industry codes -- so a missing one is not a warning, it is a run that fails
-    # several hours later having burned the grid time.
+    # Exit non-zero. This used to warn and continue inside run_pipeline.sh. Every one of
+    # these files is required for stage 1's 44-column output (the yields for credit_spread,
+    # the linker for permno, the FF files for the industry codes), so a missing one means a
+    # run that fails several hours later, after using the grid time.
     echo "[error] ${MISSING_FILES} required file(s) missing. Not continuing."
     echo "[error] Check your internet access on this node, or fetch them by hand from"
     echo "[error] the URLs in this script (download_inputs.sh) into stage1/data/."

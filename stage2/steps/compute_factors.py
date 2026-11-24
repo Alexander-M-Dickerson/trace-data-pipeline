@@ -1,19 +1,19 @@
-"""compute_factors.py -- materialize the factor time-series panel
+"""Materialize the factor time-series panel
 (`blocks/<mode>/factors.parquet`, the seam steps 4 and 7 read).
 
 Two sources (cfg.FACTOR_SOURCE / --factor-source):
-  pinned -- use the factor panel PUBLISHED for this vintage (downloaded from OSBAP), or
-            FACTORS_PINNED_FILE. The route to a published panel's factors; the panel itself is
-            reproduced only from the same WRDS run of stages 0 and 1.
-  public -- assemble fresh from the public fetchers (lib/factor_fetch) + the published extended BBW
-            series (lib/extended_factors). Runs with NO private input, anywhere -- but does NOT
-            bit-match the pinned vintage (FRED/EPU/HKM/Ludvigson back-revise history). The
+  pinned    use the factor panel published for this vintage (downloaded from OSBAP), or
+            FACTORS_PINNED_FILE. This is the route to a published panel's factors. The panel
+            itself is reproduced only from the same WRDS run of stages 0 and 1.
+  public    assemble fresh from the public fetchers (lib/factor_fetch) + the published extended BBW
+            series (lib/extended_factors). It runs anywhere with no private input, but it does
+            not bit-match the pinned vintage (FRED/EPU/HKM/Ludvigson back-revise history). The
             per-column divergence is documented in the divergence report written by this step.
 
 Order of assembly: fetch each source, subtract rf from cptlt, truncate at the start date,
 drop duplicate dates, then outer-merge the extended BBW series (lower-cased names).
 
-CLI (the divergence reporter; run from stage2/):
+CLI (the divergence reporter, run from stage2/):
     python -m steps.compute_factors [--refresh] [--report]
 builds the public panel and, with --report, diffs it per column against the pinned golden vintage,
 printing the table and writing output/factors_public_divergence.json.
@@ -44,8 +44,8 @@ def build_public(force_fetch: bool = False) -> pd.DataFrame:
     out = out[out["date"] >= pd.Timestamp(cfg.FACTORS_START_DATE)]
     out = out.drop_duplicates(subset=["date"], keep="first").reset_index(drop=True)
 
-    # the extended-BBW merge (lowercased): the PUBLISHED pre-2002-08 series, fetched by
-    # lib/extended_factors.py -- see its module docstring for the provenance
+    # the extended-BBW merge (lowercased): the published pre-2002-08 series, fetched by
+    # lib/extended_factors.py (see its module docstring for the provenance)
     ext = extended_factors.load_extended_bbw()
     ext.columns = [c if c == "date" else c.lower() for c in ext.columns]
     out = out.merge(ext, on="date", how="outer")
@@ -59,8 +59,8 @@ def _pinned_factors(force_fetch: bool = False) -> Path:
 
     Precedence: an explicit FACTORS_PINNED_FILE, then a local copy already downloaded,
     then the published zip for this vintage. Publishing these is what lets a released
-    number be reproduced -- the public sources revise, so a fresh build will not match an
-    older release.
+    number be reproduced, because the public sources revise and a fresh build will not
+    match an older release.
     """
     explicit = cfg.GOLDEN_OUTPUTS.get("factors") or cfg.FACTORS_PINNED_FILE
     if explicit:
@@ -103,7 +103,7 @@ def _pinned_factors(force_fetch: bool = False) -> Path:
 
 def ensure(mode: str | None = None, source: str | None = None,
            force_fetch: bool = False) -> Path:
-    """Materialize blocks/<mode>/factors.parquet from `source` ('pinned' | 'public'); returns its path."""
+    """Materialize blocks/<mode>/factors.parquet from `source` ('pinned' | 'public') and return its path."""
     mode = mode or cfg.INPUT_MODE
     source = source or cfg.FACTOR_SOURCE
     dst = cfg.BLOCKS_DIR / mode / "factors.parquet"

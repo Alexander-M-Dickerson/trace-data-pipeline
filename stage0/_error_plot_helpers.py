@@ -380,7 +380,7 @@ def make_panel(df_out: pd.DataFrame,
                 take_idx = np.concatenate(idx_lists)
                 # One take, then column-narrow
                 df_sub = df_out.take(take_idx)[needed]
-                # Preserve page order; build groups without an expensive groupby over the whole df
+                # Preserve page order and build groups without an expensive groupby over the whole df
                 # (We do small groupbys only on df_sub filtered to the page)
                 df_sub = df_sub[df_sub["cusip_id"].isin(page_cusips)]
                 gb = df_sub.groupby("cusip_id", sort=False, observed=True)
@@ -437,7 +437,7 @@ def make_panel(df_out: pd.DataFrame,
         transparent=(params.transparent if params else False),
     )
     
-    # Raster outputs benefit from lower dpi; PDF ignores dpi for vectors
+    # Raster outputs benefit from lower dpi. PDF ignores dpi for vectors
     if ext in ("png", "jpg", "jpeg"):
         savefig_kwargs["dpi"] = (params.figure_dpi if params else 150)
     
@@ -496,7 +496,7 @@ def build_filter_summary(
     - Excludes 'start' from the table body.
     - Treats `decimal_stage` as corrections (not deletions), merges into
       'Removed/Corrected'.
-    - %removed_start = (Removed/Corrected) / total_start, but note that the
+    - %removed_start = (Removed/Corrected) / total_start, except that the
       'overall' row uses (total_start - final_Npost) / total_start.
     - Uses a dense 'true_chunk' to handle non-contiguous chunk ids.
     """
@@ -513,14 +513,14 @@ def build_filter_summary(
     # ---- contiguous chunk ids to avoid gaps ----
     codes, uniques = pd.factorize(drf["chunk"], sort=True)  # NaNs -> -1
 
-    # Try nullable Int64 if available; else fall back to numpy int64
+    # Try nullable Int64 if available, else fall back to numpy int64
     try:
         int_dtype = pd.Int64Dtype()  # may not exist on older pandas
         drf["true_chunk"] = pd.Series(codes + 1, index=drf.index, dtype=int_dtype)
         # preserve NA semantics only when nullable dtype is supported
         drf.loc[drf["chunk"].isna(), "true_chunk"] = pd.NA
     except AttributeError:
-        # older pandas: keep dense ints; NaNs stayed as code -1 -> 0 after +1
+        # older pandas: keep dense ints. NaNs stayed as code -1 -> 0 after +1
         drf["true_chunk"] = pd.Series(codes + 1, index=drf.index).astype(np.int64)
 
     # ---- canonical order via median step index (by true_chunk) ----
@@ -540,7 +540,7 @@ def build_filter_summary(
            .reindex(order)
     )
 
-    # ---- decimal -> corrections; unify as Removed/Corrected ----
+    # ---- decimal -> corrections, unified as Removed/Corrected ----
     is_decimal = (agg.index == decimal_stage)
     removed = agg["Removed"].astype("int64").copy()
     corrected = pd.Series(0, index=agg.index, dtype="int64")
@@ -673,7 +673,7 @@ def filters_df_to_summary(df: pd.DataFrame, start_label: str = "start") -> pd.Da
          })
     )
 
-    # Ensure integer counts
+    # Make sure the counts are integers
     for c in ["Npre", "Npost", "Removed"]:
         out[c] = pd.to_numeric(out[c], errors="coerce").fillna(0).astype("int64")
 
@@ -945,7 +945,7 @@ def _fmt_scalar_value(v):
     if isinstance(v, (int, np.integer)):
         return f"{int(v)}"
     if isinstance(v, (float, np.floating)):
-        # compact but readable; 1e-08 -> 1e-08, 0.25 -> 0.25
+        # compact but readable, e.g. 1e-08 -> 1e-08, 0.25 -> 0.25
         return f"{v:.8g}"
     # Tuples/lists -> literal tuple/list in \texttt{}
     if isinstance(v, (tuple, list)):
@@ -1186,7 +1186,7 @@ reproducible methods for corporate bond research.
     tex_lines.append(r"\bibliography{references}")
     tex_lines.append(r"\end{document}")
 
-    # Ensure references.bib exists
+    # Make sure references.bib exists
     bib_path = write_references_bib(out_dir, overwrite=True)
     logging.info("Wrote/confirmed BibTeX at: %s", bib_path)
 

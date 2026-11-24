@@ -2,30 +2,30 @@
 """
 test_public_boundary.py
 =======================
-Nothing in this repository may carry the author's machine or the private
+Nothing in this repository may name the author's machine or the private
 repositories that sit beside it on that machine.
 
 This is a PUBLIC repository. Everything tracked here is read by people who will never
 see the machine it was written on, and two kinds of detail leak across that boundary
 without anyone meaning them to:
 
-  * an absolute path with a real home directory in it -- `C:\\Users\\<someone>\\...`,
+  * an absolute path with a real home directory in it, such as `C:\\Users\\<someone>\\...` or
     `/home/<someone>/...`. It names a person, and it makes the line unrunnable
     anywhere else.
-  * a path into a sibling repository that is not public -- the licensed Lehman/ICE
-    panel, the factor-production repo, a Dropbox tree. A reader cannot follow it and it
+  * a path into a sibling repository that is not public, such as the licensed Lehman/ICE
+    panel, the factor-production repo or a Dropbox tree. A reader cannot follow it and it
     discloses how the author's disk is laid out.
 
 `stage3/tests/test_stage3_contract.py` has guarded exactly this since stage 3 shipped,
-but ONLY under `stage3/`. Stages 0, 1 and 2 had no equivalent, which is where new work
-actually lands -- the duration-adjusted benchmark work of 2026-09 added files to
+but only under `stage3/`. Stages 0, 1 and 2 had no equivalent, and that is where new work
+lands. The duration-adjusted benchmark work of 2026-09 added files to
 `stage2/` and nothing would have looked at them. This covers every tracked file.
 
 A third kind is checked as WORDS, anywhere in a line: the names of private repositories
 and builds, and of the second PyBondLab path Stage 3 had until 2026-09-26. Those are kept
 as SHA-256 digests, so this file does not spell out what it forbids.
 
-WHAT IT DELIBERATELY DOES NOT FLAG. Naming a private DATASET is not leaking a path.
+What it does not flag, on purpose. Naming a private dataset is not leaking a path.
 "our Lehman-ICE panel" is provenance a user needs in order to know where the extended
 BBW series came from, and the series itself is published. `tab:monthly_data_availability`
 is a LaTeX label, not a directory.
@@ -57,7 +57,7 @@ SELF = {
 PLACEHOLDERS = {
     "yourname", "your_name", "username", "user", "<user>", "youruser", "your_user",
     "proj", "01_trace", "me", "name", "path", "you",
-    # the WRDS cloud home is /home/<your institution>/<your login>/ -- both stand-ins
+    # the WRDS cloud home is /home/<your institution>/<your login>/, and both are stand-ins
     "university", "institution", "wrds_username",
 }
 
@@ -100,7 +100,7 @@ BANNED_WORD_DIGESTS = frozenset({
 })
 
 # A second list. This package's code, comments, tests, docs and CHANGELOG describe what a
-# change does to the method or an exhibit, never where the request came from; these words say
+# change does to the method or an exhibit, never where the request came from. These words say
 # the latter. Digests as above, so this file does not spell them (added 2026-09-29).
 REVIEW_WORD_DIGESTS = frozenset({
     "81803dd4e410a92bc5d510ea539a5d38493e3fe26b707dbac6a63b9e3a7b4d90",
@@ -149,7 +149,7 @@ def word_candidates(line: str):
 
 def banned_words_in(line: str, digests=BANNED_WORD_DIGESTS) -> bool:
     """True if any candidate, or the same candidate with its hyphens read as underscores or as
-    spaces, hashes to a banned word. A digest stores ONE spelling; this catches the others."""
+    spaces, hashes to a banned word. A digest stores one spelling, and this catches the others."""
     for c in word_candidates(line):
         for v in {c, c.replace("-", "_"), c.replace("_", "-"), c.replace("-", " "),
                   c.replace("_", " ")}:
@@ -157,14 +157,14 @@ def banned_words_in(line: str, digests=BANNED_WORD_DIGESTS) -> bool:
                 return True
     return False
 
-# `C:\Users\<name>`, `/home/<name>`, `/Users/<name>` -- the name is captured so a
+# `C:\Users\<name>`, `/home/<name>`, `/Users/<name>`. The name is captured so a
 # placeholder can be let through.
 ABS_USER = re.compile(
     r"(?:[A-Za-z]:[\\/]+Users[\\/]+|/home/|/Users/)([A-Za-z0-9._{}<>$-]+)")
 
-# A path on a lettered drive. `C:\Users\<name>` is ABS_USER's to judge (placeholders pass);
-# any other drive path -- E:\work\..., F:/data -- is the author's disk layout. The letter must
-# start a token, so `https://` is not a drive.
+# A path on a lettered drive. `C:\Users\<name>` is ABS_USER's to judge (placeholders pass).
+# Any other drive path, such as E:\work\... or F:/data, is the author's disk layout. The letter
+# must start a token, so `https://` is not a drive.
 DRIVE_PATH = re.compile(r"(?<![A-Za-z0-9])[A-Za-z]:[\\/]{1,2}(?!Users[\\/])[A-Za-z]")
 
 # A private tree with a path separator on one side of it.
@@ -172,18 +172,18 @@ PRIVATE_PATH = re.compile(
     r"(?:[\\/]|\b[A-Za-z]:[\\/])(?:" + "|".join(re.escape(t) for t in PRIVATE_TREES) + r")\b"
     r"|(?:" + "|".join(re.escape(t) for t in PRIVATE_TREES) + r")[\\/]")
 
-# A credential that identifies a person rather than a role.
+# A credential that identifies a person, not a role.
 IDENTITY = re.compile(
     r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"          # an email address
     r"|wrds_username\s*=\s*[\"'](?!\s*$)(?!YOUR)[A-Za-z0-9_]+[\"']",
     re.IGNORECASE)
 
 # Addresses that are meant to be here. The maintainer's university address is the
-# PUBLISHED contact for this project -- it is in the README, the FAQ and every stage
+# published contact for this project. It is in the README, the FAQ and every stage
 # guide on purpose, so that someone who hits a problem can write to a person. Publishing
-# a contact address is the opposite of leaking one; what this guard is for is a home
-# directory or a private tree that nobody chose to disclose. Any OTHER personal address
-# still fails, which is the point of naming this one rather than dropping the rule.
+# a contact address is the opposite of leaking one. This guard is for a home
+# directory or a private tree that nobody chose to disclose. Any other personal address
+# still fails, which is why this one is named and the rule is kept.
 PUBLISHED_CONTACT = ("alexander.dickerson1@unsw.edu.au",)
 PUBLIC_EMAIL_OK = re.compile(
     "|".join([r"openbondassetpricing", r"noreply@", r"example\.com", r"@wrds\b"]
@@ -198,7 +198,7 @@ def tracked_paths() -> list[str]:
 
 
 def tracked_text_files() -> list[Path]:
-    """EVERY tracked file, whatever its suffix: `.gitignore` and `LICENSE` have none, and a
+    """Every tracked file, whatever its suffix. `.gitignore` and `LICENSE` have none, and a
     notebook or a spreadsheet added later would not be on any list of text suffixes. Binary
     content is decoded with replacement, so a name inside it is still read."""
     return [ROOT / rel for rel in tracked_paths() if rel not in SELF and (ROOT / rel).is_file()]
@@ -260,7 +260,7 @@ FILES_THAT_LIVE_ELSEWHERE = {
     "resource_tracker.py": "Python's own module, quoted in a traceback",
     "summary.md": "written by stage3/tools/compare_runs.py into the comparison folder of a run",
 }
-# A bare name or one written as a path (`docs/CONTRACTS.md`); the last part is what is checked.
+# A bare name or one written as a path (`docs/CONTRACTS.md`). The last part is what is checked.
 _FILE_REF = re.compile(r"(?<![\w/.*-])((?:[\w.-]+/)*[A-Za-z_][\w-]*\.(?:py|md))\b")
 # Item codes of private notes: "debug M10", "learnings L13", "upstream lines 232-355".
 _NOTE_CODE = re.compile(r"\b(?:debug(?:\.md)?|learnings)\s+[A-Z]\d+\b|perf_learnings\w*"
@@ -337,8 +337,8 @@ def test_the_guard_actually_fires(line, why):
 ])
 def test_the_word_guard_actually_fires(line):
     """The banned words are digests, so they cannot be planted here without spelling them out.
-    The matching is planted instead, with stand-in words: a guard that misses these would miss
-    the real ones."""
+    The matching is planted instead, with stand-in words. A guard that misses these would miss
+    the banned ones."""
     stand_ins = {hashlib.sha256(w.encode()).hexdigest()
                  for w in ("xyzzy-quux", "zork", "frob route")}
     assert banned_words_in(line, stand_ins), f"the word guard did NOT catch: {line}"

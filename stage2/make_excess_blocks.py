@@ -1,33 +1,33 @@
-"""make_excess_blocks.py -- the 68 beta and momentum columns, for any Treasury benchmark.
+"""The 68 beta and momentum columns, for any Treasury benchmark.
 
     python make_excess_blocks.py --mode stage1 --benchmark bns
     python make_excess_blocks.py --mode stage1 --benchmark all      # bns + cls
     python make_excess_blocks.py --mode stage1 --verify             # the tret path, bit-identity
 
-WHAT THIS IS FOR. The panel ships five Treasury benchmarks beside `tret`, but every
-duration-adjusted quantity in it -- the 68 beta and momentum columns, plus `ret_vwx` and `str` --
-is built from `ret_vw - tret`. So the panel offers alternative BENCHMARKS and not alternative
-SYSTEMS: nothing can be sorted on a `tret_bns`-adjusted beta.
+What this is for. The panel ships five Treasury benchmarks beside `tret`, but every
+duration-adjusted quantity in it (the 68 beta and momentum columns, plus `ret_vwx` and `str`)
+is built from `ret_vw - tret`. So the panel offers alternative benchmarks and not alternative
+systems, and nothing can be sorted on a `tret_bns`-adjusted beta.
 
 This closes that, as an OPTIONAL step run after a stage-2 build. It writes
 
     blocks/<mode>/betas_<bm>.parquet        the 45 beta + 6 sysmom columns
     blocks/<mode>/mom_retx_<bm>.parquet     the 14 momentum/LTR + 3 VaR columns
 
-with the CANONICAL column names inside -- `b_amd`, not `b_amd_bns` -- so a block swaps in
+with the canonical column names inside (`b_amd`, not `b_amd_bns`), so a block swaps in
 wholesale, exactly as `betas_x` / `mom_retx` already do for `tret`.
 
-WHY IT IS NOT A NEW RETURN TYPE. `RETURN_TYPES` is a hardcoded binary re-expressed at ten sites as
+Why it is not a new return type. `RETURN_TYPES` is a hardcoded binary re-expressed at ten sites as
 `"dur_adj" if ... else "std"`. Shipping blocks avoids all ten, and matches how the x-blocks already
 travel: step 7 never reads them, they go out in the additional-data bundle, and the panel variant is
 assembled downstream.
 
-WHAT IT DOES NOT RECOMPUTE. The raw (std) side, `value_signals_*` (deliberately shared across
-return types), and DEFB/TERMB (total-return legs). Only what actually moves with the benchmark.
+What it does not recompute. The raw (std) side, `value_signals_*` (shared across return types
+on purpose), and DEFB/TERMB (total-return legs). Only what moves with the benchmark is recomputed.
 
-❗THE BENCHMARK MUST REACH THE FACTORS TOO. A duration-adjusted beta is not the same regression on
-a different y: the four bond-market factors AND `term` are swapped for twins estimated on the same
-excess return. `compute_all_betas` raises if a variant's twins are absent rather than falling back
+The benchmark must reach the factors too. A duration-adjusted beta is not the same regression on
+a different y. The four bond-market factors and `term` are swapped for twins estimated on the same
+excess return. `compute_all_betas` raises if a variant's twins are absent and does not fall back
 to the `tret` ones, because that failure produces b_* columns that look entirely normal and mean
 nothing. Build them first with `step3_bbw.build(benchmark=...)`.
 
@@ -61,8 +61,8 @@ VAR_COLS = step6_momentum.VAR_COLS
 
 
 def tret_col(bm: str) -> str:
-    """The benchmark's column. The incumbent is plain `tret`, not `tret_tret` -- which is what
-    lets --verify run the SAME code path as a benchmark build."""
+    """The benchmark's column. The incumbent is plain `tret`, not `tret_tret`, which is what
+    lets --verify run the same code path as a benchmark build."""
     return "tret" if bm == "tret" else f"tret_{bm}"
 
 
@@ -150,7 +150,7 @@ def main() -> int:
     print(f"  {factors.shape[0]} months x {factors.shape[1]} columns")
 
     if a.verify:
-        # The gate. Same code path, `tret` as the benchmark, against the shipped blocks -- so a
+        # The gate. Same code path, `tret` as the benchmark, against the shipped blocks, so a
         # refactor that moved something is caught before any benchmark output is believed.
         print("\nVERIFY: rebuilding the tret path through this runner ...")
         t0 = time.time()
@@ -166,10 +166,10 @@ def main() -> int:
     if unknown:
         raise SystemExit(f"unknown benchmark(s) {unknown}; known: {list(BENCHMARKS)}")
 
-    # Each benchmark's BBW factor twins, rebuilt from THIS build's blocks before any beta. Until
-    # 2026-09-23 this runner never built them: on a fresh build every benchmark raised for missing
-    # twins, and where an older bbw_factors_<bm>.parquet sat in the folder it was reused silently,
-    # pairing one build's twins with another build's returns. Always rebuilt, never reused.
+    # Each benchmark's BBW factor twins, rebuilt from this build's blocks before any beta. Until
+    # 2026-09-23 this runner never built them. On a fresh build every benchmark raised for missing
+    # twins, and where an older bbw_factors_<bm>.parquet sat in the folder it was reused without a
+    # message, pairing one build's twins with another build's returns. Always rebuilt, never reused.
     import step3_bbw
     for bm in todo:
         print(f"\nBBW factor twins for {bm} (step 3, benchmark={bm}) ...")

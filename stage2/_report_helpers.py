@@ -24,7 +24,7 @@ from typing import Union
 import sys
 
 # the repository root's shared modules (recessions.py: the NBER recessions every time-series
-# figure shades, stage 3's too); appended, so nothing there shadows a stage 2 module
+# figure shades, stage 3's too). Appended, so nothing there shadows a stage 2 module
 if str(Path(__file__).resolve().parents[1]) not in sys.path:
     sys.path.append(str(Path(__file__).resolve().parents[1]))
 import recessions  # noqa: E402
@@ -79,7 +79,7 @@ def apply_plot_params(params: PlotParams):
 # ============================================================================
 
 # The released panel artifacts are named for their vintage year (main_panel_2026.parquet
-# and friends), so the prose below has to move with the release rather than naming a
+# and friends), so the prose below has to move with the release and cannot name a
 # frozen year. The document is written against 2025 and re-stamped on assembly.
 _VINTAGE_IN_SOURCE = "2025"
 
@@ -1016,11 +1016,11 @@ def get_signal_definitions() -> list:
     from, so the two tables cannot disagree, and tests/test_signal_definitions.py holds the
     dictionary to the same text.
 
-    Returns a list of {'panel', 'panel_name', 'signals'}; each signal is
+    Returns a list of {'panel', 'panel_name', 'signals'}. Each signal is
     {'mnemonic', 'name', 'description', 'citation'}, LaTeX-ready. `citation` is a citet of the
     spec's own keys, so every cited work reaches this report's reference list. The keys are the
-    paper's, and get_references_bib() uses the same ones; a key it lacks is refused here rather
-    than printed as a question mark.
+    paper's, and get_references_bib() uses the same ones. A key it lacks is refused here and
+    never printed as a question mark.
     """
     import json
     import re
@@ -1599,7 +1599,7 @@ def create_dynamics_of_default_plot(
     df_temp = df[['cusip', 'date', 'spc_rat', 'mdc_rat']].copy()
     df_temp = df_temp.sort_values(['cusip', 'date'])
 
-    # Step 1: Get bond lifespans for ALL bonds
+    # Step 1: Get bond lifespans for all bonds
     bond_life = df_temp.groupby('cusip', observed=True)['date'].agg(['min', 'max']).reset_index()
     bond_life.columns = ['cusip', 'first_trade', 'last_trade']
 
@@ -1653,7 +1653,7 @@ def create_dynamics_of_default_plot(
         freq='ME'  # Month-end frequency
     )
 
-    # Step 6: Cross-join ONLY for defaulted bonds
+    # Step 6: Cross-join only for defaulted bonds
     df_dates = pd.DataFrame({'date': all_dates})
     df_dates['_key'] = 1
     bond_info_temp = bond_info_defaulted.copy()
@@ -2028,7 +2028,7 @@ def build_month_end_panel(
     # Work on a copy
     out = df.copy()
 
-    # Ensure datetime and snap to month-end
+    # Convert to datetime and snap to month-end
     out[date_col] = pd.to_datetime(out[date_col], errors="coerce") + MonthEnd(0)
     out = out[out[date_col].notna()].copy()
 
@@ -2362,7 +2362,7 @@ def compute_cross_sectional_stats(
             'P99': monthly_p99.mean(),
         }
 
-        # Scale AFTER computation
+        # Scale after computation
         scale = scale_vars.get(var_name, 1)
         if scale != 1:
             for key in ['Mean', 'Median', 'SD', 'P1', 'P5', 'P95', 'P99']:
@@ -3476,7 +3476,7 @@ def load_dfps_data(
         cache_dir.mkdir(parents=True, exist_ok=True)
         df.to_parquet(cache_dir / filename, index=False)
 
-    # Ensure date is datetime
+    # Convert date to datetime
     df['date'] = pd.to_datetime(df['date'])
 
     return df

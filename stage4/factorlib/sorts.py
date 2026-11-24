@@ -1,13 +1,13 @@
-"""sorts.py -- one return type's panel through PyBondLab, for every rating band and sort.
+"""One return type's panel through PyBondLab, for every rating band and sort.
 
-Single sorts: deciles over all bonds, quintiles within the investment-grade and the
-non-investment-grade band. Within-firm sorts: high minus low within each firm (`permno`),
-firms with at least two bonds. Holding period one month, value weights from the month
-before, rebalanced monthly -- `spec/factors.json` declares all of it.
+Single sorts use deciles over all bonds and quintiles within the investment-grade and the
+non-investment-grade band. Within-firm sorts take high minus low within each firm (`permno`),
+for firms with at least two bonds. The holding period is one month, with value weights from
+the month before and monthly rebalancing. `spec/factors.json` declares all of it.
 
-❗No sign correction. PyBondLab can flip a factor whose full-sample mean is negative, but that
-decision moves when the sample grows, so the series are published RAW and the flips it WOULD
-make are recorded as data (`flip_set`), keyed per return type.
+There is no sign correction. PyBondLab can flip a factor whose full-sample mean is negative,
+but that decision moves when the sample grows, so the series are published as computed and
+the flips it would make are recorded as data (`flip_set`), keyed per return type.
 """
 from __future__ import annotations
 
@@ -58,13 +58,13 @@ def run_one(data: pd.DataFrame, signals: list[str], *, sort: str, band: dict,
 def run_bands(data: pd.DataFrame, signals: list[str], *, sort: str,
               return_type: str) -> list[pd.DataFrame]:
     """Every rating band for one sort and return type. The band is PyBondLab's `rating`
-    argument, which restricts the FORMATION universe; the panel itself is never subset."""
+    argument, which restricts the formation universe. The panel itself is never subset."""
     return [run_one(data, signals, sort=sort, band=b, return_type=return_type)
             for b in S.SPEC["rating_bands"]]
 
 
 def assert_one_cell_per_key(ls: pd.DataFrame) -> None:
-    """Every flip-set key must name exactly one grid cell per month; otherwise the
+    """Every flip-set key must name exactly one grid cell per month. Otherwise the
     full-sample mean below would average two different series."""
     n = ls.groupby(FLIP_KEY + ["date"]).size()
     bad = n[n > 1]
@@ -75,8 +75,9 @@ def assert_one_cell_per_key(ls: pd.DataFrame) -> None:
 
 
 def flip_set(panel: pd.DataFrame) -> dict:
-    """What the full-sample sign rule WOULD choose: True where the long-short mean is
-    negative. Per (factor, weighting, return_type); the rating band is in the factor name."""
+    """What the full-sample sign rule would choose, True where the long-short mean is
+    negative. One value per (factor, weighting, return_type). The rating band is in the
+    factor name."""
     ls = panel[panel["leg"] == "ls"]
     assert_one_cell_per_key(ls)
     g = ls.groupby(FLIP_KEY)["return"].mean()

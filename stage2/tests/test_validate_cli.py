@@ -5,12 +5,12 @@ test_validate_cli.py
 `validate_stage2.py --help` used to raise `KeyError: 'returns'`.
 
 The CLI compares each build block against a golden. A public clone has no golden, so
-`_stage2_settings.GOLDEN_OUTPUTS` is empty -- but `_specs()` indexed it unguarded, and
+`_stage2_settings.GOLDEN_OUTPUTS` is empty, but `_specs()` indexed it unguarded, and
 argparse calls `_specs()` while building `choices`. The exception therefore fired before
 argparse could print anything, including `--help`. It was shipped that way.
 
 These tests pin both halves: the CLI is usable with no golden configured, and the specs it
-builds when a golden IS configured are the ones the internal reproduction run expects.
+builds when a golden is configured are the ones the internal reproduction run expects.
 
 Author: Open Source Bond Asset Pricing
 """
@@ -83,7 +83,7 @@ def test_each_spec_points_at_the_right_pair(all_goldens):
 
 
 def test_the_two_overridden_outputs_are_not_in_the_blocks_golden_dir(all_goldens):
-    """`main` lives in the panel dir and `mmn` carries the date stamp -- the two exceptions."""
+    """`main` lives in the panel dir and `mmn` has the date stamp. These are the two exceptions."""
     specs = v._specs()
     assert specs["main"].ours.parent == cfg.PANEL_DIR
     assert cfg.DATE_STAMP in specs["mmn"].ours.name
@@ -103,7 +103,7 @@ def test_the_documented_residual_tolerances_reach_the_panel_steps(all_goldens):
 
 
 def test_a_step_whose_golden_is_missing_is_dropped_not_crashed(monkeypatch):
-    """A partial configuration is normal mid-build; it must narrow the CLI, not break it."""
+    """A partial configuration is normal mid-build. It must narrow the CLI and not break it."""
     monkeypatch.setattr(cfg, "GOLDEN_OUTPUTS", {"betas": Path("/golden/betas.parquet")})
     assert sorted(v._specs()) == ["betas"]
     with pytest.raises(SystemExit, match="no golden configured for step"):

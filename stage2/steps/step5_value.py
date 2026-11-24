@@ -1,8 +1,8 @@
-"""step5_value.py -- upstream step 5: value signals (credit-spread cross-sectional residuals ->
+"""Upstream step 5: value signals (credit-spread cross-sectional residuals ->
 val_hz / val_ipr families) + d-spread momentum-of-spread signals.
 
-Ground truth: the reference implementation's value step -- prep_value_signal_inputs (quote extension to
-1997), FISD call-dummy merge, make_value_signals, build_d_spreads(lags=(6,12), bandwidth=1,
+Ground truth: the reference implementation's value step, which is prep_value_signal_inputs (quote
+extension to 1997), FISD call-dummy merge, make_value_signals, build_d_spreads(lags=(6,12), bandwidth=1,
 mu_window=12) with the runner's column drops, left-merged into the signal frames. Machinery is
 verbatim in lib/value.py.
 
@@ -42,8 +42,8 @@ def _prep_inputs(blocks_dir: Path) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataF
         return df
 
     # The benchmark columns ride along so step 6 can roll momentum and VaR on any of them.
-    # They change nothing here: make_value_signals reads ret_vw and tret by name, and value
-    # signals are deliberately NOT duration-adjusted -- both panels share value_signals_std.
+    # They change nothing here. make_value_signals reads ret_vw and tret by name, and value
+    # signals are not duration-adjusted, on purpose. Both panels share value_signals_std.
     _RET = ["cusip", "date", "ret_vw", "tret", "tret_bns", "tret_cls"]
     all_ret = _read("all_returns", _RET)
     all_returns_ext = pd.concat([q[_RET], all_ret], ignore_index=True)

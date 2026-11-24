@@ -9,7 +9,7 @@ It used to read the space USED from the WRDS `quota` command. WRDS refreshes tha
 hour `quota` still counted the deleted folder. On 2026-09-21 it refused a run with 7.7 GB free
 by reporting 2.6. The check now takes the LIMIT from `quota` and MEASURES the use with `du`.
 
-The tests run the real script under bash with a fake `quota` and a fake `du` first on PATH.
+The tests run the script itself under bash with a fake `quota` and a fake `du` first on PATH.
 
 Author: Open Source Bond Asset Pricing
 """
@@ -74,7 +74,7 @@ def test_the_case_that_happened(tmp_path):
 
 
 def test_a_full_home_directory_is_still_refused(tmp_path):
-    """The other direction: quota looks fine, the disk is nearly full. The run must NOT start."""
+    """The other direction: quota looks fine, the disk is nearly full. The run must not start."""
     rc, out = _run(tmp_path, quota_used="1.00", du_kb=int(8.5 * GB))
     assert rc == 1, out
     assert "NOT ENOUGH DISK SPACE" in out and "Available: 1.50 GB" in out

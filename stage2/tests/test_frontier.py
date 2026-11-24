@@ -6,13 +6,13 @@ The last month of a panel is the one most likely to be wrong, and the least like
 looked at.
 
 Stage 1 pools TRACE Enhanced with 144A, which report on different lags, and resolves its
-`auto:-Nmo` cut-off against the pooled maximum -- 144A's. When that lands in a month where
+`auto:-Nmo` cut-off against the pooled maximum, which is 144A's. When that lands in a month where
 Enhanced has only a few days, the monthly panel still emits the month, but the only bonds
-with a month-end price are 144A issues. The 2026-09-09 production run is exactly this: the
+with a month-end price are 144A issues. The 2026-09-09 production run is exactly this. The
 final month held 1,914 bonds against a trailing median of 10,702, and was 100% 144A where
 every other month is around 22%.
 
-Nothing failed. The build succeeded, the column contract passed, coverage passed -- and the
+Nothing failed. The build succeeded, the column contract passed and coverage passed, and the
 panel would have shipped with a final cross-section that is not a cross-section.
 
 These tests cover the detector and the shape of what it reports.

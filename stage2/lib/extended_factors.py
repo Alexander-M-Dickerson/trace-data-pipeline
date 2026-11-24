@@ -1,15 +1,15 @@
-"""extended_factors.py -- the pre-2002-08 BBW factor backfill, as a PUBLIC fetched/cached input.
+"""The pre-2002-08 BBW factor backfill, as a public fetched/cached input.
 
 TRACE begins in 2002-07, so the BBW factor columns (mktb/drf/crf/mktbx/drfx/crfx/term) have no
 TRACE-based history before 2002-08-31. They are backfilled from an extended series (1973-2023)
 estimated on pre-TRACE bond data:
 
-  * the **Lehman Brothers Fixed Income Data**, also known as the Warga Fixed Income data; and
-  * the investment-grade and high-yield **Bank of America (BAML) constituent bonds** distributed
-    by the **Intercontinental Exchange (ICE)**.
+  * the Lehman Brothers Fixed Income Data, also known as the Warga Fixed Income data, and
+  * the investment-grade and high-yield Bank of America (BAML) constituent bonds distributed
+    by the Intercontinental Exchange (ICE).
 
-Those underlying bond data are licensed and cannot be redistributed. The finished monthly FACTOR
-SERIES can be, and is published at openbondassetpricing.com -- so the backfill is available to
+Those underlying bond data are licensed and cannot be redistributed. The finished monthly factor
+series can be, and is published at openbondassetpricing.com, so the backfill is available to
 everyone even though the data behind it is not. It is the "modified" variant: no LRF leg, matching
 the factor set this pipeline builds from TRACE.
 
@@ -35,7 +35,7 @@ OPTIONAL_COLS = ["DEFB", "TERMB"]
 
 
 def _normalize(df: pd.DataFrame) -> pd.DataFrame:
-    """['date'] + the 7 factor columns, dates coerced to month-end -- whether `date` arrived as the
+    """['date'] + the 7 factor columns, dates coerced to month-end, whether `date` arrived as the
     index (the published parquet's layout) or as a column. Raises if dates or factors are missing."""
     if "date" not in df.columns:
         df = df.reset_index()                     # published member ships date as a DatetimeIndex
@@ -45,9 +45,9 @@ def _normalize(df: pd.DataFrame) -> pd.DataFrame:
     if missing:
         raise ValueError(f"extended-BBW series is missing factor columns {missing}")
     have = [c for c in OPTIONAL_COLS if c in df.columns]
-    # The benchmark twins ride through here too. This selection is a WHITELIST -- a column absent
-    # from it is silently dropped even when the published file carries it, which is how a correct
-    # download can still produce a series with no benchmark history.
+    # The benchmark twins ride through here too. This selection is a whitelist. A column absent
+    # from it is dropped without an error even when the published file has it, which is how a
+    # correct download can still produce a series with no benchmark history.
     twins = [c for c in getattr(cfg, "BBW_BENCHMARK_COLS", ()) if c in df.columns]
     df = df[["date"] + COLS + have + twins].copy()
     df["date"] = pd.to_datetime(df["date"]) + pd.offsets.MonthEnd(0)
@@ -55,12 +55,12 @@ def _normalize(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _missing_twins(df: pd.DataFrame) -> list[str]:
-    """Benchmark twins the settings say this series must carry and it does not.
+    """Benchmark twins the settings say this series must have and it does not.
 
-    ❗THE CACHE IS THE TRAP, exactly as it is in lib/quote.py. This module returns the cached
+    The cache is the trap, exactly as it is in lib/quote.py. This module returns the cached
     parquet whenever one exists, so repointing BBW_EXTENDED_URL changes nothing on a machine that
-    already holds the old file -- and the failure is invisible: the splice still works, the tret
-    factors are all present, and only the ALTERNATIVE benchmarks silently lose their pre-2002
+    already holds the old file, and nothing shows the failure: the splice still works, the tret
+    factors are all present, and only the alternative benchmarks lose their pre-2002
     history. Betas on them then start in 2003 instead of 1997 with nothing anywhere saying why.
     """
     if not getattr(cfg, "BBW_HAS_BENCHMARKS", False):
@@ -71,12 +71,12 @@ def _missing_twins(df: pd.DataFrame) -> list[str]:
 # [group:trap.stale_cache] a cached download is used whenever it exists, so each loader checks it before trusting it
 def load_extended_bbw(force_fetch: bool = False) -> pd.DataFrame:
     """The extended BBW factor series: ['date', MKTB, DRF, CRF, MKTBx, DRFx, CRFx, TERM] plus
-    DEFB/TERMB when the published file carries them, one row per month-end (1973-02 .. 2023-01).
+    DEFB/TERMB when the published file has them, one row per month-end (1973-02 .. 2023-01).
 
     Reads the cached parquet under data/. If absent, corrupt, or `force_fetch`, downloads the published
-    zip from `cfg.BBW_EXTENDED_URL` and caches the NORMALIZED frame. The cache is written only AFTER
-    normalization: the published member is date-INDEXED, so caching it raw with index=False silently
-    drops every date.
+    zip from `cfg.BBW_EXTENDED_URL` and caches the normalized frame. The cache is written only after
+    normalization: the published member is date-indexed, so caching it raw with index=False drops
+    every date without an error.
     """
     if CACHE.exists() and not force_fetch:
         try:
@@ -103,8 +103,8 @@ def load_extended_bbw(force_fetch: bool = False) -> pd.DataFrame:
         df = _normalize(pd.read_parquet(io.BytesIO(zf.read(cfg.BBW_EXTENDED_ZIPKEY))))
     gone = _missing_twins(df)
     if gone:
-        # The download and the settings disagree. Stopping beats splicing a series that silently
-        # has no benchmark history.
+        # The download and the settings disagree. Stopping beats splicing a series that has no
+        # benchmark history and gives no sign of it.
         raise RuntimeError(
             f"the file at BBW_EXTENDED_URL is missing {gone}.\n"
             f"  url : {url}\n"

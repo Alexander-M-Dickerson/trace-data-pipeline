@@ -11,10 +11,9 @@ released 2025 vintage does exactly this, and it was verified against that file:
 `permco` and `gvkey` are 100% null there and the ratings take only the values {1, 11},
 while the raw build has them at 86.7% / 86.5% populated and ratings 1..22.
 
-This is the one place in the pipeline where a silent failure means distributing data we
-have no right to distribute, so it is tested rather than trusted -- both that the
-redaction does what it says, and that the gate in front of the packager actually catches
-an un-redacted frame.
+This is the one place in the pipeline where a failure without an error means distributing
+data we have no right to distribute, so it is tested twice: that the redaction does what
+it says, and that the gate in front of the packager catches an un-redacted frame.
 
 Author: Open Source Bond Asset Pricing
 """
@@ -64,13 +63,13 @@ def test_permno_and_the_data_are_untouched():
 
 def test_ratings_collapse_at_the_investment_grade_boundary():
     out = mr.redact_for_publication(_raw())
-    # 1..10 -> 1 (investment grade); 11 and above, default included -> 11
+    # 1..10 -> 1 (investment grade), and 11 and above, default included -> 11
     assert out["spc_rat"].tolist()[:7] == [1, 1, 1, 11, 11, 11, 11]
     assert out["mdc_rat"].tolist()[:7] == [1, 1, 1, 11, 11, 11, 11]
 
 
 def test_a_missing_rating_stays_missing():
-    """A bond with no rating must not be silently labelled investment grade."""
+    """A bond with no rating must not come out labelled investment grade."""
     out = mr.redact_for_publication(_raw())
     assert pd.isna(out["spc_rat"].iloc[-1])
     assert pd.isna(out["mdc_rat"].iloc[-1])
@@ -108,7 +107,7 @@ def test_the_gate_rejects_a_completely_unredacted_panel():
 
 
 def test_a_frame_without_the_columns_is_accepted():
-    """The additional artifacts carry no identifiers or ratings; they are publishable."""
+    """The additional artifacts have no identifiers or ratings, so they are publishable."""
     mr.assert_publishable(
         pd.DataFrame({"cusip": ["0" * 9], "date": [pd.Timestamp("2020-01-31")],
                       "b_mktb": [1.0]}),
@@ -116,10 +115,10 @@ def test_a_frame_without_the_columns_is_accepted():
 
 
 # =============================================================================================
-# THE DAILY PANEL
+# The daily panel
 #
 # Stage 1's daily file has 44 columns, among them the agency ratings, permco and gvkey, which
-# are licensed. A copy made with SELECT * carries all of them. `make_release.py --what daily`
+# are licensed. A copy made with SELECT * has all of them. `make_release.py --what daily`
 # writes the public layout, and these tests are what stands between the raw file and a
 # public link.
 # =============================================================================================

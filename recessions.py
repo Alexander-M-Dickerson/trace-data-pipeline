@@ -1,4 +1,4 @@
-"""recessions.py -- the NBER recessions every time-series figure shades, defined once.
+"""The NBER recessions every time-series figure shades, defined once.
 
 Stage 2's data report (_report_helpers.py) and stage 3's figures (figstyle.py) both read them:
 the Great Recession (2007:12 to 2009:06) and COVID-19 (2020:02 to 2020:04), NBER peak month to

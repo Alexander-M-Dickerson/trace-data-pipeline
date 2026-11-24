@@ -1,10 +1,10 @@
-"""_stage4_settings.py -- what Stage 4 reads, where it writes, and the grid it builds.
+"""What Stage 4 reads, where it writes, and the grid it builds.
 
 Stage 4 turns Stage 2's monthly panel into the TRACE-only bond factors published on
 openbondassetpricing.com. It reads only Stage 2's build output, on your own computer, and
 opens no WRDS connection.
 
-Every path can be overridden from the environment; the grid is `spec/factors.json`.
+Every path can be overridden from the environment. The grid is `spec/factors.json`.
 """
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ STAGE1_DIR = Path(os.environ.get("STAGE1_DIR", PIPELINE / "stage1"))
 STAGE2_DIR = Path(os.environ.get("STAGE2_DIR", PIPELINE / "stage2"))
 MODE = os.environ.get("STAGE4_MODE", "stage1")          # Stage 2's input mode
 
-# ❗Stage 2's BUILD output, never `stage2/release/`. The released copy nulls permco and gvkey
+# Stage 2's build output, never `stage2/release/`. The released copy nulls permco and gvkey
 # and collapses the ratings, which changes every within-firm sort.
 PANEL = STAGE2_DIR / "output" / "panel" / f"main_panel_{MODE}.parquet"
 BLOCKS = STAGE2_DIR / "output" / "blocks" / MODE

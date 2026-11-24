@@ -14,8 +14,8 @@ STAGE2_REFERENCE_OUTPUT names one:
     STAGE2_REFERENCE_OUTPUT=/path/to/reference/output \\
         python -m pytest tests/test_parity_vs_reference.py -v
 
-Target is exact equality. Anything else is investigated before it is accepted -- the
-point of building on unchanged inputs is that there is no legitimate reason to differ.
+Target is exact equality. Anything else is investigated before it is accepted, because
+building on unchanged inputs leaves no legitimate reason to differ.
 
 Author: Open Source Bond Asset Pricing
 """
@@ -62,15 +62,15 @@ CASES = [
                        f"blocks/{REF_MODE}/value_signals_adj.parquet",  ("cusip", "date")),
     ("end_returns",    f"blocks/{MODE}/end_returns.parquet",
                        f"blocks/{REF_MODE}/end_returns.parquet",        ("cusip", "date")),
-    # The _mmn sidecar carries a date stamp in its filename, and the two builds derive
-    # that stamp differently (we take it from the input file; the reference hard-coded
-    # one). Matched by glob so a naming difference cannot masquerade as a data difference.
+    # The _mmn sidecar has a date stamp in its filename, and the two builds derive
+    # that stamp differently (we take it from the input file, the reference hard-coded
+    # one). Matched by glob so a naming difference cannot pass for a data difference.
     ("mmn_signals",    f"blocks/{MODE}/mmn_price_based_signals_*.parquet",
                        f"blocks/{REF_MODE}/mmn_price_based_signals_*.parquet", ("cusip", "date")),
 ]
 
-# Rate-like columns get the looser tolerance the reference uses for them; see
-# _stage2_settings.RATE_TOL. Everything else must meet FLOAT_TOL.
+# Rate-like columns get the looser tolerance the reference uses for them (see
+# _stage2_settings.RATE_TOL). Everything else must meet FLOAT_TOL.
 _RATE_PREFIXES = ("b_", "ivol_", "iskew", "sysmom", "idimom")
 _RATE_EXTRA = ("ytm", "cs")
 
@@ -103,7 +103,7 @@ def test_block_matches_reference(label, ours_rel, ref_rel, key):
 
     def _read(path: Path):
         # Some blocks are written with index=True, so the join key comes back as the
-        # INDEX rather than a column. (This bites repeatedly in this codebase -- the
+        # index, not as a column. (This happens repeatedly in this codebase. The
         # published extended-BBW parquet has the same shape.) Normalise it away.
         df = pd.read_parquet(path)
         missing = [k for k in key if k not in df.columns]
@@ -122,8 +122,8 @@ def test_block_matches_reference(label, ours_rel, ref_rel, key):
         rate_cols=_rate_cols(ours),
     )
 
-    # Report shape problems separately -- a key gap is a different failure from a value
-    # drift, and saying which one it is saves the next person an hour.
+    # Report shape problems separately. A key gap is a different failure from a value
+    # drift, and the message should say which one it is.
     assert not report["key_gaps_ours"], (
         f"{label}: our build has {report['key_gaps_ours']} key(s) the reference does not "
         f"(ours {report['rows_ours']:,} rows vs reference {report['rows_golden']:,})"
@@ -149,7 +149,7 @@ def test_block_matches_reference(label, ours_rel, ref_rel, key):
 
 
 def test_reference_build_is_present():
-    """Fail loudly if the reference directory exists but holds no panel at all."""
+    """Fail with an error if the reference directory exists but holds no panel at all."""
     panel = REF_ROOT / "panel" / f"main_panel_{REF_MODE}.parquet"
     assert panel.exists(), (
         f"STAGE2_REFERENCE_OUTPUT points at {REF_ROOT}, which has no "

@@ -1,4 +1,4 @@
-"""momentum.py -- VERBATIM momentum/LTR machinery from the reference implementation: numba
+"""Verbatim momentum/LTR machinery from the reference implementation: numba
 window helpers + build_mom_ltr_and_industry. Arbitrated by the momentum validator."""
 import logging
 from typing import Iterable, List, Optional, Sequence, Tuple, Union
@@ -162,7 +162,7 @@ def build_mom_ltr_and_industry(
       For X_L_S, S excludes the most-recent S months INCLUDING the current month.
       Window is months t-(L-1) .. t-S (inclusive), length W=L-S.
 
-    Ramping applies ONLY to LTR specs listed above (asset + industry), per your request.
+    Ramping applies only to the LTR specs listed above (asset + industry).
     """
 
     if not _HAS_NUMBA:

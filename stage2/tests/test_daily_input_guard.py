@@ -2,9 +2,9 @@
 """
 test_daily_input_guard.py
 =========================
-Stage 2 cannot run on the Stage 1 file published for download: that file withholds the
+Stage 2 cannot run on the Stage 1 file published for download. That file withholds the
 licensed columns (the agency ratings, permco and gvkey), and Stage 2 keeps only bond-days
-carrying a rating. The guard used to report it as "missing 6 column(s)", which the docs
+that have a rating. The guard used to report it as "missing 6 column(s)", which the docs
 explained as an older release. It now names the download.
 
 Author: Open Source Bond Asset Pricing

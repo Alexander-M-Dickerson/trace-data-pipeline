@@ -1,4 +1,4 @@
-r"""compare_published.py -- check Stage 4's factors against the ones openbondassetpricing.com serves.
+r"""Check Stage 4's factors against the ones openbondassetpricing.com serves.
 
     python compare_published.py                      # both sorts; downloads each archive once
     python compare_published.py --sort single
@@ -7,13 +7,13 @@ r"""compare_published.py -- check Stage 4's factors against the ones openbondass
 Downloads the TRACE-only panel archive for this vintage (about 37 MB per sort, cached in
 output/_published/), and compares it with what build_factors.py wrote, cell by cell:
 
-  * the same (date, factor, leg, weighting, rating band, return type) rows, no more, no fewer;
-  * the same columns and types;
-  * `return`, `turnover` and `count`: the largest absolute difference and the number of
-    cells where one side is missing and the other is not, per return type and band;
-  * the same flip set.
+  * the same (date, factor, leg, weighting, rating band, return type) rows, no more, no fewer
+  * the same columns and types
+  * for `return`, `turnover` and `count`, the largest absolute difference and the number of
+    cells where one side is missing and the other is not, per return type and band
+  * the same flip set
 
-Exit 0 when everything agrees within --tol (default 0: identical); 1 otherwise.
+Exits 0 when everything agrees within --tol (default 0, which means identical) and 1 otherwise.
 """
 # [tag:entry.stage4_compare] compares them with the published files
 from __future__ import annotations
@@ -44,8 +44,8 @@ def _served_digest(url: str) -> tuple[str, str] | None:
     """What the release serves now: ("sha256", hex) from GitHub's release API, else
     ("bytes", size) from the download itself, else None when neither can be asked (offline).
 
-    Size alone is weak -- a rebuilt file can come out the same length -- so the API's digest
-    is asked first."""
+    Size alone is weak, because a rebuilt file can come out the same length, so the API's
+    digest is asked first."""
     import re
     m = re.match(r"https://github\.com/([^/]+)/([^/]+)/releases/download/([^/]+)/(.+)$", url)
     if m:
@@ -80,9 +80,9 @@ def _local_digest(p: Path, kind: str) -> str:
 def fetch(sort: str, vintage: str, refresh: bool) -> Path:
     """The published archive, from the cache when it is still what the release serves.
 
-    ❗A cached copy is re-used only while it matches what the release serves. The release is
+    A cached copy is re-used only while it matches what the release serves. The release is
     replaced when a vintage is republished, and a cache kept for ever compared a build with
-    files that were no longer online: a run on 2026-09-26 reported DIFFERS against a copy
+    files that were no longer online. A run on 2026-09-26 reported DIFFERS against a copy
     downloaded before the release was refreshed.
     """
     url = S.SPEC["published"][sort].format(vintage=vintage)

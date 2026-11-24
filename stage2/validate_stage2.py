@@ -1,4 +1,4 @@
-"""validate_stage2.py -- compare a build against a reference build, one step or all.
+"""Compare a build against a reference build, one step or all.
 
 Development only: it needs GOLDEN_OUTPUTS in _stage2_settings.py, which a public clone leaves
 empty, and then says so and exits.
@@ -9,8 +9,8 @@ Usage (the step names exist only once GOLDEN_OUTPUTS is configured):
     validate_stage2.py --step betas --json-out report.json
 
 Tolerances:
-  - default float tol 1e-6; RATE_TOL=1e-4 for the beta/ivol/iskew/sysmom/idimom families and ytm/cs
-    (float32 winsorized rate-likes);
+  - default float tol 1e-6, and RATE_TOL=1e-4 for the beta/ivol/iskew/sysmom/idimom families and
+    ytm/cs (float32 winsorized rate-likes)
   - documented irreducible residuals: cs_sprd/ar_sprd 5e-3 (numpy libm ulps at clip
     boundaries), b_dvixd 10.0 (23 near-singular numba-fastmath rows of 1.63M).
 """
@@ -93,7 +93,7 @@ def _require_specs() -> dict[str, StepSpec]:
 
 
 def _load_with_key(path: Path, key: tuple[str, ...]) -> pd.DataFrame:
-    """Read a block; restore the key from the index if it was written as one (bbw_factors)."""
+    """Read a block and restore the key from the index if it was written as one (bbw_factors)."""
     df = pd.read_parquet(path)
     if any(k not in df.columns for k in key):
         df = df.reset_index()

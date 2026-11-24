@@ -2,8 +2,8 @@
 #
 # Build the Stage 2 data report.
 #
-# Stage 2 runs on your OWN machine, not on the WRDS grid, so this is a plain script
-# and not a qsub wrapper -- there are no #$ directives here on purpose. Run it from
+# Stage 2 runs on your own machine, not on the WRDS grid, so this is a plain script
+# and not a qsub wrapper. There are no #$ directives here on purpose. Run it from
 # the repository root:
 #
 #     bash stage2/run_build_data_reports.sh
@@ -15,17 +15,17 @@
 # Output lands in stage2/data_reports/ (gitignored): the .tex, its figures, and the
 # PDF if pdflatex is installed.
 #
-# The report is built from a panel that already exists -- it never triggers a build.
+# The report is built from a panel that already exists. It never triggers a build.
 # Run the pipeline first if there is nothing under stage2/output/panel/.
 #
-# The two comparison suites (DFPS, WRDS Bond Returns) are ON by default. They need
-# the internet, and the WRDS one needs credentials; pass --no-external to skip both.
+# The two comparison suites (DFPS, WRDS Bond Returns) are on by default. They need
+# the internet, and the WRDS one needs credentials. Pass --no-external to skip both.
 
 set -euo pipefail
 
 cd "$(dirname "$0")"
 
-# PY overrides the interpreter, as in run_stage2.sh; PYTHON is read too. The default is
+# PY overrides the interpreter, as in run_stage2.sh, and PYTHON is read too. The default is
 # `python`: a Windows venv has no `python3`, and the one on PATH is a Store shortcut.
 PY="${PY:-${PYTHON:-python}}"
 

@@ -1,22 +1,23 @@
-"""step2_illiquidity.py -- DuckDB port of upstream step 2: per-bond illiquidity/risk signals and the
+"""DuckDB port of upstream step 2: per-bond illiquidity/risk signals and the
 market-level nontraded factor panel.
 
 Ground truth: the reference implementation's illiquidity pipeline and its metric functions
 (monthly_pi_fast, compute_monthly_amihud, compute_monthly_illiq_roll_fast, compute_hong_warga_spreads,
-cs_ar_spreads, p_zeros, compute_bond_turnover, compute_vov, compute_within_month_risk). The pin IS the
+cs_ar_spreads, p_zeros, compute_bond_turnover, compute_vov, compute_within_month_risk). The pin is the
 streamline_data output (validated bit-faithful), so every metric reads the pin.
 
-Faithfulness notes (each mirrors an upstream quirk -- do not "fix"):
-  - ilq/roll: n = the group's ROW count (pandas 'size'), while the sums skip NaN -- inconsistent on
-    purpose; groups gated on >=5 valid PAIRS. roll = 0 when ilq <= 0 (CASE ELSE 0 == np.where).
+Faithfulness notes (each mirrors an upstream quirk, so do not "fix" it):
+  - ilq/roll: n = the group's row count (pandas 'size'), while the sums skip NaN. The two are
+    inconsistent on purpose. Groups are gated on >=5 valid pairs. roll = 0 when ilq <= 0
+    (CASE ELSE 0 == np.where).
   - amihud: one count gate (non-null _ac >= 5) NULLs ami/ami_v/lix together.
-  - CS beta is gated at day_gap >= 5 (risk dvix at day_gap > 5 -- they differ upstream).
-  - CS/AR lags/rolling pairs are computed WITHIN each analysis subset (full vs excl-last-trade), so
-    the _adj variants re-pair neighbours, not just re-aggregate.
-  - p_fht_adj = 2*sigma_adj*ppf((1+p_zro_FULL)/2) -- the adjusted version reuses the FULL p_zro.
+  - CS beta is gated at day_gap >= 5 (risk dvix at day_gap > 5, they differ upstream).
+  - CS/AR lags/rolling pairs are computed within each analysis subset (full vs excl-last-trade), so
+    the _adj variants re-pair neighbours as well as re-aggregating.
+  - p_fht_adj = 2*sigma_adj*ppf((1+p_zro_FULL)/2). The adjusted version reuses the full p_zro.
   - pi: NULL when n < MIN_OBS or |detM| <= 1e-8 (np.isclose(detM, 0)).
-  - factors: USA-domiciled bonds only (FISD), EW means of the NORMAL signals; first-difference all
-    but PSB and RSJ; RSJ scaled /100; first (NaN-diff) row dropped.
+  - factors: USA-domiciled bonds only (FISD), EW means of the normal signals, first-difference all
+    but PSB and RSJ, RSJ scaled /100, first (NaN-diff) row dropped.
 
 Outputs under output/blocks/<mode>/: illiq_signals, illiq_signals_adj, illiq_factors.
 """
@@ -69,7 +70,7 @@ FROM _full f LEFT JOIN _adj a USING (cusip_id, month_start)
 
 
 def build(con, mode: str | None = None, limit_cusips: int | None = None) -> dict[str, Path]:
-    """Build illiq_signals / illiq_signals_adj / illiq_factors blocks; returns {name: path}."""
+    """Build illiq_signals / illiq_signals_adj / illiq_factors blocks and return {name: path}."""
     mode = mode or cfg.INPUT_MODE
     t0 = time.time()
     pt = PhaseTimer()
@@ -89,8 +90,8 @@ FROM read_parquet('{pin_path.as_posix()}')
     # ---------------- float32-order-sensitive metrics: verbatim pandas ports ----------------------
     # pi / amihud / ilq-roll / the risk kernel are computed in pandas (lib/illiq_pandas) because
     # their upstream float32 accumulation order and near-singular ratios cannot be reproduced by
-    # parallel double-precision SQL sums. The frame is pulled in (cusip, dt) order --
-    # the upstream streamline sort -- so groupby accumulation order matches bit-for-bit.
+    # parallel double-precision SQL sums. The frame is pulled in (cusip, dt) order, which is
+    # the upstream streamline sort, so groupby accumulation order matches bit-for-bit.
     with pt("pdf_pull"):
         pdf = con.execute("""
 SELECT cusip_id, dt AS trd_exctn_dt, month_start, ret_c, ret_c_lag, ret_d,
@@ -149,7 +150,7 @@ FROM (
     # [tag:col.cs_sprd] the Corwin-Schultz spread from two-day high and low prices, the month's average
     # [tag:col.ar_sprd] the Abdi-Ranaldo spread from close, high and low prices, the month's average
     # ---------------- Corwin-Schultz + Abdi-Ranaldo spreads ---------------------------------------
-    # base: hi/lo/close non-null, clipped >= 1e-12; lags pair within the SUBSET (full vs lst=1)
+    # base: hi/lo/close non-null, clipped >= 1e-12. Lags pair within the subset (full vs lst=1)
     for tag, where in (("f", "TRUE"), ("a", "lst_txn = 1")):
         con.execute(f"""
 CREATE OR REPLACE TEMP TABLE t_csar_{tag} AS
@@ -307,8 +308,8 @@ FULL JOIN m_rsk USING (cusip_id, month_start)
         FROM signals ORDER BY cusip_id, month_start""")
 
     # ---------------- nontraded factors: USA bonds, EW means, differencing ------------------------
-    # In PANDAS with the signals' native dtypes: upstream means accumulate float32 for the
-    # float32 signals (AMD/LIX/ILLIQ/ROLL come out float32 in the golden factor file); a SQL
+    # In pandas with the signals' native dtypes, because upstream means accumulate float32 for the
+    # float32 signals (AMD/LIX/ILLIQ/ROLL come out float32 in the golden factor file) and a SQL
     # double-precision avg differs by ~3e-6.
     with pt("factors"):
         fisd = pd.read_parquet(cfg.AUX["fisd"], columns=["complete_cusip", "country_domicile"])

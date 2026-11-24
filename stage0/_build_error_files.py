@@ -285,12 +285,12 @@ def _shift_date(tag: str, delta_days: int) -> str:
     return (d + timedelta(days=delta_days)).strftime("%Y%m%d")
 
 def _latest_tag_with(in_dir_t: Path, names) -> str | None:
-    """Newest YYYYMMDD stamp under `in_dir_t` for which EVERY named file exists.
+    """Newest YYYYMMDD stamp under `in_dir_t` for which every named file exists.
 
     The last resort when the run stamp does not match what is on disk. That stamp is
-    this process's OWN start date, so it drifts whenever stage 0 finishes on one day
-    and the report job starts on another -- a queue behind a long job, or a run that
-    crosses midnight. The +/-1 day probe above covers the common case; this covers the
+    this process's own start date, so it drifts whenever stage 0 finishes on one day
+    and the report job starts on another (a queue behind a long job, or a run that
+    crosses midnight). The +/-1 day probe above covers the common case. This covers the
     rest, and mirrors how stage 1 already finds its input
     (_stage1_settings.get_latest_stage0_date).
 
@@ -445,7 +445,7 @@ def _resolve_args() -> dict:
                 raise SystemExit(f"No valid --data-type provided (got {raw}).")
             cfg["data_types"] = chosen
 
-    # ---- Robust path resolution ----
+    # ---- Path resolution ----
     # If cfg["date"] is "", we inherit EDT/SDT RUN_STAMP in main().
     # Only when user passes --date should it override RUN_STAMP.
 
@@ -456,7 +456,7 @@ def _resolve_args() -> dict:
     report_dir = (out_dir_base / "data_reports")
     report_dir.mkdir(parents=True, exist_ok=True)
 
-    # IMPORTANT: do NOT auto-fill today if user left DATE blank.
+    # Do not auto-fill today's date if the user left DATE blank.
     # Keep it empty so main() can inherit EDT/SDT RUN_STAMP.
     cfg["date"]      = (cfg["date"] or "").strip()
     cfg["in_dir"]    = in_dir_base
@@ -631,9 +631,9 @@ def main():
                     logging.warning("[%s] No CUSIPs in union. Skipping figure build.", dtype)
                 else:
                     # STAGE0_REPORT_CHUNK_SIZE exists so the smoke test can force the
-                    # flagged universe into SEVERAL chunks. Without it a small run yields
+                    # flagged universe into several chunks. Without it a small run yields
                     # one chunk, run_chunks takes its serial path, and the concurrent
-                    # path is never executed -- a harness that goes green without ever
+                    # path is never executed. The harness would then pass without
                     # reaching the code it is meant to cover.
                     chunk_size   = int(os.environ.get("STAGE0_REPORT_CHUNK_SIZE", "0"))                                    or int(cfg.get("chunk_size", 250))
                     cusip_chunks = _split_into_chunks(cusips_union, n=chunk_size)
@@ -685,19 +685,20 @@ def main():
 
                     logging.info("[%s] Starting error_checks() on the restricted CUSIP universe .", dtype)
                     if dtype == 'enhanced':
-                        # Enhanced ONLY is parallelised. Measured on the 2026-09-09 run,
-                        # this loop was 45.5 of the report job's 50.9 minutes -- 83% of it
-                        # clean rather than fetch, and linear in rows (0.092 ms/row,
+                        # Only Enhanced is parallelised. Measured on the 2026-09-09 run,
+                        # this loop was 45.5 of the report job's 50.9 minutes. 83% of that
+                        # was cleaning, not fetching, and it was linear in rows (0.092 ms/row,
                         # correlation 0.991). It is the same work stage 0 does, at the same
                         # per-worker rate, done one chunk at a time. 144A's equivalent takes
-                        # 19 SECONDS, so its engine is deliberately left serial.
+                        # 19 seconds, so its engine is deliberately left serial.
                         n_workers = _reports_workers()
                         if n_workers > 1:
-                            # Close the parent's connection BEFORE the pool forks: a
+                            # Close the parent's connection before the pool forks: a
                             # psycopg2 socket shared across a fork corrupts the protocol
-                            # quietly, and a connection the parent no longer needs is one a
-                            # worker cannot have. error_checks is the last thing that needs
-                            # it for this dtype; the lazy re-open above covers the next.
+                            # with no error at the time, and a connection the parent no
+                            # longer needs is one a worker cannot have. error_checks is the
+                            # last thing that needs it for this dtype. The lazy re-open above
+                            # covers the next.
                             try:
                                 db.close()
                             except Exception:
@@ -747,7 +748,7 @@ def main():
                     for name, _df in (("dfds", dfds), ("dfbb", dfbb), ("dfie", dfie)):
                         if not pd.api.types.is_datetime64_any_dtype(_df["trd_exctn_dt"]):
                             _df["trd_exctn_dt"] = pd.to_datetime(_df["trd_exctn_dt"], errors="coerce")
-                        # Ensure stable within-CUSIP chronological order (so panels don't sort)
+                        # Keep a stable within-CUSIP chronological order (so panels don't sort)
                         _df.sort_values(["cusip_id", "trd_exctn_dt"], inplace=True, kind="mergesort")
 
                     # Build fast index maps once per table

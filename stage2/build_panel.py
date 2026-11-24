@@ -1,6 +1,6 @@
-"""build_panel.py -- the Stage 2 orchestrator: the monthly asset-pricing panel from the daily
-input, driven by _stage2_settings. Users run `_run_stage2.py`, which calls `run_stage2` here;
-running this file directly is for development.
+"""The Stage 2 orchestrator: the monthly asset-pricing panel from the daily
+input, driven by _stage2_settings. Users run `_run_stage2.py`, which calls `run_stage2` here.
+Running this file directly is for development.
 
     python build_panel.py                       # full build, all steps
     python build_panel.py --from-step 4         # resume (earlier blocks reused from disk)
@@ -9,8 +9,8 @@ running this file directly is for development.
 
 Steps (each writes its blocks under output/blocks/<mode>/ and is independently re-runnable):
   1 returns  2 illiquidity  3 bbw  4 betas  5 value  6 momentum  7 final merge -> panel/
-A run manifest (manifests/monthly_<ts>_<mode>.json) records inputs, config, timings and -- with
---validate -- the full per-column validation reports.
+A run manifest (manifests/monthly_<ts>_<mode>.json) records inputs, config, timings and, with
+--validate, the full per-column validation reports.
 """
 from __future__ import annotations
 
@@ -34,10 +34,10 @@ STEPS: list[tuple[int, str, str, bool]] = [
     (7, "step7_final", "final merge -> main panel", False),
 ]
 
-# After step 2 the step DAG forks into two independent chains -- {3: bbw -> 4: betas} and
-# {5: value -> 6: momentum} share NO blocks (3/4 read step-1+2 blocks + quote; 5/6 read step-1
-# blocks + quote; 7 joins everything) -- so a full build runs them as two concurrent subprocesses
-#. Outputs are byte-identical either way; --sequential disables the overlap.
+# After step 2 the step DAG forks into two independent chains. {3: bbw -> 4: betas} and
+# {5: value -> 6: momentum} share no blocks (3/4 read step-1+2 blocks + quote, 5/6 read step-1
+# blocks + quote, 7 joins everything), so a full build runs them as two concurrent subprocesses.
+# Outputs are byte-identical either way, and --sequential disables the overlap.
 PARALLEL_CHAINS: tuple[tuple[int, int], ...] = ((3, 4), (5, 6))
 
 # Fresh-process orchestration for FULL builds: DuckDB's parallelism collapses in a
@@ -48,7 +48,7 @@ FULL_PLAN: tuple[tuple[tuple[int, int], ...], ...] = (
     ((1, 1),), ((2, 2),), PARALLEL_CHAINS, ((7, 7),))
 
 
-# [tag:rule.fresh_process] each group of steps runs in a fresh process; a long-lived one makes DuckDB lose its parallelism
+# [tag:rule.fresh_process] each group of steps runs in a fresh process, because a long-lived one makes DuckDB lose its parallelism
 def _run_stage(ranges: tuple[tuple[int, int], ...], input_mode: str,
                limit_cusips: int | None, manifest) -> None:
     """Run one stage's step ranges as concurrent child orchestrator processes (fresh per range)."""
@@ -104,7 +104,7 @@ def run(input_mode: str, from_step: int, to_step: int, limit_cusips: int | None,
         if path is not None:
             manifest.add_input(role, path)
 
-    # materialize the factor-panel seam (blocks/<mode>/factors.parquet) BEFORE the steps that read
+    # materialize the factor-panel seam (blocks/<mode>/factors.parquet) before the steps that read
     # it (4 and 7): fetched fresh from the public sources by default, or the published file
     # with --factor-source pinned
     from steps import compute_factors
@@ -112,12 +112,12 @@ def run(input_mode: str, from_step: int, to_step: int, limit_cusips: int | None,
     manifest.add_input(f"factors_{cfg.FACTOR_SOURCE}", factors_path)
 
     if not sequential and from_step == 1 and to_step == 7:
-        # FULL build: staged fresh-process plan -- DuckDB steps in their own
+        # full build: staged fresh-process plan, with the DuckDB steps in their own
         # processes, the {3,4}/{5,6} chains concurrent, final merge last
         for stage in FULL_PLAN:
             _run_stage(stage, input_mode, limit_cusips, manifest)
     else:
-        # partial/sequential build: in-process; overlap the chains only if the range covers 3..6
+        # partial/sequential build: in-process, overlapping the chains only if the range covers 3..6
         chain_lo = min(lo for lo, _ in PARALLEL_CHAINS)
         chain_hi = max(hi for _, hi in PARALLEL_CHAINS)
         use_chains = not sequential and from_step <= chain_lo and to_step >= chain_hi
@@ -195,8 +195,8 @@ def run_stage2(config: dict, *, from_step: int = 1, to_step: int = 7,
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="daily -> monthly asset-pricing panel (stage2 port)")
-    # The mode is a LABEL: it names the blocks/<mode>/ subdirectory. The reference used it
-    # to pick between a frozen vintage and a live build; the public pipeline has one input.
+    # The mode is a label. It names the blocks/<mode>/ subdirectory. The reference used it
+    # to pick between a frozen vintage and a live build, and the public pipeline has one input.
     ap.add_argument("--input-mode", default=cfg.INPUT_MODE)
     ap.add_argument("--from-step", type=int, default=1, choices=range(1, 8))
     ap.add_argument("--to-step", type=int, default=7, choices=range(1, 8))

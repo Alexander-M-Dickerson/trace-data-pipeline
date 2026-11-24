@@ -5,7 +5,7 @@ test_wrds_credentials.py
 Where Stage 2 gets its WRDS username, and when it asks for one.
 
 Until 2026-09-23 the five WRDS fetchers read the name from the environment only, while their
-own error said "Set it in config.py"; and the start-up check looked for caches in
+own error said "Set it in config.py". The start-up check also looked for caches in
 data/factor_cache/, where none of the WRDS caches live, and accepted config.py's placeholder
 name, so it never fired. A user who set the name in config.py passed the check and then
 failed at the first fetch.

@@ -27,22 +27,22 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))  # sibling modules
 import _chunk_runner
 import _wrds_pool
 
-# Silence ONE pandas warning class, by message, so the .err logs stay readable.
+# Silence one pandas warning class, by message, so the .err logs stay readable.
 #
 # pandas 2.2 emits a ChainedAssignmentError FutureWarning from DataFrame.__setitem__
-# when the frame's Python refcount is low AND one of its data blocks is still shared
+# when the frame's Python refcount is low and one of its data blocks is still shared
 # with another object. build_fisd trips both conditions on the real FISD frame, at
 # plain column assignments such as
 #     fisd["interest_frequency"] = pd.to_numeric(...).fillna(-1).astype(int)
-# which are NOT chained assignment -- the boilerplate in the warning text
+# which are not chained assignment. The boilerplate in the warning text
 # ("df[col][row_indexer] = value") does not describe this code. Confirmed on the WRDS
 # cloud: pandas 2.2.3, copy_on_write=False, PANDAS_COPY_ON_WRITE unset, and no chained
 # assignment anywhere in this file.
 #
-# This is SUPPRESSION, not a fix. The block sharing that triggers it is still there,
+# This suppresses the warning and fixes nothing. The block sharing that triggers it is still there,
 # and under pandas 3.0 (Copy-on-Write by default) these assignments need re-checking:
-# they may silently become no-ops. Before upgrading pandas, delete this filter and get
-# a traceback to the real source with:
+# they may become no-ops without an error. Before upgrading pandas, delete this filter and get
+# a traceback to the source with:
 #     python3 -W error::FutureWarning -c "import sys, wrds; sys.path.insert(0,'.'); #         import create_daily_enhanced_trace as E; from _trace_settings import get_config; #         E.build_fisd(wrds.Connection(), params=get_config('enhanced')['fisd_params'])"
 #
 # Scoped to this one message, so every other FutureWarning still surfaces. That is the
@@ -225,8 +225,8 @@ def clean_reversal(clean4: pd.DataFrame) -> pd.DataFrame:
     Notes
     -----
     - trd_exctn_dt should be a date or datetime dtype upstream. If it is a string,
-      ensure consistent formatting before calling this function.
-    - trd_exctn_tm is used as a key; it should be a consistently formatted string.
+      make its formatting consistent before calling this function.
+    - trd_exctn_tm is used as a key, so it should be a consistently formatted string.
     """
     # ------------------------------------------------------------------
     # 0)  Column sets used repeatedly
@@ -285,14 +285,14 @@ def clean_reversal(clean4: pd.DataFrame) -> pd.DataFrame:
         indicator='rev_match'                     # keeps track of hits
     )
 
-    # Keep ONLY rows that did *not* find a reversal partner
+    # Keep only the rows that did not find a reversal partner
     clean5_header = clean5_header[clean5_header['rev_match'] == 'left_only']
     clean5_header = clean5_header.drop(columns='rev_match')
 
     # ------------------------------------------------------------------
     # Step 4-D: final SAS proc SQL "distinct a. join
-    #           – we need rows in clean5 whose 8-key appears in header
-    #           – SQL DISTINCT -> drop_duplicates()
+    #           - we need rows in clean5 whose 8-key appears in header
+    #           - SQL DISTINCT -> drop_duplicates()
     # ------------------------------------------------------------------
     #   Drop dup keys in header first: identical to SAS LEFT JOIN DISTINCT
     clean5_header_keys = clean5_header[join8].drop_duplicates()
@@ -404,13 +404,13 @@ def compute_trace_all_metrics(trace):
 
     Implementation notes
     --------------------
-    - Vectorized groupby aggregations; no per-row loops.
+    - Vectorized groupby aggregations, with no per-row loops.
     - Outputs from price, volume, and bid/ask blocks are merged and sorted by
       ['cusip_id', 'trd_exctn_dt'].
     - If the input is empty, returns an empty DataFrame with the expected columns.
     """
         
-    # Ensure we have dollar_vol
+    # Make sure we have dollar_vol
     if 'dollar_vol' not in trace.columns:
         trace['dollar_vol'] = trace['rptd_pr'] * trace['entrd_vol_qt'] / 100
 
@@ -443,7 +443,7 @@ def compute_trace_all_metrics(trace):
         'trd_exctn_tm_sec': ['mean', 'last']
     }
     
-    # [group:daily.cusip_id] the bond's 9-character CUSIP; with trd_exctn_dt, the daily key
+    # [group:daily.cusip_id] the bond's 9-character CUSIP, which with trd_exctn_dt is the daily key
     # [group:daily.trd_exctn_dt] the trade date: one row per bond and day
     results = trace.groupby(['cusip_id', 'trd_exctn_dt']).agg(agg_dict)
     
@@ -455,7 +455,7 @@ def compute_trace_all_metrics(trace):
     results['prc_vw_par'] = results['volume_weighted_price_sum'] / results['entrd_vol_qt_sum']
     
     # Create the final PricesAll dataframe
-    # [group:daily.pr] the dollar-volume-weighted clean price (prc_vw here; stage 1 renames it pr)
+    # [group:daily.pr] the dollar-volume-weighted clean price (prc_vw here, and stage 1 renames it pr)
     # [group:daily.prc_vw_par] the par-volume-weighted price
     # [group:daily.prc_ew] the equal-weighted price
     # [group:daily.prc_first] the day's first trade price
@@ -609,7 +609,7 @@ def compute_trace_all_metrics(trace):
                 prc_BID_ASK['ask_count'] = prc_BID_ASK['ask_count_y'].fillna(prc_BID_ASK['ask_count_x'])
                 prc_BID_ASK = prc_BID_ASK.drop(['prc_ask_x', 'prc_ask_y', 'ask_count_x', 'ask_count_y'], axis=1)
     
-    # Ensure all required columns exist
+    # Make sure all required columns exist
     if not prc_BID_ASK.empty:
         # Select and order columns
         prc_BID_ASK = prc_BID_ASK[['cusip_id', 'trd_exctn_dt', 'prc_bid',
@@ -637,19 +637,19 @@ def compute_trace_all_metrics(trace):
     return merged    
 # -------------------------------------------------------------------------
 # -------------------------------------------------------------------------
-# [group:filter.price_scale] rescales prices quoted per unit to percent of par; runs before every other filter, and only when the par-1000 FISD screen is off
+# [group:filter.price_scale] rescales prices quoted per unit to percent of par, before every other filter, and only when the par-1000 FISD screen is off
 def normalize_price_scale(trace, principal_amt, *, chunk_id=None, logger=None):
     """Rescale unit-quoted bonds to percent of par.
 
     TRACE `rptd_pr` is a percent of par for the standard $1,000-principal bond: at
-    par it prints 100. Small-denomination issues -- retail and structured notes with
-    a principal of $10, $25, $100 -- are quoted in UNIT dollars instead, so a $10
+    par it prints 100. Small-denomination issues (retail and structured notes with
+    a principal of $10, $25, $100) are quoted in unit dollars instead, so a $10
     note at par prints 10.00, not 100.
 
     Everything downstream assumes percent of par: the price bounds, the decimal-shift
     gates, the bounce-back point threshold, the ultra-distressed thresholds in
     stage 1, dollar volume (`entrd_vol_qt * rptd_pr / 100`) and QuantLib (face 100).
-    Left alone, a healthy $10 note reads as a bond trading at 10 percent of par --
+    Left alone, a healthy $10 note reads as a bond trading at 10 percent of par. It is
     flagged distressed, with dollar volume understated tenfold and a nonsense yield.
 
     Each CUSIP's quote convention is decided ONCE, from the median of its positive
@@ -721,18 +721,18 @@ def normalize_price_scale(trace, principal_amt, *, chunk_id=None, logger=None):
 # The loop body that used to sit inline in clean_trace_data, lifted out unchanged so
 # it can run serially in this process or in a pool worker with its own connection.
 #
-# The audit helpers append to MODULE GLOBALS, which _connect_wrds aliases to the
+# The audit helpers append to module globals, which _connect_wrds aliases to the
 # engine's instance lists. A worker has no such aliasing, and two workers appending to
-# one list would interleave rows from concurrent chunks -- which the data report
-# cannot survive, since _error_plot_helpers.py reconstructs each chunk's filter
-# sequence from ROW ORDER. So this rebinds them to per-chunk lists, returns those, and
-# restores the previous binding; the parent extends its own lists in chunk order.
+# one list would interleave rows from concurrent chunks. The data report cannot take
+# that, since _error_plot_helpers.py reconstructs each chunk's filter
+# sequence from row order. So this rebinds them to per-chunk lists, returns those, and
+# restores the previous binding. The parent extends its own lists in chunk order.
 #
-# Two quirks of THIS engine that are reproduced exactly, because they are baked into
-# outputs already shipped:
-#   * chunk ids here are 1-BASED (enhanced is 0-based), and the exporter adds 1 again.
+# Two quirks of this engine that are reproduced exactly, because outputs already
+# shipped depend on them:
+#   * chunk ids here are 1-based (enhanced is 0-based), and the exporter adds 1 again.
 #   * the per-chunk timing line prints "Chunk {chunk_id+1}" while the opening line
-#     prints "Chunk {chunk_id}" -- an off-by-one in the LOG only, left as it was.
+#     prints "Chunk {chunk_id}", an off-by-one in the log only, left as it was.
 # -------------------------------------------------------------------------
 def _process_one_chunk(chunk_id, cusips, ctx, fetch_fn, n_chunks=None,
                        defer_logs=False):
@@ -755,7 +755,7 @@ def _process_one_chunk(chunk_id, cusips, ctx, fetch_fn, n_chunks=None,
 
     sort_cols = ["cusip_id","trd_exctn_dt","trd_exctn_tm", "msg_seq_nb"]
 
-    # Per-chunk sinks. NEVER a shared list -- see the note above.
+    # Per-chunk sinks. Never a shared list (see the note above).
     my_audit, my_ct_audit = [], []
     bb_cusips_all, dec_shift_cusips_all, init_price_cusips_all = [], [], []
     my_lines = [] if defer_logs else None
@@ -809,13 +809,13 @@ def _process_one_chunk(chunk_id, cusips, ctx, fetch_fn, n_chunks=None,
         logging.info(f"Chunk {chunk_id}: Retrieved {len(trace)} rows from WRDS")
         
         if len(trace) == 0:
-            # Return BEFORE the "start" audit row, so an empty chunk contributes
-            # no audit rows at all -- what the inline loop's `continue` did.
+            # Return before the "start" audit row, so an empty chunk contributes
+            # no audit rows at all, which is what the inline loop's `continue` did.
             return _result(None, round(time.time() - start_time, 2))
         
         trace["rptd_pr"] = trace["rptd_pr"].astype("float64").round(6)
 
-        # Filter 0: price-scale normalization. Runs BEFORE every other filter, because
+        # Filter 0: price-scale normalization. Runs before every other filter, because
         # all of them assume prices are a percent of par. No-op unless the FISD screen
         # `principal_amt_eq_1000_only` has been turned off. See normalize_price_scale.
         if (price_norm or {}).get("normalize_nonpar1000") and principal_amt is not None:
@@ -930,7 +930,7 @@ def _process_one_chunk(chunk_id, cusips, ctx, fetch_fn, n_chunks=None,
         # https://wrds-www.wharton.upenn.edu/documents/1240/TRACE_Enhanced_Corporate_and_Agency_Historic_Data_File_Layout_pre_2_6_12_09092021v.pdf                  
         trace['dollar_vol'] = (trace['entrd_vol_qt'] * trace['rptd_pr'] / 100)  # always compute
         
-        if f["volume_filter_toggle"]:  # [group:filter.volume] drops trades below a dollar or par volume floor; off by default
+        if f["volume_filter_toggle"]:  # [group:filter.volume] drops trades below a dollar or par volume floor, off by default
             vkind, vthr = _normalize_volume_filter(volume_filter)
             if vkind == "dollar":
                 mask = trace['dollar_vol'] >= vthr
@@ -1210,7 +1210,7 @@ def clean_trace_data(
         raise ValueError("data_type must be 'standard' or '144a'")
 
     # Everything the per-chunk unit of work needs, gathered once. Handed to workers by
-    # the pool initializer; passed straight through in the serial path.
+    # the pool initializer, and passed straight through in the serial path.
     ctx = dict(
         filters           = f,
         fisd_off          = fisd_off,
@@ -1227,8 +1227,8 @@ def clean_trace_data(
         principal_amt     = principal_amt,
     )
 
-    # Chunk ids stay 1-BASED here, unlike the enhanced engine -- shipped audit tables
-    # carry that numbering and the exporter adds 1 again on top of it.
+    # Chunk ids stay 1-based here, unlike the enhanced engine. Shipped audit tables
+    # have that numbering and the exporter adds 1 again on top of it.
     results = _chunk_runner.run_chunks(
         cusip_chunks,
         lambda cid, cus, n: _process_one_chunk(cid, cus, ctx, fetch_fn, n_chunks=n),
@@ -1247,7 +1247,7 @@ def clean_trace_data(
 
     # Reassemble in ASCENDING CHUNK ORDER, whatever order the chunks finished in.
     for r in results:
-        for line in r.log_lines:          # empty in a serial run; already emitted
+        for line in r.log_lines:          # empty in a serial run, already emitted
             logging.info(line)
         audit_records.extend(r.audit_rows)
         ct_audit_records.extend(r.ct_audit_rows)
@@ -1258,15 +1258,14 @@ def clean_trace_data(
         init_price_cusips_all.extend(r.ie_cusips)
 
     if all_super_list:
-        # Sort once, globally, so the output is CANONICAL.
+        # Sort once, globally, so the output is canonical.
         #
         # The concatenation alone leaves row order dependent on chunk order and chunk
         # composition: each chunk is internally sorted, but the blocks arrive in the
         # order the universe was sliced. That makes the file's byte content an
-        # artefact of the work plan -- so re-chunking, or completing chunks out of
+        # artefact of the work plan, so re-chunking, or completing chunks out of
         # order, would produce a different file holding identical data, and no
-        # before/after comparison could tell a real change from a reshuffle.
-        # One sort removes the whole class of question.
+        # before/after comparison could tell a change in the data from a reshuffle.
         final_df = pd.concat(all_super_list, ignore_index=True)
         final_df = final_df.sort_values(
             ["cusip_id", "trd_exctn_dt"], kind="mergesort", ignore_index=True)
@@ -1305,7 +1304,7 @@ def decimal_shift_corrector(
     Parameters
     ----------
     df : pandas.DataFrame
-        Input panel with at least [id_col, date_col, price_col]; time_col is optional.
+        Input panel with at least [id_col, date_col, price_col]. time_col is optional.
     id_col : str, default "cusip_id"
         Bond identifier column.
     date_col : str, default "trd_exctn_dt"
@@ -1323,9 +1322,9 @@ def decimal_shift_corrector(
     tol_pct_bad : float, default 0.05
         Minimum raw relative error needed to consider a decimal-shift (e.g., 5%).
     low_pr, high_pr : float, defaults 5.0 and 300.0
-        Plausible price bounds; help gate clearly implausible observations.
+        Plausible price bounds, which help gate clearly implausible observations.
     anchor : str, default "rolling"
-        Anchor type. "rolling" is the rolling unique-median; any other value uses the
+        Anchor type. "rolling" is the rolling unique-median, and any other value uses the
         median price of the same bond on the same day.
     window : int, default 5
         Rolling half-window size for the anchor (effective window = 2*window+1).
@@ -1341,7 +1340,7 @@ def decimal_shift_corrector(
             * dec_shift_factor (float)  - chosen factor (1.0 if no change)
             * suggested_price  (float)  - corrected price proposal
             * anchor_price     (float)  - the price each row is judged against
-          With anchor="rolling" (the default) it also carries the three medians the
+          With anchor="rolling" (the default) it also has the three medians the
           anchor is built from: anchor_med_center, anchor_med_fwd, anchor_med_back.
         - "cleaned": Apply `suggested_price` where flagged and return a triplet:
             (cleaned_df, n_corrected, affected_cusips).
@@ -1362,15 +1361,15 @@ def decimal_shift_corrector(
 
     Notes
     -----
-    - This copy SORTS by (id_col, date_col, and time_col when it is in `df`) and
+    - This copy sorts by (id_col, date_col, and time_col when it is in `df`) and
       resets the index to 0..n-1 before it starts. The copy in
       create_daily_enhanced_trace.py does not sort.
     - "Unique" here means the (id_col, date_col, price_col) de-duplication applied
-      before the medians are taken -- repeated prints at the same price on the same
+      before the medians are taken: repeated prints at the same price on the same
       day count once. The medians themselves are plain medians, not medians of
       unique values within the window.
-    - Choose `output_type="uncleaned"` for audit/debugging; use "cleaned" to
-      directly obtain a corrected price series.
+    - Choose `output_type="uncleaned"` for audit/debugging, and "cleaned" to
+      get a corrected price series directly.
     """
     
     eps = 1e-12
@@ -1524,10 +1523,10 @@ def flag_price_change_errors(
 
     Workflow (per id, time-sorted)
     ------------------------------
-    1) The CALLER must sort. This function does not: date_col and time_col are
+    1) The caller must sort. This function does not: date_col and time_col are
        accepted for signature compatibility and never read. Only id_col and
        price_col are used, and every step is order-dependent, so an unsorted
-       frame yields silently wrong flags. clean_trace_data sorts immediately
+       frame yields wrong flags with no error. clean_trace_data sorts immediately
        before calling this ("Pre BB sort").
     2) Build a strictly backward-looking anchor:
        - If use_unique_trailing_median is True, use a trailing unique median
@@ -1554,14 +1553,14 @@ def flag_price_change_errors(
     Parameters
     ----------
     df : pandas.DataFrame
-        Input panel with at least [id_col, date_col, price_col]. time_col is
-        optional but recommended for intraday ordering.
+        Input panel with at least [id_col, price_col], already sorted by the
+        caller (see step 1 above).
     id_col : str, default "cusip_id"
         Security identifier column.
     date_col : str, default "trd_exctn_dt"
-        Trade date column used for sorting and grouping.
+        Accepted for signature compatibility and never read.
     time_col : str or None, default "trd_exctn_tm"
-        Optional trade time column; used in sorting if present in df.
+        Accepted for signature compatibility and never read.
     price_col : str, default "rptd_pr"
         Price column evaluated by the filter.
     threshold_abs : float, default 35.0
@@ -1601,7 +1600,7 @@ def flag_price_change_errors(
 
     Notes
     -----
-    - Grouping is performed internally by id_col; ensure each group has at least
+    - Grouping is performed internally by id_col. Make sure each group has at least
       two rows.
     - The anchor is strictly backward-looking to avoid look-ahead bias.
     - Typical usage is within a groupby-apply over ids, followed by aggregation
@@ -1635,9 +1634,9 @@ def flag_price_change_errors(
                .transform(lambda s: rolling_unique_median(s, window=window+1))
         )
     else:
-        # The shift MUST sit inside the transform. Applied outside it, it shifts the
-        # whole frame, so the first print of each bond inherits the PREVIOUS bond's
-        # median -- a cross-bond leak. (Default is the unique-median branch above,
+        # The shift must sit inside the transform. Applied outside it, it shifts the
+        # whole frame, so the first print of each bond inherits the previous bond's
+        # median, a cross-bond leak. (Default is the unique-median branch above,
         # so production output is unaffected by this.)
         out["baseline_trailing"] = (
             out.groupby(id_col, observed=True)[price_col]
@@ -1660,7 +1659,7 @@ def flag_price_change_errors(
 
         i = 0
         m = len(idxs)
-        par_cooldown_until = -1  # local index; skip non-par flags until this index after a par-run
+        par_cooldown_until = -1  # local index. Skip non-par flags until this index after a par-run
         while i < m:
             # If within cooldown and current is non-par, skip any new non-par flags
             if i <= par_cooldown_until and (abs(P[i] - par_level) > par_equal_tol):
@@ -1682,8 +1681,8 @@ def flag_price_change_errors(
                 j_match  = None
                 k_return = None
 
-                # IMPORTANT: If par-only, we *do not* use quick-correction path;
-                # only persistent par-run can cause flags.
+                # If par-only, we do not use the quick-correction path.
+                # Only a persistent par-run can cause flags.
                 if not par_only:
                     for j in range(i + 1, j_lim + 1):
                         # Opposite big move
@@ -1771,7 +1770,7 @@ def flag_initial_price_errors(
     For each CUSIP:
     1. Examine first n_transactions (default: 3)
     2. Find first large price jump (abs change > abs_change)
-    3. Flag all rows BEFORE the jump as errors
+    3. Flag all rows before the jump as errors
 
     Example:
     --------
@@ -1811,7 +1810,7 @@ def flag_initial_price_errors(
     Notes
     -----
     - Only examines first n_transactions for each CUSIP
-    - Flags all rows BEFORE the first large jump
+    - Flags all rows before the first large jump
     - Fast implementation using groupby + numpy arrays
     """
     out = df.copy()
@@ -1841,7 +1840,7 @@ def flag_initial_price_errors(
             # Find first large jump (skip position 0 which has NaN diff)
             for i in range(1, scan_len):
                 if not np.isnan(diffs[i]) and diffs[i] > abs_change:
-                    # Flag all positions BEFORE this jump
+                    # Flag all positions before this jump
                     flagged[idxs[:i]] = 1
                     break  # Only process first large jump
 
@@ -1934,9 +1933,9 @@ def _valid_session_dates(calendar_name: str, start_date: str, end_date: str) -> 
     """Session dates for one calendar and window, built once per run.
 
     filter_by_calendar is called for every CUSIP chunk with the same arguments, and
-    each call was rebuilding the whole exchange schedule -- hundreds of times over a
+    each call was rebuilding the whole exchange schedule, hundreds of times over a
     full run. The schedule depends only on these three values, so memoise it. The
-    result is identical; only the repetition is gone.
+    result is identical. Only the repetition is gone.
     """
     import pandas_market_calendars as mcal
     cal = mcal.get_calendar(calendar_name)
@@ -2046,13 +2045,13 @@ def clean_trace_standard_chunk(trace, *, chunk_id=None, logger=None):
     -------
     pandas.DataFrame
         Cleaned TRACE Standard rows for the input chunk. A new DataFrame is
-        returned; the input is not modified in place. If the input is empty,
+        returned, and the input is not modified in place. If the input is empty,
         an empty DataFrame is returned.
 
     Notes
     -----
     - Downstream code typically re-sorts by cusip_id, trd_exctn_dt, trd_exctn_tm.
-    - Ensure trd_exctn_dt is date or datetime and trd_exctn_tm is a consistent
+    - Make sure trd_exctn_dt is date or datetime and trd_exctn_tm is a consistent
       string format upstream to avoid key-matching issues.
     - This function is the Standard counterpart to the Enhanced cleaner and is
       intended to be followed by aggregation to daily metrics.
@@ -2516,7 +2515,7 @@ def error_checks(
             trace = clean_chunk.copy()
             del clean_chunk
         else:
-            # skip DN cleaner; pass raw chunk through
+            # skip the DN cleaner and pass the raw chunk through
             log_filter(trace, trace, "dick_nielsen_filter (skipped)", i)
         gc.collect()
         
@@ -2627,7 +2626,7 @@ def error_checks(
         # https://wrds-www.wharton.upenn.edu/documents/1240/TRACE_Enhanced_Corporate_and_Agency_Historic_Data_File_Layout_pre_2_6_12_09092021v.pdf            
         trace['dollar_vol'] = (trace['entrd_vol_qt'] * trace['rptd_pr'] / 100)  # always compute
         
-        if f["volume_filter_toggle"]:  # [group:filter.volume] the trade-size floor, the data report's copy; off by default
+        if f["volume_filter_toggle"]:  # [group:filter.volume] the trade-size floor, the data report's copy, off by default
             vkind, vthr = _normalize_volume_filter(volume_filter)  # NEW
             if vkind == "dollar":
                 mask = trace['dollar_vol'] >= vthr
@@ -2749,7 +2748,7 @@ def error_checks(
             gc.collect()
         else:
             log_filter(trace_ie, trace_ie, "init_price_error_filter (skipped)", i)
-            # Ensure column exists even when skipped (for plotting consistency)
+            # Make sure the column exists even when skipped (for plotting consistency)
             trace_ie["initial_error_flag"] = 0
         gc.collect()
 
@@ -2779,17 +2778,17 @@ def error_checks(
 
         # CUSIP check (only for bb and ds - ie is checked separately).
         # bb_cusips/ds_cusips are only bound when their filters ran, so read them
-        # defensively -- otherwise switching a filter off turns this diagnostic into a
-        # NameError, or worse, silently reuses the previous chunk's values.
+        # defensively. Otherwise switching a filter off turns this diagnostic into a
+        # NameError or, worse, reuses the previous chunk's values without an error.
         _bb = bb_cusips if f["bounce_back_filter"] else []
         _ds = ds_cusips if f["decimal_shift_corrector"] else []
         merged_cusips = pd.unique(pd.Series(_bb + _ds, dtype="object")).tolist()
         
-        # Validate against the chunk we ACTUALLY processed. This used to index
+        # Validate against the chunk we processed. This used to index
         # cusip_chunks[i], guarded by a "use index 0 if there is only one chunk"
-        # ternary -- which papered over an off-by-one rather than fixing it. The
+        # ternary, which hid an off-by-one and did not fix it. The
         # standard/144A loop is `enumerate(cusip_chunks, start=1)`, so with more than
-        # one chunk every iteration validated against the NEXT chunk's CUSIP set
+        # one chunk every iteration validated against the next chunk's CUSIP set
         # (producing a meaningless `missing` count) and the last one raised IndexError,
         # killing the report run after all the work was done. It never fired only
         # because 144A's flagged universe has fit in a single chunk.
@@ -3065,7 +3064,7 @@ class ProcessStandardTRACE:
             cusip_chunks   = self._make_cusip_chunks(fisd)
             if self.limit_chunks is not None:
                 # Dev/test escape hatch: process only the first N CUSIP chunks so a
-                # config or filter change can be checked in minutes rather than
+                # config or filter change can be checked in minutes, without
                 # re-running the full universe, which takes hours. Never set for a production run.
                 kept = cusip_chunks[: self.limit_chunks]
                 self.logger.warning(
@@ -3108,11 +3107,11 @@ class ProcessStandardTRACE:
         )
 
     def _principal_amounts(self, fisd: pd.DataFrame):
-        """cusip_id -> principal_amt for bonds NOT denominated at $1,000.
+        """cusip_id -> principal_amt for bonds not denominated at $1,000.
 
         Only these can be unit-quoted, so only these are candidates for price-scale
         normalization. Returns None when the feature is off or the screened universe
-        contains no such bond -- which is the case under the default FISD screen
+        contains no such bond, which is the case under the default FISD screen
         `principal_amt_eq_1000_only=True`, making the whole feature a no-op.
         """
         if not self.price_norm.get("normalize_nonpar1000"):
@@ -3150,15 +3149,15 @@ class ProcessStandardTRACE:
     def _cusip_row_counts(self, cusips):
         """cusip_id -> trade-row count, for row-balanced chunk packing.
 
-        One aggregate over the source table. Returns None -- meaning fall back to
-        fixed-size chunks -- if packing is disabled or the query fails, because a
+        One aggregate over the source table. Returns None, meaning fall back to
+        fixed-size chunks, if packing is disabled or the query fails, because a
         slower chunking scheme is a far better outcome than a failed run.
         """
         if not self.target_rows_per_chunk:
             return None
 
-        # Cache it. The aggregate scans the whole source table -- measured at 93 s for
-        # Enhanced's 477,532 CUSIPs -- which is negligible against a multi-hour run but
+        # Cache it. The aggregate scans the whole source table (measured at 93 s for
+        # Enhanced's 477,532 CUSIPs), which is negligible against a multi-hour run but
         # dominates a short one. Keyed by the run stamp, so a new day re-measures.
         cache = self._row_counts_cache_path()
         if cache.exists():
@@ -3200,10 +3199,10 @@ class ProcessStandardTRACE:
 
     def _run_clean_trace(self, cusip_chunks, fisd_off, principal_amt=None):
         if self.n_workers > 1:
-            # Close the parent's connection BEFORE the pool forks: a psycopg2 socket
-            # shared between a parent and its children corrupts the protocol quietly,
-            # and a connection the parent no longer needs is one a worker cannot have.
-            # build_fisd is done and the export takes no handle.
+            # Close the parent's connection before the pool forks: a psycopg2 socket
+            # shared between a parent and its children corrupts the protocol with no
+            # error at the time, and a connection the parent no longer needs is one a
+            # worker cannot have. build_fisd is done and the export takes no handle.
             self._disconnect_wrds()
             self.logger.info(
                 "Pulling %d chunks across %d workers, one WRDS connection each.",
@@ -3302,11 +3301,11 @@ class ProcessStandardTRACE:
                 return self.db.raw_sql(sql, params=params)
             except (SAOperationalError, PGOperationalError, EOFError) as e:
                 attempt += 1
-                # Retry a dropped connection -- and a REFUSED one. WRDS caps how many
+                # Retry a dropped connection, and a refused one. WRDS caps how many
                 # sessions a user may hold, and the wrds package's connect-failure
                 # path calls input(), so in a batch job that refusal arrives as
-                # "EOFError: EOF when reading a line": a server-side limit wearing a
-                # keyboard error's clothes. Left uncaught it kills the chunk outright,
+                # "EOFError: EOF when reading a line", a server-side limit that looks
+                # like a keyboard error. Left uncaught it kills the chunk outright,
                 # which is what used to happen. _wrds_pool owns the signature list.
                 msg = str(e).lower()
                 transient = (

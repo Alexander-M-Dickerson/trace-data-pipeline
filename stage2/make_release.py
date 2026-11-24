@@ -4,9 +4,9 @@ make_release.py
 ===============
 Package a built Stage 2 vintage for publication.
 
-Build artifacts carry the Stage 1 date stamp (``factors.parquet`` under
+Build artifacts have the Stage 1 date stamp (``factors.parquet`` under
 ``output/blocks/<mode>/``) so a panel is always traceable to the file it came from.
-Released artifacts carry the vintage YEAR -- ``factors_2026.parquet`` -- which is what
+Released artifacts have the vintage year (``factors_2026.parquet``), which is what
 users cite. This script does that rename and assembles the provenance that makes a
 published number checkable.
 
@@ -17,18 +17,18 @@ published number checkable.
     python make_release.py --what daily         # the Stage 1 daily panel, public layout
     python make_release.py --mode <mode>        # a build other than the default stage1
 
-❗**This script is for REDISTRIBUTION, and only redistribution.**
+This script is for redistribution, and only redistribution.
 
 The panel we BUILD is not the panel we PUBLISH: `permco` and `gvkey` are proprietary
 identifiers and the agency ratings are licensed, so both are redacted here before anything
 is written, and `assert_publishable` refuses to package a file where that did not take.
 
-**Your own build is NOT redacted and does not need to be.** The redaction exists so that
+Your own build is not redacted and does not need to be. The redaction exists so that
 the files put on openbondassetpricing.com can be downloaded by people who hold no licence.
 If you ran Stage 0-2 yourself you have a WRDS subscription and the licences that come with
-it, so the panel under `output/panel/` is complete -- full `permco`, `gvkey` and raw
-1-22 agency ratings -- and nothing in the build touches them. `redact_for_publication`
-returns a copy and is called from this file alone; running it does not alter your data.
+it, so the panel under `output/panel/` is complete, with full `permco`, `gvkey` and raw
+1-22 agency ratings, and nothing in the build touches them. `redact_for_publication`
+returns a copy and is called from this file alone. Running it does not alter your data.
 
 You only need this script if you are publishing a vintage for others to download.
 
@@ -56,7 +56,7 @@ import pyarrow.parquet as pq
 import _stage2_settings as cfg
 from lib import frontier
 
-# Sources that are not fetched over the web and so have no sidecar; recorded by hand.
+# Sources that are not fetched over the web and so have no sidecar. Recorded by hand.
 NON_WEB_SOURCES = {
     "vix_monthly": {
         "source": "WRDS table cboe.cboe",
@@ -77,7 +77,7 @@ def _public_path(path: Path) -> str:
     """A path as it may appear in a published file: relative to the repository, never absolute.
 
     PROVENANCE.json is zipped into public bundles. An absolute path puts the builder's user
-    name and disk layout into a download, and the 2026-09 BBW bundle carried one.
+    name and disk layout into a download, and the 2026-09 BBW bundle had one.
     """
     path = Path(path)
     try:
@@ -231,25 +231,25 @@ def build_readme(factors: pd.DataFrame, prov: dict, sha: str) -> str:
 # ---------------------------------------------------------------------------
 # Publication redaction
 # ---------------------------------------------------------------------------
-# The panel we BUILD is not the panel we PUBLISH. Two things in it are not ours to
+# The panel we build is not the panel we publish. Two things in it are not ours to
 # redistribute to an unlicensed audience, and the released 2025 vintage redacts both.
-# This applies to the DOWNLOAD only -- a user who runs the pipeline has the licences and
-# keeps the full panel:
+# This applies to the download only. A user who runs the pipeline has the licences and
+# keeps the full panel.
 #
 #   permco, gvkey       proprietary identifiers -> nulled
 #   spc_rat, mdc_rat    licensed agency ratings -> collapsed to investment grade (1)
 #                       vs non-investment grade and default (11)
 #
-# `permno` is published. Everything else -- returns, signals, factors -- is computed
-# here from scratch and carries no restriction.
+# `permno` is published. Everything else (returns, signals, factors) is computed
+# here from scratch and has no restriction.
 #
 # This is the one step in the pipeline where getting it wrong means distributing data
 # we have no right to distribute, so it is a named function with a gate behind it
-# rather than a few lines inside main().
+# and not a few lines inside main().
 
 REDACT_NULL = ("permco", "gvkey")
 REDACT_RATINGS = ("spc_rat", "mdc_rat")
-IG_MAX = 10          # ratings 1..10 are investment grade; 11+ is not
+IG_MAX = 10          # ratings 1..10 are investment grade, 11+ is not
 
 
 def redact_for_publication(df: pd.DataFrame) -> pd.DataFrame:
@@ -267,7 +267,7 @@ def redact_for_publication(df: pd.DataFrame) -> pd.DataFrame:
 
 # [tag:rule.redaction] the public panel must have permco and gvkey blank and the ratings reduced to 1 (investment grade) or 11 (high yield)
 def assert_publishable(df: pd.DataFrame, what: str) -> None:
-    """Refuse to package anything still carrying restricted data."""
+    """Refuse to package anything that still has restricted data."""
     problems = []
     for col in REDACT_NULL:
         if col in df.columns:
@@ -455,7 +455,7 @@ def release_panel(mode: str, out_dir: Path, vintage: str,
     print(f"reading  {panel_src.name} ...")
     panel = pd.read_parquet(panel_src)
     # A month where Stage 1's cut-off landed inside TRACE Enhanced's reporting gap is
-    # not a cross-section -- what survives is the 144A universe alone. Do not publish it.
+    # not a cross-section. What survives is the 144A universe alone. Do not publish it.
     bad = frontier.degenerate_tail_months(panel)
     dropped: list[str] = []
     frontier_cut = None
@@ -505,7 +505,7 @@ def release_panel(mode: str, out_dir: Path, vintage: str,
             shutil.copy2(src, dst)
         else:
             # Every artifact in a release stops at the same month. A sidecar reaching
-            # past the panel is a merge that silently drops rows, or a reader who
+            # past the panel is a merge that drops rows without an error, or a reader who
             # believes the extra month is usable when the panel says it is not.
             side = pd.read_parquet(src)
             n0 = len(side)
@@ -516,7 +516,7 @@ def release_panel(mode: str, out_dir: Path, vintage: str,
             del side
         written.append((name, dst))
 
-    # The banner is a fixed-width box; pad rather than trusting the vintage to be
+    # The banner is a fixed-width box. Pad it, because the vintage may not be
     # the same length as whatever was there last year.
     readme = PANEL_README.format(
         vintage=vintage, span_start=span[0], span_end=span[1],
@@ -606,12 +606,12 @@ def release_factors(mode: str, out_dir: Path, vintage: str) -> int:
 
 
 # =============================================================================================
-# THE BBW FOUR-FACTOR BUNDLE
+# The BBW four-factor bundle
 #
-# The corrected Bai, Bali and Wen (2019) factors -- MKTB, DRF, CRF, LRF -- for every return
+# The corrected Bai, Bali and Wen (2019) factors (MKTB, DRF, CRF, LRF) for every return
 # definition the panel uses, on the TRACE sample and on the extended (Lehman-ICE + TRACE)
 # sample, with the authors' original series beside them so the correction can be measured.
-# Stage 2 builds these anyway (step 3, for the betas); this packages them for download.
+# Stage 2 builds these anyway (step 3, for the betas). This packages them for download.
 # =============================================================================================
 
 BBW_FACTORS = ("MKTB", "DRF", "CRF", "LRF")
@@ -623,9 +623,9 @@ BBW_FACTORS = ("MKTB", "DRF", "CRF", "LRF")
 BBW_RETURN_TYPES = (("", "exc"), ("x", "dur"), ("_bns", "dbns"), ("_cls", "dcls"))
 
 # The authors' original series, committed under reference/ and shipped unchanged. Pinned: a
-# file whose CONTENT hashes differently is a different claim, and the bundle refuses it.
+# file whose content hashes differently is a different claim, and the bundle refuses it.
 # The pin is over the content with line endings normalized to LF. Until 2026-09-23 it was the
-# sha256 of a Windows checkout's CRLF bytes, so on Linux and macOS -- and on WRDS -- the
+# sha256 of a Windows checkout's CRLF bytes, so on Linux and macOS, and on WRDS, the
 # unchanged file failed the check and the BBW bundle refused to build.
 BBW_ORIGINAL = cfg.STAGE2_DIR / "reference" / "bbw_factors_original_2004_2021.csv"
 BBW_ORIGINAL_SHA256 = "d20016bd922127c7d0a5d07a4ff3a4c11b329923b15455f8d5aa2c01f62bfca5"
@@ -635,7 +635,7 @@ def _content_sha256(path: Path) -> str:
     """sha256 of a text file's content with CRLF normalized to LF: the same on every checkout."""
     return hashlib.sha256(Path(path).read_bytes().replace(b"\r\n", b"\n")).hexdigest()
 
-# Where the TRACE-built factors take over from the Lehman-ICE backfill -- step4_betas.ICE_CUTOFF.
+# Where the TRACE-built factors take over from the Lehman-ICE backfill (step4_betas.ICE_CUTOFF).
 BBW_TRACE_START = pd.Timestamp("2002-08-31")
 
 
@@ -652,7 +652,7 @@ def bbw_columns() -> list[tuple[str, str, str]]:
 def _refuse_stale_twins(blocks: Path) -> None:
     """The benchmark twins must not be older than the plain block.
 
-    Step 3 writes `bbw_factors.parquet`; `make_excess_blocks.py` writes the `_bns` and `_cls`
+    Step 3 writes `bbw_factors.parquet`. `make_excess_blocks.py` writes the `_bns` and `_cls`
     twins afterwards, from the same panel. A twin older than the plain block was built from an
     earlier panel, and the bundle would print its columns beside factors of a later one. The
     two can agree to rounding and still come from different runs, so the file times decide.
@@ -709,7 +709,7 @@ def _bbw_extended(blocks: Path) -> pd.DataFrame:
     if any(ext_col not in fm.columns for _, _, ext_col in bbw_columns()):
         # Step 4 writes factors_merged before make_excess_blocks.py builds the _bns/_cls twins,
         # so the file lacks their columns unless step 4 ran again afterwards. Until 2026-09-23
-        # that stopped the release here. The file IS step 4's build_factor_matrix(); building
+        # that stopped the release here. The file is step 4's build_factor_matrix(), so building
         # it now picks the twins up, and _gate_bbw still checks the result against the blocks.
         fm = _factor_matrix(blocks)
     fm["date"] = pd.to_datetime(fm["date"])
@@ -736,9 +736,9 @@ def _factor_matrix(blocks: Path) -> pd.DataFrame:
 def _gate_bbw(trace: pd.DataFrame, ext: pd.DataFrame) -> None:
     """Refuse what would publish a wrong series.
 
-    ❗Extended after the cutoff IS the TRACE series -- step 4 keeps the TRACE-native columns
-    from 2002-08-31 and splices the backfill only before it. So the two tables must agree
-    exactly there; a difference means a block from a different run or mode. And LRF has no
+    Extended after the cutoff is the TRACE series. Step 4 keeps the TRACE-native columns
+    from 2002-08-31 and splices the backfill only before it, so the two tables must agree
+    exactly there. A difference means a block from a different run or mode. And LRF has no
     pre-TRACE history at all (the extension is the modified, three-factor variant), so it must
     be empty before the cutoff and complete from it."""
     cols = [c for c in trace.columns if c != "date"]
@@ -963,13 +963,13 @@ def release_bbw(mode: str, out_dir: Path, vintage: str) -> int:
 
 
 # =============================================================================================
-# THE DAILY PANEL
+# The daily panel
 #
-# Stage 1's bond-day panel, in the layout we publish. The file Stage 1 BUILDS carries the
+# Stage 1's bond-day panel, in the layout we publish. The file Stage 1 builds has the
 # agency ratings and two proprietary identifiers, and is not ours to redistribute, so a copy
 # made with SELECT * is never publishable. This step is the only way a public copy is made.
 #
-# The public layout is a WHITELIST. A column Stage 1 gains later is withheld until someone
+# The public layout is a whitelist. A column Stage 1 gains later is withheld until someone
 # decides it is public, and the release refuses to run until they have decided.
 # =============================================================================================
 
@@ -1003,7 +1003,7 @@ DAILY_LICENSED = tuple(c for c, why in DAILY_WITHHELD.items() if "not in the pub
 _LICENSED_NAME = ("rating", "permco", "gvkey", "_rat")
 
 
-# [tag:rule.daily_redaction] the public daily file must not carry the licensed columns
+# [tag:rule.daily_redaction] the public daily file must not include the licensed columns
 def assert_daily_publishable(path: Path, source_rows: int | None = None) -> None:
     """Refuse a daily file that is not exactly the public layout."""
     pf = pq.ParquetFile(path)
@@ -1093,7 +1093,7 @@ def release_daily(out_dir: Path, vintage: str) -> int:
             f"TO '{target.as_posix()}' (FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE 1000000)")
         assert_daily_publishable(target, source_rows=src_rows)
 
-        # Same rows, same values. An order-independent hash over EVERY public column of every
+        # Same rows, same values. An order-independent hash over every public column of every
         # row, taken on the file read and on the file written. A float sum would not do: a
         # parallel sum is not the same to the last bit on two files laid out differently.
         probe = ("count(*), count(permno), count(DISTINCT cusip_id), min(trd_exctn_dt), "
@@ -1168,7 +1168,7 @@ def main() -> int:
         except FileNotFoundError as exc:
             # The BBW bundle needs make_excess_blocks.py's benchmark twins, which most users
             # never build. Under `--what all` that used to stop the run before the daily
-            # bundle; it is now skipped, loudly, and the exit code says so.
+            # bundle. It is now skipped with a message, and the exit code says so.
             if args.what == "bbw":
                 raise
             print(f"[bbw] SKIPPED: {exc}\n"

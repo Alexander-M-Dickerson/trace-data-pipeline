@@ -6,8 +6,8 @@ plan_chunks must produce a true PARTITION of the CUSIP universe.
 
 That property is what makes row-balanced chunking safe. Every per-chunk filter in
 stage0 groups by cusip_id and chunks are disjoint CUSIP sets, so if the partition is
-exact -- every CUSIP present exactly once -- then regrouping cannot change a single
-cleaned row. If it is not exact, bonds are silently duplicated or dropped.
+exact (every CUSIP present exactly once) then regrouping cannot change a single
+cleaned row. If it is not exact, bonds are duplicated or dropped without an error.
 
     python3 tests/test_chunk_plan.py
 
@@ -63,7 +63,7 @@ def main():
             over.append((len(ch), rows))
     check("packed: no multi-CUSIP chunk exceeds the target", not over, f"{len(over)} over")
 
-    # 4. An oversized CUSIP gets its own chunk rather than being dropped or split.
+    # 4. An oversized CUSIP gets its own chunk. It is not dropped or split.
     counts["000000500"] = 5_000_000
     chunks = plan_chunks(universe, counts, target_rows=100_000)
     solo = [ch for ch in chunks if "000000500" in ch]
@@ -71,7 +71,7 @@ def main():
           f"chunk of {len(solo[0]) if solo else '?'}")
     check("packed: still an exact partition with an outlier", is_partition(universe, chunks))
 
-    # 5. CUSIPs the count query never saw (zero rows) are still carried.
+    # 5. CUSIPs the count query never saw (zero rows) are still included.
     partial = {c: 1000 for c in universe[:500]}          # second half missing entirely
     chunks = plan_chunks(universe, partial, target_rows=10_000)
     check("packed: CUSIPs missing from row_counts are not dropped",
@@ -84,8 +84,8 @@ def main():
     check("empty row_counts falls back to fixed size",
           plan_chunks(universe, {}, 1000, chunk_size=100) == plan_chunks(universe, chunk_size=100))
 
-    # 7. The real shape: the measured Enhanced distribution.
-    #    447 chunks of 250 ranged 7,806 .. 3,392,802 rows; the busiest single CUSIP is
+    # 7. The measured Enhanced distribution.
+    #    447 chunks of 250 ranged 7,806 .. 3,392,802 rows, and the busiest single CUSIP is
     #    513,372. Packing to 750k should bring the maximum near the target.
     big = [f"{i:09d}" for i in range(112_000)]
     real = {}

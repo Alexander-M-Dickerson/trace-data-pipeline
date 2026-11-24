@@ -1,19 +1,19 @@
-"""step3_bbw.py -- Bai-Bali-Wen 4-factor construction (MKTB/DRF/CRF/LRF + duration-adjusted + TERM).
+"""Bai-Bali-Wen 4-factor construction (MKTB/DRF/CRF/LRF + duration-adjusted + TERM).
 
 Ground truth: the reference implementation's `prep_bbw_data` + `create_bbw_factors`
 (2563-3019), called by the runner with rating_col='composite', signal_cols=(var_95, ilq_adj,
-str1_adj) / (var_95x, ilq_adj, str1_adjx), n_portf=5x5, and NO fisd_path (the USA filter is
-SKIPPED for BBW, unlike the illiq factors). This step is pandas end-to-end -- the double sorts run
-through PyBondLab exactly as upstream, on small (2M-row) monthly panels; the heavy lifting was
-already done by steps 1-2.
+str1_adj) / (var_95x, ilq_adj, str1_adjx), n_portf=5x5, and no fisd_path (the USA filter is
+skipped for BBW, unlike the illiq factors). This step is pandas end-to-end. The double sorts run
+through PyBondLab exactly as upstream, on small (2M-row) monthly panels, and steps 1-2 have
+already done the heavy work.
 
 Inputs: step-1 blocks (all_returns, end_returns, end_signals, adj_signals) + step-2
 illiq_signals_adj + the cached quote panel (lib/quote) + FF5 rf (lib/ff5).
 Output: blocks/<mode>/bbw_factors.parquet (date + MKTB DRF CRF LRF MKTBx DRFx CRFx LRFx TERM
 DEFB TERMB).
 
-With `--benchmark <bm>` it instead writes blocks/<mode>/bbw_factors_<bm>.parquet, carrying only the
-benchmark-dependent half -- MKTB_<bm>, DRF_<bm>, CRF_<bm>, LRF_<bm>, TERM_<bm> -- computed exactly
+With `--benchmark <bm>` it instead writes blocks/<mode>/bbw_factors_<bm>.parquet, which holds only
+the benchmark-dependent half (MKTB_<bm>, DRF_<bm>, CRF_<bm>, LRF_<bm>, TERM_<bm>), computed exactly
 as the `x` twins are, but on `ret_vw - tret_<bm>`. The raw (std) factors and DEFB/TERMB are built
 from total returns and do not move with the benchmark, so they are not recomputed.
 """
@@ -40,7 +40,7 @@ def _prep_bbw_panel(blocks_dir: Path, tret_col: str = "tret") -> pd.DataFrame:
 
     `tret_col` is the benchmark subtracted to form the duration-adjusted side. The default is the
     incumbent `tret`, which reproduces the shipped block exactly."""
-    # -- 1. quote (pre-2002-07) + all_returns; rolling VaR on ret_vw and ret_vwx ------------------
+    # -- 1. quote (pre-2002-07) + all_returns, then rolling VaR on ret_vw and ret_vwx -------------
     q = quote.load_quote()
     q.columns = q.columns.str.lower()
     q = q.rename(columns={"cusip_id": "cusip"})[["cusip", "date", "ret_vw", tret_col]].copy()
@@ -147,7 +147,7 @@ def _double_sort_factors(df: pd.DataFrame, signals: tuple, ret_field: str,
 
 def build(con=None, mode: str | None = None, limit_cusips: int | None = None,
           benchmark: str | None = None) -> dict[str, Path]:
-    """Build the bbw_factors block. `con`/`limit_cusips` unused (pandas step; kept for API parity).
+    """Build the bbw_factors block. `con`/`limit_cusips` unused (pandas step, kept for API parity).
 
     `benchmark=None` reproduces the shipped block. Any other value builds only the twins that move
     with the benchmark, from `ret_vw - tret_<benchmark>`."""
@@ -171,7 +171,7 @@ def build(con=None, mode: str | None = None, limit_cusips: int | None = None,
     rf_df = ff5.load_ff5()[["date", "rf"]].set_index("date")["rf"]
 
     # The raw (std) side is built from total returns and does not move with the benchmark, so for a
-    # benchmark run only the adjusted side is sorted -- half the PyBondLab work.
+    # benchmark run only the adjusted side is sorted, which is half the PyBondLab work.
     if benchmark is None:
         core_std, crf_std = _double_sort_factors(df, BBW_SIGNALS, "ret", FACTOR_NAME_MAP,
                                                  "str1_adj")
@@ -197,7 +197,7 @@ def build(con=None, mode: str | None = None, limit_cusips: int | None = None,
     MKT_all["TERM"] = MKT_all["MKTB_raw"] - MKT_all["MKTBx"]
 
     if benchmark is not None:
-        # MKTB_raw and RF are benchmark-independent; TERM is not, because it is the gap between the
+        # MKTB_raw and RF are benchmark-independent. TERM is not, because it is the gap between the
         # raw market and the adjusted one. `dcapm`, `psbm` and `amdm` regress on `term` alongside
         # `mktbx`, so a benchmark run that reused the tret TERM would mix two benchmarks on one
         # right-hand side.
@@ -217,15 +217,15 @@ def build(con=None, mode: str | None = None, limit_cusips: int | None = None,
              "columns": list(bbw_bm.columns)}, indent=1))
         return {f"bbw_factors{sfx}": out_path}
 
-    # -- DEFB / TERMB: the default and term premia (Fama-French 1993; Gebhardt, Hvidkjaer &
-    #    Swaminathan 2005) ---------------------------------------------------------------------
+    # --- DEFB / TERMB: the default and term premia (Fama and French 1993, and Gebhardt,
+    #    Hvidkjaer & Swaminathan 2005) ---------------------------------------------------------
     #
-    #      DEFB  = long-term CORPORATE total return  -  long-term GOVERNMENT total return
+    #      DEFB  = long-term corporate total return  -  long-term government total return
     #      TERMB = long-term government total return -  risk-free rate
     #
     # The corporate leg is the value-weighted return of panel bonds with at least
-    # DEF_CORP_MIN_MATURITY years to maturity; the government leg is the CRSP key-rate
-    # Treasury return at DEF_GOVT_TENOR. Both legs are TOTAL returns, so the difference is
+    # DEF_CORP_MIN_MATURITY years to maturity. The government leg is the CRSP key-rate
+    # Treasury return at DEF_GOVT_TENOR. Both legs are total returns, so the difference is
     # the credit premium a long-maturity bond earns over a matched government bond.
     lt = (df.loc[df["tmat"] >= cfg.DEF_CORP_MIN_MATURITY, ["date", "ID", "mcap_s", "ret"]]
             .dropna(subset=["ret", "mcap_s"]).copy())

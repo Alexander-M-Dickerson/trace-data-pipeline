@@ -4,11 +4,11 @@ _chunk_runner.py
 ================
 How stage0 divides the CUSIP universe into work units, and how it runs them.
 
-Two halves: plan_chunks decides what a work unit IS, run_chunks decides who executes
+Two halves: plan_chunks decides what a work unit is, run_chunks decides who executes
 it. They sit together because the second only became worth having once the first made
 chunks even enough in size to run several at once.
 
-PART ONE -- THE PLAN
+PART ONE: THE PLAN
 
 The original scheme was a fixed count of CUSIPs per chunk (250). That is simple but
 badly unbalanced, because trading activity is enormously skewed: measured over the
@@ -17,25 +17,24 @@ median of 646,240. The largest chunk is a ~2.7 GB frame before the cleaners make
 their copies, and the peak inside decimal_shift_corrector is roughly 2.5x that.
 
 Serially that is merely wasteful. Running several chunks at once it is the binding
-constraint, because the memory a job must reserve is set by the WORST chunk, not the
-average -- and reserving for the worst wastes most of the job's allocation.
+constraint, because the memory a job must reserve is set by the worst chunk, not the
+average, and reserving for the worst wastes most of the job's allocation.
 
 Packing to a target ROW count instead bounds it: the same universe packs to chunks of
 about the target, with the only hard floor being the busiest single CUSIP (513,372
 rows in Enhanced), so the maximum falls from 3.39M to roughly the target.
 
-This does NOT change the cleaned data. Every per-chunk filter in both engines groups
-by cusip_id -- the decimal-shift anchor, the bounce-back scan, the initial-price-error
-scan and the Dick-Nielsen reversal keys all lead with it -- and chunks are disjoint
-CUSIP sets. So which chunk a bond lands in cannot affect its result. What DOES change
+This does not change the cleaned data. Every per-chunk filter in both engines groups
+by cusip_id (the decimal-shift anchor, the bounce-back scan, the initial-price-error
+scan and the Dick-Nielsen reversal keys all lead with it), and chunks are disjoint
+CUSIP sets. So which chunk a bond lands in cannot affect its result. What does change
 is the audit tables, whose chunk column and per-chunk counts follow the new grouping.
 
-PART TWO -- THE SCHEDULER
+PART TWO: THE SCHEDULER
 
 run_chunks executes the plan, serially or across a pool of processes each holding its
-own WRDS connection, and hands the results back IN CHUNK ORDER regardless of the order
-they finished in. See its docstring for why the ordering is a correctness requirement
-rather than a tidiness one.
+own WRDS connection, and hands the results back in chunk order whatever order
+they finished in. Its docstring says why correctness depends on that ordering.
 
 Author: Open Source Bond Asset Pricing
 """
@@ -48,7 +47,7 @@ from typing import Iterable, Sequence
 
 
 def divide_chunks(seq: Sequence, n: int):
-    """Fixed-size chunks -- the original scheme, kept as the fallback."""
+    """Fixed-size chunks, the original scheme, kept as the fallback."""
     for i in range(0, len(seq), n):
         yield seq[i: i + n]
 
@@ -63,7 +62,7 @@ def plan_chunks(cusips: Sequence[str],
     the input order so chunks stay contiguous slices of the universe and a run is
     reproducible. Without them, falls back to fixed-size chunks.
 
-    A CUSIP whose own row count exceeds the target gets a chunk to itself -- it cannot
+    A CUSIP whose own row count exceeds the target gets a chunk to itself. It cannot
     be split, since every filter needs a bond's whole history in one place.
 
     Parameters
@@ -96,7 +95,7 @@ def plan_chunks(cusips: Sequence[str],
     for c in cusips:
         n = int(row_counts.get(c, 0) or 0)
         # Close the current chunk before adding a CUSIP that would push it past the
-        # target -- unless the chunk is empty, in which case this CUSIP is oversized
+        # target, unless the chunk is empty, in which case this CUSIP is oversized
         # and takes the chunk on its own.
         if current and current_rows + n > target_rows:
             chunks.append(current)
@@ -147,8 +146,8 @@ def summarize_plan(chunks: Iterable[Sequence[str]],
 class ChunkResult:
     """One chunk's output, on its way back from wherever it was computed.
 
-    `data` is None for a chunk whose WRDS query returned nothing -- distinct from an
-    empty frame, and it carries no audit rows either, matching what the original
+    `data` is None for a chunk whose WRDS query returned nothing. That is distinct from an
+    empty frame, and it has no audit rows either, matching what the original
     inline loop did with its `continue`.
     """
     chunk_id: int
@@ -160,8 +159,8 @@ class ChunkResult:
     ie_cusips: list
     n_rows: int = 0
     elapsed: float = 0.0
-    # Per-filter log lines held back so the parent can emit them in chunk order,
-    # rather than letting concurrent workers interleave them. Empty in a serial run,
+    # Per-filter log lines held back so the parent can emit them in chunk order
+    # and concurrent workers cannot interleave them. Empty in a serial run,
     # where they are emitted as they happen.
     log_lines: list = field(default_factory=list)
 
@@ -177,7 +176,7 @@ def run_chunks(chunks,
                first_chunk_id: int = 0) -> list:
     """Run every chunk and return the results in ASCENDING CHUNK ORDER.
 
-    `n_workers <= 1` calls `run_serial(chunk_id, cusips, n_chunks)` in this process --
+    `n_workers <= 1` calls `run_serial(chunk_id, cusips, n_chunks)` in this process,
     the original loop, on the caller's own connection. Above that, `pool_task` is run
     in a process pool, each worker holding its own WRDS connection opened by
     `pool_initializer`.
@@ -186,13 +185,13 @@ def run_chunks(chunks,
     which reconstructs each chunk's filter sequence from row order, so results must be
     reassembled by chunk id no matter what order they completed in.
 
-    A chunk that produces no result ABORTS the run. Silently missing chunks are
-    silently missing bonds in a file that otherwise looks entirely normal, and stage 1
-    would happily consume it.
+    A chunk that produces no result aborts the run. A missing chunk is a set of
+    missing bonds in a file that otherwise looks entirely normal, and stage 1
+    would consume it without complaint.
 
     `first_chunk_id` exists because the two engines number chunks differently and both
     numberings are already in shipped audit tables: enhanced counts from 0, standard
-    and 144A from 1. Not worth unifying; worth not silently changing.
+    and 144A from 1. They are not worth unifying, and neither should change unnoticed.
     """
     chunks = list(chunks)
     log = logger or logging.getLogger(__name__)
@@ -209,10 +208,10 @@ def run_chunks(chunks,
 
     import multiprocessing as mp
 
-    # fork where it exists (Linux, so WRDS): the context carries fisd_off, a
+    # fork where it exists (Linux, so WRDS): the context holds fisd_off, a
     # whole-universe frame, and fork shares it by memory instead of pickling a copy to
     # every worker. Windows has no fork and falls back to spawn, which works because
-    # the entry scripts carry a __main__ guard.
+    # the entry scripts have a __main__ guard.
     try:
         mp_ctx = mp.get_context("fork")
     except ValueError:
@@ -223,11 +222,11 @@ def run_chunks(chunks,
     log.info("Running %d chunks across %d worker processes "
              "(one WRDS connection each)", n, n_workers)
 
-    # NO maxtasksperchild. Workers stay alive for the whole run on purpose: recycling
-    # one would mean a fresh ~5 s WRDS handshake per chunk -- 485 of them on Enhanced
-    # -- and would hammer the per-user connection limit for nothing. (The fresh-process
+    # No maxtasksperchild. Workers stay alive for the whole run on purpose: recycling
+    # one would mean a fresh ~5 s WRDS handshake per chunk (485 of them on Enhanced)
+    # and would hammer the per-user connection limit for nothing. (The fresh-process
     # rule that applies to heavy DuckDB work is about DuckDB's parallelism collapsing in
-    # a long-lived process; it does not transfer to a WRDS-bound pool.)
+    # a long-lived process. It does not transfer to a WRDS-bound pool.)
     pool = mp_ctx.Pool(n_workers, initializer=pool_initializer,
                        initargs=pool_initargs)
     got: dict[int, ChunkResult] = {}
@@ -238,7 +237,7 @@ def run_chunks(chunks,
                      len(got), n, res.chunk_id, f"{res.n_rows:,}", res.elapsed)
         pool.close()
     except BaseException:
-        # A worker raised, or we were interrupted. Kill the pool rather than let it
+        # A worker raised, or we were interrupted. Kill the pool so it does not
         # linger holding connections.
         pool.terminate()
         raise

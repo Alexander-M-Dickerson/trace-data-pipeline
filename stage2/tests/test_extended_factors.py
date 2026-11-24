@@ -1,8 +1,8 @@
-"""test_extended_factors.py -- the published extended-BBW seam normalizes both layouts.
+"""The published extended-BBW seam normalizes both layouts.
 
-The published parquet ships `date` as a DatetimeIndex; a cached copy ships it as a column. Both must
-normalize to the same ['date'] + 7-factor frame, and a dateless frame must fail loudly (the corrupt
-cache was exactly that -- index=False dropped the DatetimeIndex at cache-write)."""
+The published parquet ships `date` as a DatetimeIndex. A cached copy ships it as a column. Both must
+normalize to the same ['date'] + 7-factor frame, and a dateless frame must raise an error (the corrupt
+cache was exactly that, because index=False dropped the DatetimeIndex at cache-write)."""
 from __future__ import annotations
 
 import numpy as np

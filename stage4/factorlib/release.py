@@ -1,4 +1,4 @@
-"""release.py -- write one sort's factors in the layout openbondassetpricing.com publishes.
+"""Write one sort's factors in the layout openbondassetpricing.com publishes.
 
 For each sort, two folders under `stage4/output/`, each holding what the matching published
 archive holds (zip a folder and you have the archive, less its README):
@@ -72,7 +72,7 @@ def flip_blob(flips: dict) -> str:
 
 
 def write(sort: str, panel: pd.DataFrame, flips: dict, manifest: dict, vintage: str) -> dict:
-    """Write both folders for one sort; return what was written, with hashes."""
+    """Write both folders for one sort and return what was written, with hashes."""
     pdir, cdir = folders(sort, vintage)
     for d in (pdir, cdir):
         d.mkdir(parents=True, exist_ok=True)

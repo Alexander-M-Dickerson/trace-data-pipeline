@@ -1,7 +1,7 @@
-"""month_boundaries.py -- the per-month boundary table for step 1 (upstream steps 6-7 of
+"""The per-month boundary table for step 1 (upstream steps 6-7 of
 the reference implementation), computed exactly from the NYSE session calendar.
 
-Upstream builds these with pandas CustomBusinessDay/CustomBusinessMonthEnd offsets; we compute the
+Upstream builds these with pandas CustomBusinessDay/CustomBusinessMonthEnd offsets. We compute the
 identical dates positionally on the session array (proven equivalent in tests/test_month_boundaries.py):
 
   first_bday          first NYSE session >= calendar month start   (month_begin + 0*bday)
@@ -9,7 +9,7 @@ identical dates positionally on the session array (proven equivalent in tests/te
   cut_off_begin       first_bday + (business_day_gap-1) sessions   (the 5th session of the month)
   bus_month_end       last NYSE session of the month               (CustomBusinessMonthEnd)
   cut_off_end         bus_month_end - (business_day_gap-1) sessions
-  date_end_bus_lag    previous month's bus_month_end (shift over the months PRESENT IN THE DATA)
+  date_end_bus_lag    previous month's bus_month_end (shift over the months present in the data)
   month_end_cal       calendar month end (the panel date)
 
 Note the upstream "internal" offsets: the user-facing knob business_day_gap=5 means "within the first/

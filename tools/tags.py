@@ -1,4 +1,4 @@
-r"""tags.py -- check the code tags, and write TAGS.md, the index of them.
+r"""Check the code tags, and write TAGS.md, the index of them.
 
     python tools/tags.py            # check the tags, then rewrite TAGS.md
     python tools/tags.py --check    # check, and fail if TAGS.md is out of date
@@ -21,18 +21,18 @@ For a real pair, see the column contract's check, tagged in stage2/lib/contract.
 pointer to it in AGENTS.md.
 
 The rules, from tagref:
-  1. every ref names a tag or a group that exists;
-  2. no two tags share a name, and no name is both a tag and a group;
-  3. a group has at least two members;
-  4. a file or dir pointer names one that exists.
+  1. every ref names a tag or a group that exists
+  2. no two tags share a name, and no name is both a tag and a group
+  3. a group has at least two members
+  4. a file or dir pointer names one that exists
 And this repository's own:
-  5. every name starts with a namespace in NAMESPACES;
-  6. every tag and group carries a description, after it on the same line;
+  5. every name starts with a namespace in NAMESPACES
+  6. every tag and group has a description, after it on the same line
   7. every column of the monthly panel (`PANEL_COLUMNS` in stage2/lib/contract.py) has
-     exactly one `col.` name, and no `col.` name is a column the panel lacks; the same for the
-     daily panel (`daily.`, against the column tables of stage1/DATA_DICTIONARY.md);
-  8. in a Python file, a tag or group sits in a `#` comment;
-  9. TAGS.md is exactly what this script writes (with --check).
+     exactly one `col.` name, and no `col.` name is a column the panel lacks. The same holds
+     for the daily panel (`daily.`, against the column tables of stage1/DATA_DICTIONARY.md)
+  8. in a Python file, a tag or group sits in a `#` comment
+  9. TAGS.md is exactly what this script writes (with --check)
 
 Tags go in comments only, never in a docstring or a string, so tagging a Python file leaves
 its parsed code unchanged.
@@ -139,7 +139,7 @@ def read_directives(root: Path = ROOT, paths=None) -> list[Directive]:
         raw = (root / rel).read_bytes()
         lines = []
         for chunk in raw.split(b"\n"):
-            try:        # tagref skips a line that is not UTF-8; so does this
+            try:        # tagref skips a line that is not UTF-8, and so does this
                 lines.append(chunk.rstrip(b"\r").decode("utf-8"))
             except UnicodeDecodeError:
                 lines.append("")

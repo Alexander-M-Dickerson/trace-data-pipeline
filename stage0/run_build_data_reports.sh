@@ -8,10 +8,10 @@
 # each (REPORTS_CONCURRENCY in _trace_settings.py). This job runs alongside stage 1
 # since 2.2.2, so 5 here + stage 1's 1 = 6 against the measured ceiling of 7.
 #
-# ❗m_mem_free is charged PER SLOT: 5 x 8G = 40 GB, against the WRDS caps of 8 cores and
-# 48 GB per job. An over-request does not error -- the job pends forever, in silence.
-# Measured peak RSS on the serial 2026-09-09 run was 4.78 GB; the parent still holds the
-# accumulated figure frames while workers hold a chunk each.
+# m_mem_free is charged per slot: 5 x 8G = 40 GB, against the WRDS caps of 8 cores and
+# 48 GB per job. An over-request does not raise an error, and the job pends forever with
+# no message. Measured peak RSS on the serial 2026-09-09 run was 4.78 GB. The parent
+# still holds the accumulated figure frames while workers hold a chunk each.
 #$ -pe onenode 5
 #$ -l m_mem_free=8G
 #$ -o stage0/logs/_data_reports.out    # Log standard output

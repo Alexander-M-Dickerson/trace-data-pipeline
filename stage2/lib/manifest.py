@@ -1,4 +1,4 @@
-"""manifest.py -- the run-manifest writer: the machine-readable re-runnability record.
+"""The run-manifest writer: the machine-readable re-runnability record.
 
 Every full or partial build writes `manifests/monthly_<stamp>_<mode>.json` recording inputs +
 fingerprints (sha256/bytes/mtime_ns), the FULL config snapshot, git SHA, per-gate timings and
@@ -25,7 +25,7 @@ _HASH_CHUNK = 1 << 22  # 4 MiB read chunks
 
 
 def sha256_file(path: Path) -> str:
-    """sha256 hex digest, cached by (path, bytes, mtime_ns) -- multi-GB inputs hash once."""
+    """sha256 hex digest, cached by (path, bytes, mtime_ns), so multi-GB inputs hash once."""
     path = Path(path)
     st = path.stat()
     key = f"{path}|{st.st_size}|{st.st_mtime_ns}"

@@ -3,17 +3,17 @@
 probe_wrds_connections.py
 =========================
 Measure this account's WRDS connection limit, so the concurrency settings can be set
-from evidence rather than folklore.
+from a measurement.
 
-WRDS documents a limit of 5 CONCURRENT JOBS. It does not publish a per-user limit on
-database CONNECTIONS -- but one exists, and hitting it is nasty: the wrds package's
+WRDS documents a limit of 5 concurrent jobs. It does not publish a per-user limit on
+database connections, but one exists, and hitting it is confusing. The wrds package's
 connect-failure path calls input() to re-prompt for a username, so in a batch job a
 connection-limit error surfaces as
 
     EOFError: EOF when reading a line
 
-A rate limit reported as a keyboard error. This probe finds the real number and the
-real error text.
+That is a rate limit reported as a keyboard error. This probe finds the actual limit and
+the actual error text.
 
 Two separate questions, because they have different answers:
 
@@ -21,8 +21,8 @@ Two separate questions, because they have different answers:
           each proved live with SELECT 1, all held until the end. This is the number
           that bounds a worker pool where each worker owns a connection.
 
-  STORM   how many can be opened SIMULTANEOUSLY? The known failure is arrival-order
-          dependent -- several workers dialling at the same instant trip a limit that
+  STORM   how many can be opened at the same moment? The known failure depends on arrival
+          order. Several workers dialling at the same instant trip a limit that
           the same count opened sequentially does not. This is why a pool should
           serialise its handshake even when the hold count is fine.
 
@@ -32,8 +32,8 @@ Usage
     python3 tests/probe_wrds_connections.py --max 8
     python3 tests/probe_wrds_connections.py --hold-only
 
-Run it when no other WRDS jobs of yours are active: an in-flight pipeline holds
-connections too, and this probe would be measuring the remainder rather than the cap.
+Run it when no other WRDS jobs of yours are active. A pipeline in flight holds
+connections too, and this probe would then measure the remainder and not the cap.
 
 Author: Open Source Bond Asset Pricing
 """
@@ -75,7 +75,7 @@ def _classify(exc: BaseException) -> str:
 
 def _connect(user: str):
     conn = wrds.Connection(wrds_username=user) if user else wrds.Connection()
-    conn.raw_sql("SELECT 1")          # prove it is actually usable, not just built
+    conn.raw_sql("SELECT 1")          # prove the connection can run a query
     return conn
 
 

@@ -1,23 +1,23 @@
 """Every `tret`-derived quantity must have a benchmark twin, or a recorded reason why not.
 
-WHY THIS TEST EXISTS. The panel ships five Treasury benchmarks. Making the duration-adjusted
-machinery work for more than `tret` turned up the SAME defect three separate times, each found by
-tripping over it while building the next thing rather than by looking:
+Why this test exists. The panel ships five Treasury benchmarks. Making the duration-adjusted
+machinery work for more than `tret` turned up the same defect three separate times, each found by
+tripping over it while building the next thing and none by looking:
 
-  1. the published 1997-2002 quote panel carried `tret` and no alternatives, so a rolling beta on
-     another benchmark had no pre-history and started a year late;
-  2. the benchmarks were attached to the END return frame only, so 8.1% of `all_returns` -- the
-     rows that come from the BEGIN frame -- had `tret` and nothing else, which would have estimated
-     the alternative betas on a non-random 92% subsample of the rows the `tret` ones use;
-  3. the published 1973-2023 extended BBW factor series carried the `tret` twins (MKTBx/DRFx/CRFx/
+  1. the published 1997-2002 quote panel had `tret` and no alternatives, so a rolling beta on
+     another benchmark had no pre-history and started a year late
+  2. the benchmarks were attached to the end return frame only, so 8.1% of `all_returns` (the
+     rows that come from the begin frame) had `tret` and nothing else, which would have estimated
+     the alternative betas on a non-random 92% subsample of the rows the `tret` ones use
+  3. the published 1973-2023 extended BBW factor series had the `tret` twins (MKTBx/DRFx/CRFx/
      TERM) and no others, so the factor side had the same hole the quote panel had on the returns
      side.
 
 Three instances is the point to stop fixing instances. This is the gate: a FOURTH one fails here,
 in seconds, instead of surfacing hours into whatever is being built on top of it.
 
-HOW TO SATISFY IT. Either parameterise the site by benchmark -- the column name comes from a
-variable, not a literal `"tret"` -- or add it to EXEMPT with a reason. A name in EXEMPT without a
+How to satisfy it. Either parameterise the site by benchmark (the column name comes from a
+variable, not a literal `"tret"`) or add it to EXEMPT with a reason. A name in EXEMPT without a
 reason is just a silenced alarm, which is the same rule `engine_drift`'s ALLOWED list follows.
 """
 import ast
@@ -30,7 +30,7 @@ import _stage2_settings as cfg
 
 STAGE2 = Path(__file__).resolve().parents[1]
 
-# Sites that read `tret` and are NOT expected to have a benchmark twin, and why.
+# Sites that read `tret` and are not expected to have a benchmark twin, and why.
 EXEMPT = {
     "lib/treasury.py": (
         "the PRODUCER of `tret` -- it interpolates the CRSP key-rate curve at modified duration. "
@@ -102,11 +102,11 @@ def test_every_tret_derivation_is_parameterised_or_exempt():
 
 
 def test_no_block_carries_tret_without_its_twins():
-    """A block that PROPAGATES `tret` and not the alternatives is the real shape of this bug.
+    """A block that propagates `tret` and not the alternatives is the shape this bug takes.
 
-    All three original instances were propagation, not derivation: the quote panel, `all_returns`
-    and the extended BBW series each CARRIED `tret` with no twin, and the derivation downstream was
-    fine. A gate that only looks for `- frame["tret"]` misses every one of them -- which it did,
+    All three original instances were propagation, not derivation. The quote panel, `all_returns`
+    and the extended BBW series each passed `tret` on with no twin, and the derivation downstream
+    was fine. A gate that only looks for `- frame["tret"]` misses every one of them, which it did,
     until `all_returns_ext` turned up as a fourth.
     """
     import pyarrow.parquet as pq
@@ -114,7 +114,7 @@ def test_no_block_carries_tret_without_its_twins():
     if not blocks.exists():
         pytest.skip("no blocks built in this clone")
 
-    # Blocks that legitimately carry `tret` alone, and why.
+    # Blocks that legitimately have `tret` alone, and why.
     CARRIES_TRET_ONLY = {
         "end_signals.parquet": "signal frame; tret arrives via end_returns",
         "bgn_returns.parquet": "a SHIPPED block with a frozen projection -- all_returns reads the "
@@ -168,8 +168,8 @@ def test_the_beta_engine_is_benchmark_parameterised():
                                          "crf": "crfx", "lrf": "lrfx"}
     bns = betas.factor_swap("bns")
     assert bns["mktb"] == "mktb_bns"
-    # TERM is MKTB_raw - MKTBx, so it moves with the benchmark; dcapm/psbm/amdm regress on it
-    # ALONGSIDE mktbx, and leaving it behind puts two benchmarks on one right-hand side.
+    # TERM is MKTB_raw - MKTBx, so it moves with the benchmark. dcapm/psbm/amdm regress on it
+    # alongside mktbx, and leaving it behind puts two benchmarks on one right-hand side.
     assert bns["term"] == "term_bns", "term must be swapped for a non-tret benchmark"
     assert "term" not in betas.factor_swap("tret"), "there is no `termx`; tret's twin IS `term`"
 
@@ -177,7 +177,7 @@ def test_the_beta_engine_is_benchmark_parameterised():
 def test_all_returns_carries_the_benchmarks():
     """The block the rolling betas read must cover every benchmark `tret` covers.
 
-    This is bug 2. `all_returns` unions the END and BEGIN frames; the benchmarks were on the END
+    This is bug 2. `all_returns` unions the end and begin frames. The benchmarks were on the end
     frame only, so 8.1% of rows had `tret` and nothing else.
     """
     import pyarrow.parquet as pq

@@ -8,15 +8,15 @@ Edit this file to customize your processing parameters.
 Stage 2 turns Stage 1's daily bond-day panel into the monthly asset-pricing panel
 (returns, characteristics, signals, factors, rolling betas).
 
-WHERE THIS RUNS
+Where this runs
 ---------------
-Stage 2 runs on YOUR OWN MACHINE, not on the WRDS cluster. Download the stage0/ and
+Stage 2 runs on your own machine, not on the WRDS cluster. Download the stage0/ and
 stage1/ output folders from WRDS first, then run stage 2 against them locally. It is
-CPU- and memory-hungry (a full build is 8 to 18 minutes on 24 cores / 128 GB) and it
-needs no TRACE database access -- only the parquet files Stage 1 produced.
+heavy on CPU and memory (a full build is 8 to 18 minutes on 24 cores / 128 GB) and it
+needs no TRACE database access, only the parquet files Stage 1 produced.
 
-Processing knobs below are carried over verbatim from the reference implementation;
-each cites its source so a change is always a deliberate one.
+The processing settings below are taken verbatim from the reference implementation.
+Each cites its source, so a change is always a deliberate one.
 
 Author: Open Source Bond Asset Pricing
 """
@@ -28,7 +28,7 @@ import sys
 
 # Import shared configuration from root-level config.py.
 # Stage 2 can also be run from a folder that has no config.py (e.g. a stand-alone
-# extract), so fall back to environment variables rather than failing at import.
+# extract), so fall back to environment variables and do not fail at import.
 sys.path.insert(0, str(Path(__file__).parent.parent))
 import numeric_setup  # noqa: E402,F401  (pandas computes the same whatever else is installed)
 try:
@@ -65,24 +65,24 @@ DAILY_INPUT = None
 # --- Factor panel source ---
 # "public"  = assemble the monthly factor matrix from public sources (Ken French,
 #             FRED, He-Kelly-Manela, Ludvigson, Policy Uncertainty) plus the published
-#             extended BBW series. Self-contained; this is the default.
+#             extended BBW series. Self-contained, and the default.
 # "pinned"  = read a pre-built factors.parquet (set FACTORS_PINNED_FILE). Use this only
-#             to reproduce a specific published vintage exactly -- data vendors revise
+#             to reproduce a specific published vintage exactly. Data vendors restate
 #             history (FRED re-seasonally-adjusts CPI, EPU back-renormalizes), so the
 #             two sources agree closely but do not match bit-for-bit.
-FACTOR_SOURCE = "public"  # [tag:trap.factor_source] public is fresh data and will not reproduce a published vintage; pinned uses its factors
+FACTOR_SOURCE = "public"  # [tag:trap.factor_source] public is fresh data and will not reproduce a published vintage. Pinned uses that vintage's factors
 FACTORS_PINNED_FILE = None
 
 # The factor panel each published vintage was built from, hosted so a published number can
-# be reproduced. Public sources revise -- Ken French restates SMB/HML, FRED
-# re-seasonally-adjusts CPI, Ludvigson re-estimates its history -- so a fresh build will
-# NOT reproduce an older release. Set FACTOR_SOURCE = "pinned" to fetch and use one of
-# these instead; it is cached under stage2/data/ like any other download.
-# ❗The URL must serve the file the vintage's panel was BUILT with -- the one the site's download
-# links serve, on the osbap-site release. Until 2026-09-23 this pointed at a WordPress upload from
-# 2026-09-10 that predates the eight _bns/_cls twin factors (36 columns, not 44). Step 4 drops
-# those columns unread, so no build changed; the point is that the pinned file IS the published
-# one.
+# be reproduced. Public sources change their history (Ken French restates SMB/HML, FRED
+# re-seasonally-adjusts CPI, Ludvigson re-estimates its history), so a fresh build will
+# not reproduce an older release. Set FACTOR_SOURCE = "pinned" to fetch and use one of
+# these instead. It is cached under stage2/data/ like any other download.
+# The URL must serve the file the vintage's panel was built with, which is the one the site's
+# download links serve, on the osbap-site release. Until 2026-09-23 this pointed at a WordPress
+# upload from 2026-09-10 that predates the eight _bns/_cls twin factors (36 columns, not 44).
+# Step 4 drops those columns unread, so no build changed. What matters is that the pinned file
+# is the published one.
 FACTORS_PINNED_URL = {
     "2026": "https://github.com/Alexander-M-Dickerson/osbap-site/releases/download/data-2026/osbap_stage2_factors_2026.zip",
 }
@@ -99,18 +99,18 @@ DUCKDB_MEMORY_LIMIT = os.environ.get("STAGE2_DUCKDB_MEMORY_LIMIT", "")
 # PROCESSING PARAMETERS
 # ============================================================================
 # Verbatim from the reference implementation's "Processing Parameters" block.
-# Changing any of these changes the published panel -- do so deliberately.
+# Changing any of these changes the published panel, so do it deliberately.
 
 IMP_GAP = 1                # business days between signal observation and portfolio formation
 BUSINESS_DAY_GAP = 5       # max NYSE-session gap for contiguous returns
 ADJ_WINDOW = 10            # max days back within the month for the adjusted month-end signal
 CALENDAR_NAME = "NYSE"     # market calendar for business-day math
 SWAP_ADJ_SIGNALS = True    # replace month-end signals with adjusted versions in the final panel
-START_DATE = "2002-07-31"  # first month-end priced; returns, and so the panel, start a month later
+START_DATE = "2002-07-31"  # first month-end priced. Returns, and so the panel, start a month later
 SIGNALS = ("ytm", "mod_dur", "convexity", "credit_spread")   # step-1 signals (lagged by IMP_GAP)
 
-# Three things that are NOT settings, so nobody edits a constant and expects an effect:
-#   - The adjusted signal is read at least ONE session before the month-end trade. That is the
+# Three things that are not settings, so nobody edits a constant and expects an effect:
+#   - The adjusted signal is read at least one session before the month-end trade. That is the
 #     strict `<` in step 1 (`p.dt < t.dt_e`), and ADJ_WINDOW above is its only knob.
 #   - Defaulted-bond returns always use the event-based method (README_Default.md).
 #   - The published extended-BBW series always backfills the factor columns before 2002-08-31.
@@ -130,12 +130,12 @@ BETA_MIN_OBS = 12          # min obs within window
 # step 4 DEF / TERM factors (see stage2/DATA_DICTIONARY.md, "Model Specifications")
 #
 # The default premium is the difference between the total returns on long-term corporate
-# bonds and long-term government bonds (Fama-French 1993; Gebhardt, Hvidkjaer &
+# bonds and long-term government bonds (Fama and French 1993, and Gebhardt, Hvidkjaer &
 # Swaminathan 2005):
 #     defb  = VW return of bonds with tmat >= DEF_CORP_MIN_MATURITY  -  DEF_GOVT_TENOR treasury return
 #     termb = DEF_GOVT_TENOR treasury return  -  risk-free rate
-DEF_CORP_MIN_MATURITY = 10.0   # years; the long-term corporate leg
-DEF_GOVT_TENOR = 20.0          # years; the long-term government leg (CRSP key-rate tenor)
+DEF_CORP_MIN_MATURITY = 10.0   # years, the long-term corporate leg
+DEF_GOVT_TENOR = 20.0          # years, the long-term government leg (CRSP key-rate tenor)
 
 # step 5 value / d-spreads
 DSPREAD_LAGS = (6, 12)
@@ -144,13 +144,13 @@ DSPREAD_MU_WINDOW = 12
 
 # --- NYSE session calendar ---
 # Holidays are known in advance, so any end date at or beyond your data max behaves
-# identically. Fixed rather than date.today() so builds are deterministic.
+# identically. It is fixed, and not date.today(), so builds are deterministic.
 CAL_START = "2001-07-01"
 CAL_END = "2030-12-31"
 
 # --- Treasury series vintage cap ---
 # None = use every month available. Set a date only to reproduce an older published
-# vintage. A cap here silently truncates tret -> ret_vwx -> the BBW duration-adjusted
+# vintage. A cap here truncates, without an error, tret -> ret_vwx -> the BBW duration-adjusted
 # factors -> every rolling beta: 42 panel columns. Leave it None unless reproducing.
 TRET_MAX_DATE = None
 
@@ -172,45 +172,45 @@ PANEL_ZSTD_LEVEL = 3       # level 3 writes ~5x faster than 9 for ~7% larger fil
 # 2026-09: extended from 9 to 14 columns, adding the five Treasury benchmarks
 # (tret_bns / tret_cfm / tret_gprs / tret_cls / tret_mat) so the rolling windows behind the
 # duration-adjusted blocks have the same pre-history for those benchmarks that they already had
-# for `tret`. The original nine columns are byte-identical -- the file was extended by a join
-# against the Lehman-ICE panel, not rebuilt. The zip member keeps its old name, so QUOTE_ZIPKEY
-# is unchanged and nothing that reads this file by name needs to move.
+# for `tret`. The original nine columns are byte-identical, because the file was extended by a
+# join against the Lehman-ICE panel and was not rebuilt. The zip member keeps its old name, so
+# QUOTE_ZIPKEY is unchanged and nothing that reads this file by name needs to move.
 QUOTE_URL = "https://openbondassetpricing.com/wp-content/uploads/2026/09/quote_returns_quantlib_tret.zip"
 QUOTE_ZIPKEY = "quote_returns_quantlib.parquet"
 
-# The columns this file is REQUIRED to carry. Steps 3/4/5 each select an explicit subset of these
-# by name, so a wider file cannot change any computation -- but a NARROWER one silently produces
-# short rolling windows, which is the failure this pins.
+# The columns this file is required to have. Steps 3/4/5 each select an explicit subset of these
+# by name, so a wider file cannot change any computation. A narrower one produces short rolling
+# windows without an error, which is the failure this pins.
 QUOTE_REQUIRED_COLS = ("cusip_id", "date", "ret_vw", "tret", "cs", "bbtm", "sze")
 
-# The benchmark block the 2026 file adds. QUOTE_HAS_BENCHMARKS declares what QUOTE_URL points at;
-# lib/quote.py refuses a cached copy that disagrees with it rather than using the stale one. Set
+# The benchmark block the 2026 file adds. QUOTE_HAS_BENCHMARKS declares what QUOTE_URL points at.
+# lib/quote.py refuses a cached copy that disagrees with it and does not use the stale one. Set
 # this False alongside reverting QUOTE_URL if you ever need the nine-column file back.
 QUOTE_BENCHMARK_COLS = ("tret_bns", "tret_cfm", "tret_gprs", "tret_cls", "tret_mat")
 QUOTE_HAS_BENCHMARKS = True
 
 # --- the bond->firm linker ------------------------------------------------------------------
-# The SAME published file Stage 1 uses (stage1/_stage1_settings.py LINKER_URL). Stage 2 re-joins it
-# rather than inheriting Stage 1's ids through the pin, because the two stages were joining
-# DIFFERENT WINDOWS of it -- see lib/linker.py for the measured consequence.
+# The same published file Stage 1 uses (stage1/_stage1_settings.py LINKER_URL). Stage 2 re-joins
+# it and does not inherit Stage 1's ids through the pin, because the two stages were joining
+# different windows of it (see lib/linker.py for the measured consequence).
 #
-# LINKER_WINDOW is the decision, named once. `fl_linker` carries two:
-#   ("w0", "w1")  EVIDENCE -- when the mapping is provable. For equity-side joins.
-#   ("i0", "i1")  IDENTITY -- whose bond it is. For firm LABELLING.
+# LINKER_WINDOW is the decision, named once. `fl_linker` has two:
+#   ("w0", "w1")  evidence, when the mapping is provable. For equity-side joins.
+#   ("i0", "i1")  identity, whose bond it is. For firm labelling.
 # A bond-month panel labels firms, so the identity window is the default here. The authority is
 # the linker bundle's own SCHEMA.md / README.md, which ship inside LINKER_URL and state which
-# window answers which question. (Cited by the published docs, not a path -- a user of this
-# repo has the zip and nothing else.)
+# window answers which question. (Cited as the published docs and not as a path, because a user
+# of this repo has the zip and nothing else.)
 LINKER_URL = "https://openbondassetpricing.com/wp-content/uploads/2026/09/bond_firm_linker_2026.zip"
 LINKER_ZIPKEY = "bond_firm_linker_2026/fl_linker.parquet"
 LINKER_REQUIRED_COLS = ("cusip9", "permno", "permco", "gvkey")
-LINKER_WINDOW = ("i0", "i1")  # [group:rule.linker_window] firm ids join the linker's identity window; stages 1 and 2 must agree
+LINKER_WINDOW = ("i0", "i1")  # [group:rule.linker_window] firm ids join the linker's identity window, and stages 1 and 2 must agree
 
-# Extended "modified" BBW factor series, used ONLY to backfill factor history before
+# Extended "modified" BBW factor series, used only to backfill factor history before
 # 2002-08-31 (rows from 2002-08 on are recomputed from TRACE and overwritten).
 # Estimated on the Lehman Brothers (Warga) Fixed Income Data and the BAML investment-grade
 # and high-yield constituent bonds distributed by ICE. Those bond data are licensed and
-# cannot be redistributed; the finished factor series can be, and is. Do not replace this
+# cannot be redistributed. The finished factor series can be, and is. Do not replace this
 # with a longer file: the build asserts every date in it exists in the factor panel.
 # 2026-09: extended from 9 to 17 columns, adding the bond-market factor twins for the alternative
 # Treasury benchmarks (MKTB/DRF/CRF/TERM for each of bns and cls). build_factor_matrix splices this
@@ -222,7 +222,7 @@ BBW_EXTENDED_ZIPKEY = "bbw_factors_extended_1973_2023.parquet"
 
 # The twins the 2026-09 file adds, and the flag declaring that QUOTE_URL's sibling points at it.
 # Same contract as QUOTE_BENCHMARK_COLS / QUOTE_HAS_BENCHMARKS: lib/extended_factors.py refuses a
-# cached copy that disagrees rather than quietly splicing a series with no benchmark history.
+# cached copy that disagrees, so a series with no benchmark history is never spliced in unnoticed.
 BBW_BENCHMARK_COLS = ("MKTB_bns", "DRF_bns", "CRF_bns", "TERM_bns",
                       "MKTB_cls", "DRF_cls", "CRF_cls", "TERM_cls")
 BBW_HAS_BENCHMARKS = True
@@ -233,13 +233,13 @@ FF5_URL = ("https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/"
 # He-Kelly-Manela publish under a dated filename and change it each release. The fetcher
 # uses this URL while it is live and otherwise discovers the current one from HKM_INDEX.
 # Note: as of 2026-09-10 the authors had not published past 2025-05, so `b_cptlt`
-# legitimately stops there on a later panel -- that is upstream, not a broken link.
+# legitimately stops there on a later panel. That is upstream, not a broken link.
 HKM_URL = "https://zhiguohe.net/wp-content/uploads/2025/07/He_Kelly_Manela_Factors_monthly_250627.csv"
 HKM_INDEX = ("https://zhiguohe.net/data-and-empirical-patterns/"
              "intermediary-capital-ratio-and-risk-factor/")
 # Ludvigson rotates the zip filename on every update, so the fetcher tries this URL and
 # then discovers the current link from the index page.
-# Current vintage as of 2026-09-10 (data through 2026-06); the previous 202508 link 404s.
+# Current vintage as of 2026-09-10 (data through 2026-06). The previous 202508 link 404s.
 LUDVIGSON_URL = "https://www.sydneyludvigson.com/s/MacroFinanceUncertainty_202608Update-3.zip"
 LUDVIGSON_INDEX = "https://www.sydneyludvigson.com/macro-and-financial-uncertainty-indexes"
 EPU_URL = "https://www.policyuncertainty.com/media/Categorical_EPU_Data.xlsx"
@@ -281,7 +281,7 @@ MANIFEST_DIR = STAGE2_DIR / "manifests"    # JSON run manifests (gitignored: the
 FACTOR_CACHE_DIR = STAGE2_DATA / "factor_cache"
 
 # What Stage 2 fetches from WRDS on its first run, cached in STAGE2_DATA after one fetch. Both
-# factor sources need these four; the public source also fetches monthly VIX into
+# factor sources need these four. The public source also fetches monthly VIX into
 # FACTOR_CACHE_DIR. The credentials check in validate_config asks for WRDS_USERNAME only while
 # one of them is missing.
 WRDS_CACHES = ("crsp_treasury_returns.parquet", "ff5_factors.parquet", "cboe_vix.parquet",
@@ -333,7 +333,7 @@ def _latest_stamped(directory: Path, prefix: str, suffix: str = ".parquet") -> P
 def daily_input(mode: str | None = None) -> Path:
     """The Stage 1 daily panel Stage 2 reads.
 
-    `mode` is accepted and ignored: the reference implementation carried several input
+    `mode` is accepted and ignored: the reference implementation had several input
     modes, the public pipeline has one.
 
     Precedence: STAGE2_DAILY_INPUT env var > DAILY_INPUT setting > newest
@@ -352,7 +352,7 @@ def daily_input(mode: str | None = None) -> Path:
 
 
 def date_stamp() -> str:
-    """The YYYYMMDD stamp Stage 2 carries on its outputs, taken from the input filename.
+    """The YYYYMMDD stamp Stage 2 puts on its outputs, taken from the input filename.
 
     Stage 2 outputs inherit the Stage 1 stamp so a panel is always traceable to the
     daily file it was built from.
@@ -365,12 +365,12 @@ def date_stamp() -> str:
 def release_vintage() -> str:
     """The four-digit vintage a RELEASE is published under, e.g. "2026".
 
-    Build artifacts carry the Stage 1 date stamp (20260909) so a panel is always traceable
-    to the file it came from. Released artifacts carry the vintage YEAR instead, which is
-    what users cite -- `main_panel_2026.parquet`. Stamped while building, vintaged when
+    Build artifacts have the Stage 1 date stamp (20260909) so a panel is always traceable
+    to the file it came from. Released artifacts have the vintage year instead, which is
+    what users cite, as in `main_panel_2026.parquet`. Stamped while building, vintaged when
     released.
 
-    Derived from the stamp's year rather than hard-coded, so next year's run publishes
+    Derived from the stamp's year and not hard-coded, so next year's run publishes
     itself. Override with RELEASE_VINTAGE in this file, or the STAGE2_RELEASE_VINTAGE
     environment variable, if a release ever needs to differ from its build year.
     """
@@ -393,9 +393,9 @@ def released_name(kind: str, suffix: str = ".parquet") -> str:
 def fisd_file() -> Path | None:
     """Stage 0's FISD characteristics file (144a flag, domicile, SIC, issue_id).
 
-    Honours STAGE2_FISD_FILE. It must: AUX below reads the same override, and when the two
-    disagreed the validator reported a file as missing that the build then used happily --
-    so `_run_stage2.py` refused to start on inputs `build_panel.py` accepted.
+    Honours STAGE2_FISD_FILE. It must, because AUX below reads the same override. When the two
+    disagreed the validator reported a file as missing that the build then used without
+    complaint, so `_run_stage2.py` refused to start on inputs `build_panel.py` accepted.
     """
     env = os.environ.get("STAGE2_FISD_FILE")
     if env:
@@ -502,7 +502,7 @@ def get_config() -> dict:
 
 
 # Columns Stage 2 reads from the Stage 1 daily panel. Kept here (not buried in SQL) so a
-# missing upstream column is reported before a build starts rather than mid-run.
+# missing upstream column is reported before a build starts, not mid-run.
 REQUIRED_DAILY_COLUMNS = (
     "cusip_id", "trd_exctn_dt", "pr", "prfull", "acclast", "accpmt", "accall",
     "prc_vw_par", "prc_ew", "prc_first", "prc_last", "prc_hi", "prc_lo",
@@ -513,11 +513,11 @@ REQUIRED_DAILY_COLUMNS = (
     "permno", "permco", "gvkey", "ff17num", "ff30num", "db_type",
 )
 
-# Stage 2 selects bond-days that carry at least one agency rating. The public DOWNLOAD of
-# the Stage 1 panel does not carry the licensed columns, and a panel whose rating columns are
-# all null would silently select zero rows -- so both are hard errors, not an empty panel.
+# Stage 2 selects bond-days that have at least one agency rating. The public download of
+# the Stage 1 panel does not have the licensed columns, and a panel whose rating columns are
+# all null would select zero rows without an error, so both are hard errors, not an empty panel.
 RATING_COLUMNS = ("sp_rating", "mdy_rating")
-# Licensed, so the published Stage 1 download does not carry them.
+# Licensed, so the published Stage 1 download does not have them.
 LICENSED_DAILY_COLUMNS = {"sp_rating", "mdy_rating", "spc_rating", "mdc_rating", "permco", "gvkey"}
 
 
@@ -583,7 +583,7 @@ def validate_config(config: dict) -> None:
 
     # --- PyBondLab and numba ------------------------------------------------
     # Step 3's BBW factors are PyBondLab sorts and the rolling kernels are numba. Both come from
-    # requirements-local.txt and its second install line; pybondlab_pin says what is wrong.
+    # requirements-local.txt and its second install line, and pybondlab_pin says what is wrong.
     import pybondlab_pin
     engine = pybondlab_pin.check()
     if engine:
@@ -617,7 +617,7 @@ def _validate_daily_panel(daily: Path) -> None:
         missing = [c for c in REQUIRED_DAILY_COLUMNS if c not in present]
         withheld = sorted(set(missing) & LICENSED_DAILY_COLUMNS)
         if withheld:  # [tag:trap.public_daily_file] the Stage 1 file published for download lacks the licensed columns, so stage 2 refuses it at this check
-            # The public download withholds exactly these. Say so, rather than send the user
+            # The public download withholds exactly these. Say so, and do not send the user
             # looking for an older release.
             raise ValueError(
                 f"The Stage 1 panel at {daily} has no {', '.join(withheld)}.\n"
@@ -633,7 +633,7 @@ def _validate_daily_panel(daily: Path) -> None:
                 f"    A panel produced by this repository's Stage 1 contains all of them."
             )
 
-        # Ratings must actually carry values, not just exist.
+        # Ratings must have values. Existing as columns is not enough.
         blank = [
             c for c in RATING_COLUMNS
             if con.execute(
@@ -658,26 +658,26 @@ def _validate_daily_panel(daily: Path) -> None:
 # ============================================================================
 # The build engine under lib/ and steps/ is a verbatim port of a validated reference
 # implementation, and it reads its configuration as `cfg.<NAME>`. Exposing that exact
-# surface here means those modules port with ONLY their import line changed -- which is
+# surface here means those modules port with only their import line changed, which is
 # what makes the output provably identical to the reference.
 #
 # Everything below is an alias or a thin wrapper over the settings above. The names are
-# the reference's, not ours; edit the user-facing settings at the top of this file.
+# the reference's, not ours. Edit the user-facing settings at the top of this file.
 
 REPO = ROOT_PATH                      # the reference called the tree root REPO
 DATA_DIR = STAGE2_DATA                # cached external inputs
 BBW_EXTENDED_CACHE = STAGE2_DATA / BBW_EXTENDED_ZIPKEY
 
-# The reference carried several input "modes" (a frozen golden vintage vs a live build).
+# The reference had several input "modes" (a frozen golden vintage vs a live build).
 # The public pipeline has exactly one input: whatever Stage 1 produced.
 INPUT_MODE = "stage1"
 
 DATE_STAMP = date_stamp()
 
-# Auxiliary merges. The reference pinned these to fixed files; here they are resolved
+# Auxiliary merges. The reference pinned these to fixed files. Here they are resolved
 # from the Stage 0 / Stage 1 outputs, with environment overrides for testing.
 AUX = {
-    # One resolution path, shared with validate_config -- see `fisd_file`.
+    # One resolution path, shared with validate_config (see `fisd_file`).
     "fisd": fisd_file(),
     "call": call_dummy_file(),
     # The reference merged a separate issuer-level linker file to attach permno/permco/
@@ -700,7 +700,7 @@ if _pinned_factors:
 
 
 def tret_max_date(mode: str | None = None) -> str | None:
-    """Treasury-series vintage cutoff; None means use every month available.
+    """Treasury-series vintage cutoff. None means use every month available.
 
     STAGE2_TRET_MAX_DATE overrides the setting, which is how a published vintage built
     against an older Treasury pull is reproduced exactly.
@@ -768,8 +768,8 @@ def print_config_summary(config: dict) -> None:
     print(f"  Reports              : {config['report_dir']}")
     print(line)
 
-# ❗Accepting a final month that is NOT a cross-section. The build refuses by default
-# (step7): a month carried by one source alone -- typically 144A after Enhanced's cut-off --
+# Accepting a final month that is not a cross-section. The build refuses by default
+# (step7). A month that only one source covers, typically 144A after Enhanced's cut-off,
 # looks like a normal month and is not one. Set this True only to inspect such a build
-# deliberately; publishing it is refused separately by make_release.py.
+# on purpose. Publishing it is refused separately by make_release.py.
 ALLOW_DEGENERATE_FRONTIER = False

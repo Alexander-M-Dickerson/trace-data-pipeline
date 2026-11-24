@@ -15,10 +15,10 @@ PY=${PY:-python}
 echo "== building the factors =="
 "$PY" build_factors.py "$@"
 
-# Help and a dry run build nothing; a --signals or --return-types run writes a partial grid to
+# Help and a dry run build nothing. A --signals or --return-types run writes a partial grid to
 # output/_subset. None of them is compared with the published files.
-# Plain "$@", not an array: bash before 4.4 (macOS ships 3.2) treats an empty array as
-# unbound under `set -u`.
+# Plain "$@" is used here, not an array, because bash before 4.4 (macOS ships 3.2) treats an
+# empty array as unbound under `set -u`.
 sort=all
 prev=""
 for a in "$@"; do

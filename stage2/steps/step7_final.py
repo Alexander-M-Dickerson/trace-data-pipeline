@@ -1,14 +1,14 @@
-"""step7_final.py -- upstream step 7 (step_final_wrangle): the final left-join merge chain that
+"""Upstream step 7 (step_final_wrangle): the final left-join merge chain that
 produces the 145-column monthly panel.
 
-Ground truth: the reference implementation's final wrangle line-for-line -- wrangle_returns (+ OSBAP
+Ground truth: the reference implementation's final wrangle, line for line: wrangle_returns (+ OSBAP
 linker), wrangle_signals, build_main_panel, str = ret_vw, runner column drops, str1_adj -> str_adj,
 swap_adj_signals (which also writes the mmn_price_based_signals block), sig_dt/sig_gap merge, rfret
 from the pinned factor panel, FISD 144a/country/call, reorder_panel_cols. Machinery is verbatim in
 lib/wrangle.py.
 
 Outputs: blocks/<mode>/{returns_alt_final, mmn_price_based_signals}.parquet and
-panel/main_panel_<mode>.parquet -- the deliverable, validated against main_panel_20251126.
+panel/main_panel_<mode>.parquet, the deliverable, validated against main_panel_20251126.
 """
 from __future__ import annotations
 
@@ -49,12 +49,13 @@ def build(con=None, mode: str | None = None, limit_cusips: int | None = None) ->
         end_signals = _read(blocks_dir, "end_signals")
         adj_signals = _read(blocks_dir, "adj_signals")
 
-    # Firm identifiers. Stage 1 attaches permno/permco/gvkey at BOND level using dated
-    # windows, and step 1 carries them through, so by default we use those directly.
+    # Firm identifiers. Step 1 joins permno/permco/gvkey from the published bond-firm linker at
+    # bond level, on cfg.LINKER_WINDOW, and writes them as the firm_ids block, so by default we
+    # use those directly. Stage 1's own ids are not used.
     #
-    # The alternative is the historical path: re-derive them here by merging a separate
+    # The alternative is the historical path, which re-derives them here by merging a separate
     # issuer-level linker keyed on the first six CUSIP characters and forward-filled by
-    # month. That is strictly worse -- issuer-level keys cannot distinguish two issuers
+    # month. That is strictly worse. Issuer-level keys cannot distinguish two issuers
     # sharing a CUSIP6, and a forward fill back-casts a link across a period where it did
     # not hold. It stays reachable (set STAGE2_LINKER_FILE) only to reproduce a panel
     # published before the change.
@@ -104,8 +105,8 @@ def build(con=None, mode: str | None = None, limit_cusips: int | None = None) ->
             spreads_value_adj=spreads_value_adj, illiq_signals=illiq_signals,
             illiq_signals_adj=illiq_signals_adj, betas_std=betas_std, mom_ret=mom_ret, verbose=True)
 
-    # runner: str = the month-t return (the gap-adjusted twin replaces it below); deprecated
-    # column drops; str1_adj -> str_adj
+    # runner: str = the month-t return (the gap-adjusted twin replaces it below), deprecated
+    # column drops, str1_adj -> str_adj
     main_panel["str"] = main_panel["ret_vw"]
     for col in RUNNER_DROP_COLS:
         if col in main_panel.columns:
@@ -154,8 +155,8 @@ def build(con=None, mode: str | None = None, limit_cusips: int | None = None) ->
                                                     verbose=True)
         main_panel["cusip"] = main_panel["cusip"].astype("category")
 
-    # The panel is published; its column names AND their order are part of the artifact.
-    # Fail here rather than shipping a silently permuted file (lib/contract.py).
+    # The panel is published, and its column names and their order are part of the artifact.
+    # Fail here, before a file with permuted columns ships without an error (lib/contract.py).
     contract.assert_panel_contract(main_panel, what=f"main_panel_{mode}")
 
     # `hprd` is the return's real window, dt_s -> dt_e in NYSE sessions. Checked against the two
@@ -165,15 +166,15 @@ def build(con=None, mode: str | None = None, limit_cusips: int | None = None) ->
     contract.assert_holding_period_is_the_window(
         main_panel, _cal.cal_lut_frame(), what=f"main panel ({mode})")
 
-    # ❗The frontier guard, HERE rather than only at packaging. A month carried by one
-    # source alone is not a cross-section -- the usual cause is Stage 1's cut-off landing
-    # where Enhanced has a few days and 144A has the whole month -- and until 2026-09-16
-    # nothing in the build looked. `lib/frontier` was imported by make_release.py,
+    # The frontier guard runs here as well as at packaging. A month that only one source
+    # covers is not a cross-section. The usual cause is Stage 1's cut-off landing where
+    # Enhanced has a few days and 144A has the whole month, and until 2026-09-16 nothing in
+    # the build looked. `lib/frontier` was imported by make_release.py,
     # validate_coverage.py and a test, and by no step, so the first thing to notice a bad
     # final month was the packager, possibly weeks later.
     #
-    # Measured before this was wired in, so it cannot fail a legitimate build: both current
-    # panels have ZERO degenerate tail months. The frontier check fires on the RAW stage-1
+    # Measured before this was wired in, so it cannot fail a legitimate build. Both current
+    # panels have zero degenerate tail months. The frontier check fires on the raw stage-1
     # input, which is why this vintage was truncated to 2025-11 before the panel was built.
     if not getattr(cfg, "ALLOW_DEGENERATE_FRONTIER", False):
         from lib import frontier as _frontier
@@ -195,12 +196,12 @@ def build(con=None, mode: str | None = None, limit_cusips: int | None = None) ->
         import pyarrow.parquet as _pq
         _mmn_cols = _pq.ParquetFile(mmn_path).schema.names
         contract.assert_mmn_twins(_mmn_cols, what=f"mmn_price_based_signals_{mode}")
-        # ❗The other direction: a twin that ships WITHOUT being declared in MMN_TWINNED is a
+        # The other direction. A twin that ships without being declared in MMN_TWINNED is a
         # signal the twin gate iterates straight past, because it iterates the declared set.
         contract.assert_mmn_twins_are_declared(_mmn_cols,
                                                what=f"mmn_price_based_signals_{mode}")
-        # ❗And WHICH form is in the panel. Existence of a twin says nothing about that, and
-        # the unadjusted form in the main panel is the basrev v1 failure -- a complete,
+        # And which form is in the panel. Existence of a twin says nothing about that, and
+        # the unadjusted form in the main panel is the basrev v1 failure, a complete,
         # normal-looking panel whose reversal signal is four fifths bounce.
         _keep = [c for c in _mmn_cols if c in ("cusip", "date") or c.endswith("_mmn")]
         contract.assert_main_panel_is_adjusted(

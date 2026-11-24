@@ -1,8 +1,8 @@
-"""check_external_data.py -- the external-data inventory CHECK for the monthly panel.
+"""The external-data inventory check for the monthly panel.
 
-Every external series the monthly build consumes, in ONE registry: what it is, where it comes from
-(WRDS table or public URL), which local cache holds it, and -- stamped live from the cache each run --
-the LAST month we actually have. Run it to see whether any source has gone stale relative to the
+Every external series the monthly build consumes, in one registry: what it is, where it comes from
+(WRDS table or public URL), which local cache holds it, and the last month we have, stamped live
+from the cache each run. Run it to see whether any source has gone stale relative to the
 panel, or before an extension to know what will (and won't) advance.
 
     check_external_data.py                 # table from local caches (fast, offline)
@@ -59,9 +59,9 @@ SOURCES: list = [
      "pandas_market_calendars NYSE", D / "nyse_calendar.parquet", None),
 ]
 
-# Stage-1 auxiliary inputs, and the optional pinned factor panel. These are OPTIONAL by
-# construction: cfg.AUX carries only what this configuration defines, and GOLDEN_OUTPUTS is
-# empty unless a pinned factor file is set -- which is the normal state of a fresh clone.
+# Stage-1 auxiliary inputs, and the optional pinned factor panel. These are optional by
+# construction. cfg.AUX has only what this configuration defines, and GOLDEN_OUTPUTS is
+# empty unless a pinned factor file is set, which is the normal state of a fresh clone.
 # Indexing them directly built the SOURCES list at import time and raised KeyError before
 # main() ran, so the script could not be used by the people it is for.
 for _label, _key, _why, _date_col in (

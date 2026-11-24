@@ -4,24 +4,24 @@ test_signal_definitions.py
 ==========================
 The panel's 145 columns are defined in three places a reader can land on:
 
-    stage3/spec/signal_definitions.json   THE source. Table IA.VIII is rendered from it.
-    the Stage 2 data report, Table 7      now READS the spec (_report_helpers.get_signal_definitions)
+    stage3/spec/signal_definitions.json   the source. Table IA.VIII is rendered from it.
+    the Stage 2 data report, Table 7      reads the spec (_report_helpers.get_signal_definitions)
     stage2/DATA_DICTIONARY.md             hand-written markdown, held to the spec by this file
 
-Why this exists. test_column_contract.py already proved the three carried the same MNEMONICS.
-It never compared a name or a description, and they drifted: on 2026-09-16 five names were
-corrected in the spec and the dictionary (b_eput is TAX policy uncertainty, lix is stored
+Why this exists. test_column_contract.py already proved the three had the same mnemonics.
+It never compared a name or a description, and they drifted. On 2026-09-16 five names were
+corrected in the spec and the dictionary (b_eput is tax policy uncertainty, lix is stored
 negated, ...) and the report's own copy was missed, so the published data report went on
 printing "Trade Policy Uncertainty Beta". Separately, all three called `hprd` "calendar days"
 for years, which it never was.
 
 So: the report has no copy any more, and the dictionary must say what the spec says.
 
-What is compared: every column's NAME and DESCRIPTION, after removing what legitimately
-differs -- LaTeX markup against markdown, a cross-reference to a figure only one document
-prints, and the dictionary's notes about which columns are redacted on publication.
+What is compared: every column's name and description, after removing what legitimately
+differs (LaTeX markup against markdown, a cross-reference to a figure only one document
+prints, and the dictionary's notes about which columns are redacted on publication).
 
-What this does NOT check: that a definition is TRUE. That is settled against the code, one
+What this does not check: that a definition is true. That is settled against the code, one
 row at a time, and recorded in stage3/RECONCILIATION_ia08.md.
 
 Author: Open Source Bond Asset Pricing
@@ -115,9 +115,9 @@ def test_the_report_has_no_copy_of_its_own():
 def test_a_cited_work_reaches_the_reference_list():
     """The table cites with the spec's keys, so the report's bibliography must define them.
 
-    Printing author-year WORDS instead was tried and dropped 39 works from the reference
+    Printing author-year words instead was tried and dropped 39 works from the reference
     list, because nothing cited them any more. LaTeX prints '?' for an unknown key and
-    carries on, so the helper refuses one.
+    continues, so the helper refuses one.
     """
     import _report_helpers as rpt
     known = set(re.findall(r"@\w+\{([^,\s]+),", rpt.get_references_bib()))

@@ -7,10 +7,10 @@ Cross-stage invariant checks for a smoke run of the pipeline.
 Run after run_smoke_test.sh has produced a small stage0 -> stage1 chain, or point it at
 any existing output tree. Exits non-zero if any check fails, so it can gate a commit.
 
-These assert against the pipeline's PUBLISHED contract -- the column lists and the
-db_type codes as documented in stage1/DATA_DICTIONARY.md -- not against whatever the
-code currently happens to do. That distinction is the point: a check derived from the
-implementation cannot catch the implementation being wrong.
+These assert against the pipeline's published contract (the column lists and the
+db_type codes as documented in stage1/DATA_DICTIONARY.md) and not against whatever the
+code currently does, because a check derived from the implementation cannot catch the
+implementation being wrong.
 
 Usage
 -----
@@ -29,13 +29,13 @@ from pathlib import Path
 import pandas as pd
 
 # ---------------------------------------------------------------------------
-# THE PUBLISHED CONTRACT -- keep in step with stage1/DATA_DICTIONARY.md
+# The published contract. Keep it in step with stage1/DATA_DICTIONARY.md
 # ---------------------------------------------------------------------------
 
 # "Source TRACE database: 1=Enhanced, 2=Standard, 3=144A"
 # Published in stage1/DATA_DICTIONARY.md, stage1/README_stage1.md and README.md, and
-# downstream research keys on db_type == 3 meaning 144A. These codes are a contract:
-# a member's code must NEVER depend on how many other members happen to be configured.
+# downstream research keys on db_type == 3 meaning 144A. These codes are a contract.
+# A member's code must never depend on how many other members happen to be configured.
 CANONICAL_DB_TYPE = {"enhanced": 1, "standard": 2, "144a": 3}
 
 STAGE0_COLUMNS = [
@@ -56,9 +56,9 @@ STAGE1_COLUMNS = [
     "spc_rating", "mdc_rating",
 ]
 
-# Standard TRACE is kept only for dates AFTER the last Enhanced date, and the trailing
-# DATE_CUT_OFF then falls before that -- so db_type 2 can never reach the stage1 output.
-# See CHANGELOG 2.1.0, "Investigated -- no change".
+# Standard TRACE is kept only for dates after the last Enhanced date, and the trailing
+# DATE_CUT_OFF then falls before that, so db_type 2 can never reach the stage1 output.
+# See CHANGELOG 2.1.0, under "Investigated".
 NEVER_SURVIVES_STAGE1 = {"standard"}
 
 
@@ -105,8 +105,8 @@ def find_stage0_daily(root, member):
     """The daily panel, not its siblings.
 
     trace_{member}_*.parquet also matches trace_{member}_fisd_*.parquet, whose key
-    column is complete_cusip rather than cusip_id. Keep only the main file --
-    exactly trace_{member}_{YYYYMMDD} -- the same rule
+    column is complete_cusip, not cusip_id. Keep only the main file, which is
+    exactly trace_{member}_{YYYYMMDD}. This is the same rule
     _stage1_settings.get_latest_stage0_date applies.
     """
     prefix = f"trace_{member}_"
@@ -134,11 +134,11 @@ def check_stage0(root, members, r):
         r.check(f"stage0[{m}] output exists", True, f"{path.name}  {len(df):,} rows")
         r.check(f"stage0[{m}] non-empty", len(df) > 0, f"{len(df):,} rows")
 
-        # By NAME, not by position. Stage 1 reads columns by name, and the engines
-        # genuinely differ in order: the standard/144A aggregation emits bid_time_ew
-        # and bid_time_last after ask_count, where enhanced puts them before prc_ask.
-        # That is a long-standing wart, not a correctness problem -- so note it, do
-        # not fail on it.
+        # By name, not by position. Stage 1 reads columns by name, and the engines
+        # differ in order. The standard/144A aggregation emits bid_time_ew and
+        # bid_time_last after ask_count, where enhanced puts them before prc_ask.
+        # That is a long-standing oddity and does not affect correctness, so note it
+        # and do not fail on it.
         got, want = list(df.columns), STAGE0_COLUMNS
         missing, extra = sorted(set(want) - set(got)), sorted(set(got) - set(want))
         same_names = not missing and not extra
@@ -156,10 +156,10 @@ def check_stage0(root, members, r):
 
 
 def check_stage0_audit(root, members, r):
-    """The reports job rebuilds within-chunk filter order from ROW ORDER, via
-    groupby(chunk).cumcount(). If audit rows are ever written out of order -- which is
-    exactly what naive concurrency would do -- every filter-cascade plot in the data
-    report is silently mislabelled. So audit ordering is a correctness property."""
+    """The reports job rebuilds within-chunk filter order from row order, via
+    groupby(chunk).cumcount(). If audit rows are ever written out of order, which is
+    exactly what naive concurrency would do, every filter-cascade plot in the data
+    report is mislabelled without an error. So audit ordering is a correctness property."""
     for m in members:
         path = _latest(list((root / "stage0" / m).glob(f"drr_filters_audit_{m}_*.parquet")))
         if path is None:
@@ -194,9 +194,9 @@ def check_stage1(root, members, stage0, min_rows, r):
             f"missing={sorted(set(want) - set(got))} extra={sorted(set(got) - set(want))}")
 
     # ---- the severe one -----------------------------------------------------
-    # db_type must be the member's CANONICAL code. Assigning it by POSITION in
-    # TRACE_MEMBERS means dropping a member silently renumbers the others -- turning
-    # 144A into 2, which the overlap clip then deletes as if it were Standard.
+    # db_type must be the member's canonical code. Assigning it by position in
+    # TRACE_MEMBERS means dropping a member renumbers the others without an error. 144A
+    # becomes 2, which the overlap clip then deletes as if it were Standard.
     if "db_type" in df.columns:
         present = set(int(v) for v in pd.unique(df["db_type"].dropna()))
         expected = {CANONICAL_DB_TYPE[m] for m in members if m not in NEVER_SURVIVES_STAGE1}
@@ -208,11 +208,11 @@ def check_stage1(root, members, stage0, min_rows, r):
                 f"present={sorted(present)} expected={sorted(expected)}"
                 + ("" if present == expected else
                    "  <-- db_type looks positional in TRACE_MEMBERS, not per-member"))
-        # Retention, not an absolute count. A member being quietly gutted is the failure
-        # mode we care about, and a fixed row floor only detects it at one sample size --
-        # this harness is meant to run at 2 chunks, 5 chunks or the full universe.
-        # Stage 1's filters legitimately remove some rows, so the bar is deliberately
-        # low; what it catches is a member losing MOST of its data.
+        # Retention, not an absolute count. The failure to catch is a member losing most
+        # of its data without an error, and a fixed row floor only detects that at one
+        # sample size, while this harness is meant to run at 2 chunks, 5 chunks or the full
+        # universe. Stage 1's filters legitimately remove some rows, so the bar is low on
+        # purpose.
         for m in sorted(members):
             if m in NEVER_SURVIVES_STAGE1:
                 continue
@@ -239,12 +239,12 @@ def check_stage1(root, members, stage0, min_rows, r):
                 f"{n_ff12} distinct values" + ("" if n_ff12 > 1 else
                 "  <-- Siccodes12 parse failed; every bond fell into the Other bucket"))
 
-    # Equity-link coverage is checked PER MEMBER, because it differs by an order of
+    # Equity-link coverage is checked per member, because it differs by an order of
     # magnitude between them and a pooled figure just measures the sample's mix.
-    # Measured: Enhanced ~80%, 144A ~25% -- 144A issues are private placements and
+    # Measured: Enhanced ~80%, 144A ~25%. 144A issues are private placements and
     # Rule 144A offerings, which far less often have a listed equity parent. Pooling
     # them made this check fail on a 144A-heavy sample for no good reason.
-    # What we actually want to catch is a linker merge that produced nothing, or one
+    # The check is meant to catch a linker merge that produced nothing, or one
     # that matched everything (which would mean the dated window was ignored).
     if "permno" in df.columns and "db_type" in df.columns:
         PERMNO_BAND = {"enhanced": (50.0, 99.0), "standard": (30.0, 99.0),

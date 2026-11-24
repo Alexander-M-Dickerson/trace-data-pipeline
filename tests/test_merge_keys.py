@@ -9,28 +9,27 @@ This exists because of a specific, expensive failure. On 2026-09-09 a full run l
 
     RuntimeError: 268 duplicate (cusip_id, trd_exctn_dt) rows after the linker merge.
 
-The linker was innocent. `fisd.fisd_mergedissue` is one row per ISSUE, not per CUSIP,
-and CUSIP 29357JAC0 carries two issue records -- an ABS row and a CDEB row with the same
+The linker was innocent. `fisd.fisd_mergedissue` is one row per issue, not per CUSIP,
+and CUSIP 29357JAC0 has two issue records, an ABS row and a CDEB row with the same
 issuer, maturity and coupon. Step 6 left-joined that frame on `cusip_id` to fill missing
 offering amounts, which duplicated every one of that bond's 268 surviving bond-days. The
 panel is not re-checked for uniqueness between step 2 and step 7, so the abort landed
 five steps and an hour and a half downstream of its cause, pointing at the wrong thing.
 
-The smoke test cannot catch this. It asserts panel uniqueness and passed 28/28 -- a
-four-chunk sample simply contains no multi-issue CUSIP. The property that matters is not
-"is the output unique" but "is every lookup keyed the way the join assumes", and that is
-checkable in seconds against the source tables.
+The smoke test cannot catch this. It asserts panel uniqueness and passed 28/28, because a
+four-chunk sample contains no multi-issue CUSIP. The property to check is "is every lookup
+keyed the way the join assumes", and that takes seconds against the source tables.
 
     python3 tests/test_merge_keys.py            # default: no WRDS needed, instant
     python3 tests/test_merge_keys.py --wrds     # also check the FISD source tables
 
-❗The default needs NO database connection, and deliberately so. Nothing in this
-pipeline connects to WRDS from the login node -- run_pipeline.sh only reads config,
-downloads over HTTP and submits jobs; every WRDS connection happens inside a batch job.
-This repo has never required a ~/.pgpass, and does not now. The --wrds checks are a
-monitoring extra: they watch for a future FISD vintage growing more multi-issue CUSIPs.
-The fix itself does not depend on them -- the offering_amt lookup is collapsed
-unconditionally -- so run them wherever your credentials work, or not at all.
+The default needs no database connection, on purpose. Nothing in this pipeline connects
+to WRDS from the login node. run_pipeline.sh only reads config, downloads over HTTP and
+submits jobs, and every WRDS connection happens inside a batch job. This repo has never
+required a ~/.pgpass, and does not now. The --wrds checks are a monitoring extra. They
+watch for a future FISD vintage growing more multi-issue CUSIPs. The fix itself does not
+depend on them, because the offering_amt lookup is collapsed unconditionally, so run them
+wherever your credentials work, or not at all.
 
 Author: Open Source Bond Asset Pricing
 """
@@ -57,7 +56,7 @@ def check(name, cond, detail=""):
 
 
 def note(name, detail, skipped=False):
-    """Report something worth knowing that is NOT a failure."""
+    """Report a finding that is not a failure."""
     print(f"[note] {name:<58} {detail}")
     if skipped:
         SKIPPED.append(name)
@@ -65,7 +64,7 @@ def note(name, detail, skipped=False):
 
 # ---------------------------------------------------------------- offline checks
 def check_stage0_artifact():
-    """The stage-0 FISD universe must be one row per CUSIP -- steps 3, 4 and 6 join it."""
+    """The stage-0 FISD universe must be one row per CUSIP, because steps 3, 4 and 6 join it."""
     found = sorted(ROOT.glob("**/stage0/enhanced/trace_enhanced_fisd_*.parquet"))
     if not found:
         note("stage0 FISD artifact", "none on disk; skipped (run stage 0 or the smoke test)",
@@ -81,10 +80,10 @@ def check_stage0_artifact():
 def _load_fn(name, extra_globals=None):
     """Pull one function out of the shipped source and make it callable.
 
-    stage1_pipeline.py cannot be imported on its own -- create_daily_stage1.py injects
-    LOG_DIR and friends into its globals before exec'ing it. Rather than test a copy of
-    the function, lift the real definition out of the file with ast and exec just that.
-    A copy would drift; this cannot.
+    stage1_pipeline.py cannot be imported on its own, because create_daily_stage1.py injects
+    LOG_DIR and friends into its globals before exec'ing it. So the function's own definition
+    is lifted out of the file with ast and only that is exec'd. A copy of the function would
+    drift, and this cannot.
     """
     import ast
     src = (ROOT / "stage1" / "stage1_pipeline.py").read_text(encoding="utf-8")
@@ -129,7 +128,7 @@ def check_merge_helper():
 def check_the_actual_bug(issues_for_amt, panel_days=304):
     """Reproduce the 2026-09-09 failure on real FISD rows, then show the fix kills it.
 
-    This is the check that would have caught the bug. It does not need a pipeline run --
+    This is the check that would have caught the bug. It does not need a pipeline run,
     only the lookup frame and a panel of one bond's trading days.
     """
     dupd = issues_for_amt["cusip_id"].duplicated(keep=False)
@@ -145,14 +144,14 @@ def check_the_actual_bug(issues_for_amt, panel_days=304):
         "trd_exctn_dt": pd.date_range("2023-01-02", periods=panel_days, freq="B"),
     })
 
-    # BEFORE: the shipped merge, straight onto the issue-keyed frame.
+    # Before: the shipped merge, straight onto the issue-keyed frame.
     before = panel.merge(issues_for_amt[["cusip_id", "offering_amt"]],
                          on="cusip_id", how="left")
     check("the old merge DOES fan out (bug reproduced)",
           len(before) == panel_days * n_records,
           f"{cusip}: {panel_days} bond-days x {n_records} issue records -> {len(before):,} rows")
 
-    # AFTER: the shipped collapse + guarded merge.
+    # After: the shipped collapse + guarded merge.
     collapse = _load_fn("_offering_amt_by_cusip")
     merge1to1 = _load_fn("_merge_1to1")
     if collapse is None or merge1to1 is None:
@@ -169,9 +168,9 @@ def check_the_actual_bug(issues_for_amt, panel_days=304):
 def _connect_wrds_or_none(user):
     """Connect WITHOUT ever prompting, and report a failure in one line.
 
-    ❗The wrds package answers a failed connect by calling input() for a username and
-    password. On a login node that does not raise -- it silently consumes whatever is
-    next in the terminal's paste buffer, which is usually the next command you typed.
+    The wrds package answers a failed connect by calling input() for a username and
+    password. On a login node that does not raise. It consumes whatever is next in the
+    terminal's paste buffer, which is usually the next command you typed, and says nothing.
     That produced, verbatim:
 
         FATAL: PAM authentication failed for user
@@ -200,7 +199,7 @@ def _connect_wrds_or_none(user):
 
 
 def check_wrds():
-    """The source tables, keyed as each join assumes. Aggregates only -- seconds."""
+    """The source tables, keyed as each join assumes. Aggregates only, so it takes seconds."""
     user = os.environ.get("WRDS_USERNAME", "")
     if not user or user == "your_wrds_username":
         note("WRDS checks", "WRDS_USERNAME not set; skipped", skipped=True)
@@ -219,8 +218,8 @@ def check_wrds():
             check(f"fisd.{table} is one row per {key}", int(r["n"]) == int(r["k"]),
                   f"{int(r['n']):,} rows / {int(r['k']):,} keys")
 
-        # The CUSIPs carrying more than one issue record. This is the whole input to the
-        # reproduction below, and it is a handful of rows -- the previous version pulled
+        # The CUSIPs with more than one issue record. This is the whole input to the
+        # reproduction below, and it is a handful of rows. The previous version pulled
         # all 773,423 rows of the table to find them, which is why this test was slow.
         dups = db.raw_sql("""
             SELECT complete_cusip AS cusip_id, COUNT(*) AS n_issues
@@ -235,7 +234,7 @@ def check_wrds():
             note("fan-out reproduction", "nothing to reproduce in this FISD vintage")
             return
 
-        # Fetch ONLY those CUSIPs' rows -- two rows, not three quarters of a million.
+        # Fetch only those CUSIPs' rows, which is two rows and not three quarters of a million.
         cusips = tuple(dups["cusip_id"].tolist())
         issues_for_amt = db.raw_sql(
             "SELECT complete_cusip AS cusip_id, offering_amt "

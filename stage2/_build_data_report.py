@@ -14,9 +14,9 @@ TRACE-derived bond databases in circulation.
     python _build_data_report.py --no-pdf            # emit .tex only
     python _build_data_report.py --mode <mode>       # a build other than the default stage1
 
-Two comparison suites need the network (and WRDS credentials). They are ON by
-default because a data report that does not compare against the alternatives is
-not making the case; ``--no-external`` drops them and the report still builds.
+Two comparison suites need the network (and WRDS credentials). They are on by
+default, because a data report that does not compare against the alternatives does
+not make its case. ``--no-external`` drops them and the report still builds.
 
 The heavy lifting lives in ``_report_helpers.py``, ported unchanged from the
 reference implementation. This file is the sequence, not the statistics.
@@ -60,13 +60,13 @@ def _say(msg: str) -> None:
 # ---------------------------------------------------------------------------
 # Every statistic below is requested by column name. The reference implementation
 # skipped a name it could not find (`if var_name not in df.columns: continue`), so a
-# renamed column removed a row from every table with no error anywhere -- three of
+# renamed column removed a row from every table with no error anywhere. Three of
 # them were missing from the shipped report and nobody noticed. Names are checked
 # up front now, once, against the panel.
 
 def require_columns(df: pd.DataFrame, requested: list[tuple[str, str]],
                     what: str, derived: set[str] = frozenset()) -> None:
-    """Fail loudly if a requested variable is not in the panel."""
+    """Stop with an error if a requested variable is not in the panel."""
     missing = [(c, label) for c, label in requested
                if c not in df.columns and c not in derived]
     if not missing:
@@ -93,7 +93,7 @@ def attach_prices(df: pd.DataFrame, mode: str) -> pd.DataFrame:
     under the label "Price (VW)", and so showed fewer prices than returns, which cannot
     happen to the price a return is computed from.
 
-    That price is the month-end one. The `_mmn` sidecar carries it as `bbtm_mmn`.
+    That price is the month-end one. The `_mmn` sidecar has it as `bbtm_mmn`.
     """
     sidecars = sorted((cfg.BLOCKS_DIR / mode).glob("mmn_price_based_signals_*.parquet"))
     if not sidecars:
@@ -468,7 +468,7 @@ def compile_pdf(tex_path: Path) -> Path | None:
         if cmd[0] is None:
             continue
         r = subprocess.run(cmd, cwd=d, capture_output=True, text=True)
-        # bibtex fails harmlessly when nothing is cited; only the LaTeX passes matter
+        # bibtex fails harmlessly when nothing is cited, and only the LaTeX passes matter
         if r.returncode != 0 and i != 1:
             tail = "\n".join((r.stdout or "").splitlines()[-25:])
             _say(f"  pdflatex pass {i} failed:\n{tail}")

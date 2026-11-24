@@ -1,12 +1,12 @@
-"""quote.py -- the 1997-2002 quote-return panel (openbondassetpricing.com published data),
+"""The 1997-2002 quote-return panel (openbondassetpricing.com published data),
 downloaded once and cached to data/quote_returns_quantlib.parquet. Used by steps 3/4/5 exactly as
 upstream `load_bond_data_from_url` uses the live download.
 
-❗THE CACHE IS THE TRAP. This module returns the cached copy whenever one exists, so repointing
-`QUOTE_URL` at a new file changes NOTHING on a machine that already has the old one -- the build
+The cache is the trap. This module returns the cached copy whenever one exists, so repointing
+`QUOTE_URL` at a new file changes nothing on a machine that already has the old one. The build
 keeps running on stale data and every number it produces looks entirely reasonable. That is why
 `load_quote` validates what it loaded against `QUOTE_REQUIRED_COLS` / `QUOTE_HAS_BENCHMARKS` and
-re-fetches, rather than trusting that the file on disk is the file the settings describe.
+re-fetches. It does not trust that the file on disk is the file the settings describe.
 """
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ def load_quote(force_fetch: bool = False) -> pd.DataFrame:
     """The quote-returns frame (cusip_id, date, ret_vw, tret, cs, bbtm, sze, + the tret_* block).
 
     A cached copy that does not match what the settings describe is treated as stale and replaced,
-    because the alternative is a silently short pre-history.
+    because the alternative is a short pre-history that nothing reports.
     """
     df = None
     if QUOTE_CACHE.exists() and not force_fetch:
@@ -58,7 +58,7 @@ def load_quote(force_fetch: bool = False) -> pd.DataFrame:
         df = _fetch()
         gone = _missing(df)
         if gone:
-            # The download and the settings disagree. Failing here is the point: continuing would
+            # The download and the settings disagree. Fail here, because continuing would
             # mean building on a file that is not the one this configuration claims to use.
             raise RuntimeError(
                 f"the file at QUOTE_URL is missing {gone}.\n"
