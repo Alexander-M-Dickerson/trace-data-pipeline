@@ -6,14 +6,14 @@ published files, cell by cell. It runs on your own computer, and nothing in it c
 
 ## What it builds
 
-108 signals, each sorted two ways:
+It sorts 108 signals, each two ways.
 
-- **single sorts**: deciles over all bonds, quintiles within the investment-grade band and
-  within the non-investment-grade band;
-- **within-firm sorts**: high minus low within each firm (`permno`), for firms with at least
+- Single sorts form deciles over all bonds, and quintiles within the investment-grade band and
+  within the non-investment-grade band.
+- Within-firm sorts take high minus low within each firm (`permno`), for firms with at least
   two bonds in a rating group that month.
 
-Each for four return types and three rating bands (all, IG, non-IG):
+Each is built for four return types and three rating bands (all, IG, non-IG).
 
 | return type | the return sorted |
 |---|---|
@@ -24,25 +24,26 @@ Each for four return types and three rating bands (all, IG, non-IG):
 
 For the three duration-adjusted types, the 68 beta and momentum signals are the ones Stage 2
 estimated on that same adjusted return (its blocks `betas_x` and `mom_retx`, or their `_bns`
-and `_cls` versions), and `str` is adjusted too. Holding period one month, value weights from
-the month before, rebalanced monthly. Every choice is in [`spec/factors.json`](spec/factors.json).
-The swap itself is `return_types.py` at the repository root, which Stage 3 uses too: `bash
+and `_cls` versions), and `str` is adjusted too. The holding period is one month, with value
+weights from the month before, rebalanced monthly. Every choice is in
+[`spec/factors.json`](spec/factors.json).
+The swap itself is `return_types.py` at the repository root, which Stage 3 uses too. `bash
 run_stage3.sh --returns dbns` builds the paper's exhibits on the same return types.
 
-The series are **unflipped**: a factor whose long-short mean is negative stays negative.
+The series are not sign-corrected. A factor whose long-short mean is negative stays negative.
 `flip_set.json` records which factors the full-sample sign rule would flip, per return type.
 
 ## Before you start
 
-1. Stage 2 has finished: Stage 4 reads `stage2/output/panel/main_panel_stage1.parquet`, and
+1. Stage 2 has finished. Stage 4 reads `stage2/output/panel/main_panel_stage1.parquet`, and
    `betas_x`, `mom_retx` and `factors.parquet` in `stage2/output/blocks/stage1/`.
-2. For `dbns` and `dcls`, Stage 2's optional benchmark blocks exist:
+2. For `dbns` and `dcls`, Stage 2's optional benchmark blocks exist. This command makes them.
 
    ```bash
    cd ../stage2 && python make_excess_blocks.py --mode stage1 --benchmark all
    ```
 
-3. The requirements for stages 2-4 are installed, in Python 3.11 to 3.13:
+3. The requirements for stages 2 to 4 are installed, in Python 3.11 to 3.13.
 
    ```bash
    python -m pip install -r requirements-local.txt
@@ -50,7 +51,7 @@ The series are **unflipped**: a factor whose long-short mean is negative stays n
    ```
 
    PyBondLab 0.3.0 declares `numpy<2` and this repository installs numpy 2, so it goes in
-   without its dependency list; [`requirements-local.txt`](../requirements-local.txt) says why
+   without its dependency list. [`requirements-local.txt`](../requirements-local.txt) says why
    that is safe.
 
 `python build_factors.py --dry-run` checks all of this and names the command that makes
@@ -58,13 +59,13 @@ anything missing.
 
 ## Run it
 
-From `stage4/`:
+Run this from `stage4/`.
 
 ```bash
 bash run_stage4.sh                  # build both sorts, then compare with the published files
 ```
 
-or step by step:
+Or run it step by step.
 
 ```bash
 python build_factors.py --dry-run   # the inputs, and the PyBondLab release in use
@@ -72,10 +73,10 @@ python build_factors.py             # both sorts, all four return types
 python compare_published.py         # downloads the published files once, then compares
 ```
 
-About 8 minutes on 24 cores, measured on the 2026-09-21 run's panel. `--sort single` or
-`--sort within_firm` builds one sort; `--signals cs mom6_1` is a quick run on a few signals and
-writes to `output/_subset/`, so it never replaces a full build. `run_stage4.sh` calls the
-`python` on PATH; set `PY=/path/to/python` to choose another.
+A run takes about 8 minutes on 24 cores, measured on the 2026-09-21 run's panel. `--sort single`
+or `--sort within_firm` builds one sort. `--signals cs mom6_1` is a quick run on a few signals
+and writes to `output/_subset/`, so it never replaces a full build. `run_stage4.sh` calls the
+`python` on PATH. Set `PY=/path/to/python` to choose another.
 
 ## What you get
 
@@ -94,7 +95,7 @@ stage4/output/
 ```
 
 Each folder holds what the matching archive on openbondassetpricing.com holds, apart from its
-README. `<vintage>` is the release year, taken from the Stage 1 file's date stamp; set
+README. `<vintage>` is the release year, taken from the Stage 1 file's date stamp. Set
 `STAGE4_VINTAGE` to choose another. The columns are in [DATA_DICTIONARY.md](DATA_DICTIONARY.md).
 
 ## Checking against the published files
@@ -104,9 +105,9 @@ README. `<vintage>` is the release year, taken from the Stage 1 file's date stam
 largest difference in `return`, `turnover` and `count`, the cells missing on one side only, and
 whether the flip sets agree. It exits 0 when everything is identical, or within `--tol`.
 
-On the 2026-09-21 run, Stage 4's output is identical, all 4,354,560 rows, to the factors
-OSBAP built from that run. A panel built from a newer WRDS run will
-differ, as it should; the comparison then tells you by how much.
+On the 2026-09-21 run, all 4,354,560 rows of Stage 4's output are identical to the factors
+OSBAP built from that run. A panel built from a newer WRDS run will differ, as it should, and
+the comparison then tells you by how much.
 
 ## Settings
 
@@ -124,8 +125,8 @@ differ, as it should; the comparison then tells you by how much.
 |---|---|
 | `PyBondLab ... is installed, and this repository runs on 0.3.0` | run the two install lines above |
 | `missing Stage 2 inputs` | run the command printed under each missing file |
-| `... signals are not in the ... panel` | the panel is not a full Stage 2 build; rebuild it |
-| `DIFFERS` from `compare_published.py` | expected if your panel comes from a different WRDS run; otherwise check `MANIFEST.json` against the Stage 2 files you meant to use |
+| `... signals are not in the ... panel` | the panel is not a full Stage 2 build, so rebuild it |
+| `DIFFERS` from `compare_published.py` | expected if your panel comes from a different WRDS run. Otherwise check `MANIFEST.json` against the Stage 2 files you meant to use |
 
 ## Tests
 

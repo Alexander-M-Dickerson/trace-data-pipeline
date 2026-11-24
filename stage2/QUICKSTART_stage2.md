@@ -1,18 +1,18 @@
-# Quick Start (Stage 2) — Monthly Asset-Pricing Panel
+# Quick start (Stage 2): monthly asset-pricing panel
 
-The shortest path from a Stage 1 daily panel to a 145-column monthly bond panel.
+This is the shortest path from a Stage 1 daily panel to a 145-column monthly bond panel.
 
-Stage 2 runs on **your own machine**, not the WRDS grid. It reads Stage 1's output rather
-than the TRACE tape, so there is no job to submit and no queue to wait in. On 24 cores and
-the full 2002-2025 sample, full builds took 8.3 minutes (2026-09-14) and 13.0 minutes
-(2026-09-16), start to finish. The first build in a fresh checkout, which also downloads
-the external series, took 18.2 minutes, and the next one there 11.6 (2026-09-23).
-
----
+Stage 2 runs on your own machine, not on the WRDS grid. It reads Stage 1's output and never
+the TRACE transactions, so there is no job to submit and no queue to wait in. On 24 cores and the full
+2002-2025 sample, full builds took 8.3 minutes (2026-09-14) and 13.0 minutes (2026-09-16),
+start to finish. The first build in a fresh checkout, which also downloads the external
+series, took 18.2 minutes, and the next one there took 11.6 (2026-09-23).
 
 ## Prerequisites
 
-**1. Stage 0 and Stage 1 output, produced by you.**
+You need the three things below.
+
+### 1. Stage 0 and Stage 1 output, produced by you
 
 | file | from | why |
 |---|---|---|
@@ -20,18 +20,21 @@ the external series, took 18.2 minutes, and the next one there 11.6 (2026-09-23)
 | `stage0/enhanced/trace_enhanced_fisd_<YYYYMMDD>.parquet` | Stage 0 | 144A flag, country, SIC, FISD issue id |
 | `stage1/data/call_dummy_<YYYYMMDD>.parquet` | Stage 1 | callable flag |
 
-All three are found automatically — newest date stamp wins.
+All three are found automatically, and the newest date stamp wins.
 
-> ❗**The OSBAP download will not work here.** The public Stage 1 file has its rating
-> columns removed (they are proprietary), and Stage 2 selects only bond-months with at
+> The OSBAP download **will not work** here. The public Stage 1 file has its rating
+> columns removed (they are proprietary), and Stage 2 selects only bond-days with at
 > least one rating. Stage 2 recognises the download and refuses it at start-up. Run Stage 0
 > and Stage 1 yourself.
 
-**2. A WRDS account.** Stage 2 pulls Treasury returns, the Fama-French factors, VIX and the
-FISD coupon terms the `tret_*` benchmarks need. These are fetched once and cached under
-`stage2/data/`.
+### 2. A WRDS account
 
-**3. Python packages**, in Python 3.11 to 3.13 (3.14 cannot install yet), from the repository root:
+Stage 2 pulls Treasury returns, the Fama-French factors, VIX and the FISD coupon terms the
+`tret_*` benchmarks need. These are fetched once and cached under `stage2/data/`.
+
+### 3. Python packages
+
+Install them from the repository root, in Python 3.11 to 3.13 (3.14 cannot install them yet).
 
 ```bash
 python -m pip install -r requirements-local.txt
@@ -39,51 +42,50 @@ python -m pip install --no-deps pybondlab==0.3.0
 ```
 
 DuckDB is the engine and PyBondLab 0.3.0 builds the BBW bond factors. PyBondLab declares
-`numpy<2` and this repository installs numpy 2, so it goes in without its dependency list;
-`requirements-local.txt` says why that is safe. Stage 2 stops at start-up and prints these two
-lines if PyBondLab is missing or a different version.
-
----
+`numpy<2` and this repository installs numpy 2, so it goes in without its dependency list
+(`requirements-local.txt` says why that is safe). If PyBondLab is missing or is a different
+version, Stage 2 stops at start-up and prints these two lines.
 
 ## Step-by-step
 
 ### 1. Check the configuration
 
-Set your WRDS username first if it is not already in the environment or `config.py`:
+Set your WRDS username first if it is not already in the environment or `config.py`.
 
 ```bash
 export WRDS_USERNAME=your_username        # macOS/Linux
 setx WRDS_USERNAME your_username          # Windows, then reopen the shell
 ```
 
-Before the first build, connect once by hand, so the build never has to ask for the password:
-`python -c "import wrds; wrds.Connection()"`. It asks for it and offers to save it where the
-`wrds` package looks (`~/.pgpass`, or `%APPDATA%\postgresql\pgpass.conf` on Windows).
+Before the first build, connect once by hand, so the build never has to ask for the password.
+Run `python -c "import wrds; wrds.Connection()"`. It asks for the password and offers to save
+it where the `wrds` package looks (`~/.pgpass`, or `%APPDATA%\postgresql\pgpass.conf` on
+Windows).
 
 ```bash
 cd stage2
 python _run_stage2.py --dry-run
 ```
 
-This resolves every input, prints what it found, and exits. If a file is missing it says
+The dry run resolves every input, prints what it found and exits. If a file is missing it says
 which one and where it looked. Nothing is built.
 
 ### 2. Build
 
-It needs room: on the 2026-09-21 run `stage2/output/` came to 9.4 GB (`output/_cache/`, stage 2's
-working copy of the stage 1 panel, 2.7 GB; the blocks 5.6 GB; the panel 1.2 GB), and the release
-bundles (`make_release.py`) add 5.0 GB in `stage2/release/`. The downloads in `stage2/data/` are
-small (34 MB).
+The build needs disk space. On the 2026-09-21 run `stage2/output/` came to 9.4 GB. Of that,
+`output/_cache/` (stage 2's working copy of the stage 1 panel) was 2.7 GB, the blocks were
+5.6 GB and the panel was 1.2 GB. The release bundles (`make_release.py`) add 5.0 GB in
+`stage2/release/`. The downloads in `stage2/data/` are small (34 MB).
 
 ```bash
 python _run_stage2.py
 ```
 
-or, equivalently, `bash run_stage2.sh`.
+`bash run_stage2.sh` does the same.
 
-Seven steps run in fresh processes: step 1, step 2, then steps 3-4 and 5-6 as two processes
-side by side, then step 7. The console prints a line as each starts and ends; each process has
-its own log under `output/logs/`.
+Seven steps run in fresh processes. Step 1 runs first, then step 2, then steps 3-4 and 5-6 as
+two processes side by side, then step 7. The console prints a line as each starts and ends,
+and each process has its own log under `output/logs/`.
 
 | step | what it does |
 |---|---|
@@ -95,16 +97,16 @@ its own log under `output/logs/`.
 | 6 | momentum, long-term reversal, VaR and expected shortfall |
 | 7 | the final merge into `main_panel_<mode>.parquet` |
 
-Useful flags:
+These flags are useful.
 
 ```bash
-python _run_stage2.py --limit-cusips 200      # a fast smoke build (replaces output/ -- see below)
+python _run_stage2.py --limit-cusips 200      # a fast smoke build (replaces output/, see below)
 python _run_stage2.py --from-step 4           # resume after a failure
 python _run_stage2.py --factor-source pinned  # the factors a published vintage used
 ```
 
-❗`--limit-cusips` writes to the same `output/` as a full build, so it replaces that build's
-panel and blocks. Run it before a full build, not after.
+`--limit-cusips` writes to the same `output/` as a full build, so it
+**replaces that build's panel and blocks**. Run it before a full build, not after.
 
 ### 3. Check what you built
 
@@ -112,10 +114,10 @@ panel and blocks. Run it before a full build, not after.
 python validate_coverage.py
 ```
 
-Every column should reach within a month of the panel's last date. On the 2026 data the gate
-names one that does not: `b_cptlt` (He-Kelly-Manela have not published past 2025-05).
+Every column should reach within a month of the panel's last date. On the 2026 data the check
+names one that does not, `b_cptlt` (He-Kelly-Manela have not published past 2025-05).
 `b_dcpi` and `b_cpi_vol6` end one month early (FRED's CPIAUCSL is missing an observation),
-which the gate allows. Those are upstream limits, not build failures.
+which the check allows. Those are upstream limits, not build failures.
 
 ### 4. Build the data report (optional)
 
@@ -124,12 +126,10 @@ bash run_build_data_reports.sh
 bash run_build_data_reports.sh --no-external    # skip the comparisons, no network needed
 ```
 
-14 tables and 11 figures describing coverage, distributions, extreme returns and how the
-panel compares with the DFPS and WRDS bond databases. Roughly 2½ minutes with the
-comparison suites, 1 minute without. The PDF is built if `pdflatex` is installed; without
-it you still get the `.tex`.
-
----
+The report has 14 tables and 11 figures. They describe coverage, distributions, extreme
+returns and how the panel compares with the DFPS and WRDS bond databases. It takes roughly
+2½ minutes with the comparison suites and 1 minute without. The PDF is built if `pdflatex` is
+installed. Without it you still get the `.tex`.
 
 ## What you end up with
 
@@ -141,21 +141,19 @@ stage2/output/blocks/<mode>/                      intermediate blocks, incl.
 stage2/data_reports/                              the report, its figures and PDF
 ```
 
-Every column is defined in [`DATA_DICTIONARY.md`](DATA_DICTIONARY.md). The column names
-**and their order** are frozen in `lib/contract.py` and checked at the end of every build,
-so a panel that builds is a panel you can read positionally.
-
----
+Every column is defined in [`DATA_DICTIONARY.md`](DATA_DICTIONARY.md). The column names and
+their order are frozen in `lib/contract.py` and checked at the end of every build, so you can
+read any panel that builds by column position.
 
 ## If something goes wrong
 
 | symptom | cause |
 |---|---|
-| "It looks like the Stage 1 file published for download" | you pointed it at the public Stage 1 file; the licensed columns are removed from it |
-| a missing-input box at start-up | Stage 0/1 output is absent; `--dry-run` shows where it looked (each input is the newest file of its kind, so check that the three come from the same run) |
-| `FileNotFoundError` on a factor | first run with no cache and no internet; the fetchers need one online run |
-| WRDS asks for a password on every step | no saved password: run `python -c "import wrds; wrds.Connection()"` once by hand and let it save one |
-| the build asserts on the column contract | something changed the panel's columns; the message names them — see `lib/contract.py` |
-| step 2 takes several times its usual ~2 minutes | you are running steps in one process; a full `_run_stage2.py` build starts each group of steps in a fresh process (a `--from-step`/`--to-step` run does not) |
+| "It looks like the Stage 1 file published for download" | you pointed it at the public Stage 1 file, which has the licensed columns removed |
+| a missing-input box at start-up | Stage 0/1 output is absent. `--dry-run` shows where it looked (each input is the newest file of its kind, so check that the three come from the same run) |
+| `FileNotFoundError` on a factor | first run with no cache and no internet. The fetchers need one online run |
+| WRDS asks for a password on every step | there is no saved password. Run `python -c "import wrds; wrds.Connection()"` once by hand and let it save one |
+| the build asserts on the column contract | something changed the panel's columns. The message names them, and the contract is in `lib/contract.py` |
+| step 2 takes several times its usual ~2 minutes | you are running steps in one process. A full `_run_stage2.py` build starts each group of steps in a fresh process (a `--from-step`/`--to-step` run does not) |
 
-More detail in [`README_stage2.md`](README_stage2.md).
+[`README_stage2.md`](README_stage2.md) has more detail.

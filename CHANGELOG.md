@@ -91,19 +91,19 @@ they belong, and Table IA.IV prints the latent implementation bias in percent. `
 
 ## [4.2.0] - 2026-09-28
 
-**Every figure in two looks, and the paper's new look is the default.** No table and no
+**Every figure in two styles, and the paper's new style is the default.** No table and no
 number that any stage computes changes: this release changes figures and their captions.
 `docs/validation/validated_runs.csv` records the checks.
 
 ### Changed
-- **Stage 3 draws every figure in two looks** (`stage3/figstyle.py`, `--style
+- **Stage 3 draws every figure in two styles** (`stage3/figstyle.py`, `--style
   house|submitted|both`; the runner draws both).
-  - `house` (the default, `reports/figures/`) is the paper's look from the 2026 revision on:
+  - `house` (the default, `reports/figures/`) is the paper's style from 2026 on:
     the production-paper style of the bond_schedule project, maroon, blue and charcoal,
     legends outside the data. Its nine cluster colours (Figures IA.3 to IA.6) are kept apart
     by a test: the palette's teal and green, which the eye reads as one colour, are not both
     used.
-  - `submitted` (`reports/figures/submitted/`) restores the look of the figures in the paper
+  - `submitted` (`reports/figures/submitted/`) restores the style of the figures in the paper
     as first submitted, which stage 3 had not reproduced. That means the serif type and the
     submitted colours for every figure, plus the features individual figures had:
     - the cluster colours, the cluster legend and the baseline mark in Figures IA.3 to IA.6;

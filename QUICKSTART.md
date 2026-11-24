@@ -1,55 +1,48 @@
-# TRACE Data Pipeline — Quick Start Guide
+# TRACE Data Pipeline quick start guide
 
-Processes TRACE data from intraday trades to a monthly bond panel. One script runs Stages 0
-and 1 on WRDS, and Stage 2 then runs on your own computer.
+The pipeline processes TRACE data from intraday trades to a monthly bond panel. One script runs
+Stages 0 and 1 on WRDS, and Stage 2 then runs on your own computer.
 
----
+## What this pipeline does
 
-## What This Pipeline Does
+It turns raw TRACE data into a bond dataset for research, which includes the following.
 
-Transforms raw TRACE data into a research-ready bond dataset with:
+- Clean TRACE prices (Enhanced, Standard, and 144A)
+- Bond characteristics from FISD
+- Analytics (YTM, duration, convexity, credit spreads via QuantLib)
+- Credit ratings (S&P and Moody's)
+- Equity identifiers (PERMNO, PERMCO, GVKEY)
+- Quality filters (ultra-distressed bond detection)
+- Industry classifications (Fama-French 12, 17 and 30)
 
-- ✨ **Clean TRACE prices** (Enhanced, Standard, and 144A)
-- 📊 **Bond characteristics** from FISD
-- 📈 **Analytics** (YTM, duration, convexity, credit spreads via QuantLib)
-- ⭐ **Credit ratings** (S&P and Moody's)
-- 🔗 **Equity identifiers** (PERMNO, PERMCO, GVKEY)
-- 🚨 **Quality filters** (ultra-distressed bond detection)
-- 🏭 **Industry classifications** (Fama-French 12, 17 and 30)
-
-**Output:** A parquet file with 44 columns per bond-day (see [stage1/DATA_DICTIONARY.md](stage1/DATA_DICTIONARY.md)).
-
----
+The output is a parquet file with 44 columns per bond-day (see
+[stage1/DATA_DICTIONARY.md](stage1/DATA_DICTIONARY.md)).
 
 ## Prerequisites
 
-- ✅ **WRDS account** with TRACE, FISD, and ratings access
-- ✅ **WRDS Cloud access** (or local Python environment)
-- ✅ **No password file on WRDS**: jobs on the WRDS Cloud connect without one
-- ✅ **Python ≥ 3.10** (the 2026-09-21 run used 3.14.5 on the WRDS Cloud)
-
----
+- A WRDS account with TRACE, FISD, and ratings access
+- WRDS Cloud access (or a local Python environment)
+- No password file on WRDS, because jobs on the WRDS Cloud connect without one
+- Python 3.10 or higher (the 2026-09-21 run used 3.14.5 on the WRDS Cloud)
 
 ## Two machines, one pipeline
 
-Before you start, know where you will be:
+Know where each stage runs before you start.
 
 | | Where | What |
 |---|---|---|
-| Stages 0 and 1 | **WRDS Cloud** | build the daily bond panel from the raw TRACE tape (~5 h) |
-| The hand-off | you | zip it on WRDS, `scp` it to your own computer (~5 GB) |
-| Stage 2 | **your own computer** | build the monthly panel from that file (~8-18 min) |
-| Stage 3 | **your own computer** | sorts, uncertainty grids and the paper's exhibits (~15-20 min, optional) |
-| Stage 4 | **your own computer** | the TRACE-only bond factors openbondassetpricing.com publishes, checked against the published files (~8 min, optional) |
+| Stages 0 and 1 | WRDS Cloud | build the daily bond panel from the raw TRACE transactions (~5 h) |
+| The hand-off | you | zip it on WRDS, `scp` it to your own computer (~5.6 GB) |
+| Stage 2 | your own computer | build the monthly panel from that file (~8-18 min) |
+| Stage 3 | your own computer | sorts, uncertainty grids and the paper's exhibits (~15-20 min, optional) |
+| Stage 4 | your own computer | the TRACE-only bond factors openbondassetpricing.com publishes, checked against the published files (~8 min, optional) |
 
-Steps 1-3 below are all **on WRDS**. The switch to your own computer happens at
+Steps 1 to 3 below are all on WRDS. You switch to your own computer at
 [Download Results](#download-results-to-your-local-machine), and Stage 2 follows it.
 
----
+## Quick start (3 steps) on WRDS
 
-## Quick Start (3 Steps) — on WRDS
-
-### Step 1: Clone and Configure
+### Step 1: Clone and configure
 
 ```bash
 # SSH to WRDS Cloud
@@ -61,27 +54,26 @@ git clone https://github.com/Alexander-M-Dickerson/trace-data-pipeline.git
 cd trace-data-pipeline
 ```
 
-**Configure your WRDS username and author:**
+Then set your WRDS username and the author name. The pipeline reads `WRDS_USERNAME` and `AUTHOR`
+from the environment or `config.py`.
 
-The pipeline reads `WRDS_USERNAME` and `AUTHOR` from the environment or `config.py`.
-
-**Option A — Set environment variable (recommended):**
+Option A is to set an environment variable (recommended).
 ```bash
 export WRDS_USERNAME="your_wrds_id"
 ```
 
-Make it persistent for future sessions:
+Make it persistent for future sessions.
 ```bash
 echo 'export WRDS_USERNAME="your_wrds_id"' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-**Option B — Edit `config.py` directly:**
+Option B is to edit `config.py` directly.
 ```bash
 nano config.py
 ```
 
-Change the default values:
+Change the default values.
 ```python
 WRDS_USERNAME = os.getenv("WRDS_USERNAME", "your_wrds_username")  # Change to your WRDS ID
 AUTHOR = "Your Name"  # Change from default "Open Source Bond Asset Pricing"
@@ -89,19 +81,17 @@ AUTHOR = "Your Name"  # Change from default "Open Source Bond Asset Pricing"
 
 Save and exit (Ctrl+O, Enter, Ctrl+X).
 
-**Note:** Your password goes nowhere: jobs on the WRDS Cloud connect without it.
+You do not enter your password anywhere, because jobs on the WRDS Cloud connect without it.
 
----
+### Step 2: Install dependencies
 
-### Step 2: Install Dependencies
-
-**For Stages 0 and 1** (both need it; stage 0 uses `pandas_market_calendars` and `SQLAlchemy`,
-which the system Python may not have):
+Stages 0 and 1 both need this install. Stage 0 uses `pandas_market_calendars` and `SQLAlchemy`,
+which the system Python may not have.
 ```bash
 python -m pip install --user -r requirements.txt
 ```
 
-**Alternative - Virtual environment (optional):**
+A virtual environment is an optional alternative.
 ```bash
 # Create virtual environment in project root. --system-site-packages keeps the WRDS
 # Cloud's own pandas 2.2 visible: pip has no build of it for the Cloud's Python 3.14.
@@ -110,24 +100,22 @@ source venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
-**Required packages for Stages 0 and 1:** the list, with minimum versions, is
-`requirements.txt`; install it whole: `download_inputs.sh` already needs `duckdb`, to check the
-bond-firm linker.
+The required packages for Stages 0 and 1, with minimum versions, are listed in
+`requirements.txt`. Install the whole list, because `download_inputs.sh` already needs `duckdb`
+to check the bond-firm linker.
 
-❗Do **not** pin these to exact versions on the WRDS Cloud. `--user` installs shadow the
+Do not pin these to exact versions on the WRDS Cloud. `--user` installs shadow the
 system packages, and WRDS already ships newer ones than any pin here (numpy 2.4.6,
-pyarrow 24.0.0 on Python 3.14) — pinning downgrades a working environment. Use
+pyarrow 24.0.0 on Python 3.14), so pinning downgrades a working environment. Use
 `requirements.txt`, which states minimums.
 
----
-
-### Step 3: Run the Pipeline
+### Step 3: Run the pipeline
 
 The scripts ship executable, so a fresh clone needs no `chmod`.
 
 ```bash
 # OPTIONAL BUT RECOMMENDED: prove the chain works first, in ~10 minutes
-bash download_inputs.sh     # LOGIN NODE only -- compute nodes have no internet
+bash download_inputs.sh     # on the login node only, because compute nodes have no internet
 qsub run_smoke_test.sh      # result in smoke_test.out
 # wait until qstat no longer lists it: it and the full run both hold WRDS connections
 
@@ -135,22 +123,22 @@ qsub run_smoke_test.sh      # result in smoke_test.out
 ./run_pipeline.sh
 ```
 
-**What happens:**
+#### What happens
 
-1. **Pre-Stage** (`download_inputs.sh`, on the login node):
+1. The pre-stage (`download_inputs.sh`, on the login node) fetches these inputs.
    - Liu-Wu treasury zero-coupon yields
    - bond-firm linker (equity identifiers)
    - Fama-French industry classifications
 
-2. **Stage 0** (TRACE data extraction) -- submits exactly the members in
-   `TRACE_MEMBERS`, which defaults to Enhanced + 144A:
+2. Stage 0 (TRACE data extraction) submits exactly the members in
+   `TRACE_MEMBERS`, which defaults to Enhanced + 144A.
    - Enhanced TRACE (2002-07 onward), pulling 5 CUSIP chunks at a time
    - 144A TRACE (first trade 2003-10), running alongside it
-   - Standard TRACE (2024-present) -- OPT-IN; when requested it runs after the other
+   - Standard TRACE (2024-present), which is opt-in. When requested it runs after the other
      two so it can use the whole WRDS connection budget
    - Data quality reports
 
-3. **Stage 1** (bond analytics):
+3. Stage 1 (bond analytics) runs these steps.
    - Merge FISD characteristics
    - Compute bond analytics with QuantLib
    - Merge credit ratings
@@ -158,12 +146,10 @@ qsub run_smoke_test.sh      # result in smoke_test.out
    - Apply quality filters
    - Generate final dataset
 
-**Runtime:** about 5 hours total on the WRDS Cloud with default settings (5.3 h on 2026-09-21, the run the 2026 vintage was built from)
+The run takes about 5 hours in total on the WRDS Cloud with default settings (5.3 h on
+2026-09-21, the run the 2026 vintage was built from).
 
----
-
-
-## Monitor Progress
+## Monitor progress
 
 ```bash
 # Check job status
@@ -184,9 +170,7 @@ tail -f stage1/logs/stage1.err
 
 Press Ctrl+C to stop tailing logs.
 
----
-
-## Check Output
+## Check output
 
 ```bash
 # Stage 0 outputs
@@ -202,7 +186,7 @@ ls stage0/data_reports/enhanced/
 ls stage1/data_reports/
 ```
 
-**Expected output structure:**
+The output should have this structure.
 ```
 trace-data-pipeline/
 ├── stage0/
@@ -247,17 +231,17 @@ trace-data-pipeline/
     └── logs/
 ```
 
----
+## Download results to your local machine
 
-## Download Results to Your Local Machine
+The pipeline generates a large folder (~5.6 GB) with hundreds of files. We recommend that you zip
+the folder first, then download a single file.
 
-The pipeline generates a large folder (~5 GB) with hundreds of files. **The recommended approach is to zip the folder first**, then download a single file.
+### Step 1: Zip the folder on WRDS (via SSH)
 
-### Step 1: Zip the Folder on WRDS (via SSH)
+Your WRDS home directory has limited space (~10 GB). Use the scratch space (~500 GB) to create
+the zip file.
 
-Your WRDS home directory has limited space (~10 GB). Use the scratch space (~500 GB) to create the zip file.
-
-**Connect to WRDS Cloud:**
+Connect to the WRDS Cloud.
 ```bash
 # Windows (PowerShell, Windows Terminal, or PuTTY)
 ssh {wrds_username}@wrds-cloud.wharton.upenn.edu
@@ -266,65 +250,64 @@ ssh {wrds_username}@wrds-cloud.wharton.upenn.edu
 ssh {wrds_username}@wrds-cloud.wharton.upenn.edu
 ```
 
-**Create the zip file in scratch space:**
+Create the zip file in scratch space.
 ```bash
 cd ~
 rm -f "/scratch/$(basename "$(dirname "$HOME")")/trace-data-pipeline.zip"   # zip would otherwise ADD to an old archive
 zip -r "/scratch/$(basename "$(dirname "$HOME")")/trace-data-pipeline.zip" trace-data-pipeline/
 ```
 
-This compresses the folder and stores it in scratch space, avoiding home directory quota issues.
-`$(basename "$(dirname "$HOME")")` is your institution code, the folder between `/home` and your username. Type the line as written; nothing in it is a placeholder. For the `scp` line below, `{institution}` IS a placeholder: replace it, braces included, with that code (`echo $HOME` on WRDS shows it).
+This compresses the folder and stores it in scratch space, which avoids the home directory quota.
+`$(basename "$(dirname "$HOME")")` is your institution code, the folder between `/home` and your username. Type the line as written, because nothing in it is a placeholder. In the `scp` line below, `{institution}` is a placeholder. Replace it, braces included, with that code (`echo $HOME` on WRDS shows it).
 
-> ❗`zip` stores whatever path you hand it. Given the absolute `~/trace-data-pipeline/`,
+> `zip` stores whatever path you hand it. Given the absolute `~/trace-data-pipeline/`,
 > it strips the leading `/` and stores `home/{institution}/{wrds_username}/trace-data-pipeline/...`,
-> so the archive extracts four directories deep. Run it from `~` on a **relative** path,
+> so the archive extracts four directories deep. Run it from `~` on a relative path,
 > as above, and the archive extracts to a single clean `trace-data-pipeline/` folder.
 
+### Step 2: Download the zip file to your local machine
 
-### Step 2: Download the Zip File to Your Local Machine
+Run the command from your local machine, not from WRDS.
 
-**From your LOCAL machine** (not WRDS), run:
+#### Windows (PowerShell or Windows Terminal)
 
-**Windows (PowerShell or Windows Terminal):**
 ```powershell
 scp {wrds_username}@wrds-cloud.wharton.upenn.edu:/scratch/{institution}/trace-data-pipeline.zip "{local_destination}"
 ```
 
-**Mac/Linux (Terminal):**
+#### Mac/Linux (Terminal)
+
 ```bash
 scp {wrds_username}@wrds-cloud.wharton.upenn.edu:/scratch/{institution}/trace-data-pipeline.zip "{local_destination}"
 ```
 
-**Windows (WinSCP - GUI alternative):**
+#### Windows (WinSCP, a GUI alternative)
+
 1. Connect to `wrds-cloud.wharton.upenn.edu` with your WRDS credentials
 2. Navigate to `/scratch/{institution}/`
 3. Download `trace-data-pipeline.zip`
 
-### Step 3: Extract the Zip File Locally
+### Step 3: Extract the zip file locally
 
-**Windows:**
-- Right-click `trace-data-pipeline.zip` → **Extract All...**, and remove the trailing
-  `\trace-data-pipeline` from the folder it proposes. The zip already holds that folder, so
-  keeping it gives `trace-data-pipeline\trace-data-pipeline\`.
+- On Windows, right-click `trace-data-pipeline.zip`, choose Extract All..., and remove the
+  trailing `\trace-data-pipeline` from the folder it proposes. The zip already holds that folder,
+  so keeping it gives `trace-data-pipeline\trace-data-pipeline\`.
+- On a Mac, double-click `trace-data-pipeline.zip` (it extracts automatically).
+- On Linux, use the command below.
 
-**Mac:**
-- Double-click `trace-data-pipeline.zip` (extracts automatically)
-
-**Linux:**
 ```bash
 unzip trace-data-pipeline.zip -d "{local_destination}"
 ```
 
-### Step 4: Clean Up (Optional)
+### Step 4: Clean up (optional)
 
-After confirming the download, remove the zip from scratch space:
+After confirming the download, remove the zip from scratch space.
 ```bash
 # On WRDS Cloud
 rm /scratch/{institution}/trace-data-pipeline.zip
 ```
 
-### Placeholder Reference
+### Placeholder reference
 
 | Placeholder | Description | Example |
 |-------------|-------------|---------|
@@ -332,12 +315,10 @@ rm /scratch/{institution}/trace-data-pipeline.zip
 | `{institution}` | Your institution's WRDS scratch folder | `wharton`, `chicago`, `nyu` |
 | `{local_destination}` | Path on your local machine | `~/Downloads` (Mac/Linux) or `C:\Users\YourName\Downloads` (Windows) |
 
----
-
-## Verify Your Data
+## Verify your data
 
 This reads only the file's metadata, so it is safe on the WRDS login node, where heavy work
-is not allowed:
+is not allowed.
 
 ```python
 import pyarrow.parquet as pq
@@ -347,17 +328,15 @@ print(f"{f.metadata.num_rows:,} rows, {len(f.schema_arrow.names)} columns")   # 
 print(f.schema_arrow.names)
 ```
 
----
-
 ## Now switch to your own computer: Stage 2
 
-Everything above happened **on WRDS**. Stage 2 happens **on your own computer**, on the
+Everything above happened on WRDS. Stage 2 happens on your own computer, on the
 files you just downloaded. Its first run connects to WRDS once, to fetch and cache a few
 series (CRSP Treasury returns, Fama-French factors, VIX and FISD coupon terms), so it needs
-your WRDS username, in `config.py` or `export WRDS_USERNAME=...`; later runs read the cache.
+your WRDS username, in `config.py` or `export WRDS_USERNAME=...`. Later runs read the cache.
 
-First install the requirements for stages 2-4 there, in Python 3.11 to 3.13, in an environment of
-their own (the install replaces packages other projects may rely on):
+First install the requirements for stages 2 to 4 there, in Python 3.11 to 3.13, in an environment
+of their own (the install replaces packages other projects may rely on).
 
 ```bash
 cd trace-data-pipeline          # the folder you just unzipped
@@ -367,20 +346,20 @@ python -m pip install -r requirements-local.txt
 python -m pip install --no-deps pybondlab==0.3.0
 ```
 
-Activate it again in every new terminal before running stages 2-4. (If Windows PowerShell refuses
-to run `activate`, run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once.)
+Activate it again in every new terminal before running stages 2 to 4. (If Windows PowerShell
+refuses to run `activate`, run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once.)
 
 PyBondLab 0.3.0 declares `numpy<2` and this repository installs numpy 2, so it goes in without
-its dependency list; `requirements-local.txt` says why that is safe. Stages 2-4 stop at start-up
-and print these two lines if PyBondLab is missing or a different version.
+its dependency list, and `requirements-local.txt` says why that is safe. Stages 2 to 4 stop at
+start-up and print these two lines if PyBondLab is missing or a different version.
 
-❗**On Windows, before you `git pull` a newer release into this folder**, run
+On Windows, before you `git pull` a newer release into this folder, run
 `git config core.fileMode false` in it once. Unzipping on Windows drops the executable bit from
 every `.sh` file, git then counts each one as changed, and the pull stops with "Please commit your
-changes or stash them before you merge". Nothing in the files changed; the setting tells git to
+changes or stash them before you merge". Nothing in the files changed. The setting tells git to
 ignore the bit.
 
-Then build the panel:
+Then build the panel.
 
 ```bash
 cd stage2
@@ -389,20 +368,23 @@ python _run_stage2.py               # the full build, ~8-18 minutes on 24 cores
 ```
 
 `--factor-source pinned` uses the factor file published with your vintage instead of
-rebuilding it from public sources that revise their history. It reproduces a published panel only when stages 0 and 1 are the same WRDS run; a new run ends later and carries WRDS's revisions, so its panel differs whichever factors it uses. See [stage2/QUICKSTART_stage2.md](stage2/QUICKSTART_stage2.md). To match it exactly in 139 of 145 columns, the other six within 1e-13, also install the exact
-package versions it was built with:
-`python -m pip install -r requirements-local.txt -c constraints-2026.txt`, which the file
-explains.
+rebuilding it from public sources that change their history. It reproduces a published panel only
+when stages 0 and 1 are the same WRDS run. A new run ends later and includes WRDS's changes to
+earlier data, so its panel differs whichever factors it uses. See
+[stage2/QUICKSTART_stage2.md](stage2/QUICKSTART_stage2.md). To match it exactly in 139 of 145
+columns, the other six within 1e-13, also install the exact package versions it was built with.
+The command is `python -m pip install -r requirements-local.txt -c constraints-2026.txt`. The
+top of `constraints-2026.txt` says what it fixes and why.
 
-It writes `output/panel/main_panel_<mode>.parquet` -- 145 columns per bond-month -- plus the
-unadjusted `_mmn` twins, the factor series, and the beta and momentum blocks. Every column is
+The build writes `output/panel/main_panel_<mode>.parquet`, with 145 columns per bond-month, plus
+the unadjusted `_mmn` twins, the factor series, and the beta and momentum blocks. Every column is
 defined in [stage2/DATA_DICTIONARY.md](stage2/DATA_DICTIONARY.md).
 
-The build asserts its own column contract at the end: the 145 names **and their order** are
-frozen in `stage2/lib/contract.py`, so a change to the model list cannot silently permute the
-published file.
+The build asserts its own column contract at the end. The 145 names and their order are
+frozen in `stage2/lib/contract.py`, so a change to the model list cannot reorder the
+published file without an error.
 
-To package a vintage for distribution:
+To package a vintage for distribution, run these commands.
 
 ```bash
 python make_excess_blocks.py --mode stage1 --verify           # first: the default rebuilt, checked
@@ -410,13 +392,13 @@ python make_excess_blocks.py --mode stage1 --benchmark all   # the blocks the re
 python make_release.py              # the stage1 build; --mode <mode> for another
 ```
 
-which redacts the proprietary identifiers and licensed ratings, and refuses to write a bundle
-that still carries them. See [stage2/QUICKSTART_stage2.md](stage2/QUICKSTART_stage2.md).
+The packaging redacts the proprietary identifiers and licensed ratings, and refuses to write a
+bundle that still has them. See [stage2/QUICKSTART_stage2.md](stage2/QUICKSTART_stage2.md).
 
 ## Optional: Stages 3 and 4
 
 Both run on your own computer and read what Stage 2 wrote, plus Stage 1's daily file (Stage 3's
-data appendix, Stage 4's vintage year). Neither connects to WRDS; Stage 4 downloads the
+data appendix, Stage 4's vintage year). Neither connects to WRDS. Stage 4 downloads the
 published factor files to compare with.
 
 ```bash
@@ -435,114 +417,95 @@ See [stage3/QUICKSTART_stage3.md](stage3/QUICKSTART_stage3.md) and
 
 ### Pipeline fails immediately
 
-**Check:** Are you in the root directory?
+Check that you are in the root directory.
 ```bash
 pwd  # Should show: .../trace-data-pipeline
 ls   # Should show: stage0/ stage1/ config.py run_pipeline.sh
 ```
 
-**Fix:** Navigate to root directory
+If you are not, go to the root directory.
 ```bash
 cd ~/trace-data-pipeline
 ```
 
----
-
 ### "WRDS connection failed"
 
-**On the WRDS Cloud** no password file is needed: jobs there connect without one. A failed
-connection is almost always the username: `WRDS_USERNAME` unset, or still `your_wrds_username`
-in `config.py` (`python3 doctor.py --wrds` checks it). If the username is right, it is WRDS's
-limit of 7 connections held at once (`stage0/README_stage0.md`).
+On the WRDS Cloud no password file is needed, because jobs there connect without one. A failed
+connection is almost always the username, with `WRDS_USERNAME` unset or still
+`your_wrds_username` in `config.py` (`python3 doctor.py --wrds` checks it). If the username is
+right, it is WRDS's limit of 7 connections held at once (`stage0/README_stage0.md`).
 
-**On your own computer** (stage 2's first run), the password must be saved where the `wrds`
-package looks. Connect once by hand; it asks for the password and offers to save it
-(`~/.pgpass`, or `%APPDATA%\postgresql\pgpass.conf` on Windows):
+On your own computer (stage 2's first run), the password must be saved where the `wrds`
+package looks. Connect once by hand. It asks for the password and offers to save it
+(`~/.pgpass`, or `%APPDATA%\postgresql\pgpass.conf` on Windows).
 ```bash
 python -c "import wrds; wrds.Connection()"
 ```
 
----
-
 ### "ModuleNotFoundError: No module named 'QuantLib'"
 
-**Fix:** Install QuantLib (`requirements.txt` asks for `>=1.36`)
+Install QuantLib (`requirements.txt` asks for `>=1.36`).
 ```bash
 pip install --user QuantLib
 ```
 
----
-
 ### Stage 1 fails with "Stage0 output files not found"
 
-**Check:** Did Stage 0 complete successfully?
+Check whether Stage 0 completed successfully.
 ```bash
 ls stage0/enhanced/trace_enhanced_*.parquet
 ```
 
-**Fix:** `run_pipeline.sh` starts Stage 1 only after Stage 0 has ended, so this means a
-Stage 0 job failed. Read its log for the first error, fix it, and run `./run_pipeline.sh` again:
+`run_pipeline.sh` starts Stage 1 only after Stage 0 has ended, so this means a
+Stage 0 job failed. Read its log for the first error, fix it, and run `./run_pipeline.sh` again.
 ```bash
 grep -n -m5 -i "error" stage0/logs/*.err
 ```
 
----
-
 ### Jobs are running very slowly
 
-**Check:** WRDS system status
+Check the WRDS system status.
 ```bash
 qstat -f  # Check cluster load
 ```
 
-**Speed up:**
-1. Process fewer datasets (edit `TRACE_MEMBERS` in `config.py`)
-2. Not the reports: `STAGE0_OUTPUT_FIGURES = False` in `config.py` skips their figures, but the
-   report job runs beside Stage 1, so the run does not finish any sooner
-
----
+To speed the run up, process fewer datasets (edit `TRACE_MEMBERS` in `config.py`). Skipping the
+reports' figures does not help. `STAGE0_OUTPUT_FIGURES = False` in `config.py` skips them, but
+the report job runs beside Stage 1, so the run does not finish any sooner.
 
 ### Memory errors ("Killed")
 
-**Fix:** Use more, smaller chunks. A WRDS job may hold at most 48 GB, and Stage 1 asks for
-40 GB (4 slots of 10 GB):
+Use more, smaller chunks. A WRDS job may hold at most 48 GB, and Stage 1 asks for
+40 GB (4 slots of 10 GB).
 ```python
 # In stage1/_stage1_settings.py
 N_CHUNKS = 20    # default 10; more chunks means a smaller peak
 N_CORES = None   # leave it: it follows the 4 slots the job was granted
 ```
 
----
+## What's next?
 
-## What's Next?
+After the pipeline completes, you can do any of these.
 
-After the pipeline completes:
+1. Explore your data by loading `stage1_YYYYMMDD.parquet` into pandas/R
+2. See `README.md` for variable definitions
+3. Check data quality in the reports in `stage1/data_reports/`
+4. Edit `stage1/_stage1_settings.py` for custom filters
+5. Re-run Stage 1 with different settings without re-running Stage 0
 
-1. **Explore your data**: Load `stage1_YYYYMMDD.parquet` into pandas/R
-2. **Read detailed docs**: See `README.md` for variable definitions
-3. **Check data quality**: Review reports in `stage1/data_reports/`
-4. **Customize filters**: Edit `stage1/_stage1_settings.py` for custom filters
-5. **Run incrementally**: Re-run Stage 1 with different settings without re-running Stage 0
+## File structure overview
 
----
+[CODE_MAP.md](CODE_MAP.md) says what each stage reads and writes, and what every file in the
+repository does. [INDEX.md](INDEX.md) says which doc answers which question.
 
-## File Structure Overview
+## Getting help
 
-What each stage reads and writes, and what every file in the repository does:
-[CODE_MAP.md](CODE_MAP.md). For which doc answers which question: [INDEX.md](INDEX.md).
+- See `README.md` for the detailed documentation
+- See `stage1/QUICKSTART_stage1.md` for Stage 1 details
+- Email alexander.dickerson1@unsw.edu.au
+- Report issues on [GitHub Issues](https://github.com/Alexander-M-Dickerson/trace-data-pipeline/issues)
 
----
-
-## Getting Help
-
-- 📖 **Detailed docs**: See `README.md` for comprehensive documentation
-- 🚀 **Stage-specific guide**: See `stage1/QUICKSTART_stage1.md` for Stage 1 details
-- 📧 **Email**: alexander.dickerson1@unsw.edu.au
-- 🐛 **Issues**: [GitHub Issues](https://github.com/Alexander-M-Dickerson/trace-data-pipeline/issues)
-
----
-
-## Command Reference
+## Command reference
 
 ```bash
 # Initial setup
@@ -578,6 +541,3 @@ cd ~ && zip -r "/scratch/$(basename "$(dirname "$HOME")")/trace-data-pipeline.zi
 # Step 2: Download zip (from LOCAL machine)
 scp {wrds_username}@wrds-cloud.wharton.upenn.edu:/scratch/{institution}/trace-data-pipeline.zip ./
 ```
-
----
-

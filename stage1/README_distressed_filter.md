@@ -1,34 +1,32 @@
-# Ultra-Distressed Filter: Technical Documentation
+# Ultra-distressed filter: technical documentation
 
 ## Overview
 
-The **ultra-distressed filter** detects anomalous prices in distressed corporate bond transaction data. These anomalies include ultra-low prices, upward spikes, persistent plateaus, and intraday inconsistencies that indicate data quality issues rather than genuine market conditions.
+The ultra-distressed filter detects anomalous prices in distressed corporate bond transaction data. The anomalies are ultra-low prices, upward spikes, persistent plateaus and intraday inconsistencies that come from data errors and do not reflect market conditions.
 
-The algorithm employs four independent filters operating on daily aggregated price data, using lookback/lookforward windows, round-number heuristics, and ratio-based thresholds to identify error candidates.
+The algorithm runs four independent filters on daily aggregated prices. They use lookback and lookforward windows, round-number heuristics and ratio-based thresholds to find candidate errors.
 
-**When This Filter Is Most Useful**: This filter primarily addresses data quality issues that arise when Stage 0 applies minimal or no volume filtering, or when filtering only on par volume. Such configurations retain micro trades at obscure round numbers that may represent placeholder values or data entry errors. This filter provides a cleanup mechanism for these edge cases.
-These bond prices are often associated with debt issues trading in default. Thank you to Colin Philipps (FINRA) for some clarification on these extremely low/rounded prices in TRACE, "_... not the TRACE system adding anything to the tape but are transactions reported [by] broker dealers. Likely they are cleaning up positions/books. TRACE only transmits what is submitted to the system._".
-
----
+The filter is most useful when Stage 0 applies little or no volume filtering, or filters only on par volume. Those configurations keep micro trades at obscure round numbers, which may be placeholder values or data entry errors, and this filter cleans up those cases.
+These bond prices often occur on debt issues trading in default. Thank you to Colin Philipps (FINRA) for some clarification on these extremely low/rounded prices in TRACE, "_... not the TRACE system adding anything to the tape but are transactions reported [by] broker dealers. Likely they are cleaning up positions/books. TRACE only transmits what is submitted to the system._".
 
 ## Framework
 
-### Problem Statement
+### Problem statement
 
-Given a time-ordered sequence of daily aggregated prices $\{P_1, P_2, \ldots, P_n\}$ for a bond, identify observations $P_i$ that represent **candidate errors** characterized by one or more of the following:
+Given a time-ordered sequence of daily aggregated prices $\{P_1, P_2, \ldots, P_n\}$ for a bond, the task is to find the observations $P_i$ that are candidate errors. A candidate error is one or more of the following.
 
-1. **Ultra-low anomaly**: Price $P_i$ is significantly lower than surrounding prices (downward outlier)
-2. **Upward spike**: Price $P_i$ is significantly higher than preceding prices and quickly recovers
-3. **Persistent plateau**: Sequence of identical ultra-low or round prices lasting multiple days
-4. **Intraday inconsistency**: an implausibly wide intraday HIGH/LOW range (`prc_hi` vs `prc_lo`)
+1. An ultra-low anomaly, where price $P_i$ is much lower than the surrounding prices (a downward outlier)
+2. An upward spike, where price $P_i$ is much higher than the preceding prices and quickly recovers
+3. A persistent plateau, a sequence of identical ultra-low or round prices lasting multiple days
+4. An intraday inconsistency, an implausibly wide intraday high/low range (`prc_hi` vs `prc_lo`)
 
-The algorithm must distinguish these errors from **genuine distressed pricing** (e.g., default events, bankruptcy) that persist consistently over time.
+The algorithm must tell these errors apart from genuine distressed pricing (e.g., default events, bankruptcy), which persists over time.
 
-### Core Algorithm Components
+### Core algorithm components
 
-#### 1. Round Number Detection
+#### 1. Round number detection
 
-For all filters, compute a **round number mask** to identify prices at suspicious round levels:
+For all filters, compute a round number mask that identifies prices at suspicious round levels.
 
 $$
 R_i = \begin{cases}
@@ -37,16 +35,15 @@ R_i = \begin{cases}
 \end{cases}
 $$
 
-where:
-- $R_i$ = binary indicator (1 if price $P_i$ matches a suspicious round number, 0 otherwise)
-- $r$ = an individual round number from the set $\mathcal{R}$
-- $\mathcal{R} = \{0.001, 0.01, 0.05, 0.10, 0.25, 0.50, 1.00\}$ = suspicious round numbers (in % of par).
-  ❗**0.75 is deliberately NOT in this set** -- it is a plausible distressed price, not a placeholder.
-- $\epsilon_{\text{round}} = 0.0001$ = tolerance for round detection
+- $R_i$ is a binary indicator (1 if price $P_i$ matches a suspicious round number, 0 otherwise)
+- $r$ is an individual round number from the set $\mathcal{R}$
+- $\mathcal{R} = \{0.001, 0.01, 0.05, 0.10, 0.25, 0.50, 1.00\}$ is the set of suspicious round numbers (in % of par).
+  **0.75 is deliberately not in this set**, because it is a plausible distressed price and not a placeholder.
+- $\epsilon_{\text{round}} = 0.0001$ is the tolerance for round detection
 
-**Important: Price Units.** All prices in this filter are expressed as **% of par**. With par = $1,000:
+All prices in this filter are expressed in % of par. With par = $1,000, the round numbers have these dollar values.
 
-| Price (% of par) | Dollar Value |
+| Price (% of par) | Dollar value |
 |------------------|--------------|
 | 0.001 | $0.01 |
 | 0.01 | $0.10 |
@@ -56,277 +53,264 @@ where:
 | 0.50 | $5.00 |
 | 1.00 | $10.00 |
 
-**Note on Round Numbers**: We are in contact with FINRA/TRACE to understand these odd rounded numbers that often occur in recognizable sequences. According to Colin Philipps (FINRA), it could be associated with dealers "cleaning-up" the books.
+We are in contact with FINRA/TRACE to understand these odd rounded numbers, which often occur in recognizable sequences. According to Colin Philipps (FINRA), it could be dealers "cleaning-up" the books.
 
----
+## Filter components
 
-## Filter Components
+### Filter 1: anomaly detection (downward outliers)
 
-### Filter 1: Anomaly Detection (Downward Outliers)
+This filter detects isolated ultra-low prices that are outliers compared to the surrounding normal prices.
 
-**Purpose**: Detect isolated ultra-low prices that are outliers compared to surrounding normal prices.
+#### Opening conditions
 
-#### Opening Conditions
-
-A row $i$ becomes a **candidate for anomaly flagging** if:
+A row $i$ becomes a candidate for anomaly flagging if
 
 $$
 P_i < \tau_{\text{low}} \quad \text{OR} \quad R_i = 1
 $$
 
-where:
-- $P_i$ = price at row $i$ (in % of par)
-- $R_i$ = round number indicator (1 if $P_i$ matches a suspicious round number, 0 otherwise; see Section 1)
-- $\tau_{\text{low}} = 0.10$ = ultra-low threshold (**0.10% of par = $1**)
+- $P_i$ is the price at row $i$ (in % of par)
+- $R_i$ is the round number indicator (1 if $P_i$ matches a suspicious round number, 0 otherwise, see Section 1)
+- $\tau_{\text{low}} = 0.10$ is the ultra-low threshold (0.10% of par = $1)
 
-**Interpretation**: A price is a candidate if it is below $1 (extremely low) OR matches a suspicious round number.
+In words, a price is a candidate if it is below $1 (extremely low) or matches a suspicious round number.
 
-#### Surrounding Price Analysis
+#### Surrounding price analysis
 
-For each candidate at row $i$, collect **surrounding prices** from lookback and lookforward windows:
+For each candidate at row $i$, collect the surrounding prices from the lookback and lookforward windows.
 
 $$
 \mathcal{S}_i = \{P_j : j \in [i-L_{\text{back}}, i-1] \cup [i+1, i+L_{\text{fwd}}], \, P_j > P_i, \, P_j \text{ valid}\}
 $$
 
-where:
-- $L_{\text{back}} = 5$ = lookback window (observations: days on which the bond traded)
-- $L_{\text{fwd}} = 5$ = lookforward window (observations)
-- Only prices **strictly greater than** $P_i$ are collected
+- $L_{\text{back}} = 5$ is the lookback window, in observations (days on which the bond traded)
+- $L_{\text{fwd}} = 5$ is the lookforward window, in observations
+- Only prices strictly greater than $P_i$ are collected
 
-Compute the **median of surrounding prices**:
+Then compute the median of the surrounding prices.
 
 $$
 M_{\text{surr}} = \text{median}(\mathcal{S}_i)
 $$
 
-#### Anomaly Criterion
+#### Anomaly criterion
 
-Flag row $i$ as anomalous if:
+Flag row $i$ as anomalous if
 
 $$
 \frac{M_{\text{surr}}}{P_i + \epsilon} \geq \rho_{\text{anomaly}}
 $$
 
-where:
-- $\rho_{\text{anomaly}} = 3.0$ = minimum ratio for anomaly detection
-- $\epsilon = 10^{-10}$ = numerical stability constant
+- $\rho_{\text{anomaly}} = 3.0$ is the minimum ratio for anomaly detection
+- $\epsilon = 10^{-10}$ is the numerical stability constant
 
-**Interpretation**: The median of surrounding (higher) prices is at least 3× higher than the current price.
+That is, the median of the surrounding (higher) prices is at least 3 times the current price.
 
-#### Numerical Example
+#### Numerical example
 
 | Day | Price (% par) | Price ($) | Candidate? | Surrounding (> $P_i$) | Median | Ratio | Flagged? |
 |-----|---------------|-----------|------------|----------------------|--------|-------|----------|
-| 1 | 45.0 | $450 | No | — | — | — | No |
-| 2 | 44.5 | $445 | No | — | — | — | No |
-| 3 | **0.05** | **$0.50** | Yes (< 0.10 AND round) | {45.0, 44.5, 45.2, 44.8} | 44.9 | 898× | **Yes** |
-| 4 | 45.2 | $452 | No | — | — | — | No |
-| 5 | 44.8 | $448 | No | — | — | — | No |
+| 1 | 45.0 | $450 | No | | | | No |
+| 2 | 44.5 | $445 | No | | | | No |
+| 3 | 0.05 | $0.50 | Yes (< 0.10 and round) | {45.0, 44.5, 45.2, 44.8} | 44.9 | 898× | Yes |
+| 4 | 45.2 | $452 | No | | | | No |
+| 5 | 44.8 | $448 | No | | | | No |
 
-Day 3 is flagged because: (1) price 0.05 < τ_low = 0.10, (2) 0.05 is a round number, and (3) surrounding median / current price = 44.9 / 0.05 = 898 ≥ 3.0.
+Day 3 is flagged because (1) price 0.05 < τ_low = 0.10, (2) 0.05 is a round number, and (3) surrounding median / current price = 44.9 / 0.05 = 898 ≥ 3.0.
 
-#### Anomaly Classification
+#### Anomaly classification
 
-Flag types:
-- **`ultra_low`** ($t = 1$): $P_i < \tau_{\text{low}}$ AND NOT $R_i$
-- **`round_number`** ($t = 2$): $R_i$ AND NOT $(P_i < \tau_{\text{low}})$
-- **`ultra_low_round`** ($t = 3$): $P_i < \tau_{\text{low}}$ AND $R_i$
+The flag type depends on which conditions hold.
+- `ultra_low` ($t = 1$) when $P_i < \tau_{\text{low}}$ and not $R_i$
+- `round_number` ($t = 2$) when $R_i$ and not $(P_i < \tau_{\text{low}})$
+- `ultra_low_round` ($t = 3$) when $P_i < \tau_{\text{low}}$ and $R_i$
 
----
+### Filter 2: spike detection (upward outliers)
 
-### Filter 2: Spike Detection (Upward Outliers)
+This filter detects temporary upward price spikes that quickly revert to lower levels.
 
-**Purpose**: Detect temporary upward price spikes that quickly revert to lower levels.
+#### Opening conditions
 
-#### Opening Conditions
-
-A row $i$ becomes a **candidate for spike flagging** if:
+A row $i$ becomes a candidate for spike flagging if
 
 $$
 P_i > \tau_{\text{high}} \quad \text{OR} \quad (R_i = 1 \text{ AND } P_i > 0.50)
 $$
 
-where:
-- $P_i$ = price at row $i$ (in % of par)
-- $R_i$ = round number indicator (1 if $P_i$ matches a suspicious round number, 0 otherwise; see Section 1)
-- $\tau_{\text{high}} = 5.0$ = high spike threshold (**5% of par = $50**)
-- Round number condition requires $P_i > 0.50$ (**0.50% of par = $5**) to avoid flagging tiny round numbers
+- $P_i$ is the price at row $i$ (in % of par)
+- $R_i$ is the round number indicator (1 if $P_i$ matches a suspicious round number, 0 otherwise, see Section 1)
+- $\tau_{\text{high}} = 5.0$ is the high spike threshold (5% of par = $50)
+- The round number condition requires $P_i > 0.50$ (0.50% of par = $5), so that tiny round numbers are not flagged
 
-**Interpretation**: A price is a candidate if it exceeds $50 OR is a suspicious round number above $5.
+So a price is a candidate if it exceeds $50 or is a suspicious round number above $5.
 
-#### Pre-Spike Price Analysis
+#### Pre-spike price analysis
 
-For each candidate at row $i$, collect **preceding prices** from lookback window:
+For each candidate at row $i$, collect the preceding prices from the lookback window.
 
 $$
 \mathcal{P}_{\text{pre}} = \{P_j : j \in [i-L_{\text{back}}, i-1], \, P_j < P_i, \, P_j \text{ valid}\}
 $$
 
-where only prices **strictly less than** $P_i$ are collected.
+Only prices strictly less than $P_i$ are collected.
 
-Compute the **median of pre-spike prices**:
+Then compute the median of the pre-spike prices.
 
 $$
 M_{\text{pre}} = \text{median}(\mathcal{P}_{\text{pre}})
 $$
 
-#### Spike Magnitude Check
+#### Spike magnitude check
 
-Check if spike is sufficiently large:
+Check that the spike is large enough.
 
 $$
 \frac{P_i}{M_{\text{pre}} + \epsilon} \geq \rho_{\text{spike}}
 $$
 
-where $\rho_{\text{spike}} = 3.0$ = minimum spike ratio.
+Here $\rho_{\text{spike}} = 3.0$ is the minimum spike ratio.
 
-#### Recovery Check
+#### Recovery check
 
-Define the **recovery threshold**:
+Define the recovery threshold as
 
 $$
 P_{\text{recovery}} = M_{\text{pre}} \cdot \rho_{\text{recovery}}
 $$
 
-where $\rho_{\text{recovery}} = 2.0$ = recovery ratio.
+where $\rho_{\text{recovery}} = 2.0$ is the recovery ratio.
 
-Search forward for **evidence of recovery**:
+Then search forward for evidence of recovery.
 
 $$
 \exists j \in [i+1, i+L_{\text{fwd}}] : P_j \leq P_{\text{recovery}} \text{ AND } P_j \text{ valid}
 $$
 
-**Decision**: Flag row $i$ as spike if **both** magnitude check AND recovery check pass.
+Flag row $i$ as a spike if both the magnitude check and the recovery check pass.
 
-#### Numerical Example
+#### Numerical example
 
-| Day | Price (% par) | Price ($) | Candidate? | Pre-prices (< $P_i$) | Median | Spike Ratio | Recovery? | Flagged? |
+| Day | Price (% par) | Price ($) | Candidate? | Pre-prices (< $P_i$) | Median | Spike ratio | Recovery? | Flagged? |
 |-----|---------------|-----------|------------|---------------------|--------|-------------|-----------|----------|
-| 1 | 12.5 | $125 | No | — | — | — | — | No |
-| 2 | 11.8 | $118 | No | — | — | — | — | No |
-| 3 | **100.0** | **$1,000** | Yes (> 5.0) | {12.5, 11.8} | 12.15 | 8.23× | Check day 4 | — |
-| 4 | 12.2 | $122 | — | — | — | — | 12.2 ≤ 24.3 ✓ | — |
-| 5 | 11.5 | $115 | No | — | — | — | — | No |
+| 1 | 12.5 | $125 | Yes (> 5.0) | none | | | | No |
+| 2 | 11.8 | $118 | Yes (> 5.0) | none | | | | No |
+| 3 | 100.0 | $1,000 | Yes (> 5.0) | {12.5, 11.8} | 12.15 | 8.23× | Yes, day 4 (12.2 ≤ 24.3) | Yes |
+| 4 | 12.2 | $122 | Yes (> 5.0) | {11.8} | 11.8 | 1.03× | | No |
+| 5 | 11.5 | $115 | Yes (> 5.0) | none | | | | No |
 
-Day 3 is flagged because:
-1. Candidate: 100.0 > τ_high = 5.0 ✓
-2. Pre-spike median = (11.8 + 12.5) / 2 = 12.15
-3. Spike ratio = 100.0 / 12.15 = 8.23 ≥ 3.0 ✓
-4. Recovery threshold = 12.15 × 2.0 = 24.3; Day 4 price 12.2 ≤ 24.3 ✓
+Day 3 is flagged for these reasons.
+1. It is a candidate, because 100.0 > τ_high = 5.0
+2. The pre-spike median is (11.8 + 12.5) / 2 = 12.15
+3. The spike ratio is 100.0 / 12.15 = 8.23 ≥ 3.0
+4. The recovery threshold is 12.15 × 2.0 = 24.3, and the Day 4 price is 12.2 ≤ 24.3
 
-#### Spike Classification
+Days 1, 2, 4 and 5 are candidates too, because each is above 5.0, and none is flagged. Days 1, 2
+and 5 have no earlier price below their own, so there is nothing to compare with. Day 4's spike
+ratio is 12.2 / 11.8 = 1.03, below 3.0.
 
-Flag types:
-- **`high_spike`** ($s = 1$): $P_i > \tau_{\text{high}}$ AND NOT $R_i$
-- **`round_spike`** ($s = 2$): $R_i$ AND NOT $(P_i > \tau_{\text{high}})$
-- **`high_round_spike`** ($s = 3$): $P_i > \tau_{\text{high}}$ AND $R_i$
+#### Spike classification
 
----
+The flag type depends on which conditions hold.
+- `high_spike` ($s = 1$) when $P_i > \tau_{\text{high}}$ and not $R_i$
+- `round_spike` ($s = 2$) when $R_i$ and not $(P_i > \tau_{\text{high}})$
+- `high_round_spike` ($s = 3$) when $P_i > \tau_{\text{high}}$ and $R_i$
 
-### Filter 3: Plateau Detection (Persistent Identical Prices)
+### Filter 3: plateau detection (persistent identical prices)
 
-**Purpose**: Detect sequences of consecutive days with identical ultra-low or round prices.
+This filter detects sequences of consecutive days with identical ultra-low or round prices.
 
-#### Opening Conditions
+#### Opening conditions
 
-A row $i$ becomes the **start of a potential plateau** if:
+A row $i$ becomes the start of a potential plateau if
 
 $$
 P_i < \tau_{\text{plateau}} \quad \text{OR} \quad R_i = 1
 $$
 
-where:
-- $P_i$ = price at row $i$ (in % of par)
-- $R_i$ = round number indicator (1 if $P_i$ matches a suspicious round number, 0 otherwise; see Section 1)
-- $\tau_{\text{plateau}} = 0.15$ = plateau threshold (**0.15% of par = $1.50**)
+- $P_i$ is the price at row $i$ (in % of par)
+- $R_i$ is the round number indicator (1 if $P_i$ matches a suspicious round number, 0 otherwise, see Section 1)
+- $\tau_{\text{plateau}} = 0.15$ is the plateau threshold (0.15% of par = $1.50)
 
-**Interpretation**: Only ultra-low prices (< $1.50) or round numbers can start a plateau.
+Only ultra-low prices (< $1.50) or round numbers can start a plateau.
 
-#### Plateau Identification
+#### Plateau identification
 
-Starting from row $i$, find the **extent of exact price equality**:
+Starting from row $i$, find how far the exact price equality extends.
 
 $$
 \ell_{\text{plateau}} = \max\{k : P_{i+j} = P_i \text{ for all } j \in [0, k-1]\}
 $$
 
-where $\ell_{\text{plateau}}$ is the length of consecutive **identical** prices (exact equality required).
+Here $\ell_{\text{plateau}}$ is the length of the run of consecutive identical prices (exact equality is required).
 
-#### Minimum Run Length
+#### Minimum run length
 
-A plateau is considered for flagging only if:
+A plateau is considered for flagging only if
 
 $$
 \ell_{\text{plateau}} \geq \ell_{\min}
 $$
 
-where $\ell_{\min} = 2$ (default minimum plateau length, in observations).
+where $\ell_{\min} = 2$ (the default minimum plateau length, in observations).
 
-#### Plateau Suspicion Criteria
+#### Plateau suspicion criteria
 
-A plateau is flagged as **suspicious** if **any** of the following hold:
+A plateau is flagged as suspicious if any of the following criteria holds.
 
-**Criterion 1: Pre-plateau displacement**
-
-If $i > 0$ and $P_{i-1}$ is valid:
+Criterion 1 is pre-plateau displacement. If $i > 0$ and $P_{i-1}$ is valid, it holds when
 
 $$
 \frac{P_{i-1}}{P_i + \epsilon} \geq \rho_{\text{plateau}}
 $$
 
-**Criterion 2: Post-plateau displacement**
-
-Let $j = i + \ell_{\text{plateau}}$ (first row after plateau). If $j < n$ and $P_j$ is valid:
+Criterion 2 is post-plateau displacement. Let $j = i + \ell_{\text{plateau}}$ (the first row after the plateau). If $j < n$ and $P_j$ is valid, it holds when
 
 $$
 \frac{P_j}{P_i + \epsilon} \geq \rho_{\text{plateau}}
 $$
 
-**Criterion 3: Round number plateau**
+Criterion 3 is a round number plateau.
 
 $$
 R_i = 1
 $$
 
-where $\rho_{\text{plateau}} = 3.0$ = pre/post price ratio threshold.
+Here $\rho_{\text{plateau}} = 3.0$ is the pre/post price ratio threshold.
 
-**Decision**: If any criterion holds, flag **all rows** in $[i, i+\ell_{\text{plateau}}-1]$ and assign plateau ID.
+If any criterion holds, flag all rows in $[i, i+\ell_{\text{plateau}}-1]$ and assign a plateau ID.
 
-#### Numerical Example
+#### Numerical example
 
 | Day | Price (% par) | Price ($) | Candidate? | Plateau? | Pre-ratio | Post-ratio | Round? | Flagged? |
 |-----|---------------|-----------|------------|----------|-----------|------------|--------|----------|
-| 1 | 55.0 | $550 | No | — | — | — | — | No |
-| 2 | 54.8 | $548 | No | — | — | — | — | No |
-| 3 | **0.01** | **$0.10** | Yes (< 0.15 & round) | Start | 5,480× | — | Yes | **Yes** |
-| 4 | **0.01** | **$0.10** | — | Continue | — | — | — | **Yes** |
-| 5 | **0.01** | **$0.10** | — | Continue | — | 5,550× | — | **Yes** |
-| 6 | 55.5 | $555 | No | — | — | — | — | No |
+| 1 | 55.0 | $550 | No | | | | | No |
+| 2 | 54.8 | $548 | No | | | | | No |
+| 3 | 0.01 | $0.10 | Yes (< 0.15 and round) | Start | 5,480× | | Yes | Yes |
+| 4 | 0.01 | $0.10 | | Continue | | | | Yes |
+| 5 | 0.01 | $0.10 | | Continue | | 5,550× | | Yes |
+| 6 | 55.5 | $555 | No | | | | | No |
 
-Days 3-5 are flagged because:
-1. Price 0.01 < τ_plateau = 0.15 AND is a round number ✓
-2. Plateau length = 3 ≥ ℓ_min = 2 ✓
-3. Suspicion criteria (all three met!):
-   - Pre-plateau: 54.8 / 0.01 = 5,480 ≥ 3.0 ✓
-   - Post-plateau: 55.5 / 0.01 = 5,550 ≥ 3.0 ✓
-   - Round number: 0.01 ∈ R ✓
+Days 3 to 5 are flagged for these reasons.
+1. The price 0.01 is below τ_plateau = 0.15 and is a round number
+2. The plateau length is 3 ≥ ℓ_min = 2
+3. All three suspicion criteria are met
+   - The pre-plateau ratio is 54.8 / 0.01 = 5,480 ≥ 3.0
+   - The post-plateau ratio is 55.5 / 0.01 = 5,550 ≥ 3.0
+   - The price is a round number, 0.01 ∈ R
 
----
+### Filter 4: intraday inconsistency detection
 
-### Filter 4: Intraday Inconsistency Detection
+This filter detects days where the intraday high/low range (`prc_hi`, `prc_lo`) is implausibly wide relative to their mean. It is a range test on two columns and does not compare price estimators.
 
-**Purpose**: Detect days where the intraday HIGH/LOW range (`prc_hi`, `prc_lo`) is implausibly wide relative to their mean. This is a range test on two columns, not a comparison across price estimators.
+#### Price range analysis
 
-#### Price Range Analysis
-
-For each row $i$, collect available intraday prices:
+For each row $i$, collect the available intraday prices.
 
 $$
 \mathcal{I}_i = \{P_i^{\text{high}}, P_i^{\text{low}}\} \quad (\texttt{prc\_hi}, \texttt{prc\_lo})
 $$
 
-Compute **intraday range** and **mean**:
+Then compute the intraday range and mean.
 
 $$
 R_{\mathrm{intraday}} = \max(\mathcal{I}_i) - \min(\mathcal{I}_i)
@@ -336,9 +320,9 @@ $$
 \bar{P}_{\mathrm{intraday}} = \frac{1}{|\mathcal{I}_i|} \sum_{p \in \mathcal{I}_i} p
 $$
 
-#### Inconsistency Criterion
+#### Inconsistency criterion
 
-Flag row $i$ as inconsistent if **both** conditions hold:
+Flag row $i$ as inconsistent if both conditions hold.
 
 $$
 \exists p \in \mathcal{I}_i : p < \tau_{\mathrm{intraday}}
@@ -348,29 +332,26 @@ $$
 \frac{R_{\mathrm{intraday}}}{\bar{P}_{\mathrm{intraday}}} > \gamma_{\mathrm{range}}
 $$
 
-where:
-- $\tau_{\mathrm{intraday}} = 20.0$ = price threshold (**20% of par = $200**; only check days with at least one low price)
-- $\gamma_{\mathrm{range}} = 0.75$ = maximum allowed range as fraction of mean (75%)
+- $\tau_{\mathrm{intraday}} = 20.0$ is the price threshold (20% of par = $200). Only days with at least one low price are checked
+- $\gamma_{\mathrm{range}} = 0.75$ is the maximum allowed range as a fraction of the mean (75%)
 
-**Interpretation**: At least one intraday price is below $200, AND the intraday range exceeds 75% of the mean price.
+That is, at least one intraday price is below $200 and the intraday range exceeds 75% of the mean price.
 
-#### Numerical Example
+#### Numerical example
 
 | Row | `prc_hi` (% par) | `prc_lo` (% par) | Min | Max | Mean | Range | Range/Mean | Flagged? |
 |-----|------------------|------------------|-----|-----|------|-------|------------|----------|
 | A | 88.5 | 87.2 | 87.2 | 88.5 | 87.85 | 1.3 | 1.5% | No (no price < 20) |
-| B | 89.0 | **0.10** | 0.10 | 89.0 | 44.55 | 88.9 | **199%** | **Yes** |
+| B | 89.0 | 0.10 | 0.10 | 89.0 | 44.55 | 88.9 | 199% | Yes |
 | C | 15.0 | 14.5 | 14.5 | 15.0 | 14.75 | 0.5 | 3.4% | No (range/mean ≤ 0.75) |
 
-Row B is flagged because:
-1. At least one price < 20: prc_lo = 0.10 < 20 ✓
-2. Range/Mean = 88.9 / 44.55 = 1.99 > 0.75 ✓
+Row B is flagged for these reasons.
+1. At least one price is below 20, because prc_lo = 0.10 < 20
+2. Range/Mean = 88.9 / 44.55 = 1.99 > 0.75
 
-**Note**: Row B shows an erroneous low print ($1 vs $890) on an otherwise normally-priced day.
+Row B shows an erroneous low print ($1 vs $890) on an otherwise normally priced day.
 
----
-
-## Function Signature
+## Function signature
 
 ```python
 def ultra_distressed_filter(
@@ -404,11 +385,9 @@ def ultra_distressed_filter(
 ) -> pd.DataFrame
 ```
 
----
-
 ## Parameters
 
-### Input Data Parameters
+### Input data parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -417,7 +396,7 @@ def ultra_distressed_filter(
 | `date_col` | `str` | `"trd_exctn_dt"` | Column name for trade execution date |
 | `price_col` | `str` | `"pr"` | Column name for primary price (in % of par) |
 
-### Filter Toggle Parameters
+### Filter toggle parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -426,61 +405,59 @@ def ultra_distressed_filter(
 | `enable_plateau_filter` | `bool` | `True` | Enable plateau sequence detection |
 | `enable_intraday_filter` | `bool` | `True` | Enable intraday inconsistency detection |
 
-### Anomaly Detection Parameters (Filter 1)
+### Anomaly detection parameters (Filter 1)
 
-| Parameter | Type | Default | Mathematical Notation | Description |
+| Parameter | Type | Default | Mathematical notation | Description |
 |-----------|------|---------|----------------------|-------------|
 | `ultra_low_threshold` | `float` | `0.10` | $\tau_{\text{low}}$ | Price threshold for ultra-low detection (0.10% of par = $1) |
 | `min_normal_price_ratio` | `float` | `3.0` | $\rho_{\text{anomaly}}$ | Minimum ratio of surrounding median to current price |
 | `lookback` | `int` | `5` | $L_{\text{back}}$ | Number of the bond's earlier observations to look back over |
 | `lookforward` | `int` | `5` | $L_{\text{fwd}}$ | Number of the bond's later observations to look forward over |
 
-### Spike Detection Parameters (Filter 2)
+### Spike detection parameters (Filter 2)
 
-| Parameter | Type | Default | Mathematical Notation | Description |
+| Parameter | Type | Default | Mathematical notation | Description |
 |-----------|------|---------|----------------------|-------------|
 | `high_spike_threshold` | `float` | `5.0` | $\tau_{\text{high}}$ | Price threshold for high spike detection (5% of par = $50) |
 | `min_spike_ratio` | `float` | `3.0` | $\rho_{\text{spike}}$ | Minimum ratio of spike price to pre-spike median |
 | `recovery_ratio` | `float` | `2.0` | $\rho_{\text{recovery}}$ | Maximum recovery price as multiple of pre-spike median |
 
-### Plateau Detection Parameters (Filter 3)
+### Plateau detection parameters (Filter 3)
 
-| Parameter | Type | Default | Mathematical Notation | Description |
+| Parameter | Type | Default | Mathematical notation | Description |
 |-----------|------|---------|----------------------|-------------|
 | `plateau_ultra_low_threshold` | `float` | `0.15` | $\tau_{\text{plateau}}$ | Price threshold for plateau candidates (0.15% of par = $1.50) |
 | `min_plateau_days` | `int` | `2` | $\ell_{\min}$ | Minimum consecutive observations (days the bond traded) to qualify as plateau |
 | `pre_post_price_ratio` | `float` | `3.0` | $\rho_{\text{plateau}}$ | Minimum ratio of adjacent prices to plateau price |
 
-### Round Number Parameters (All Filters)
+### Round number parameters (all filters)
 
-| Parameter | Type | Default | Mathematical Notation | Description |
+| Parameter | Type | Default | Mathematical notation | Description |
 |-----------|------|---------|----------------------|-------------|
-| `suspicious_round_numbers` | `List[float]` | `[0.001, 0.01, 0.05, 0.10, 0.25, 0.50, 1.00]` | $\mathcal{R}$ | List of suspicious round price levels (in % of par; see table above) |
+| `suspicious_round_numbers` | `List[float]` | `[0.001, 0.01, 0.05, 0.10, 0.25, 0.50, 1.00]` | $\mathcal{R}$ | List of suspicious round price levels (in % of par, see the table above) |
 | `round_tolerance` | `float` | `0.0001` | $\epsilon_{\text{round}}$ | Numerical tolerance for round number matching |
 
-### Intraday Inconsistency Parameters (Filter 4)
+### Intraday inconsistency parameters (Filter 4)
 
-| Parameter | Type | Default | Mathematical Notation | Description |
+| Parameter | Type | Default | Mathematical notation | Description |
 |-----------|------|---------|----------------------|-------------|
-| `price_cols` | `list` | `["prc_hi", "prc_lo"]` | — | The two columns the range test reads. It is a HIGH/LOW RANGE test, not a cross-estimator test; `prc_vw` is not even a Stage 1 column. |
+| `price_cols` | `list` | `["prc_hi", "prc_lo"]` | | The two columns the range test reads. It is a high/low range test and does not compare estimators. `prc_vw` is not a Stage 1 column. |
 | `intraday_range_threshold` | `float` | `0.75` | $\gamma_{\mathrm{range}}$ | Maximum intraday range as fraction of mean price (75%) |
 | `intraday_price_threshold` | `float` | `20.0` | $\tau_{\mathrm{intraday}}$ | Only check inconsistency if any price below this (20% of par = $200) |
 
-### Performance Parameters
+### Performance parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `verbose` | `bool` | `False` | Print detailed progress information |
-| `keep_flag_columns` | `bool` | `False` | If True, retain individual filter flag columns; otherwise drop to save memory |
+| `keep_flag_columns` | `bool` | `False` | If True, keep the individual filter flag columns. Otherwise drop them to save memory |
 
----
+## Algorithm logic (step-by-step)
 
-## Algorithm Logic (Step-by-Step)
-
-### Step 1: Preprocessing
-1. **Sort** DataFrame by `[id_col, date_col]`
-2. **Round** all price columns to 4 decimal places
-3. Initialize output arrays:
+### Step 1: preprocessing
+1. Sort the DataFrame by `[id_col, date_col]`
+2. Round all price columns to 4 decimal places
+3. Initialize the output arrays
    - `flag_anomalous_price` (int8)
    - `anomaly_type` (object)
    - `flag_upward_spike` (int8)
@@ -488,9 +465,12 @@ def ultra_distressed_filter(
    - `flag_plateau_sequence` (int8)
    - `plateau_id` (int32)
 
-### Step 2: Per-CUSIP Processing
+   A seventh column, `flag_intraday_inconsistent` (int8), is added after the per-CUSIP pass by
+   Filter 4. It is all 0 when that filter is off.
 
-For each bond group (`id_col`), iterate through the following filters:
+### Step 2: per-CUSIP processing
+
+For each bond group (`id_col`), run the following filters.
 
 ```
 INITIALIZE:
@@ -644,9 +624,9 @@ IF enable_intraday_filter:
                 flag_intraday_inconsistent[i] = 1
 ```
 
-### Step 3: Combined Flag
+### Step 3: combined flag
 
-Compute the unified flag (stored in the `flag_refined_any` column):
+Compute the unified flag (stored in the `flag_refined_any` column).
 
 $$
 \mathit{flagRefinedAny}_i = \begin{cases}
@@ -655,147 +635,138 @@ $$
 \end{cases}
 $$
 
-### Step 4: Output
+### Step 4: output
 
-Return DataFrame with added column:
-- `flag_refined_any` (int8): `1` if flagged by any filter, `0` otherwise
+Return the DataFrame with the added column `flag_refined_any` (int8), which is `1` if the row was flagged by any filter and `0` otherwise.
 
-Note: Individual filter flags and metadata are dropped to conserve memory.
-
----
+The individual filter flags and metadata are dropped to conserve memory.
 
 ## Examples
 
-### Example 1: Ultra-Low Anomaly Detection
+### Example 1: ultra-low anomaly detection
 
-**Input Data** (CUSIP = `XYZ1`):
+The input data is for CUSIP `XYZ1`.
 
 | Row $i$ | Date | Price $P_i$ | Notes |
 |---------|------|-------------|-------|
 | 0 | 2024-01-10 | 45.2 | Normal distressed |
 | 1 | 2024-01-11 | 44.8 | Normal distressed |
-| 2 | 2024-01-12 | **0.05** | **Data entry error** |
+| 2 | 2024-01-12 | 0.05 | Data entry error |
 | 3 | 2024-01-13 | 45.5 | Reverts to normal |
 | 4 | 2024-01-14 | 44.3 | Normal distressed |
 
-**Algorithm Execution (Filter 1)**:
+Filter 1 runs in these steps.
 
-1. **Row 2 (Candidate)**:
-   - $P_2 = 0.05 < \tau_{\text{low}} = 0.10$ ✓
-   - $|0.05 - 0.05| < 0.0001$ ✓ (is round number)
-   - **Candidate opened**
+1. Row 2 is a candidate.
+   - $P_2 = 0.05 < \tau_{\text{low}} = 0.10$, so the price is ultra-low
+   - $|0.05 - 0.05| < 0.0001$, so it is a round number
+   - The candidate is opened
 
-2. **Surrounding Prices**:
-   - Lookback: $\{P_0 = 45.2, P_1 = 44.8\}$ (both > 0.05)
-   - Lookforward: $\{P_3 = 45.5, P_4 = 44.3\}$ (both > 0.05)
+2. The surrounding prices are collected.
+   - The lookback gives $\{P_0 = 45.2, P_1 = 44.8\}$ (both > 0.05)
+   - The lookforward gives $\{P_3 = 45.5, P_4 = 44.3\}$ (both > 0.05)
    - $\mathcal{S}_2 = \{45.2, 44.8, 45.5, 44.3\}$
    - $M_{\text{surr}} = \text{median}(\{44.3, 44.8, 45.2, 45.5\}) = \frac{44.8 + 45.2}{2} = 45.0$
 
-3. **Anomaly Check**:
-   - $\frac{M_{\text{surr}}}{P_2} = \frac{45.0}{0.05} = 900.0 \geq 3.0$ ✓
-   - **Flag as anomaly**
-   - Type: `ultra_low_round` (ultra-low AND round)
+3. The anomaly check passes.
+   - $\frac{M_{\text{surr}}}{P_2} = \frac{45.0}{0.05} = 900.0 \geq 3.0$
+   - The row is flagged as an anomaly
+   - The type is `ultra_low_round` (ultra-low and round)
 
-**Output**:
+The output is as follows.
 
 | Row | Price | `flag_refined_any` | Notes |
 |-----|-------|--------------------|-------|
-| 2 | 0.05 | **1** | Anomalous (ultra_low_round) |
+| 2 | 0.05 | 1 | Anomalous (ultra_low_round) |
 
----
+### Example 2: upward spike detection
 
-### Example 2: Upward Spike Detection
-
-**Input Data** (CUSIP = `XYZ2`):
+The input data is for CUSIP `XYZ2`.
 
 | Row | Date | Price | Notes |
 |-----|------|-------|-------|
 | 0 | 2024-02-10 | 12.5 | Distressed level |
 | 1 | 2024-02-11 | 11.8 | Distressed level |
-| 2 | 2024-02-12 | **100.0** | **Erroneous par spike** |
+| 2 | 2024-02-12 | 100.0 | Erroneous par spike |
 | 3 | 2024-02-13 | 12.2 | Recovery |
 | 4 | 2024-02-14 | 11.5 | Normal |
 
-**Algorithm Execution (Filter 2)**:
+Filter 2 runs in these steps.
 
-1. **Row 2 (Candidate)**:
-   - $P_2 = 100.0 > \tau_{\text{high}} = 5.0$ ✓ (a high price)
+1. Row 2 is a candidate.
+   - $P_2 = 100.0 > \tau_{\text{high}} = 5.0$ (a high price)
    - 100.0 is not in the round-number set $\mathcal{R}$, so the round test plays no part here
-   - **Candidate opened**
+   - The candidate is opened
 
-2. **Pre-Spike Prices**:
+2. The pre-spike prices are collected.
    - $\mathcal{P}_{\text{pre}} = \{P_0 = 12.5, P_1 = 11.8\}$ (both < 100.0)
    - $M_{\text{pre}} = \frac{11.8 + 12.5}{2} = 12.15$
 
-3. **Spike Magnitude**:
-   - $\frac{P_2}{M_{\text{pre}}} = \frac{100.0}{12.15} \approx 8.23 \geq 3.0$ ✓
+3. The spike is large enough.
+   - $\frac{P_2}{M_{\text{pre}}} = \frac{100.0}{12.15} \approx 8.23 \geq 3.0$
 
-4. **Recovery Check**:
+4. The recovery check passes.
    - $P_{\text{recovery}} = 12.15 \times 2.0 = 24.30$
-   - Row 3: $P_3 = 12.2 \leq 24.30$ ✓
-   - **Recovery found**
+   - At row 3, $P_3 = 12.2 \leq 24.30$
+   - A recovery is found
 
-5. **Decision**: **Flag as spike** (type: `high_spike`)
+5. The row is flagged as a spike (type `high_spike`).
 
-Verified by running `ultra_distressed_filter` on this input with the default configuration:
-row 2 is the only row flagged, with `spike_type = high_spike`.
+Running `ultra_distressed_filter` on this input with the default configuration confirms it.
+Row 2 is the only row flagged, with `spike_type = high_spike`.
 
-**Output**:
+The output is as follows.
 
 | Row | Price | `flag_refined_any` |
 |-----|-------|--------------------|
-| 2 | 100.0 | **1** |
+| 2 | 100.0 | 1 |
 
----
+### Example 3: plateau detection
 
-### Example 3: Plateau Detection
-
-**Input Data** (CUSIP = `XYZ3`):
+The input data is for CUSIP `XYZ3`.
 
 | Row | Date | Price | Notes |
 |-----|------|-------|-------|
 | 0 | 2024-03-10 | 55.2 | Normal |
 | 1 | 2024-03-11 | 54.8 | Normal |
-| 2 | 2024-03-12 | **0.01** | **Error plateau starts** |
-| 3 | 2024-03-13 | **0.01** | **Continues** |
-| 4 | 2024-03-14 | **0.01** | **Continues** |
+| 2 | 2024-03-12 | 0.01 | Error plateau starts |
+| 3 | 2024-03-13 | 0.01 | Continues |
+| 4 | 2024-03-14 | 0.01 | Continues |
 | 5 | 2024-03-15 | 55.5 | Reverts |
 
-**Algorithm Execution (Filter 3)**:
+Filter 3 runs in these steps.
 
-1. **Row 2 (Plateau Start)**:
-   - $P_2 = 0.01 < \tau_{\text{plateau}} = 0.15$ ✓
-   - $|P_2 - 0.01| < 0.0001$ ✓ (round number)
+1. Row 2 is the start of a potential plateau.
+   - $P_2 = 0.01 < \tau_{\text{plateau}} = 0.15$
+   - $|P_2 - 0.01| < 0.0001$ (a round number)
 
-2. **Plateau Extent**:
+2. The plateau extent is measured.
    - $P_2 = P_3 = P_4 = 0.01$
-   - $\ell_{\text{plateau}} = 3 \geq \ell_{\min} = 2$ ✓
+   - $\ell_{\text{plateau}} = 3 \geq \ell_{\min} = 2$
 
-3. **Suspicion Criteria**:
-   - **Pre-plateau**: $\frac{P_1}{P_2} = \frac{54.8}{0.01} = 5480.0 \geq 3.0$ ✓
-   - **Post-plateau**: $\frac{P_5}{P_2} = \frac{55.5}{0.01} = 5550.0 \geq 3.0$ ✓
-   - **Round number**: $R_2 = 1$ ✓
-   - **Decision**: Suspicious (multiple criteria met)
+3. The suspicion criteria are checked.
+   - Pre-plateau, $\frac{P_1}{P_2} = \frac{54.8}{0.01} = 5480.0 \geq 3.0$
+   - Post-plateau, $\frac{P_5}{P_2} = \frac{55.5}{0.01} = 5550.0 \geq 3.0$
+   - Round number, $R_2 = 1$
+   - The plateau is suspicious (multiple criteria met)
 
-4. **Flagging**: Flag rows 2, 3, 4 with plateau ID = 0
+4. Rows 2, 3, 4 are flagged with plateau ID = 0.
 
-**Output**:
+The output is as follows.
 
 | Row | Price | `flag_refined_any` | Notes |
 |-----|-------|--------------------|-------|
-| 2 | 0.01 | **1** | Plateau (ID=0), also anomalous (`ultra_low_round`) |
-| 3 | 0.01 | **1** | Plateau (ID=0), also anomalous (`ultra_low_round`) |
-| 4 | 0.01 | **1** | Plateau (ID=0), also anomalous (`ultra_low_round`) |
+| 2 | 0.01 | 1 | Plateau (ID=0), also anomalous (`ultra_low_round`) |
+| 3 | 0.01 | 1 | Plateau (ID=0), also anomalous (`ultra_low_round`) |
+| 4 | 0.01 | 1 | Plateau (ID=0), also anomalous (`ultra_low_round`) |
 
 Run on this input, the anomaly filter (Filter 1) flags the same three rows on its own, because
 each 0.01 is ultra-low, round, and far below the prices around it. Either filter is enough to
 remove them.
 
----
+### Example 4: genuine distressed trading (no flag)
 
-### Example 4: Genuine Distressed Trading (No Flag)
-
-**Input Data** (CUSIP = `XYZ4`, genuine default scenario):
+The input data is for CUSIP `XYZ4`, a genuine default scenario.
 
 | Row | Date | Price (% par) | Price ($) | Notes |
 |-----|------|---------------|-----------|-------|
@@ -805,72 +776,68 @@ remove them.
 | 3 | 2024-04-13 | 8.2 | $82 | Slight recovery |
 | 4 | 2024-04-14 | 7.5 | $75 | Distressed level |
 
-**Algorithm Execution**:
+The filters give these results.
 
-**Filter 1 (Anomaly)**: No candidates
+Filter 1 (Anomaly) has no candidates.
 - None of the prices {65.0, 8.5, 7.8, 8.2, 7.5} are < τ_low = 0.10
 - None are round numbers from R = {0.001, 0.01, 0.05, 0.10, 0.25, 0.50, 1.00}
-- **No candidates opened** → Filter 1 passes all rows
+- No candidates are opened, so Filter 1 passes all rows
 
-**Filter 2 (Spike)**: candidates, but no flag
+Filter 2 (Spike) has candidates but flags none.
 - Every price is above τ_high = 5.0, so every row is a spike candidate
 - Row 0 (65.0) has no earlier prices to compare against
 - Rows 1, 2 and 4 have no earlier price below their own, so no pre-spike median exists
 - Row 3 (8.2) has one lower earlier price, 7.8, and 8.2 / 7.8 ≈ 1.05 is below the 3.0 ratio
-- **No spike flagged**
+- No spike is flagged
 
-**Filter 3 (Plateau)**: No candidates
-- No price < τ_plateau = 0.15 AND no round numbers
-- **No plateau candidates**
+Filter 3 (Plateau) has no candidates.
+- No price is < τ_plateau = 0.15 and none is a round number
+- There are no plateau candidates
 
-**Filter 4 (Intraday)**: Not applicable (would need intraday data)
+Filter 4 (Intraday) does not apply, because it would need intraday data.
 
-**Output**: All rows have `flag_refined_any = 0` (genuine distressed trading preserved).
-Verified by running `ultra_distressed_filter` on this input with the default configuration.
+All rows have `flag_refined_any = 0` in the output, so the genuine distressed trading is preserved.
+Running `ultra_distressed_filter` on this input with the default configuration confirms it.
 
-**Key Insight**: The filter correctly ignores genuine distressed bonds because:
+The filter leaves genuine distressed bonds alone for these reasons.
 1. Even $75-85 prices are well above the ultra-low thresholds ($1-$1.50)
-2. Prices aren't suspicious round numbers
-3. Prices aren't identical across days (no plateau)
+2. The prices are not suspicious round numbers
+3. The prices are not identical across days (no plateau)
 
----
+### Example 5: intraday inconsistency
 
-### Example 5: Intraday Inconsistency
-
-**Input Data** (CUSIP = `XYZ5`, single day with `prc_hi` and `prc_lo` columns):
+The input data is for CUSIP `XYZ5`, a single day with `prc_hi` and `prc_lo` columns.
 
 | Row | Date | `prc_hi` (% par) | `prc_lo` (% par) | `prc_hi` ($) | `prc_lo` ($) | Notes |
 |-----|------|------------------|------------------|--------------|--------------|-------|
-| 0 | 2024-05-10 | 89.0 | **0.10** | $890 | **$1** | Erroneous low print |
+| 0 | 2024-05-10 | 89.0 | 0.10 | $890 | $1 | Erroneous low print |
 
-**Algorithm Execution (Filter 4)**:
+Filter 4 runs in these steps.
 
-1. **Intraday Prices** (from available columns):
+1. The intraday prices are read from the available columns.
    - $\mathcal{I}_0 = \{89.0, 0.10\}$ (all non-NaN values from price_cols)
 
-2. **Low Price Check**:
-   - $\min(\mathcal{I}_0) = 0.10 < \tau_{\mathrm{intraday}} = 20.0$ ✓
+2. The low price check passes.
+   - $\min(\mathcal{I}_0) = 0.10 < \tau_{\mathrm{intraday}} = 20.0$
 
-3. **Range Analysis**:
+3. The range is analyzed.
    - $R_{\mathrm{intraday}} = 89.0 - 0.10 = 88.9$
    - $\bar{P}_{\mathrm{intraday}} = \frac{89.0 + 0.10}{2} = 44.55$
-   - $\frac{R_{\mathrm{intraday}}}{\bar{P}_{\mathrm{intraday}}} = \frac{88.9}{44.55} \approx 2.0 > 0.75$ ✓
+   - $\frac{R_{\mathrm{intraday}}}{\bar{P}_{\mathrm{intraday}}} = \frac{88.9}{44.55} \approx 2.0 > 0.75$
 
-4. **Decision**: **Flag as intraday inconsistent**
+4. The row is flagged as intraday inconsistent.
 
-**Output**:
+The output is as follows.
 
 | Row | `flag_refined_any` | Notes |
 |-----|--------------------|-------|
-| 0 | **1** | Intraday inconsistency |
+| 0 | 1 | Intraday inconsistency |
 
-**Note**: This example shows an erroneous low print of $1 on a day where the high was $890—an implausible 890× intraday swing indicating data error. Verified by running `ultra_distressed_filter` on this input: the row is flagged `flag_intraday_inconsistent = 1`.
+This example shows an erroneous low print of $1 on a day where the high was $890, an implausible 890× intraday swing that indicates a data error. Running `ultra_distressed_filter` on this input confirms it, and the row is flagged `flag_intraday_inconsistent = 1`.
 
----
+## Default configuration
 
-## Default Configuration
-
-From `stage1/_stage1_settings.py`:
+The defaults come from `stage1/_stage1_settings.py`.
 
 ```python
 ULTRA_DISTRESSED_CONFIG = {
@@ -906,20 +873,18 @@ ULTRA_DISTRESSED_CONFIG = {
 }
 ```
 
-**Note**: Parameters not in this config (e.g., `lookback`, `lookforward`, `pre_post_price_ratio`) use function defaults.
+Parameters that are not in this config (e.g., `lookback`, `lookforward`, `pre_post_price_ratio`) use the function defaults.
 
----
+## Typical usage in pipeline
 
-## Typical Usage in Pipeline
+**In the pipeline this is not optional.** `step10a` applies `flag_refined_any != 1`
+as an unconditional row filter, so a flagged bond-day is deleted from the published
+panel and is not left in it with a flag. Changing any parameter below moves the sample.
 
-❗**In the pipeline this is not optional.** `step10a` applies `flag_refined_any != 1`
-as an unconditional row filter, so a flagged bond-day is DELETED from the published
-panel, not merely marked. Changing any parameter below moves the sample.
-
-❗**Do not splat `ULTRA_DISTRESSED_CONFIG`.** It contains `price_col`, which would
+**Do not splat `ULTRA_DISTRESSED_CONFIG`.** It contains `price_col`, which would
 collide with an explicit `price_col=`, and `target_rows_per_chunk`, which is not a
-parameter of this function -- either raises `TypeError`. `stage1_pipeline.py` passes the
-keys individually for exactly that reason, and this mirrors it:
+parameter of this function. Either one raises `TypeError`. `stage1_pipeline.py` passes the
+keys individually for that reason, and the code below does the same.
 
 ```python
 import helper_functions as hf
@@ -957,92 +922,73 @@ print(f"Affected CUSIPs: {affected_cusips:,}")
 #   Affected CUSIPs: 1,045
 ```
 
----
+## Design rationale
 
-## Design Rationale
+### Why four independent filters?
 
-### Why Four Independent Filters?
+Each type of error needs its own detection logic.
 
-Different error types require specialized detection logic:
-
-1. **Anomaly Filter**: Detects isolated downward outliers (temporary data entry errors)
-2. **Spike Filter**: Detects temporary upward outliers (erroneous par or high prints)
-3. **Plateau Filter**: Detects persistent placeholder values (multi-day data gaps)
-4. **Intraday Filter**: Detects within-day inconsistencies (aggregation errors)
+1. The anomaly filter detects isolated downward outliers (temporary data entry errors)
+2. The spike filter detects temporary upward outliers (erroneous par or high prints)
+3. The plateau filter detects persistent placeholder values (multi-day data gaps)
+4. The intraday filter detects within-day inconsistencies (aggregation errors)
 
 Each filter can be disabled independently for sensitivity analysis.
 
-### Why Round Number Heuristic?
+### Why round number heuristic?
 
-Corporate bond prices rarely settle exactly at round levels like $0.01$ or $1.00$ due to:
-- Bid-ask spreads
-- Accrued interest calculations
-- Market microstructure
+Corporate bond prices rarely settle exactly at round levels like $0.01$ or $1.00$, because of bid-ask spreads, accrued interest calculations and market microstructure.
 
-Round numbers in distressed bonds are almost always:
+Round numbers in distressed bonds are almost always one of these.
 - Placeholder values (e.g., $0.01$ as "effectively zero")
-- Data entry errors (e.g., typing $1.00$ instead of actual price)
+- Data entry errors (e.g., typing $1.00$ instead of the actual price)
 - Dealers "cleaning up" their books (per Colin Philipps, FINRA)
 
-### Why Ratio-Based Thresholds?
+### Why ratio-based thresholds?
 
-Using **multiplicative ratios** (e.g., $3\times$) instead of absolute differences provides:
-- **Scale invariance**: Works for both high-yield ($50-80$) and deeply distressed ($5-20$) bonds
-- **Robustness**: Adapts to local price level without manual tuning
+The thresholds use multiplicative ratios (e.g., $3\times$) instead of absolute differences. A ratio is scale invariant, so it works for both high-yield ($50-80$) and deeply distressed ($5-20$) bonds, and it adapts to the local price level without manual tuning.
 
-### Why Lookback/Lookforward Windows?
+### Why lookback/lookforward windows?
 
-**Symmetric windows** ($L_{\text{back}} = L_{\text{fwd}} = 5$) provide:
-- **Temporal context**: Compare price to both past and future
-- **Genuine event detection**: Permanent changes (defaults) won't revert in lookforward
-- **Reduced false positives**: Temporary errors isolated from surrounding normal prices
+Symmetric windows ($L_{\text{back}} = L_{\text{fwd}} = 5$) compare each price to both its past and its future. A permanent change (a default) does not revert in the lookforward window, which is how a genuine event is recognized. A temporary error is isolated from the normal prices around it, which reduces false positives.
 
-### Why Separate Intraday Filter?
+### Why separate intraday filter?
 
-Intraday inconsistencies can occur even when daily aggregates appear normal:
-- Erroneous single trade at $0.10$ among normal trades at $85-90$
-- Daily volume-weighted average may mask the error
-- Filter 4 catches these within-day anomalies
+Intraday inconsistencies can occur even when the daily aggregates appear normal. A single erroneous trade at $0.10$ among normal trades at $85-90$ may be masked by the daily volume-weighted average. Filter 4 catches these within-day anomalies.
 
----
+## Performance considerations
 
-## Performance Considerations
+### Numba compilation
 
-### Numba Compilation
+The core detection functions (`_detect_anomalies_ultra`, `_detect_spikes_ultra`, `_detect_plateaus_ultra`) are compiled with Numba when it is installed. `requirements.txt` installs it only below Python 3.14, and without it the same code runs as plain Python, more slowly. The compilation uses these options.
+- `nopython=True` for pure NumPy operations (no Python overhead)
+- `cache=True` so that compiled functions are cached across runs
+- `fastmath=True` for aggressive floating-point optimizations
+- `nogil=True` to release the Python GIL for potential parallelism
 
-Core detection functions (`_detect_anomalies_ultra`, `_detect_spikes_ultra`, `_detect_plateaus_ultra`) are compiled with Numba when it is installed (`requirements.txt` installs it only below Python 3.14; without it the same code runs as plain Python, more slowly), using:
-- `nopython=True`: Pure NumPy operations (no Python overhead)
-- `cache=True`: Compiled functions cached across runs
-- `fastmath=True`: Aggressive floating-point optimizations
-- `nogil=True`: Release Python GIL for potential parallelism
+The whole Step 8 (the filter plus its chunking and bookkeeping) took about 10 minutes over the full sample on the 2026-09-10 run.
 
-**Typical Performance**: the whole Step 8 (the filter plus its chunking and bookkeeping) took about 10 minutes over the full sample on the 2026-09-10 run.
+### Memory optimization
 
-### Memory Optimization
-
-At function exit, individual flag columns are **dropped** to conserve RAM:
+At function exit, the individual flag columns are dropped to conserve RAM.
 - Only `flag_refined_any` is retained (1 byte per row)
-- Metadata columns (`anomaly_type`, `spike_type`, `plateau_id`) discarded
-- Reduces memory footprint by ~90% for large datasets
+- The metadata columns (`anomaly_type`, `spike_type`, `plateau_id`) are discarded
+- This reduces the memory footprint by ~90% for large datasets
 
----
+## Comparison with other filters
 
-## Comparison with Other Filters
-
-| Aspect | Bounce-Back Filter | Ultra-Distressed Filter |
+| Aspect | Bounce-back filter | Ultra-distressed filter |
 |--------|-------------------|------------------------|
-| **Data Level** | Intraday transactions | Daily aggregates |
-| **Error Type** | Transient price spikes (both up/down) | Persistent anomalies, plateaus, inconsistencies |
-| **Detection Method** | Reversion pattern (lookahead for bounce-back) | Ratio-based outlier detection + plateau sequences |
-| **Action** | **Flag** transactions | **Delete** flagged daily observations (in step 10a) |
-| **Sequence** | Applied in Stage 0 (intraday) | Applied in Stage 1 (daily) |
-| **Primary Use Case** | Real-time transaction filtering | Post-aggregation quality control |
+| Data level | Intraday transactions | Daily aggregates |
+| Error type | Transient price spikes (both up/down) | Persistent anomalies, plateaus, inconsistencies |
+| Detection method | Reversion pattern (lookahead for bounce-back) | Ratio-based outlier detection + plateau sequences |
+| Action | Flag transactions, and Stage 0 drops the flagged ones | Delete flagged daily observations (in step 10a) |
+| Sequence | Applied in Stage 0 (intraday) | Applied in Stage 1 (daily) |
+| Primary use case | Transaction-level cleaning | Post-aggregation quality control |
 
-**Complementary Relationship**:
-- Bounce-back filter removes intraday errors **before** aggregation
-- Ultra-distressed filter catches errors that survive aggregation or appear **only** in daily data
-
----
+The two filters complement each other.
+- The bounce-back filter removes intraday errors before aggregation
+- The ultra-distressed filter catches errors that survive aggregation or appear only in daily data
 
 ## References
 
@@ -1062,12 +1008,10 @@ At function exit, individual flag columns are **dropped** to conserve RAM:
 }
 ```
 
----
+## See also
 
-## See Also
-
-- `../stage0/README_bounce_back_filter.md` — Documentation for the intraday bounce-back filter (Stage 0)
-- `_stage1_settings.py` — Default configuration parameters
-- `stage1/helper_functions.py`, `ultra_distressed_filter()` (tag `filter.ultra_distressed_flags`) — its source
-- `stage1/stage1_pipeline.py::step8_ultra_distressed()` — where the pipeline calls it,
-  and `step10a_build_filter_tables()` — where flagged rows are DELETED
+- `../stage0/README_bounce_back_filter.md` documents the intraday bounce-back filter (Stage 0)
+- `_stage1_settings.py` holds the default configuration parameters
+- `stage1/helper_functions.py`, `ultra_distressed_filter()` (tag `filter.ultra_distressed_flags`) is its source
+- `stage1/stage1_pipeline.py::step8_ultra_distressed()` is where the pipeline calls it,
+  and `step10a_build_filter_tables()` is where flagged rows are deleted

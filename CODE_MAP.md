@@ -1,31 +1,32 @@
 # Code map
 
-What each stage reads and writes, and what every code file does. For "where do I look to do X",
-see [INDEX.md](INDEX.md). For which file makes each table and figure of the paper, see
-[stage3/INDEX.md](stage3/INDEX.md).
+This page says what each stage reads and writes, and what every code file does. For "where do I
+look to do X", see [INDEX.md](INDEX.md). For which file makes each table and figure of the
+paper, see [stage3/INDEX.md](stage3/INDEX.md).
 
 `tests/test_docs.py` fails if a tracked `.py` or `.sh` file is missing from this page, so
-every code file is listed. It does not check that a description is still true. Exempt: files inside `tests/` folders (described per folder
-below) and package `__init__` files; stage 3's drivers may be listed in `stage3/INDEX.md` instead. The check
-needs git, and is skipped without it.
+every code file is listed. It does not check that a description is still true. Files inside
+`tests/` folders (described per folder below) and package `__init__` files are exempt. Stage 3's
+drivers may be listed in `stage3/INDEX.md` instead. The check needs git, and is skipped without
+it.
 
 ## How the data moves
 
 | stage | runs on | reads | writes | settings |
 |---|---|---|---|---|
-| 0 | the WRDS grid | WRDS: `trace.trace_enhanced`, `trace.trace_btds144a`, `trace.trace` (Standard, opt-in), `fisd.fisd_mergedissue`, `fisd.fisd_mergedissuer` | `stage0/<member>/trace_<member>_<stamp>.parquet` (the daily panel), the member's FISD file (`trace_enhanced_fisd_<stamp>.parquet`, `trace_fisd_144a_<stamp>.parquet`), the filter audit files, `stage0/data_reports/` | `config.py`, `stage0/_trace_settings.py` |
-| 1 | the WRDS grid, after stage 0 | the stage 0 panels and Enhanced FISD file; WRDS: `fisd.fisd_ratings`, `fisd.fisd_mergedissue`, `fisd.fisd_mergedredemption`, `fisd.fisd_amt_out_hist`; the files `download_inputs.sh` fetched | `stage1/data/stage1_<stamp>.parquet` (44 columns), `call_dummy_<stamp>.parquet`, `sp_ratings_<stamp>.parquet`, `moodys_ratings_<stamp>.parquet`, `ultra_distressed_cusips_<stamp>.csv`, `stage1/data_reports/` | `config.py`, `stage1/_stage1_settings.py` |
-| 2 | your own computer | `stage1_<stamp>.parquet`, `trace_enhanced_fisd_<stamp>.parquet`, `call_dummy_<stamp>.parquet`; on the first run, WRDS (`crsp.tfz_idx`, `crsp.tfz_mth_ft`, `ff.factors_monthly`, `ff.fivefactors_monthly`, `cboe.cboe`, `fisd.fisd_mergedissue`), read with `WRDS_USERNAME` (`config.py` or the environment), and public downloads, all cached in `stage2/data/` | `stage2/output/panel/main_panel_<mode>.parquet` (145 columns), `stage2/output/blocks/<mode>/`, `stage2/manifests/`, and with `make_release.py` the shareable `stage2/release/` | `stage2/_stage2_settings.py` |
-| 3 | your own computer | the stage 2 panel, its blocks and factor file, and the stage 1 daily panel; on duration-adjusted returns (`--returns`), also that type's two blocks | `stage3/data/` (sort results, grids, statistics), `stage3/reports/tables/`, `stage3/reports/figures/`, `stage3/reports/exhibits.pdf`, `stage3/reports/timings.jsonl`; a duration-adjusted run writes the same under `stage3/variants/<type>/` | `stage3/_stage3_settings.py` |
-| 4 | your own computer | the stage 2 panel; its blocks `betas_x`, `mom_retx`, `betas_bns`, `mom_retx_bns`, `betas_cls`, `mom_retx_cls`; the risk-free rate in its factor file; for the check, the published TRACE-only factors (downloaded) | `stage4/output/<sort>_sort_panel_trace_<vintage>/` (the long factor panel, `flip_set.json`, `MANIFEST.json`) and `stage4/output/<sort>_sort_trace_<vintage>_csv/` (24 CSV files) | `stage4/_stage4_settings.py`, `stage4/spec/factors.json` |
+| 0 | the WRDS grid | From WRDS, `trace.trace_enhanced`, `trace.trace_btds144a`, `trace.trace` (Standard, opt-in), `fisd.fisd_mergedissue` and `fisd.fisd_mergedissuer` | `stage0/<member>/trace_<member>_<stamp>.parquet` (the daily panel), the member's FISD file (`trace_enhanced_fisd_<stamp>.parquet`, `trace_fisd_144a_<stamp>.parquet`), the filter audit files, `stage0/data_reports/` | `config.py`, `stage0/_trace_settings.py` |
+| 1 | the WRDS grid, after stage 0 | The stage 0 panels and Enhanced FISD file. From WRDS, `fisd.fisd_ratings`, `fisd.fisd_mergedissue`, `fisd.fisd_mergedredemption` and `fisd.fisd_amt_out_hist`. The files `download_inputs.sh` fetched | `stage1/data/stage1_<stamp>.parquet` (44 columns), `call_dummy_<stamp>.parquet`, `sp_ratings_<stamp>.parquet`, `moodys_ratings_<stamp>.parquet`, `ultra_distressed_cusips_<stamp>.csv`, `stage1/data_reports/` | `config.py`, `stage1/_stage1_settings.py` |
+| 2 | your own computer | `stage1_<stamp>.parquet`, `trace_enhanced_fisd_<stamp>.parquet` and `call_dummy_<stamp>.parquet`. On the first run, WRDS (`crsp.tfz_idx`, `crsp.tfz_mth_ft`, `ff.factors_monthly`, `ff.fivefactors_monthly`, `cboe.cboe`, `fisd.fisd_mergedissue`), read with `WRDS_USERNAME` (`config.py` or the environment), and public downloads, all cached in `stage2/data/` | `stage2/output/panel/main_panel_<mode>.parquet` (145 columns), `stage2/output/blocks/<mode>/`, `stage2/manifests/`, and with `make_release.py` the shareable `stage2/release/` | `stage2/_stage2_settings.py` |
+| 3 | your own computer | The stage 2 panel, its blocks and factor file, and the stage 1 daily panel. On duration-adjusted returns (`--returns`), also that type's two blocks | `stage3/data/` (sort results, grids, statistics), `stage3/reports/tables/`, `stage3/reports/figures/`, `stage3/reports/exhibits.pdf`, `stage3/reports/timings.jsonl`. A duration-adjusted run writes the same under `stage3/variants/<type>/` | `stage3/_stage3_settings.py` |
+| 4 | your own computer | The stage 2 panel, the risk-free rate in its factor file, and its blocks `betas_x`, `mom_retx`, `betas_bns`, `mom_retx_bns`, `betas_cls` and `mom_retx_cls`. For the check, the published TRACE-only factors (downloaded) | `stage4/output/<sort>_sort_panel_trace_<vintage>/` (the long factor panel, `flip_set.json`, `MANIFEST.json`) and `stage4/output/<sort>_sort_trace_<vintage>_csv/` (24 CSV files) | `stage4/_stage4_settings.py`, `stage4/spec/factors.json` |
 
 `<stamp>` is the run date, `YYYYMMDD`. `<member>` is `enhanced`, `144a` or `standard`. `<mode>`
-is `stage1` unless you set another. `<sort>` is `single` or `within_firm`; `<vintage>` is the
+is `stage1` unless you set another. `<sort>` is `single` or `within_firm`. `<vintage>` is the
 release year, taken from the stage 1 file's stamp.
 
-**Downloads.** Stage 1's come from `download_inputs.sh`, run on the WRDS login node: the Liu-Wu
-Treasury yields, the bond-firm linker, and the Fama-French industry files. Stage 2 fetches its
-own the first time it needs them. The URLs are in `stage2/_stage2_settings.py` and
+Stage 1's downloads come from `download_inputs.sh`, run on the WRDS login node. They are the
+Liu-Wu Treasury yields, the bond-firm linker and the Fama-French industry files. Stage 2
+fetches its own the first time it needs them. The URLs are in `stage2/_stage2_settings.py` and
 `stage2/lib/duration_adjusted.py`, and `stage2/check_external_data.py` lists every source with
 the last month each cache holds.
 
@@ -33,49 +34,49 @@ the last month each cache holds.
 
 | file | what it does |
 |---|---|
-| `config.py` | Settings shared by stages 0-2: `WRDS_USERNAME`, `AUTHOR`, `TRACE_MEMBERS`, `OUTPUT_FORMAT`, `STAGE0_OUTPUT_FIGURES` |
+| `config.py` | The settings stages 0 to 2 share (`WRDS_USERNAME`, `AUTHOR`, `TRACE_MEMBERS`, `OUTPUT_FORMAT`, `STAGE0_OUTPUT_FIGURES`) |
 | `requirements.txt` | The Python packages for stages 0 and 1, installed on WRDS |
-| `requirements-local.txt` | The packages for stages 2-4, on your own computer: `requirements.txt` plus numba, numexpr and pytest. PyBondLab goes in on a second line, as the file explains |
-| `constraints-2026.txt` | Optional: the exact package versions the published 2026 vintage was built with, for a build that matches it exactly in 139 of 145 columns, the other six within 1e-13 |
-| `pybondlab_pin.py` | The PyBondLab release stages 2-4 run on, the start-up check that it is the one installed, and its fingerprint for manifests |
+| `requirements-local.txt` | The packages for stages 2 to 4, on your own computer. They are `requirements.txt` plus numba, numexpr and pytest. PyBondLab goes in on a second line, as the file explains |
+| `constraints-2026.txt` | Optional. The exact package versions the published 2026 vintage was built with, for a build that matches it exactly in 139 of 145 columns, and within 1e-13 in the other six |
+| `pybondlab_pin.py` | The PyBondLab release stages 2 to 4 run on, the start-up check that it is the one installed, and its fingerprint for manifests |
 | `recessions.py` | The NBER recessions every time-series figure shades (stage 2's data report and stage 3's figures), and the helper that shades the ones inside a panel's dates |
-| `numeric_setup.py` | Makes pandas use `numexpr` (required: it changes float32 results, and the published panels were built with it) and not `bottleneck`, so stages 2-4 compute the same numbers on any machine |
-| `return_types.py` | The return types stages 3 and 4 sort (declared in `stage4/spec/factors.json`), and the swap that builds a duration-adjusted type's panel: the 68 beta and momentum signals from that type's blocks, and its Treasury column |
-| `run_pipeline.sh` | Runs stages 0 and 1 on WRDS: downloads the inputs, submits the stage 0 jobs, then the report job and stage 1, each waiting on the jobs it needs |
-| `download_inputs.sh` | Fetches the files stage 1 needs from the internet. Login node only: WRDS compute nodes have no internet |
+| `numeric_setup.py` | Makes pandas use `numexpr` (required, because it changes float32 results and the published panels were built with it) and not `bottleneck`, so stages 2 to 4 compute the same numbers on any machine |
+| `return_types.py` | The return types stages 3 and 4 sort (declared in `stage4/spec/factors.json`), and the swap that builds a duration-adjusted type's panel. The swap puts in the 68 beta and momentum signals from that type's blocks, and its Treasury column |
+| `run_pipeline.sh` | Runs stages 0 and 1 on WRDS. It downloads the inputs, submits the stage 0 jobs, then the report job and stage 1, each waiting on the jobs it needs |
+| `download_inputs.sh` | Fetches the files stage 1 needs from the internet. Run it on the login node, because WRDS compute nodes have no internet |
 | `check_disk_space.sh` | Checks there is room in your WRDS home quota before a run. Called by `run_pipeline.sh` |
-| `run_smoke_test.sh` | Runs the real stage 0 and stage 1 code on a few CUSIP chunks and checks the results, in about 10 minutes. Its data goes under `smoke/`, its log to `smoke_test.out` and `smoke_test.err` |
-| `doctor.py` | Says what is ready and what to run next: on your computer for stages 2-4, or with `--wrds` on the login node for stages 0-1. It runs each stage's own check, and downloads, connects and creates nothing |
-| `tools/tags.py` | Checks the code tags (tagref's syntax: a named tag on the line that computes a panel column, applies a filter or enforces a rule) and writes `TAGS.md`, the index of them |
+| `run_smoke_test.sh` | Runs the same stage 0 and stage 1 code as a full run on a few CUSIP chunks and checks the results, in about 10 minutes. Its data goes under `smoke/`, its log to `smoke_test.out` and `smoke_test.err` |
+| `doctor.py` | Says what is ready and what to run next, on your computer for stages 2 to 4, or with `--wrds` on the login node for stages 0 and 1. It runs each stage's own check, and downloads, connects and creates nothing |
+| `tools/tags.py` | Checks the code tags (tagref's syntax, a named tag on the line that computes a panel column, applies a filter or enforces a rule) and writes `TAGS.md`, the index of them |
 
 ## Stage 0: raw TRACE to daily panels (WRDS)
 
 | file | what it does |
 |---|---|
-| `stage0/_trace_settings.py` | Stage 0 settings: the filters, the FISD screens, the date range, `CONCURRENCY` (WRDS connections per member) and the job sizes |
+| `stage0/_trace_settings.py` | Stage 0's settings (the filters, the FISD screens, the date range, the job sizes and `CONCURRENCY`, the WRDS connections per member) |
 | `stage0/run_enhanced_trace.sh` | SGE job script for Enhanced TRACE |
 | `stage0/run_144a_trace.sh` | SGE job script for Rule 144A |
 | `stage0/run_standard_trace.sh` | SGE job script for Standard TRACE (opt-in) |
 | `stage0/run_build_data_reports.sh` | SGE job script for the stage 0 data-quality reports |
-| `stage0/_run_enhanced_trace.py` | Entry point for Enhanced: reads its settings and runs the cleaner |
+| `stage0/_run_enhanced_trace.py` | Entry point for Enhanced. Reads its settings and runs the cleaner |
 | `stage0/_run_144a_trace.py` | Entry point for Rule 144A |
 | `stage0/_run_standard_trace.py` | Entry point for Standard TRACE |
-| `stage0/create_daily_enhanced_trace.py` | The Enhanced cleaner: pulls trades from WRDS, applies every filter and correction, and writes the daily panel and its audit files |
+| `stage0/create_daily_enhanced_trace.py` | The Enhanced cleaner. It pulls trades from WRDS, applies every filter and correction, and writes the daily panel and its audit files |
 | `stage0/create_daily_standard_trace.py` | The same for Standard TRACE and Rule 144A |
 | `stage0/_chunk_runner.py` | Splits the CUSIP universe into chunks and runs several at once |
 | `stage0/_wrds_pool.py` | Opens one WRDS connection per worker process, safely |
-| `stage0/_build_error_files.py` | Builds the stage 0 data-quality reports (the LaTeX and its figure PDFs; you compile the report) |
+| `stage0/_build_error_files.py` | Builds the stage 0 data-quality reports (the LaTeX and its figure PDFs). You compile the report |
 | `stage0/_error_plot_helpers.py` | Plotting and filter helpers for those reports |
 
 ## Stage 1: daily bond analytics (WRDS)
 
 | file | what it does |
 |---|---|
-| `stage1/_stage1_settings.py` | Stage 1 settings: inputs, the sample end (`DATE_CUT_OFF`), the distressed-bond filter, the linker |
+| `stage1/_stage1_settings.py` | Stage 1's settings (inputs, the sample end `DATE_CUT_OFF`, the distressed-bond filter, the linker) |
 | `stage1/run_stage1.sh` | SGE job script for stage 1 |
 | `stage1/_run_stage1.py` | Entry point, called by `run_stage1.sh` |
 | `stage1/create_daily_stage1.py` | Wires the settings into the pipeline and runs it |
-| `stage1/stage1_pipeline.py` | The pipeline: loads the stage 0 panels, adds FISD characteristics, QuantLib analytics, ratings, firm ids and industries, applies the distressed-bond filter, writes `stage1_<stamp>.parquet` |
+| `stage1/stage1_pipeline.py` | The pipeline. It loads the stage 0 panels, adds FISD characteristics, QuantLib analytics, ratings, firm ids and industries, applies the distressed-bond filter, and writes `stage1_<stamp>.parquet` |
 | `stage1/helper_functions.py` | The functions the pipeline calls, including the bond analytics |
 | `stage1/_linker_join.py` | Attaches `permno`, `permco` and `gvkey` from the bond-firm linker, on its identity window |
 | `stage1/_distressed_plot_helpers.py` | Figures and the LaTeX report for the distressed-bond filter |
@@ -84,28 +85,28 @@ the last month each cache holds.
 
 | file | what it does |
 |---|---|
-| `stage2/_run_stage2.py` | Entry point: checks the settings, prints them, then runs `build_panel.py` |
+| `stage2/_run_stage2.py` | Entry point. Checks the settings, prints them, then runs `build_panel.py` |
 | `stage2/run_stage2.sh` | Shell wrapper for `_run_stage2.py`. Not a WRDS job |
-| `stage2/_stage2_settings.py` | Stage 2 settings and the input checks: inputs, the factor source, workers, the published-factor URLs |
-| `stage2/build_panel.py` | The build: the factor series, then the seven steps in fresh processes (steps 1 and 2 in turn, steps 3-4 and 5-6 side by side, then step 7) |
-| `stage2/db.py` | DuckDB access: every query reads parquet files; there is no database file |
+| `stage2/_stage2_settings.py` | Stage 2's settings (inputs, the factor source, workers, the published-factor URLs) and the input checks |
+| `stage2/build_panel.py` | The build, which is the factor series and then the seven steps in fresh processes (steps 1 and 2 in turn, steps 3-4 and 5-6 side by side, then step 7) |
+| `stage2/db.py` | DuckDB access. Every query reads parquet files, and there is no database file |
 | `stage2/validate_coverage.py` | Checks that every column reaches the panel's last month, and names the ones whose source stops early |
 | `stage2/validate_stage2.py` | Compares a build's step outputs with a reference build's, column by column, within tolerances |
 | `stage2/check_external_data.py` | Lists every external series stage 2 uses, where it comes from, and the last month its cache holds |
-| `stage2/make_excess_blocks.py` | Optional: re-estimates the 68 beta and momentum columns on the two other Treasury benchmarks |
-| `stage2/make_release.py` | Packages a build for sharing: removes the licensed values and refuses to write a file that still has them |
+| `stage2/make_excess_blocks.py` | Optional. Re-estimates the 68 beta and momentum columns on the two other Treasury benchmarks |
+| `stage2/make_release.py` | Packages a build for sharing. It removes the licensed values and refuses to write a file that still has them |
 | `stage2/_build_data_report.py` | Builds the stage 2 data report (LaTeX, and the PDF when TeX is installed) |
 | `stage2/_report_helpers.py` | Tables, figures and LaTeX for that report |
 | `stage2/run_build_data_reports.sh` | Shell wrapper for the data report |
 | `stage2/conftest.py` | Lets the tests import the stage 2 modules |
 | `stage2/steps/compute_factors.py` | The factor time series, from the public sources or the published file (`--factor-source`) |
-| `stage2/steps/step1_returns.py` | Step 1: monthly returns, month-end signals, default handling, duration-matched Treasury returns |
-| `stage2/steps/step2_illiquidity.py` | Step 2: illiquidity and risk signals per bond, and the market illiquidity factors |
-| `stage2/steps/step3_bbw.py` | Step 3: the Bai-Bali-Wen bond factors, from double sorts through PyBondLab |
-| `stage2/steps/step4_betas.py` | Step 4: rolling 36-month betas on every factor model, and systematic momentum |
-| `stage2/steps/step5_value.py` | Step 5: the value signals and the spread-momentum signals |
-| `stage2/steps/step6_momentum.py` | Step 6: momentum, long-term reversal, industry momentum, VaR and expected shortfall |
-| `stage2/steps/step7_final.py` | Step 7: joins everything into the 145-column panel and the `_mmn` sidecar |
+| `stage2/steps/step1_returns.py` | Step 1. Monthly returns, month-end signals, default handling, duration-matched Treasury returns |
+| `stage2/steps/step2_illiquidity.py` | Step 2. Illiquidity and risk signals per bond, and the market illiquidity factors |
+| `stage2/steps/step3_bbw.py` | Step 3. The Bai-Bali-Wen bond factors, from double sorts through PyBondLab |
+| `stage2/steps/step4_betas.py` | Step 4. Rolling 36-month betas on every factor model, and systematic momentum |
+| `stage2/steps/step5_value.py` | Step 5. The value signals and the spread-momentum signals |
+| `stage2/steps/step6_momentum.py` | Step 6. Momentum, long-term reversal, industry momentum, VaR and expected shortfall |
+| `stage2/steps/step7_final.py` | Step 7. Joins everything into the 145-column panel and the `_mmn` sidecar |
 | `stage2/lib/contract.py` | The 145 column names and their order. A build that changes either fails |
 | `stage2/lib/betas.py` | The rolling-beta models (`BETA_MODELS`) and the code that runs them |
 | `stage2/lib/rolling_kernels.py` | The numba kernels behind the betas, momentum and skewness |
@@ -116,7 +117,7 @@ the last month each cache holds.
 | `stage2/lib/wrangle.py` | The final merge and column order |
 | `stage2/lib/pin.py` | The daily panel projection every step reads, built once |
 | `stage2/lib/treasury.py` | Duration-matched Treasury returns (`tret`), from CRSP via WRDS, fetched once and cached |
-| `stage2/lib/duration_adjusted.py` | The five alternative Treasury benchmarks: four priced from each bond's own cash flows on the GSW curve (`tret_bns`, `tret_cfm`, `tret_gprs`, `tret_cls`), and `tret_mat`, the `tret` method at the bond's maturity instead of its duration |
+| `stage2/lib/duration_adjusted.py` | The five alternative Treasury benchmarks. Four are priced from each bond's own cash flows on the GSW curve (`tret_bns`, `tret_cfm`, `tret_gprs`, `tret_cls`). The fifth, `tret_mat`, is the `tret` method at the bond's maturity instead of its duration |
 | `stage2/lib/ff5.py` | Fama-French five factors from WRDS, fetched once and cached |
 | `stage2/lib/vix.py` | Daily VIX from WRDS, fetched once and cached |
 | `stage2/lib/factor_fetch.py` | The sources for `--factor-source public` (Ken French, FRED, He-Kelly-Manela, Ludvigson, EPU, and monthly VIX from WRDS), fetched once and cached |
@@ -126,7 +127,7 @@ the last month each cache holds.
 | `stage2/lib/frontier.py` | Refuses to publish a last month that holds too few bonds to be a real cross-section |
 | `stage2/lib/nyse_calendar.py` | The NYSE trading calendar |
 | `stage2/lib/month_boundaries.py` | Each month's first and last trading days, from that calendar |
-| `stage2/lib/manifest.py` | Writes the run manifest: inputs and their hashes, settings, timings, checks |
+| `stage2/lib/manifest.py` | Writes the run manifest (inputs and their hashes, settings, timings, checks) |
 | `stage2/lib/validate_core.py` | The column-by-column comparison `validate_stage2.py` uses |
 | `stage2/lib/phase_timer.py` | Times each phase of a step |
 | `stage2/reference/bbw_factors_original_2004_2021.csv` | The BBW authors' original factor series, shipped in the BBW download |
@@ -135,22 +136,22 @@ the last month each cache holds.
 
 Stage 3's drivers, one per table or figure, are listed with the exhibit they make in
 [stage3/INDEX.md](stage3/INDEX.md). The folders are numbered in the order they were built, not by
-paper section: `s1_lib` is the paper's Section 3, `s2_lab` Section 4, `s3_nse` Section 5.
+paper section. `s1_lib` is the paper's Section 3, `s2_lab` Section 4 and `s3_nse` Section 5.
 
 | file | what it does |
 |---|---|
-| `stage3/run_stage3.sh` | Runs everything: the input check, then `_run_stage3.py` |
-| `stage3/_run_stage3.py` | Entry point: section by section, the producers (sorts and grids) then their exhibits, then the PDF |
+| `stage3/run_stage3.sh` | Runs everything, the input check and then `_run_stage3.py` |
+| `stage3/_run_stage3.py` | Entry point. Section by section it runs the producers (sorts and grids), then their exhibits, and last the PDF |
 | `stage3/_stage3_settings.py` | Every path and constant. Inputs can be moved with environment variables |
 | `stage3/paths.py` | The paths, derived from the settings |
 | `stage3/pblenv.py` | Checks the installed PyBondLab against `pybondlab_pin.py` before any sort, and records its version and content hash with every result |
 | `stage3/drrlib.py` | Shared loading, statistics (Newey-West, CAPM_B alpha, paired differences) and result manifests |
-| `stage3/returns.py` | The return every section sorts, in the run's return type (`--returns`): the standard run's exactly as before, or a duration-adjusted one with its own signals. Every place stage 3 forms a return calls it |
-| `stage3/signal_set.py` | Which panel columns are signals: the 108 Cluster rows of the Table IA.VIII spec. Every section sorts these and nothing else |
+| `stage3/returns.py` | The return every section sorts, in the run's return type (`--returns`). The standard run's return is exactly as before, and a duration-adjusted one has its own signals. Every place stage 3 forms a return calls it |
+| `stage3/signal_set.py` | Which panel columns are signals. They are the 108 Cluster rows of the Table IA.VIII spec. Every section sorts these and nothing else |
 | `stage3/fastrun.py` | Runs the grids one signal per fresh process |
 | `stage3/bench.py` | Times each run and records its own checks in `reports/timings.jsonl` |
 | `stage3/captions.py` | Every table caption |
-| `stage3/figstyle.py` | The two looks every figure can be drawn in: the house look (the paper's, and the default) and the look of the paper as first submitted (`--style house\|submitted\|both`); the NBER recession dates every time-series figure shades |
+| `stage3/figstyle.py` | The two styles every figure can be drawn in, the house style (the paper's, and the default) and the style of the paper as first submitted (`--style house\|submitted\|both`). It takes the NBER recession dates from `recessions.py` |
 | `stage3/latex_format.py` | Number formatting for the LaTeX tables |
 | `stage3/helper_functions.py` | Small shared conventions |
 | `stage3/make_report.py` | Puts every table and figure into `reports/exhibits.pdf` |
@@ -160,14 +161,14 @@ paper section: `s1_lib` is the paper's Section 3, `s2_lab` Section 4, `s3_nse` S
 | `stage3/s2_lab/lab_engine.py` | Statistics for every Section 4 exhibit |
 | `stage3/s2_lab/lab_exhibit.py` | The table layout shared by the Section 4 tables |
 | `stage3/s3_nse/nse_engine.py` | Statistics for every Section 5 exhibit |
-| `stage3/s3_nse/mua_engines.py` | The method-uncertainty grid: its 216 specifications, through PyBondLab's `assay_anomaly_fast` |
+| `stage3/s3_nse/mua_engines.py` | The method-uncertainty grid and its 216 specifications, run through PyBondLab's `assay_anomaly_fast` |
 | `stage3/s3_nse/clusters.py` | The 108 signals' nine clusters, and the grid definitions |
 | `stage3/s3_nse/cluster_table.py` | The table layout shared by Tables 5 and 6 |
 | `stage3/s4_zoo/zoo_engine.py` | Statistics for the factor-zoo exhibits |
 | `stage3/s4_zoo/zoo_frames.py` | The four factor-zoo statistics tables, computed once |
 | `stage3/tools/check_inputs.py` | Checks the five inputs before a long run, and a duration-adjusted run's two blocks |
-| `stage3/tools/build_index.py` | Writes `stage3/INDEX.md` from the code; `--check` fails if it is out of date |
-| `stage3/tools/compare_runs.py` | Compares two stage 3 runs cell by cell (a duration-adjusted run against the standard one, say): what moved, what changed sign, which t-statistics crossed 1.96 |
+| `stage3/tools/build_index.py` | Writes `stage3/INDEX.md` from the code. `--check` fails if it is out of date |
+| `stage3/tools/compare_runs.py` | Compares two stage 3 runs cell by cell (a duration-adjusted run against the standard one, say). It reports what moved, what changed sign, and which t-statistics crossed 1.96 |
 | `stage3/spec/inputs.json` | The five inputs and their expected shape, and the blocks of each duration-adjusted return type |
 | `stage3/spec/signal_definitions.json` | What each of the 145 panel columns means, with its citation |
 
@@ -175,13 +176,13 @@ paper section: `s1_lib` is the paper's Section 3, `s2_lab` Section 4, `s3_nse` S
 
 | file | what it does |
 |---|---|
-| `stage4/run_stage4.sh` | Runs everything: `build_factors.py`, then `compare_published.py` |
-| `stage4/build_factors.py` | Entry point: loads each return type's panel once, sorts it both ways over the three rating bands, and writes the factors, the flip set and a manifest |
+| `stage4/run_stage4.sh` | Runs everything, `build_factors.py` and then `compare_published.py` |
+| `stage4/build_factors.py` | Entry point. Loads each return type's panel once, sorts it both ways over the three rating bands, and writes the factors, the flip set and a manifest |
 | `stage4/compare_published.py` | Downloads the TRACE-only factors openbondassetpricing.com serves and compares them with yours, cell by cell |
 | `stage4/_stage4_settings.py` | The paths (movable with environment variables) and the release year |
-| `stage4/spec/factors.json` | The grid: the 108 signals, the four return types, the rating bands, the portfolio counts and the 68 columns a duration-adjusted return type swaps |
-| `stage4/factorlib/inputs.py` | The panel for each return type: excess of the T-bill, or duration-adjusted with its own betas and momentum (the swap itself is `return_types.py`, shared with stage 3) |
-| `stage4/factorlib/sorts.py` | One return type through PyBondLab for every band, unflipped, and the flip set |
+| `stage4/spec/factors.json` | The grid (the 108 signals, the four return types, the rating bands, the portfolio counts and the 68 columns a duration-adjusted return type swaps) |
+| `stage4/factorlib/inputs.py` | The panel for each return type, either excess of the T-bill or duration-adjusted with its own betas and momentum. The swap itself is `return_types.py`, shared with stage 3 |
+| `stage4/factorlib/sorts.py` | One return type through PyBondLab for every band, with no sign correction, and the flip set |
 | `stage4/factorlib/release.py` | Writes the files in the published archives' layout, and the wide CSVs |
 | `stage4/conftest.py` | Lets the tests import the stage 4 modules |
 
@@ -189,25 +190,26 @@ paper section: `s1_lib` is the paper's Section 3, `s2_lab` Section 4, `s3_nse` S
 
 | folder | what it covers |
 |---|---|
-| `tests/` | The whole repo: stage 0 chunking and scheduling, the disk-space check, one row per key on every lookup, the stage 1 linker window and sample-end rule, no private paths in tracked files, the docs against the code (`test_docs.py`), the code tags (`test_tags.py`), the assistant skills (`test_skills.py`), `doctor.py` and `download_inputs.sh`, the smoke test's checks (`smoke_assertions.py`), and a probe of your WRDS connection limit (`probe_wrds_connections.py`, needs WRDS). `tests/AGENTS.md` says what each file guards |
-| `stage2/tests/` | Stage 2: the column contract and order, the `_mmn` twin rule, the release redaction, the factor sources, the calendar and month boundaries, the data dictionary against the code, and parity with a reference build (skipped when there is none) |
-| `stage3/tests/` | Stage 3: the input contract, the runner and its steps, the exhibit index, no absolute or private paths, the Section 5 counting rules, the signal definitions, the signal set every section sorts, the skip-and-rebuild rule, and the return types (`stage3/tests/test_returns.py`: the standard run's returns as before, a duration-adjusted run's signals and returns and its own tree, and no return formed outside `returns.py`) |
-| `stage4/tests/` | Stage 4, on small synthetic panels: the grid in the spec, the duration swap (and that the shared swap builds the same panel as stage 4's own did), the flip set, the CSV pivot, and one run through PyBondLab |
+| `tests/` | The whole repo. Stage 0 chunking and scheduling, the disk-space check, one row per key on every lookup, the stage 1 linker window and sample-end rule, no private paths in tracked files, the docs against the code (`test_docs.py`), the code tags (`test_tags.py`), the assistant skills (`test_skills.py`), `doctor.py` and `download_inputs.sh`, the smoke test's checks (`smoke_assertions.py`), and a probe of your WRDS connection limit (`probe_wrds_connections.py`, needs WRDS). `tests/AGENTS.md` says what each file guards |
+| `stage2/tests/` | Stage 2. The column contract and order, the `_mmn` twin rule, the release redaction, the factor sources, the calendar and month boundaries, the data dictionary against the code, and parity with a reference build (skipped when there is none) |
+| `stage3/tests/` | Stage 3. The input contract, the runner and its steps, the exhibit index, no absolute or private paths, the Section 5 counting rules, the signal definitions, the signal set every section sorts, the skip-and-rebuild rule, and the return types (`stage3/tests/test_returns.py` covers the standard run's returns as before, a duration-adjusted run's signals and returns and its own tree, and no return formed outside `returns.py`) |
+| `stage4/tests/` | Stage 4, on small synthetic panels. The grid in the spec, the duration swap (and that the shared swap builds the same panel as stage 4's own did), the flip set, the CSV pivot, and one run through PyBondLab |
 
-Run `python -m pytest stage2/tests tests stage3/tests stage4/tests -q`. Nothing in it needs WRDS or the network.
-On GitHub, `.github/workflows/tests.yml` runs it on Linux, Windows and macOS with Python 3.11 and
-3.13 on every push, with `tools/tags.py --check`, `doctor.py` and the official tagref.
+Run `python -m pytest stage2/tests tests stage3/tests stage4/tests -q`. Nothing in it needs WRDS
+or the network. On GitHub, `.github/workflows/tests.yml` runs it on Linux, Windows and macOS with
+Python 3.11 and 3.13 on every push, with `tools/tags.py --check`, `doctor.py` and the official
+tagref.
 
 ## For AI assistants
 
 | file | what it is |
 |---|---|
-| `AGENTS.md`, and one in each of `stage0/` to `stage4/` and `tests/` | The instructions every assistant reads: what to run, what to check, the traps. Each `CLAUDE.md` beside one imports it |
-| `.claude/skills/`, `.agents/skills/` | Seven step-by-step procedures (`onboard`, `run-wrds`, `build-panel`, `reproduce-exhibits`, `build-factors`, `explain-pipeline`, `add-a-column`), the same file twice: Claude Code reads the first folder, Codex and Gemini the second, and Cursor and Copilot both, so they may list each skill twice |
+| `AGENTS.md`, and one in each of `stage0/` to `stage4/` and `tests/` | The instructions every assistant reads (what to run, what to check, the traps). Each `CLAUDE.md` beside one imports it |
+| `.claude/skills/`, `.agents/skills/` | Seven step-by-step procedures (`onboard`, `run-wrds`, `build-panel`, `reproduce-exhibits`, `build-factors`, `explain-pipeline`, `add-a-column`), each the same file twice. Claude Code reads the first folder, Codex and Gemini the second, and Cursor and Copilot both, so they may list each skill twice |
 | `.claude/settings.json` | Lets Claude Code run the read-only checks without asking, and blocks the usual spellings of a force-push and a recursive delete |
 | `.github/copilot-instructions.md` | Points GitHub Copilot at `AGENTS.md` |
 | `GEMINI.md` | Imports `AGENTS.md` for Gemini CLI, which reads `GEMINI.md` and not `AGENTS.md` |
 | `TAGS.md` | Every code tag, with its file and what it marks. Written by `tools/tags.py` |
 | `docs/acceptance/prompts.csv` | The questions a new assistant must answer well, with what a good answer uses and says |
 | `docs/validation/validated_runs.csv` | What has been run end to end, when, and where the evidence is |
-| `docs/validation/agent_acceptance_log.csv` | Each run of the acceptance prompts: which assistant, whether it passed, and what it missed |
+| `docs/validation/agent_acceptance_log.csv` | Each run of the acceptance prompts, with which assistant ran it, whether it passed, and what it missed |

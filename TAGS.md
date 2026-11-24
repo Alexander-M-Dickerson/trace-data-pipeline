@@ -37,22 +37,22 @@ A rule the code enforces. The tag sits on the check, or on the one setting that 
 
 | name | where | what | pointed to from |
 |---|---|---|---|
-| `rule.adjusted_in_panel` | [stage2/lib/contract.py](stage2/lib/contract.py) | the main panel carries the gap-adjusted form of each signal, never the unadjusted twin |  |
-| `rule.column_contract` | [stage2/lib/contract.py](stage2/lib/contract.py) | the panel's 145 column names and their order are fixed; a build that changes them fails | `AGENTS.md` |
+| `rule.adjusted_in_panel` | [stage2/lib/contract.py](stage2/lib/contract.py) | the main panel has the gap-adjusted form of each signal, never the unadjusted twin |  |
+| `rule.column_contract` | [stage2/lib/contract.py](stage2/lib/contract.py) | the panel's 145 column names and their order are fixed, and a build that changes them fails | `AGENTS.md` |
 | `rule.complete_months` | [stage1/_stage1_settings.py](stage1/_stage1_settings.py) | the sample ends at the last complete month | `stage1/AGENTS.md` |
 | `rule.connection_cap` | [stage0/_trace_settings.py](stage0/_trace_settings.py) | the members' CONCURRENCY together must leave one of WRDS's 7 connections free | `AGENTS.md`, `stage0/AGENTS.md` |
-| `rule.daily_redaction` | [stage2/make_release.py](stage2/make_release.py) | the public daily file must not carry the licensed columns |  |
-| `rule.fresh_process` | [stage2/build_panel.py](stage2/build_panel.py) | each group of steps runs in a fresh process; a long-lived one makes DuckDB lose its parallelism | `AGENTS.md` |
+| `rule.daily_redaction` | [stage2/make_release.py](stage2/make_release.py) | the public daily file must not include the licensed columns |  |
+| `rule.fresh_process` | [stage2/build_panel.py](stage2/build_panel.py) | each group of steps runs in a fresh process, because a long-lived one makes DuckDB lose its parallelism | `AGENTS.md` |
 | `rule.frontier` | [stage2/lib/frontier.py](stage2/lib/frontier.py) | the panel's last month must be a real cross-section, not one TRACE database alone |  |
 | `rule.holding_period` | [stage2/lib/contract.py](stage2/lib/contract.py) | hprd must equal the NYSE sessions between dt_s and dt_e |  |
-| `rule.linker_window` | [stage1/_stage1_settings.py](stage1/_stage1_settings.py)<br>[stage2/_stage2_settings.py](stage2/_stage2_settings.py) | firm ids join the linker's identity window; stages 1 and 2 must agree | `stage1/AGENTS.md` |
-| `rule.memory_per_slot` | [stage0/_trace_settings.py](stage0/_trace_settings.py) | memory is charged per slot and a job may use 8 slots and 48 GB; a larger request would wait in the queue forever, so this refuses it | `AGENTS.md`, `stage0/AGENTS.md` |
+| `rule.linker_window` | [stage1/_stage1_settings.py](stage1/_stage1_settings.py)<br>[stage2/_stage2_settings.py](stage2/_stage2_settings.py) | firm ids join the linker's identity window, and stages 1 and 2 must agree | `stage1/AGENTS.md` |
+| `rule.memory_per_slot` | [stage0/_trace_settings.py](stage0/_trace_settings.py) | memory is charged per slot and a job may use 8 slots and 48 GB, and a larger request would wait in the queue forever, so this refuses it | `AGENTS.md`, `stage0/AGENTS.md` |
 | `rule.mmn_twins` | [stage2/lib/contract.py](stage2/lib/contract.py) | every price-based signal ships with its unadjusted _mmn twin |  |
-| `rule.numexpr` | [numeric_setup.py](numeric_setup.py) | pandas uses numexpr, as the published build did; it changes float32 results |  |
+| `rule.numexpr` | [numeric_setup.py](numeric_setup.py) | pandas uses numexpr, as the published build did, and it changes float32 results |  |
 | `rule.parquet_only` | [stage0/_trace_settings.py](stage0/_trace_settings.py) | every stage reads parquet, so any other OUTPUT_FORMAT stops here | `stage0/AGENTS.md` |
 | `rule.pybondlab_pin` | [pybondlab_pin.py](pybondlab_pin.py) | stages 2-4 stop at start-up unless PyBondLab is the pinned release and numba and numexpr are installed | `AGENTS.md` |
 | `rule.redaction` | [stage2/make_release.py](stage2/make_release.py) | the public panel must have permco and gvkey blank and the ratings reduced to 1 (investment grade) or 11 (high yield) | `AGENTS.md` |
-| `rule.return_types` | [return_types.py](return_types.py) | a duration-adjusted return type swaps the return-based signals for ones estimated on that return; one definition, stages 3 and 4 | `AGENTS.md`, `stage3/AGENTS.md`, `stage3/_run_stage3.py`, `stage3/_stage3_settings.py`, `stage3/make_report.py`, `stage3/returns.py`, `stage3/run_stage3.sh`, `stage3/s1_lib/run_lib_sorts.py`, `stage3/s1_lib/run_sorts.py`, `stage3/s2_lab/f06_dua.py`, `stage3/s2_lab/run_lab.py`, `stage3/s3_nse/mua_engines.py`, `stage3/s3_nse/run_dua_grid.py`, `stage3/s4_zoo/run_zoo_sorts.py`, `stage3/tools/check_inputs.py`, `stage4/AGENTS.md`, `stage4/factorlib/inputs.py` |
+| `rule.return_types` | [return_types.py](return_types.py) | a duration-adjusted return type swaps the return-based signals for ones estimated on that return, defined once for stages 3 and 4 | `AGENTS.md`, `stage3/AGENTS.md`, `stage3/_run_stage3.py`, `stage3/_stage3_settings.py`, `stage3/make_report.py`, `stage3/returns.py`, `stage3/run_stage3.sh`, `stage3/s1_lib/run_lib_sorts.py`, `stage3/s1_lib/run_sorts.py`, `stage3/s2_lab/f06_dua.py`, `stage3/s2_lab/run_lab.py`, `stage3/s3_nse/mua_engines.py`, `stage3/s3_nse/run_dua_grid.py`, `stage3/s4_zoo/run_zoo_sorts.py`, `stage3/tools/check_inputs.py`, `stage4/AGENTS.md`, `stage4/factorlib/inputs.py` |
 | `rule.signal_set` | [stage3/signal_set.py](stage3/signal_set.py) | the signals are the spec's Cluster rows; everything else is never sorted | `stage3/AGENTS.md`, `stage3/s1_lib/run_lib_sorts.py`, `stage3/s1_lib/tB1_lib_summary.py`, `stage3/s4_zoo/run_zoo_sorts.py` |
 
 ## trap
@@ -62,7 +62,7 @@ A mistake that has caught people, at the line that guards against it.
 | name | where | what | pointed to from |
 |---|---|---|---|
 | `trap.eof_error` | [stage0/_wrds_pool.py](stage0/_wrds_pool.py) | no username makes the wrds package prompt and die with an EOFError that looks like the connection cap | `AGENTS.md`, `stage0/AGENTS.md` |
-| `trap.factor_source` | [stage2/_stage2_settings.py](stage2/_stage2_settings.py) | public is fresh data and will not reproduce a published vintage; pinned uses its factors | `AGENTS.md` |
+| `trap.factor_source` | [stage2/_stage2_settings.py](stage2/_stage2_settings.py) | public is fresh data and will not reproduce a published vintage. Pinned uses that vintage's factors | `AGENTS.md` |
 | `trap.no_internet` | [download_inputs.sh](download_inputs.sh) | WRDS compute nodes have no internet, so this runs on the login node first | `AGENTS.md`, `stage1/AGENTS.md` |
 | `trap.public_daily_file` | [stage2/_stage2_settings.py](stage2/_stage2_settings.py) | the Stage 1 file published for download lacks the licensed columns, so stage 2 refuses it at this check | `AGENTS.md` |
 | `trap.spool_copy` | [run_smoke_test.sh](run_smoke_test.sh) | qsub runs a copy of this script from its spool folder, so the repository is found from SGE_O_WORKDIR |  |
@@ -89,13 +89,13 @@ A cleaning filter or correction, applied in stage 0 or stage 1.
 | `filter.maturity_one_year` | [stage1/stage1_pipeline.py](stage1/stage1_pipeline.py) | stage 1 filter 3: drops every bond-day within a year of maturity | `stage1/AGENTS.md` |
 | `filter.price_above_300` | [stage1/stage1_pipeline.py](stage1/stage1_pipeline.py) | stage 1 filter 6: drops prices above 300 (% of par) | `stage1/AGENTS.md` |
 | `filter.price_range` | [stage0/create_daily_enhanced_trace.py](stage0/create_daily_enhanced_trace.py)<br>[stage0/create_daily_standard_trace.py](stage0/create_daily_standard_trace.py) | drops prices at or below 0 and above 1000 | `stage0/AGENTS.md` |
-| `filter.price_scale` | [stage0/create_daily_enhanced_trace.py](stage0/create_daily_enhanced_trace.py)<br>[stage0/create_daily_standard_trace.py](stage0/create_daily_standard_trace.py) | rescales prices quoted per unit to percent of par; runs before every other filter, and only when the par-1000 FISD screen is off | `stage0/AGENTS.md` |
+| `filter.price_scale` | [stage0/create_daily_enhanced_trace.py](stage0/create_daily_enhanced_trace.py)<br>[stage0/create_daily_standard_trace.py](stage0/create_daily_standard_trace.py) | rescales prices quoted per unit to percent of par, before every other filter, and only when the par-1000 FISD screen is off | `stage0/AGENTS.md` |
 | `filter.rating_present` | [stage1/stage1_pipeline.py](stage1/stage1_pipeline.py) | stage 1 filter 2: keeps rows with an S&P or a Moody's rating | `stage1/AGENTS.md` |
 | `filter.reversals_standard` | [stage0/create_daily_standard_trace.py](stage0/create_daily_standard_trace.py) | Standard TRACE and 144A: removes reversals and the trades they reverse | `stage0/AGENTS.md` |
 | `filter.trade_time` | [stage0/create_daily_enhanced_trace.py](stage0/create_daily_enhanced_trace.py)<br>[stage0/create_daily_standard_trace.py](stage0/create_daily_standard_trace.py) | keeps trades inside the configured hours of the day | `stage0/AGENTS.md` |
 | `filter.ultra_distressed` | [stage1/stage1_pipeline.py](stage1/stage1_pipeline.py) | stage 1 filter 4: drops the price errors the ultra-distressed filter flags | `stage1/AGENTS.md` |
 | `filter.ultra_distressed_flags` | [stage1/helper_functions.py](stage1/helper_functions.py) | flags probable price errors among very low-priced bonds: anomalies, upward spikes, plateaus and intraday gaps | `stage1/AGENTS.md` |
-| `filter.volume` | [stage0/create_daily_enhanced_trace.py](stage0/create_daily_enhanced_trace.py)<br>[stage0/create_daily_standard_trace.py](stage0/create_daily_standard_trace.py) | drops trades below a dollar or par volume floor; off by default | `stage0/AGENTS.md` |
+| `filter.volume` | [stage0/create_daily_enhanced_trace.py](stage0/create_daily_enhanced_trace.py)<br>[stage0/create_daily_standard_trace.py](stage0/create_daily_standard_trace.py) | drops trades below a dollar or par volume floor, off by default | `stage0/AGENTS.md` |
 | `filter.volume_vs_amount` | [stage0/create_daily_enhanced_trace.py](stage0/create_daily_enhanced_trace.py)<br>[stage0/create_daily_standard_trace.py](stage0/create_daily_standard_trace.py) | drops trades of half the offering amount or more | `stage0/AGENTS.md` |
 | `filter.winsorize` | [stage1/stage1_pipeline.py](stage1/stage1_pipeline.py) | clips ytm and credit_spread to their 0.5% and 99.5% quantiles within each trade date | `stage1/AGENTS.md` |
 | `filter.yield_as_price` | [stage0/create_daily_enhanced_trace.py](stage0/create_daily_enhanced_trace.py)<br>[stage0/create_daily_standard_trace.py](stage0/create_daily_standard_trace.py) | drops trades whose price equals their reported yield | `stage0/AGENTS.md` |
@@ -106,7 +106,7 @@ Where a column of the stage 1 daily panel is computed.
 
 | name | where | what | pointed to from |
 |---|---|---|---|
-| `daily.accall` | [stage1/helper_functions.py](stage1/helper_functions.py) | accrued interest plus coupons paid; the returns use it |  |
+| `daily.accall` | [stage1/helper_functions.py](stage1/helper_functions.py) | accrued interest plus coupons paid, which the returns use |  |
 | `daily.acclast` | [stage1/helper_functions.py](stage1/helper_functions.py) | interest accrued since the last coupon |  |
 | `daily.accpmt` | [stage1/helper_functions.py](stage1/helper_functions.py) | the coupons paid since issue |  |
 | `daily.ask_count` | [stage0/create_daily_enhanced_trace.py](stage0/create_daily_enhanced_trace.py)<br>[stage0/create_daily_standard_trace.py](stage0/create_daily_standard_trace.py) | the number of dealer sales to customers |  |
@@ -119,20 +119,20 @@ Where a column of the stage 1 daily panel is computed.
 | `daily.bond_maturity` | [stage1/stage1_pipeline.py](stage1/stage1_pipeline.py) | years to maturity at the trade date | `stage1/AGENTS.md` |
 | `daily.convexity` | [stage1/helper_functions.py](stage1/helper_functions.py) | convexity |  |
 | `daily.credit_spread` | [stage1/helper_functions.py](stage1/helper_functions.py) | ytm minus the Treasury yield interpolated at the bond's maturity | `stage1/AGENTS.md` |
-| `daily.cusip_id` | [stage0/create_daily_enhanced_trace.py](stage0/create_daily_enhanced_trace.py)<br>[stage0/create_daily_standard_trace.py](stage0/create_daily_standard_trace.py) | the bond's 9-character CUSIP; with trd_exctn_dt, the daily key |  |
+| `daily.cusip_id` | [stage0/create_daily_enhanced_trace.py](stage0/create_daily_enhanced_trace.py)<br>[stage0/create_daily_standard_trace.py](stage0/create_daily_standard_trace.py) | the bond's 9-character CUSIP, which with trd_exctn_dt is the daily key |  |
 | `daily.db_type` | [stage1/stage1_pipeline.py](stage1/stage1_pipeline.py) | which TRACE database the row came from: 1 Enhanced, 2 Standard, 3 144A | `stage1/AGENTS.md` |
 | `daily.dvolume` | [stage0/create_daily_enhanced_trace.py](stage0/create_daily_enhanced_trace.py)<br>[stage0/create_daily_standard_trace.py](stage0/create_daily_standard_trace.py) | dollar volume, in $ millions |  |
 | `daily.ff12num` | [stage1/helper_functions.py](stage1/helper_functions.py) | the Fama-French 12-industry code, from the FISD SIC code |  |
 | `daily.ff17num` | [stage1/helper_functions.py](stage1/helper_functions.py) | the Fama-French 17-industry code |  |
 | `daily.ff30num` | [stage1/helper_functions.py](stage1/helper_functions.py) | the Fama-French 30-industry code |  |
-| `daily.gvkey` | [stage1/stage1_pipeline.py](stage1/stage1_pipeline.py) | the issuer's Compustat GVKEY, from the bond-firm linker's identity window; not in the public download |  |
+| `daily.gvkey` | [stage1/stage1_pipeline.py](stage1/stage1_pipeline.py) | the issuer's Compustat GVKEY, from the bond-firm linker's identity window, not in the public download |  |
 | `daily.mac_dur` | [stage1/helper_functions.py](stage1/helper_functions.py) | Macaulay duration |  |
 | `daily.mdc_rating` | [stage1/stage1_pipeline.py](stage1/stage1_pipeline.py) | Moody's (21 moved to 22), filled from S&P where missing |  |
 | `daily.mdy_rating` | [stage1/stage1_pipeline.py](stage1/stage1_pipeline.py) | the latest Moody's rating on or before the trade date, 1 to 21 |  |
 | `daily.mod_dur` | [stage1/helper_functions.py](stage1/helper_functions.py) | modified duration |  |
-| `daily.permco` | [stage1/stage1_pipeline.py](stage1/stage1_pipeline.py) | the issuer's CRSP PERMCO, from the bond-firm linker's identity window; not in the public download |  |
+| `daily.permco` | [stage1/stage1_pipeline.py](stage1/stage1_pipeline.py) | the issuer's CRSP PERMCO, from the bond-firm linker's identity window, not in the public download |  |
 | `daily.permno` | [stage1/stage1_pipeline.py](stage1/stage1_pipeline.py) | the issuer's CRSP PERMNO, from the bond-firm linker's identity window | `stage1/AGENTS.md` |
-| `daily.pr` | [stage0/create_daily_enhanced_trace.py](stage0/create_daily_enhanced_trace.py)<br>[stage0/create_daily_standard_trace.py](stage0/create_daily_standard_trace.py) | the dollar-volume-weighted clean price (prc_vw here; stage 1 renames it pr) |  |
+| `daily.pr` | [stage0/create_daily_enhanced_trace.py](stage0/create_daily_enhanced_trace.py)<br>[stage0/create_daily_standard_trace.py](stage0/create_daily_standard_trace.py) | the dollar-volume-weighted clean price (prc_vw here, and stage 1 renames it pr) |  |
 | `daily.prc_ask` | [stage0/create_daily_enhanced_trace.py](stage0/create_daily_enhanced_trace.py)<br>[stage0/create_daily_standard_trace.py](stage0/create_daily_standard_trace.py) | the dollar-volume-weighted price of dealer sales to customers (the ask) |  |
 | `daily.prc_bid` | [stage0/create_daily_enhanced_trace.py](stage0/create_daily_enhanced_trace.py)<br>[stage0/create_daily_standard_trace.py](stage0/create_daily_standard_trace.py) | the dollar-volume-weighted price of dealer purchases from customers (the bid) |  |
 | `daily.prc_ew` | [stage0/create_daily_enhanced_trace.py](stage0/create_daily_enhanced_trace.py)<br>[stage0/create_daily_standard_trace.py](stage0/create_daily_standard_trace.py) | the equal-weighted price |  |
@@ -212,7 +212,7 @@ Where a column of the stage 2 monthly panel is computed. Of the 38 price-based s
 | `col.cs` | [stage2/steps/step1_returns.py](stage2/steps/step1_returns.py) | credit spread, read at the signal trade |  |
 | `col.cs_mu12_1` | [stage2/lib/value.py](stage2/lib/value.py) | the average credit spread over the bond's twelve observations before this month, at least six of them |  |
 | `col.cs_sprd` | [stage2/steps/step2_illiquidity.py](stage2/steps/step2_illiquidity.py) | the Corwin-Schultz spread from two-day high and low prices, the month's average |  |
-| `col.cusip` | [stage2/steps/step1_returns.py](stage2/steps/step1_returns.py) | the bond's 9-character CUSIP; with date, the panel's key |  |
+| `col.cusip` | [stage2/steps/step1_returns.py](stage2/steps/step1_returns.py) | the bond's 9-character CUSIP, which with date is the panel's key |  |
 | `col.date` | [stage2/steps/step1_returns.py](stage2/steps/step1_returns.py) | the calendar month-end the row belongs to |  |
 | `col.db_mkt` | [stage2/lib/illiq_pandas.py](stage2/lib/illiq_pandas.py) | beta of the daily return on the day's average bond return |  |
 | `col.dcs6` | [stage2/lib/value.py](stage2/lib/value.py) | the log change in the credit spread over six months, positive when it narrowed |  |
@@ -229,7 +229,7 @@ Where a column of the stage 2 monthly panel is computed. Of the 38 price-based s
 | `col.fce_val` | [stage2/steps/step1_returns.py](stage2/steps/step1_returns.py) | amount outstanding in thousands of dollars (stage 1's bond_amt_outstanding), rounded |  |
 | `col.ff17num` | [stage2/steps/step1_returns.py](stage2/steps/step1_returns.py) | the Fama-French 17-industry code, from stage 1 |  |
 | `col.ff30num` | [stage2/steps/step1_returns.py](stage2/steps/step1_returns.py) | the Fama-French 30-industry code, from stage 1 |  |
-| `col.gvkey` | [stage2/steps/step1_returns.py](stage2/steps/step1_returns.py) | the issuer's Compustat GVKEY, from the published bond-firm linker on its identity window; blank in the public release |  |
+| `col.gvkey` | [stage2/steps/step1_returns.py](stage2/steps/step1_returns.py) | the issuer's Compustat GVKEY, from the published bond-firm linker on its identity window (blank in the public release) |  |
 | `col.hprd` | [stage2/steps/step1_returns.py](stage2/steps/step1_returns.py) | the holding period: NYSE sessions from the start trade (dt_s) to the end trade (dt_e) |  |
 | `col.hprd_bgn` | [stage2/steps/step1_returns.py](stage2/steps/step1_returns.py) | the holding period of the month-begin return: NYSE sessions from its first trade to its last |  |
 | `col.idimom12_1` | [stage2/lib/betas.py](stage2/lib/betas.py) | idiosyncratic momentum: the part of the bond's eleven previous returns that the rolling MKTB regression leaves unexplained, summed |  |
@@ -257,7 +257,7 @@ Where a column of the stage 2 monthly panel is computed. Of the 38 price-based s
 | `col.mcap_e` | [stage2/steps/step1_returns.py](stage2/steps/step1_returns.py) | market value at the month-end trade: amount outstanding x dirty price, in $ millions |  |
 | `col.mcap_s` | [stage2/steps/step1_returns.py](stage2/steps/step1_returns.py) | market value at the start trade: amount outstanding x dirty price, in $ millions |  |
 | `col.md_dur` | [stage2/steps/step1_returns.py](stage2/steps/step1_returns.py) | modified duration, read at the signal trade |  |
-| `col.mdc_rat` | [stage2/steps/step1_returns.py](stage2/steps/step1_returns.py) | the Moody's rating, filled from S&P where missing (stage 1's mdc_rating); renamed from mdyc_rat in lib/wrangle.py |  |
+| `col.mdc_rat` | [stage2/steps/step1_returns.py](stage2/steps/step1_returns.py) | the Moody's rating, filled from S&P where missing (stage 1's mdc_rating), renamed from mdyc_rat in lib/wrangle.py |  |
 | `col.mom12_1` | [stage2/lib/momentum.py](stage2/lib/momentum.py) | momentum: the bond's return compounded over the eleven returns before this month's |  |
 | `col.mom12_7` | [stage2/lib/momentum.py](stage2/lib/momentum.py) | intermediate momentum: the bond's return compounded from eleven to seven returns back |  |
 | `col.mom3_1` | [stage2/lib/momentum.py](stage2/lib/momentum.py) | momentum: the bond's return compounded over the two returns before this month's |  |
@@ -265,11 +265,11 @@ Where a column of the stage 2 monthly panel is computed. Of the 38 price-based s
 | `col.mom9_1` | [stage2/lib/momentum.py](stage2/lib/momentum.py) | momentum: the bond's return compounded over the eight returns before this month's |  |
 | `col.p_fht` | [stage2/steps/step2_illiquidity.py](stage2/steps/step2_illiquidity.py) | the FHT spread: 2 x daily return volatility x the normal quantile of (1 + the share of no-price days) / 2, that share always counting every day of the month |  |
 | `col.p_zro` | [stage2/steps/step2_illiquidity.py](stage2/steps/step2_illiquidity.py) | the share of the month's business days with no price |  |
-| `col.permco` | [stage2/steps/step1_returns.py](stage2/steps/step1_returns.py) | the issuer's CRSP PERMCO, from the published bond-firm linker on its identity window; blank in the public release |  |
+| `col.permco` | [stage2/steps/step1_returns.py](stage2/steps/step1_returns.py) | the issuer's CRSP PERMCO, from the published bond-firm linker on its identity window (blank in the public release) |  |
 | `col.permno` | [stage2/steps/step1_returns.py](stage2/steps/step1_returns.py) | the issuer's CRSP PERMNO, from the published bond-firm linker on its identity window |  |
 | `col.pi` | [stage2/lib/illiq_pandas.py](stage2/lib/illiq_pandas.py) | price impact: minus the loading on signed lagged volume in a regression of the bond's daily excess log return |  |
 | `col.ret_type` | [stage2/steps/step1_returns.py](stage2/steps/step1_returns.py) | how the return was measured: standard, default_evnt (the month the bond defaults) or trad_in_def (trading while in default) |  |
-| `col.ret_vw` | [stage2/steps/step1_returns.py](stage2/steps/step1_returns.py) | the month-end return: the change in clean price plus accrued interest plus coupons paid, over the dirty price at the start; defaulted bonds are handled below |  |
+| `col.ret_vw` | [stage2/steps/step1_returns.py](stage2/steps/step1_returns.py) | the month-end return: the change in clean price plus accrued interest plus coupons paid, over the dirty price at the start. Defaulted bonds are handled below |  |
 | `col.ret_vw_bgn` | [stage2/steps/step1_returns.py](stage2/steps/step1_returns.py) | the month-begin return: from the first trade early in the month to the last trade late in the same month |  |
 | `col.rfret` | [stage2/steps/step7_final.py](stage2/steps/step7_final.py) | the one-month risk-free rate, from the factor panel |  |
 | `col.rkt` | [stage2/lib/illiq_pandas.py](stage2/lib/illiq_pandas.py) | the realized kurtosis of the bond's daily returns in the month |  |
@@ -301,4 +301,4 @@ Where a column of the stage 2 monthly panel is computed. Of the 38 price-based s
 | `col.var_90` | [stage2/lib/var_es.py](stage2/lib/var_es.py) | 90% value-at-risk: the 10th-percentile loss of the bond's monthly returns over the last 36 months (12 at least) |  |
 | `col.var_95` | [stage2/lib/var_es.py](stage2/lib/var_es.py) | 95% value-at-risk: the 5th-percentile loss of the bond's monthly returns over the last 36 months (12 at least) |  |
 | `col.vov` | [stage2/steps/step2_illiquidity.py](stage2/steps/step2_illiquidity.py) | volatility over volume: 2.5 x sigma^0.6 / mean dollar volume^0.25 |  |
-| `col.ytm` | [stage2/steps/step1_returns.py](stage2/steps/step1_returns.py) | yield to maturity, read at the signal trade rather than the month-end trade |  |
+| `col.ytm` | [stage2/steps/step1_returns.py](stage2/steps/step1_returns.py) | yield to maturity, read at the signal trade, not at the month-end trade |  |

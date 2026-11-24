@@ -1,65 +1,68 @@
 # Contributing to TRACE Data Pipeline
 
-Thank you for your interest in contributing to the TRACE Data Pipeline! This document provides guidelines for contributing to the project.
-The paper that underlies the data work is currently under a "Revise & Resubmit (R&R)" -- your contributions will directly benefit this research.
+Thank you for your interest in contributing to the TRACE Data Pipeline. This document gives the
+guidelines for contributing to the project.
+The paper that underlies the data work is currently under a "Revise & Resubmit (R&R)", so your
+contributions will directly benefit this research.
 
-## How to Contribute
+## How to contribute
 
-### Reporting Bugs
+### Reporting bugs
 
-If you find a bug, please create an issue on GitHub with:
+If you find a bug, please create an issue on GitHub with the following.
 - A clear, descriptive title
 - Detailed steps to reproduce the issue
-- Expected behavior vs. actual behavior
+- The expected behavior and the actual behavior
 - Your environment (Python version, OS, WRDS setup)
 - Relevant log files or error messages
 - Sample code if applicable
 
-### Suggesting Enhancements
+### Suggesting enhancements
 
-We welcome suggestions for new features or improvements! Please create an issue with:
+We welcome suggestions for new features or improvements. Please create an issue with the
+following.
 - A clear description of the enhancement
-- The motivation/use case for the enhancement
+- The motivation or use case for the enhancement
 - Any relevant examples or references
 - Whether you're willing to implement it yourself
 
-### Pull Requests
+### Pull requests
 
-1. **Fork the repository** and create your branch from `main`
-2. **Make your changes** with clear, descriptive commit messages
-3. **Test thoroughly** - ensure your changes don't break existing functionality
-4. **Update documentation** - reflect your changes in README files
-5. **Submit a pull request** with a clear description of changes
+1. Fork the repository and create your branch from `main`
+2. Make your changes with clear, descriptive commit messages
+3. Test thoroughly, and make sure your changes don't break existing functionality
+4. Update the documentation so the README files reflect your changes
+5. Submit a pull request with a clear description of changes
 
-## Development Setup
+## Development setup
 
 ### Prerequisites
-- Python 3.10 or higher for stages 0-1 (WRDS), 3.11 to 3.13 for stages 2-4
+- Python 3.10 or higher for stages 0 and 1 (WRDS), 3.11 to 3.13 for stages 2 to 4
 - Access to WRDS (for testing)
 - Git
 
-### Setup Steps
+### Setup steps
 
-1. Clone your fork:
+1. Clone your fork.
 ```bash
 git clone https://github.com/YOUR_USERNAME/trace-data-pipeline.git
 cd trace-data-pipeline
 ```
 
-2. Create a virtual environment:
+2. Create a virtual environment.
 ```bash
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-3. Install dependencies (no `--user` -- pip refuses it inside an active virtualenv). For the
-   local stages and the tests, `requirements-local.txt` includes `requirements.txt`:
+3. Install dependencies without `--user`, which pip refuses inside an active virtualenv. For the
+   local stages and the tests, `requirements-local.txt` includes `requirements.txt`.
 ```bash
 python -m pip install -r requirements-local.txt
 python -m pip install --no-deps pybondlab==0.3.0
 ```
 
-4. Create a branch for your changes:
+4. Create a branch for your changes.
 ```bash
 git checkout -b feature/your-feature-name
 ```
@@ -68,8 +71,8 @@ git checkout -b feature/your-feature-name
 
 The repo ships a test suite. Run it before submitting a pull request.
 
-**Most of it needs no WRDS and runs in seconds.** The bulk lives under `stage2/tests/` and is
-pytest:
+Most of it needs no WRDS and runs in seconds. The bulk is under `stage2/tests/` and is
+pytest.
 
 ```bash
 python -m pytest stage2/tests tests -q      # Stage 2 and the whole repo, no WRDS, no network
@@ -81,19 +84,18 @@ That covers the frozen 145-column contract and its order, the `_mmn` twin rule, 
 redaction gate, the frontier guard, the `auto:complete` cut-off rule, the golden-diff engine,
 the NYSE calendar, month boundaries, the factor fetchers and the published extended series.
 
-❗**Some of it skips on a fresh clone, and a skip is not a pass.** Most of the
-`stage2/tests/test_column_contract.py` tests need a built panel under `stage2/output/panel/`, so the
-panel = report = dictionary gate passes *vacuously* until you have run a build. The parity
-tests skip unless `STAGE2_REFERENCE_OUTPUT` / `STAGE2_REFERENCE_ROOT` point at a reference
+Some of it skips on a fresh clone, and a skip is not a pass. Most of the
+`stage2/tests/test_column_contract.py` tests need a built panel under `stage2/output/panel/`, so
+the panel = report = dictionary gate passes with nothing to check until you have run a build. The
+parity tests skip unless `STAGE2_REFERENCE_OUTPUT` / `STAGE2_REFERENCE_ROOT` point at a reference
 tree. `pytest -rs` lists what skipped and why.
 
 `tests/test_docs.py` checks the documentation against the code, and pytest runs it.
-`tests/test_tags.py` checks the code tags: a new panel column needs a `col.` tag on the line that
-computes it, and a new filter a `filter.` tag (`AGENTS.md` shows how); run `python tools/tags.py`
+`tests/test_tags.py` checks the code tags. A new panel column needs a `col.` tag on the line that
+computes it, and a new filter a `filter.` tag (`AGENTS.md` shows how). Run `python tools/tags.py`
 afterwards to rewrite `TAGS.md`. `tests/test_skills.py` keeps the two copies of each assistant
-skill identical, so edit one and copy it over the other. Three
-files under `tests/` are scripts rather than pytest modules -- pytest imports them and
-collects nothing -- so run them directly:
+skill identical, so edit one and copy it over the other. Three files under `tests/` are scripts,
+not pytest modules. Pytest imports them and collects nothing, so run them directly.
 
 ```bash
 python tests/test_chunk_plan.py         # chunk-partition properties
@@ -101,29 +103,29 @@ python tests/test_chunk_scheduler.py    # ordering + failure handling
 python tests/test_merge_keys.py         # one row per key on every lookup
 ```
 
-**Whole chain, WRDS needed** -- ~10 minutes. Runs the real Stage 0 and Stage 1 code on a
-handful of CUSIP chunks and asserts the cross-stage invariants in `tests/smoke_assertions.py`. Writes to `smoke/` and
-never touches production output:
+The whole-chain test needs WRDS and takes ~10 minutes. It runs the same Stage 0 and Stage 1 code
+as a full run, on a handful of CUSIP chunks, and asserts the cross-stage invariants in
+`tests/smoke_assertions.py`. It writes to `smoke/` and never touches production output.
 
 ```bash
 bash download_inputs.sh          # once, on a machine with internet
 ./run_smoke_test.sh              # locally
-qsub run_smoke_test.sh           # on WRDS -- head nodes forbid heavy work
+qsub run_smoke_test.sh           # on WRDS, where head nodes forbid heavy work
 ```
 
-❗**For any change to Stage 0's scheduling, chunking or ordering, the bar is
-byte-identical output.** Bank the parquet files from `smoke/stage0/` before your change,
+For any change to Stage 0's scheduling, chunking or ordering, the bar is
+byte-identical output. Bank the parquet files from `smoke/stage0/` before your change,
 re-run after, and compare with `sha256sum`. This is possible because Stage 0 sorts
 canonically before export, and it is the only way to tell a real change from a reshuffle.
-The audit tables must match too -- the data reports reconstruct each chunk's filter
+The audit tables must match too, because the data reports reconstruct each chunk's filter
 sequence from row order.
 
-Then:
+Then do the following.
 
-1. **Check logs** for errors or warnings
-2. **Verify outputs** match the published schema (21 columns from Stage 0, 44 from Stage 1)
-3. **Run on a small sample** before the full dataset: the smoke test above (`qsub
-   run_smoke_test.sh` on WRDS, 5 chunks by default) writes only to `smoke/`. (`STAGE0_LIMIT_CHUNKS=5 ./run_pipeline.sh` also works, but writes into the real
+1. Check the logs for errors or warnings
+2. Verify that the outputs match the published schema (21 columns from Stage 0, 44 from Stage 1)
+3. Run on a small sample before the full dataset. The smoke test above (`qsub
+   run_smoke_test.sh` on WRDS, 5 chunks by default) writes only to `smoke/`. (`STAGE0_LIMIT_CHUNKS=5 ./run_pipeline.sh` also works, but writes into the production
    `stage0/` and `stage1/` folders.)
 
 ## License
@@ -132,15 +134,12 @@ By contributing, you agree that your contributions will be licensed under the MI
 
 ## Questions?
 
-If you have questions about contributing, feel free to:
-- Open an issue for discussion
-- Email: alexander.dickerson1@unsw.edu.au
+If you have questions about contributing, open an issue for discussion or email
+alexander.dickerson1@unsw.edu.au.
 
 ## Recognition
 
-Contributors will be acknowledged in:
+Contributors will be acknowledged in these places.
 - The project README
 - Release notes for significant contributions
 - The academic paper underlying this data
-
-Thank you for helping improve the TRACE Data Pipeline!

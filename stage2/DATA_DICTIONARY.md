@@ -61,56 +61,56 @@ This document describes the variables computed in the Stage 2 bond data pipeline
 
 All data in the panel is sampled at the end of month $t$, with one exception. `lib` and `libd` sit on the row for month $t$ and measure the price move from that month-end to the first trade of month $t+1$, so they look one month ahead. They describe a cost, and are not signals to sort on. See [Latent Implementation Bias](#latent-implementation-bias-lib).
 
-**Sample start dates:** Most signals have a sample start date of 2002-08, including those that require a rolling estimation period. Signals requiring rolling data use ICE/BofA data to generate observations prior to 2002-08, enabling a consistent start date of 2002-08 for the main panel. Rolling signals that require TRACE-based illiquidity data (e.g., Amihud and Pastor-Stambaugh liquidity betas) start 2003-07.
+Most signals start in 2002-08, including those that need a rolling estimation period. The rolling signals use ICE/BofA data for the months before 2002-08, so the main panel has one start date, 2002-08. Rolling signals that need TRACE-based illiquidity data (e.g., Amihud and Pastor-Stambaugh liquidity betas) start in 2003-07.
 
 Several datasets are available on the [Open Source Bond Asset Pricing](https://openbondassetpricing.com/) website.
 
 ### Market Microstructure Adjusted Signals and Returns
 
-The main panel includes several identifiers, additional variables, and signals. As standard, we provide market microstructure-adjusted (MMN) price-based signals, which includes all variables related to bond price, yield, spread, value, illiquidity, within-month risk, and daily betas. The signals employ a minimum 1-business day gap before the month-end price used for returns. In the 2026 vintage the average (median) gap is 1.66 (1) business days. The maximum allowed gap is capped at 10 business days, and long gaps are rare (the 95th percentile is 5 days and the 99th is 7). The methodology is outlined in the [Signal Gap](#signal-gap-for-price-based-signals) section below.
+The main panel has identifiers, signals and some additional variables. Its price-based signals are market microstructure-adjusted (MMN) as standard. That covers every variable related to bond price, yield, spread, value, illiquidity, within-month risk and daily betas. The signals use a gap of at least 1 business day before the month-end price used for returns. In the 2026 vintage the average (median) gap is 1.66 (1) business days. The gap is capped at 10 business days, and long gaps are rare (the 95th percentile is 5 days and the 99th is 7). The [Signal Gap](#signal-gap-for-price-based-signals) section below gives the method.
 
-**Main panel usage:** Use month-end returns (`ret_vw`) with the MMN-adjusted signals provided in the main panel.
+Use month-end returns (`ret_vw`) with the MMN-adjusted signals in the main panel.
 
-As an alternative, researchers may access and download the unadjusted (noisy) price-based signals from [openbondassetpricing.com](https://openbondassetpricing.com/). The file is named `mmn_price_based_signals_<YYYY>.parquet` (`mmn_price_based_signals_<stamp>.parquet` in your own build); all variables in this file have the suffix `_mmn` (e.g., `ytm_mmn`, `cs_mmn`, `val_hz_mmn`).
+The unadjusted (noisy) price-based signals can be downloaded from [openbondassetpricing.com](https://openbondassetpricing.com/). The file is named `mmn_price_based_signals_<YYYY>.parquet` (`mmn_price_based_signals_<stamp>.parquet` in your own build). Every variable in it has the suffix `_mmn` (e.g., `ytm_mmn`, `cs_mmn`, `val_hz_mmn`).
 
-**Noisy signals usage:** If using signals from `mmn_price_based_signals_<YYYY>.parquet`, you **must** use month-begin returns (`ret_vw_bgn`) to avoid microstructure bias.
+If you use signals from `mmn_price_based_signals_<YYYY>.parquet`, you **must** use month-begin returns (`ret_vw_bgn`) to avoid microstructure bias.
 
-Our recommendation is to use the main panel data as provided with `ret_vw`. However, results are extremely similar using either method.
+We recommend the main panel as provided, with `ret_vw`. The two methods give extremely similar results.
 
 ### Excess and Duration-Adjusted Return-Based Signals
 
-The main panel assumes researchers will form factors with excess returns, $r - r^{f}$, computed from the panel as `ret_vw - rfret`. If research designs instead rely on duration-adjusted returns, $r^{x} = r - r^{Tsy}$ — which is what **`ret_vwx` means throughout this document, namely `ret_vw - tret`** — we provide signals specifically computed with duration-adjusted returns. These include all factor betas in `betas_x_<YYYY>.parquet` and momentum/long-term reversal variables in `mom_retx_<YYYY>.parquet`, where `<YYYY>` is the vintage year of the release (see [Output Files](#output-files)).
+The main panel assumes researchers will form factors with excess returns, $r - r^{f}$, computed from the panel as `ret_vw - rfret`. For research designs that use duration-adjusted returns, $r^{x} = r - r^{Tsy}$, we provide signals computed with those returns. Throughout this document `ret_vwx` means that return, namely `ret_vw - tret`. The signals are all the factor betas, in `betas_x_<YYYY>.parquet`, and the momentum and long-term reversal variables, in `mom_retx_<YYYY>.parquet`, where `<YYYY>` is the vintage year of the release (see [Output Files](#output-files)).
 
-> `ret_vwx` is **only** the duration-adjusted return. There is no column for the excess return; subtract `rfret` from `ret_vw` yourself if that is what you want.
+> `ret_vwx` is only the duration-adjusted return. There is no column for the excess return. Subtract `rfret` from `ret_vw` yourself if that is what you want.
 
-The Treasury return `tret` is the U.S. Treasury bond return that is duration-matched to each corporate bond's modified duration on its month-end trade (the unadjusted duration, not the gap-adjusted `md_dur`). For each bond $i$ in each month $t$, we linearly interpolate using key rate U.S. Treasury bond returns from WRDS and the bond's modified duration, following the method of Andreani, Palhares, and Richardson (2024).
+The Treasury return `tret` is the U.S. Treasury bond return that is duration-matched to each corporate bond's modified duration on its month-end trade (the unadjusted duration, not the gap-adjusted `md_dur`). For each bond $i$ in each month $t$, we interpolate linearly between the key rate U.S. Treasury bond returns from WRDS at the bond's modified duration, following the method of Andreani, Palhares, and Richardson (2024).
 
 The short-term reversal signal can be computed as the current `str` variable minus `tret`. This signal is already MMN-adjusted in the main panel.
 
 ### Alternative Month-End Returns
 
-For researchers requiring alternative return measures, we publish
+For researchers who need other return measures, we publish
 `returns_alt_<YYYY>.parquet`. It is keyed on `cusip` + `date` like the main panel, and each
-column differs from `ret_vw` only in which price is used at each month end:
+column differs from `ret_vw` only in which price is used at each month end.
 
 | Column | Type | Definition |
 |---|---|---|
 | `cusip` | string | 9-character bond CUSIP. Panel key with `date`. |
 | `date` | datetime | Calendar month end. Panel key with `cusip`. |
-| `ret_vwp` | float32 | Return computed from **par-weighted** prices on day $d$. |
-| `ret_ew` | float32 | Return computed from **equal-weighted** prices on day $d$. |
-| `ret_1st` | float32 | Return computed from the **first** available trade price on day $d$. |
-| `ret_lst` | float32 | Return computed from the **last** available trade price on day $d$. |
-| `ret_bid` | float32 | Return computed from the volume-weighted average **bid** price on day $d$. |
+| `ret_vwp` | float32 | Return computed from par-weighted prices on day $d$. |
+| `ret_ew` | float32 | Return computed from equal-weighted prices on day $d$. |
+| `ret_1st` | float32 | Return computed from the first available trade price on day $d$. |
+| `ret_lst` | float32 | Return computed from the last available trade price on day $d$. |
+| `ret_bid` | float32 | Return computed from the volume-weighted average bid price on day $d$. |
 | `tret` | float32 | Duration-matched Treasury return, as in the main panel. |
 
-where day $d$ is in the last 5 business days of months $t$ and $t+1$. The five alternative
+Day $d$ is in the last 5 business days of months $t$ and $t+1$. The five alternative
 Treasury benchmarks (`tret_bns` and the rest) are in the main panel only, not in this file.
 
-All five return measures use the same total-return construction as `ret_vw` -- the coupon is
-carried through accrued interest, not inferred from a dirty-price ratio -- so they differ from
-each other and from `ret_vw` only in the price input. The exception is a default row: on
-`default_evnt` rows, and `trad_in_def` rows where the column has a value, every alternative
+All five return measures use the same total-return construction as `ret_vw`. The coupon comes
+in through accrued interest and is not inferred from a dirty-price ratio. So they differ from
+each other and from `ret_vw` only in the price input. Default rows are the exception. On
+`default_evnt` rows, and on `trad_in_def` rows where the column has a value, every alternative
 return is set to `ret_vw`.
 
 ---
@@ -353,44 +353,41 @@ For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month r
 
 ## Redaction: the file you download is not the file the pipeline builds
 
-Four columns differ between a panel **you build** from your own WRDS subscription and the panel
-**published** at openbondassetpricing.com. The identifiers are proprietary and the agency ratings
-are licensed, so redistribution is restricted -- building them yourself is not.
+Four columns differ between a panel you build from your own WRDS subscription and the panel
+published at openbondassetpricing.com. The identifiers are proprietary and the agency ratings
+are licensed, so redistribution is restricted. Building them yourself is not.
 
 | column | in your build | in the published file |
 |---|---|---|
-| `permno` | populated | **populated** (kept) |
+| `permno` | populated | populated (kept) |
 | `permco` | populated | null |
 | `gvkey` | populated | null |
 | `spc_rat` | 1..22 | 1 = investment grade, 11 = non-investment grade and default |
 | `mdc_rat` | 1..22 | 1 = investment grade, 11 = non-investment grade and default |
 
-A bond with no rating stays missing in both -- it is never silently labelled investment grade.
+A bond with no rating stays missing in both. It is never labelled investment grade.
 
-This is applied by `make_release.redact_for_publication`, and `make_release.assert_publishable`
-refuses to package a frame that still carries full identifiers or raw ratings. Measured against
-the released vintage: `permco` and `gvkey` are 100% null there and ratings take only {1, 11}.
+`make_release.redact_for_publication` applies this, and `make_release.assert_publishable`
+refuses to package a frame that still has full identifiers or raw ratings. Measured on the
+released vintage, `permco` and `gvkey` are 100% null and the ratings take only {1, 11}.
 In the raw 2026 build `permco` and `gvkey` are 88.8% / 88.7% populated, and both ratings are
 present on every row, on the full 1..22 scale.
 
 ## Bond Returns
 
-Monthly bond returns are computed from volume-weighted clean prices, accrued interest, and coupon payments. We compute two return types based on the measurement window.
+Monthly bond returns are computed from volume-weighted clean prices, accrued interest and coupon payments. We compute two returns, which differ in the measurement window.
 
 ---
 
 ### Month-End Return (`ret_vw`)
 
-The month-end return measures performance from the end of month $t$ to the end of month $t+1$:
+The month-end return runs from the end of month $t$ to the end of month $t+1$.
 
 $$r_{i,t+1}^{End} = \frac{P_{i,t+1} + AI_{i,t+1} + C_{i,t+1}}{P_{i,t} + AI_{i,t}} - 1$$
 
-where:
-- $P_{i,t+1}$ = volume-weighted clean price at month-end $t+1$
-- $AI_{i,t+1}$ = accrued interest at month-end $t+1$
-- $C_{i,t+1}$ = coupon payment during month $t+1$ (if any)
+where $P_{i,t+1}$ is the volume-weighted clean price at month-end $t+1$, $AI_{i,t+1}$ is the accrued interest at month-end $t+1$ and $C_{i,t+1}$ is the coupon payment during month $t+1$ (if any).
 
-**Validity Criterion:** A month-end return is valid only if the bond trades within the last 5 business days of both month $t$ and month $t+1$ (NYSE calendar).
+A month-end return is valid only if the bond trades within the last 5 business days of both month $t$ and month $t+1$ (NYSE calendar).
 
 ```
                       MONTH-END RETURN TIMELINE
@@ -426,15 +423,13 @@ where:
 
 ### Month-Begin Return (`ret_vw_bgn`)
 
-The month-begin return measures performance within a single month, from the beginning to the end:
+The month-begin return runs within a single month, from its beginning to its end.
 
 $$r_{i,t+1}^{Bgn} = \frac{P_{i,t+1}^{end} + AI_{i,t+1}^{end} + C_{i,t+1}}{P_{i,t+1}^{bgn} + AI_{i,t+1}^{bgn}} - 1$$
 
-where:
-- $P_{i,t+1}^{end}, AI_{i,t+1}^{end}$ = price and accrued interest from the last 5 business days of month $t+1$
-- $P_{i,t+1}^{bgn}, AI_{i,t+1}^{bgn}$ = price and accrued interest from the first 5 business days of month $t+1$
+where $P_{i,t+1}^{end}, AI_{i,t+1}^{end}$ are the price and accrued interest from the last 5 business days of month $t+1$, and $P_{i,t+1}^{bgn}, AI_{i,t+1}^{bgn}$ are the price and accrued interest from the first 5 business days of month $t+1$.
 
-**Validity Criterion:** A month-begin return is valid only if the bond trades within both the first 5 and last 5 business days of month $t+1$ (NYSE calendar).
+A month-begin return is valid only if the bond trades within both the first 5 and last 5 business days of month $t+1$ (NYSE calendar).
 
 ```
                      MONTH-BEGIN RETURN TIMELINE
@@ -474,7 +469,7 @@ where:
 
 The implementation gap measures how long a trader waits, once the month has turned, for the first trade. On the row for month $t$, `igap_bgn` counts the NYSE sessions from the last session of month $t-1$ to the month-begin trade of month $t$ (`dt_s_bgn`). It runs 1 to 5, because the month-begin trade must fall in the first 5 sessions of the month.
 
-It is measured from the last SESSION of month $t-1$, whether or not the bond traded that day. It is not measured from the bond's own month-end trade, which can sit up to 4 sessions earlier.
+It is measured from the last session of month $t-1$, whether or not the bond traded that day. It is not measured from the bond's own month-end trade, which can sit up to 4 sessions earlier.
 
 ```
                         IMPLEMENTATION GAP TIMELINE
@@ -505,19 +500,17 @@ It is measured from the last SESSION of month $t-1$, whether or not the bond tra
 
 ### Latent Implementation Bias (`lib`)
 
-The **Latent Implementation Bias (LIB)** captures the cost of not being able to trade at the signal observation price.
+The Latent Implementation Bias (LIB) is the cost of not being able to trade at the signal observation price.
 
-**Motivation:** A representative trader who observes a price-based signal at the end of month $t$ cannot trade at that exact price. Instead, they must wait until the next trading opportunity—the first available price in month $t+1$. The month-begin return framework accounts for this by using the month-begin price as the entry point.
+A representative trader who observes a price-based signal at the end of month $t$ cannot trade at that exact price. They must wait for the next trading opportunity, which is the first available price in month $t+1$. The month-begin return accounts for this by using the month-begin price as the entry point.
 
-**LIB** is the clean price return between the signal observation price and the actual execution price:
+LIB is the clean price return between the signal observation price and the execution price.
 
 $$\text{LIB}_{i,t+1} = \frac{P_{i,t+1}^{bgn}}{P_{i,t}} - 1$$
 
-where:
-- $P_{i,t}$ = month-end clean price at $t$ (signal observation price, denominator of $r^{End}$)
-- $P_{i,t+1}^{bgn}$ = month-begin clean price at $t+1$ (execution price, denominator of $r^{Bgn}$)
+where $P_{i,t}$ is the month-end clean price at $t$ (the signal observation price, the denominator of $r^{End}$) and $P_{i,t+1}^{bgn}$ is the month-begin clean price at $t+1$ (the execution price, the denominator of $r^{Bgn}$).
 
-**Which row it sits on.** In the panel the value is stored on the row for month $t$, the month of the end price it follows. So `lib` on a row dated month $t$ is the gap that comes AFTER that row's `ret_vw`, and it lines up with the NEXT row's `ret_vw_bgn`. `igap_bgn` runs the other way: on the row for month $t$ it looks back to the last session of month $t-1$.
+In the panel the value is stored on the row for month $t$, the month of the end price it follows. So `lib` on a row dated month $t$ is the gap that comes after that row's `ret_vw`, and it lines up with the next row's `ret_vw_bgn`. `igap_bgn` runs the other way. On the row for month $t$ it looks back to the last session of month $t-1$.
 
 ```
              LATENT IMPLEMENTATION BIAS: SIGNAL TO EXECUTION
@@ -550,23 +543,20 @@ where:
    └─────────────────────────────────────────────────────────────────┘
 ```
 
-**Interpretation:**
-- **LIB > 0**: Price rose between signal observation and execution (adverse move for buyers)
-- **LIB < 0**: Price fell between signal observation and execution (favorable move for buyers)
-- Month-begin returns remove LIB, providing a cleaner measure of implementable returns
+When LIB > 0 the price rose between signal observation and execution, an adverse move for buyers. When LIB < 0 the price fell, a favorable move for buyers. Month-begin returns remove LIB, so they are a cleaner measure of implementable returns.
 
 | Variable | Description |
 |----------|-------------|
-| `lib` | Latent Implementation Bias: $(P_{i,t+1}^{bgn} / P_{i,t}) - 1$ (clean price return), stored on the row for month $t$ |
-| `libd` | Latent Implementation Bias Dirty: uses dirty prices (includes accrued interest), stored on the row for month $t$ |
+| `lib` | Latent Implementation Bias, $(P_{i,t+1}^{bgn} / P_{i,t}) - 1$ (clean price return), stored on the row for month $t$ |
+| `libd` | Latent Implementation Bias Dirty, which uses dirty prices (includes accrued interest), stored on the row for month $t$ |
 
 ---
 
 ### Signal Gap for Price-Based Signals
 
-The **Signal Gap** addresses market microstructure noise in price-based signals. When forming portfolios based on signals derived from bond prices (yields, spreads, value measures), using the same price for both the signal and the return denominator introduces a mechanical relationship that can bias results.
+The Signal Gap deals with market microstructure noise in price-based signals. When portfolios are formed on signals derived from bond prices (yields, spreads, value measures), using the same price for both the signal and the return denominator creates a mechanical relationship that can bias results.
 
-To address this, we compute price-based signals using prices observed **at least 1 business day before** the month-end price used for returns. The variable `sig_gap` records the number of business days between signal observation (`sig_dt`) and the month-end price date (`dt_e`).
+So we compute price-based signals from prices observed at least 1 business day before the month-end price used for returns. The variable `sig_gap` records the number of business days between signal observation (`sig_dt`) and the month-end price date (`dt_e`).
 
 ```
                    SIGNAL GAP FOR PRICE-BASED SIGNALS
@@ -599,7 +589,7 @@ To address this, we compute price-based signals using prices observed **at least
    └─────────────────────────────────────────────────────────────────┘
 ```
 
-**MMN-adjusted signals in main panel:** The following variables are computed with the 1–10 BD signal gap and are provided as standard in the main TRACE panel downloads:
+The MMN-adjusted signals in the main panel are listed below. They are computed with the 1 to 10 BD signal gap and are provided as standard in the main TRACE panel downloads.
 
 | Category | Variables |
 |----------|-----------|
@@ -611,37 +601,34 @@ To address this, we compute price-based signals using prices observed **at least
 | Within-Month Risk | `dvol`, `dskew`, `dkurt`, `dvol_sys`, `dvol_idio`, `rvol`, `rsj`, `rsk`, `rkt` |
 | Within-Month Betas | `db_mkt`, `b_vix`, `b_dvixd` |
 
-The 1-10 business-day window applies to the price-read signals (yields, spreads, value, size,
-`str`). A bond-month with no trade in that window has none of them: on the 2026-09-21 panel
-`ytm`, `cs` and `md_dur` are empty on 67,234 of 1,950,002 rows (3.45%), almost all of which
-carry the unadjusted twin. The illiquidity and within-month risk measures are adjusted another
-way: they leave out the bond's last trading day in the month.
+The window of 1 to 10 business days applies to the price-read signals (yields, spreads, value,
+size, `str`). A bond-month with no trade in that window has none of them. On the 2026-09-21
+panel `ytm`, `cs` and `md_dur` are empty on 67,234 of 1,950,002 rows (3.45%), and almost all of
+those rows have the unadjusted twin. The illiquidity and within-month risk measures are adjusted
+another way, by leaving out the bond's last trading day in the month.
 
-**Usage with main panel:** Use month-end returns (`ret_vw`) with the MMN-adjusted signals above.
+Use month-end returns (`ret_vw`) with the MMN-adjusted signals above.
 
-**Noisy versions available separately:** The unadjusted (noisy) versions of all signals above are provided in `mmn_price_based_signals_<YYYY>.parquet` with the `_mmn` suffix (e.g., `ytm_mmn`, `cs_mmn`, `val_hz_mmn`, `ami_mmn`, etc.).
+The unadjusted (noisy) versions of all the signals above are in `mmn_price_based_signals_<YYYY>.parquet`, with the `_mmn` suffix (e.g., `ytm_mmn`, `cs_mmn`, `val_hz_mmn`, `ami_mmn`, etc.).
 
-**Usage with noisy signals:** If using signals from `mmn_price_based_signals_<YYYY>.parquet`, you **must** use month-begin returns (`ret_vw_bgn`) to avoid microstructure bias. Both methods produce similar results.
+If you use signals from `mmn_price_based_signals_<YYYY>.parquet`, you must use month-begin returns (`ret_vw_bgn`) to avoid microstructure bias. Both methods produce similar results.
 
 | Variable | Description |
 |----------|-------------|
 | `sig_dt` | Date when price-based signal was observed (minimum 1 BD before `dt_e`) |
-| `sig_gap` | Business days between signal observation and month-end price; ranges 1–10 BD |
+| `sig_gap` | Business days between signal observation and month-end price, from 1 to 10 BD |
 
 ---
 
 ### The Three Approaches
 
-We compare portfolio performance using three approaches that differ in signal timing and return measurement:
+We compare portfolio performance under three approaches that differ in signal timing and return measurement.
 
-**Approach 1: With Noise.**
-Uses the month-end price $P_t^{\text{end}}$ in *both* the signal and return computation. Portfolio weights $\omega_t$ are computed from signals observed at $P_t^{\text{end}}$, and returns are the standard month-end returns $r_{t+1}^{\text{End}}$. This creates mechanical correlation between signal and return, potentially biasing factor performance upward.
+Approach 1, With Noise, uses the month-end price $P_t^{\text{end}}$ in both the signal and the return computation. Portfolio weights $\omega_t$ are computed from signals observed at $P_t^{\text{end}}$, and returns are the standard month-end returns $r_{t+1}^{\text{End}}$. Signal and return are then mechanically correlated, which can bias factor performance upward.
 
-**Approach 2: Adjusted Signal (Default in Main Panel).**
-Uses signals computed with at least a 1-business day gap before $P_t^{\text{end}}$, breaking the mechanical correlation. Portfolio weights $\omega_t^{a}$ are computed from gapped signals at $P_{t-\Delta}^{s}$ where $\Delta \geq 1$ BD (max 10 BD). Returns remain the standard month-end returns $r_{t+1}^{\text{End}}$.
+Approach 2, Adjusted Signal, is the default in the main panel. It uses signals computed with a gap of at least 1 business day before $P_t^{\text{end}}$, which breaks the mechanical correlation. Portfolio weights $\omega_t^{a}$ are computed from gapped signals at $P_{t-\Delta}^{s}$ where $\Delta \geq 1$ BD (max 10 BD). Returns remain the standard month-end returns $r_{t+1}^{\text{End}}$.
 
-**Approach 3: Adjusted Return.**
-Uses the same signal timing as Approach 1, but returns are computed from month-begin to month-end within month $t+1$. Portfolio weights $\omega_t$ are computed from $P_t^{\text{end}}$, but returns are the month-begin returns $r_{t+1}^{\text{Bgn}}$. This captures the *implementable* return for a trader observing a signal at month-end.
+Approach 3, Adjusted Return, keeps the signal timing of Approach 1 and computes returns from month-begin to month-end within month $t+1$. Portfolio weights $\omega_t$ are computed from $P_t^{\text{end}}$, and returns are the month-begin returns $r_{t+1}^{\text{Bgn}}$. This is the implementable return for a trader who observes a signal at month-end.
 
 ```
                     THE THREE APPROACHES
@@ -666,64 +653,61 @@ Uses the same signal timing as Approach 1, but returns are computed from month-b
    Fix:     Implementable return (trade at month-begin)
 ```
 
-**Note:** Approaches 2 and 3 are both "cleaned" of microstructure noise, while Approach 1 is noisy. The main panel uses Approach 2 by default.
+Approaches 2 and 3 are both "cleaned" of microstructure noise, while Approach 1 is noisy. The main panel uses Approach 2 by default.
 
 ---
 
 ### Feasibility Bias
 
-The **Feasibility Bias** quantifies the inflation in factor performance due to market microstructure noise. We compute two bias measures:
+The Feasibility Bias measures how much market microstructure noise inflates factor performance. We compute two bias measures.
 
-**Bias (1)−(2): Signal Adjustment.**
+The first is Bias (1)−(2), Signal Adjustment.
 
 $$\text{Bias}_{1-2} = (\omega_t - \omega_t^{a}) \times r_{t+1}^{\text{End}}$$
 
-This measures the bias from using different weights (noisy vs. gapped signal) while holding the return constant.
+It is the bias from using different weights (noisy vs. gapped signal) while holding the return constant.
 
-**Bias (1)−(3): Return Adjustment.**
+The second is Bias (1)−(3), Return Adjustment.
 
 $$\text{Bias}_{1-3} = \omega_t \times (r_{t+1}^{\text{End}} - r_{t+1}^{\text{Bgn}})$$
 
-This measures the bias from using the same weights but different returns (month-end vs. month-begin).
+It is the bias from using the same weights but different returns (month-end vs. month-begin).
 
-**Interpretation:**
-- Positive bias indicates the noisy approach (Approach 1) overstates factor performance
-- The magnitude of bias varies by signal type—price-based signals (value, spreads) typically show larger bias than return-based signals (momentum, betas)
-- Both bias measures should be small for well-constructed factors
+A positive bias means the noisy approach (Approach 1) overstates factor performance. The size of the bias varies by signal type. Price-based signals (value, spreads) typically show a larger bias than return-based signals (momentum, betas). Both bias measures should be small for well-constructed factors.
 
 ---
 
 ### Excess and Duration-Adjusted Returns
 
-Users can compute adjusted returns from the variables in the main panel:
+Adjusted returns can be computed from the variables in the main panel.
 
-**Excess returns** remove the risk-free rate:
+Excess returns remove the risk-free rate.
 
 $$r_{i,t+1}^{x} = r_{i,t+1} - r_{t+1}^{f}$$
 
-Compute as: `ret_vw - rfret` (month-end) or `ret_vw_bgn - rfret` (month-begin)
+Compute them as `ret_vw - rfret` (month-end) or `ret_vw_bgn - rfret` (month-begin).
 
-**Duration-adjusted returns** remove systematic interest rate exposure by subtracting the return on a duration-matched U.S. Treasury bond:
+Duration-adjusted returns remove systematic interest rate exposure by subtracting the return on a duration-matched U.S. Treasury bond.
 
 $$r_{i,t+1}^{x} = r_{i,t+1} - r_{i,t+1}^{Tsy}$$
 
-Compute as: `ret_vw - tret` (month-end) or `ret_vw_bgn - tret` (month-begin)
+Compute them as `ret_vw - tret` (month-end) or `ret_vw_bgn - tret` (month-begin).
 
 | Variable | Description |
 |----------|-------------|
-| `tret` | Duration-matched U.S. Treasury return; linearly interpolated from WRDS key rate Treasury returns at the bond's modified duration on its month-end trade, rounded to 2 decimals (the unadjusted duration, not the gap-adjusted `md_dur`) |
-| `tret_bns` | Treasury benchmark from the bond's OWN cash flows, present-value (duration) weighted, on the Gurkaynak-Sack-Wright zero curve (van Binsbergen, Nozawa & Schwert) |
-| `tret_cfm` | The same ladder weighted by future value instead of present value; overstates interest rate risk (their Internet Appendix A1) |
-| `tret_gprs` | The exact duration match: present-value weights are duration-matched only on a flat curve, so the Treasury yield is solved for and the weights restated (Ghaderi, Plante, Roussanov & Seo, App. B.2) |
-| `tret_cls` | The CASH-FLOW match: the same ladder discounted on the Treasury curve rather than the bond's own yield, so it also removes slope and curvature, not just parallel shifts (Cui, Lu & Song 2026) |
-| `tret_mat` | `tret`'s twin -- same series, nodes and rounding, interpolated at MATURITY rather than modified duration (Bessembinder, Kahle, Maxwell & Xu 2009) |
+| `tret` | Duration-matched U.S. Treasury return, linearly interpolated from WRDS key rate Treasury returns at the bond's modified duration on its month-end trade, rounded to 2 decimals (the unadjusted duration, not the gap-adjusted `md_dur`) |
+| `tret_bns` | Treasury benchmark from the bond's own cash flows, present-value (duration) weighted, on the Gurkaynak-Sack-Wright zero curve (van Binsbergen, Nozawa & Schwert) |
+| `tret_cfm` | The same ladder weighted by future value instead of present value. It overstates interest rate risk (their Internet Appendix A1) |
+| `tret_gprs` | The exact duration match. Present-value weights are duration-matched only on a flat curve, so the Treasury yield is solved for and the weights restated (Ghaderi, Plante, Roussanov & Seo, App. B.2) |
+| `tret_cls` | The cash-flow match. The same ladder is discounted on the Treasury curve instead of at the bond's own yield, so it removes slope and curvature as well as parallel shifts (Cui, Lu & Song 2026) |
+| `tret_mat` | The twin of `tret`, with the same series, nodes and rounding, interpolated at maturity instead of modified duration (Bessembinder, Kahle, Maxwell & Xu 2009) |
 | `rfret` | Monthly risk-free rate from Fama-French |
 
-> **The five alternative `tret_*` columns are benchmarks only — nothing else in the panel uses
-> them.** The panel's 68 rolling beta and momentum columns are estimated on the bond's
-> monthly returns: the month-end return before the cap on trading-in-default returns (so it can
-> differ from `ret_vw` on the few capped rows), or the month-begin return where a month has none,
-> with the quote-based returns before 2002-07 in front of them. Their
+> The five alternative `tret_*` columns are benchmarks only. Nothing else in the panel uses
+> them. The panel's 68 rolling beta and momentum columns are estimated on the bond's
+> monthly returns. That is the month-end return before the cap on trading-in-default returns
+> (so it can differ from `ret_vw` on the few capped rows), or the month-begin return where a
+> month has none, with the quote-based returns before 2002-07 in front of them. Their
 > duration-adjusted versions, on `ret_vw - tret`, ship as separate blocks (`betas_x`, 51 columns,
 > and `mom_retx`, 17), and `stage2/make_excess_blocks.py` re-estimates those 68 on `tret_bns` or
 > `tret_cls` (see "Alternative Treasury benchmarks" in `README_stage2.md`).
@@ -732,25 +716,26 @@ Compute as: `ret_vw - tret` (month-end) or `ret_vw_bgn - tret` (month-begin)
 
 ## Defaulted Bond Returns
 
-When bonds enter or trade under default, coupon payments cease and the return formulas are adjusted accordingly. Default status is determined by credit ratings.
+When a bond enters default or trades under default, coupon payments stop and the return formulas are adjusted for that. Credit ratings determine default status.
 
 ### Default Identification
 
-We use the raw agency ratings from the stage 1 daily panel, `sp_rating` and `mdy_rating`, to identify default status. Step 1 calls them `sp_rat` and `mdy_rat`, the names below; neither is a column of the published panel, which carries the composite ratings `spc_rat` and `mdc_rat`:
+We use the raw agency ratings from the stage 1 daily panel, `sp_rating` and `mdy_rating`, to identify default status. Step 1 calls them `sp_rat` and `mdy_rat`, the names used below. Neither is a column of the published panel, which has the composite ratings `spc_rat` and `mdc_rat`.
 
 | Rating Agency | Variable | Default Level |
 |--------------|----------|---------------|
 | S&P | `sp_rat` | 22 |
 | Moody's | `mdy_rat` | 21 |
 
-**A bond is considered in default if:**
-- `sp_rat == 22` **OR** `mdy_rat == 21`
+A bond is considered in default if `sp_rat == 22` or `mdy_rat == 21`. Moody's raw scale stops at
+21, its default grade, and the composite ratings (`spc_rat`, `mdc_rat`) move it to 22. The diagrams
+below use that composite scale, so "rating = 22" there means in default with either agency.
 
 ---
 
 ### Standard Return (Non-Default)
 
-For bonds not in default, we use the standard total return formula with dirty prices:
+For bonds not in default, we use the standard total return formula with dirty prices.
 
 $$r_{i,t+1}^{std} = \frac{P_{i,t+1}^{dirty} + C_{i,t+1} - P_{i,t}^{dirty}}{P_{i,t}^{dirty}}$$
 
@@ -781,7 +766,7 @@ where $P^{dirty} = P^{clean} + AI$ (clean price plus accrued interest).
 
 ### Default Event Return
 
-When a bond **transitions INTO default**, coupon payments cease immediately. The return compares the clean price at default to the prior dirty price:
+When a bond moves into default, coupon payments stop at once. The return compares the clean price at default to the prior dirty price.
 
 $$r_{i,t+1}^{def} = \frac{P_{i,t+1}^{clean} - P_{i,t}^{dirty}}{P_{i,t}^{dirty}}$$
 
@@ -817,7 +802,7 @@ $$r_{i,t+1}^{def} = \frac{P_{i,t+1}^{clean} - P_{i,t}^{dirty}}{P_{i,t}^{dirty}}$
 
 ### Trading Under Default (Flat Return)
 
-When a bond **remains in default**, there are no coupon accruals. Returns are based solely on clean price changes:
+While a bond remains in default, no coupon accrues. Returns are based only on clean price changes.
 
 $$r_{i,t+1}^{flat} = \frac{P_{i,t+1}^{clean}}{P_{i,t}^{clean}} - 1$$
 
@@ -859,25 +844,25 @@ $$r_{i,t+1}^{flat} = \frac{P_{i,t+1}^{clean}}{P_{i,t}^{clean}} - 1$$
 | Default Event | Enters default | $(P_{t+1}^{clean} - P_t^{dirty}) / P_t^{dirty}$ | `default_evnt` |
 | Trading Under Default | Remains in default | $P_{t+1}^{clean} / P_t^{clean} - 1$ | `trad_in_def` |
 
-**Note:** The same logic applies to both month-end (`ret_vw`) and month-begin (`ret_vw_bgn`) returns.
+The same logic applies to both month-end (`ret_vw`) and month-begin (`ret_vw_bgn`) returns.
 A `trad_in_def` return is capped at the standard return `ret_std` (`stage2/steps/step1_returns.py`).
 
 ---
 
 ## Technical Appendix
 
-This appendix provides detailed methodology for factor models, beta estimation, and signal computation.
+This appendix gives the method for the factor models, the beta estimation and the signal computation.
 
 ---
 
 ### Factor Models
 
-Rolling betas are estimated using a 36-month rolling window with a minimum of 12 observations. For each factor model, betas are computed twice:
+Rolling betas are estimated on a 36-month rolling window with a minimum of 12 observations. For each factor model, betas are computed twice.
 
-1. **Standard returns** (`ret_vw`): Value-weighted bond returns
-2. **Duration-adjusted returns** (`ret_vwx`): `ret_vwx = ret_vw - tret`
+1. On standard returns (`ret_vw`), the value-weighted bond returns.
+2. On duration-adjusted returns (`ret_vwx`), with `ret_vwx = ret_vw - tret`.
 
-where `tret` is the matched Treasury return based on bond duration.
+Here `tret` is the matched Treasury return based on bond duration.
 
 | Model | Factors | Outputs Kept | SUM Operation | ivol |
 |-------|---------|--------------|---------------|------|
@@ -923,7 +908,7 @@ where `tret` is the matched Treasury return based on bond duration.
 
 ### Duration-Adjusted Factor Substitution
 
-When computing betas with duration-adjusted returns (`ret_vwx`), bond market factors are replaced with their duration-adjusted equivalents:
+When betas are computed with duration-adjusted returns (`ret_vwx`), the bond market factors are replaced with their duration-adjusted equivalents.
 
 | Standard Factor | Duration-Adjusted Factor |
 |-----------------|--------------------------|
@@ -932,11 +917,11 @@ When computing betas with duration-adjusted returns (`ret_vwx`), bond market fac
 | `crf` | `crfx` |
 | `lrf` | `lrfx` |
 
-`term` is the same in `betas_x` as in the panel: it is already the gap to the `tret`-adjusted
-market. On the `_bns` and `_cls` benchmarks it is replaced by `term_bns` and `term_cls`. The
-square, downside and upside parts of the market
-(`mktb_sq`, `mktb_down`, `mktb_up`) are built from the raw `mktb` and are not swapped, so in
-`betas_x` the coskewness and the downside and upside betas still load on the raw market.
+`term` is the same in `betas_x` as in the panel, because it is already the gap to the
+`tret`-adjusted market. On the `_bns` and `_cls` benchmarks it is replaced by `term_bns` and
+`term_cls`. The square, downside and upside parts of the market (`mktb_sq`, `mktb_down`,
+`mktb_up`) are built from the raw `mktb` and are not swapped, so in `betas_x` the coskewness
+and the downside and upside betas still load on the raw market.
 
 ---
 
@@ -944,15 +929,11 @@ square, downside and upside parts of the market
 
 #### Rolling OLS Regression
 
-For each bond $i$ at time $t$, betas are estimated using a rolling window:
+For each bond $i$ at time $t$, betas are estimated on a rolling window.
 
 $$r_{i,s} = \alpha_i + \sum_{k=1}^{K} \beta_{i,k} F_{k,s} + \varepsilon_{i,s}, \quad s \in [t-W+1, t]$$
 
-where:
-- $r_{i,s}$ = bond return (ret_vw or ret_vwx)
-- $F_{k,s}$ = factor $k$ at time $s$
-- $W$ = window size (36 months)
-- Minimum observations = 12
+where $r_{i,s}$ is the bond return (ret_vw or ret_vwx), $F_{k,s}$ is factor $k$ at time $s$ and $W$ is the window size (36 months). The minimum is 12 observations.
 
 #### Idiosyncratic Volatility
 
@@ -968,68 +949,68 @@ where $n$ is the number of observations and $K$ is the number of factors.
 
 $$r_{i,t} = \alpha + \beta^{rf} \cdot MKTRF_t + \beta^{b} \cdot MKTB_t + \varepsilon_{i,t}$$
 
-**Outputs:** `b_mktrf_mkt`, `b_mktb_mkt`, `ivol_mkt`
+The outputs are `b_mktrf_mkt`, `b_mktb_mkt` and `ivol_mkt`.
 
 #### BBW (Bai-Bali-Wen 4-Factor Model)
 
 $$r_{i,t} = \alpha + \beta^{m} \cdot MKTB_t + \beta^{d} \cdot DRF_t + \beta^{c} \cdot CRF_t + \beta^{l} \cdot LRF_t + \varepsilon_{i,t}$$
 
-**Output:** `ivol_bbw`
+The output is `ivol_bbw`.
 
 #### DCAPM (Duration-Adjusted CAPM)
 
-Duration-based bond pricing model (van Binsbergen, Nozawa & Schwert, 2025):
+This is the duration-based bond pricing model of van Binsbergen, Nozawa & Schwert (2025).
 
 $$r_{i,t} = \alpha + \beta^{mx} \cdot MKTBX_t + \beta^{term} \cdot TERM_t + \varepsilon_{i,t}$$
 
 where $TERM_t = MKTB_t + r^f_t - MKTBX_t$, the value-weighted duration-matched Treasury return
 (MKTBX is taken off the raw market return, before $r^f$ is, so TERM is not an excess return).
-In the main panel $r_{i,t}$ is `ret_vw`; in the `betas_x` block it is the duration-adjusted
+In the main panel $r_{i,t}$ is `ret_vw`. In the `betas_x` block it is the duration-adjusted
 return $r^x$.
 
-**Outputs:** `b_mktbx_dcapm`, `b_term_dcapm`
+The outputs are `b_mktbx_dcapm` and `b_term_dcapm`.
 
 #### VOLAM (Volatility with Amihud)
 
-Volatility factor model (Chung, Wang & Wu, 2019):
+This is the volatility factor model of Chung, Wang & Wu (2019).
 
 $$r_{i,t} = \alpha + \beta^{rf} \cdot MKTRF_t + \beta^{smb} \cdot SMB_t + \beta^{hml} \cdot HML_t + \beta^{vix} \cdot VIX_t + \beta^{dvix} \cdot \Delta VIX_t + \beta^{dvixlag} \cdot \Delta VIX_{t-1} + \beta^{amd} \cdot AMD_t + \varepsilon_{i,t}$$
 
-**Output:** `b_dvix_va` = $\beta^{dvix} + \beta^{dvixlag}$
+The output is `b_dvix_va` = $\beta^{dvix} + \beta^{dvixlag}$.
 
 #### VOLPSB (Volatility with Pastor-Stambaugh Bond)
 
-Volatility factor model with bond liquidity (Chung, Wang & Wu, 2019):
+This is the volatility factor model with bond liquidity (Chung, Wang & Wu, 2019).
 
 $$r_{i,t} = \alpha + \beta^{rf} \cdot MKTRF_t + \beta^{smb} \cdot SMB_t + \beta^{hml} \cdot HML_t + \beta^{vix} \cdot VIX_t + \beta^{dvix} \cdot \Delta VIX_t + \beta^{dvixlag} \cdot \Delta VIX_{t-1} + \beta^{psb} \cdot PSB_t + \varepsilon_{i,t}$$
 
-**Outputs:** `b_dvix_vp` = $\beta^{dvix} + \beta^{dvixlag}$, `ivol_vp`
+The outputs are `b_dvix_vp` = $\beta^{dvix} + \beta^{dvixlag}$ and `ivol_vp`.
 
 #### PSBm (Pastor-Stambaugh Bond Multi-Factor Model)
 
-Bond liquidity risk model (Lin, Wang & Wu, 2011):
+This is the bond liquidity risk model of Lin, Wang & Wu (2011).
 
 $$r_{i,t} = \alpha + \beta^{rf} \cdot MKTRF_t + \beta^{smb} \cdot SMB_t + \beta^{hml} \cdot HML_t + \beta^{mx} \cdot MKTBX_t + \beta^{term} \cdot TERM_t + \beta^{psb} \cdot PSB_t + \varepsilon_{i,t}$$
 
-**Output:** `b_psb_m`
+The output is `b_psb_m`.
 
 #### AMDM (Amihud Multi-Factor Model)
 
-Bond illiquidity risk model with Amihud factor:
+This is a bond illiquidity risk model with the Amihud factor.
 
 $$r_{i,t} = \alpha + \beta^{rf} \cdot MKTRF_t + \beta^{smb} \cdot SMB_t + \beta^{hml} \cdot HML_t + \beta^{mx} \cdot MKTBX_t + \beta^{term} \cdot TERM_t + \beta^{amd} \cdot AMD_t + \varepsilon_{i,t}$$
 
-**Output:** `b_amd_m`
+The output is `b_amd_m`.
 
 #### VIX (VIX Innovation Model)
 
 $$r_{i,t} = \alpha + \beta^{b} \cdot MKTB_t + \beta^{rf} \cdot MKTRF_t + \beta^{dvix} \cdot \Delta VIX_t + \beta^{dvixlag} \cdot \Delta VIX_{t-1} + \varepsilon_{i,t}$$
 
-**Output:** `b_dvix` = $\beta^{dvix} + \beta^{dvixlag}$
+The output is `b_dvix` = $\beta^{dvix} + \beta^{dvixlag}$.
 
 #### Two-Factor Models
 
-For models with a single factor of interest plus market control:
+These models have a single factor of interest plus a market control.
 
 $$r_{i,t} = \alpha + \beta^{b} \cdot MKTB_t + \beta^{x} \cdot X_t + \varepsilon_{i,t}$$
 
@@ -1055,41 +1036,39 @@ $$r_{i,t} = \alpha + \beta^{b} \cdot MKTB_t + \beta^{x} \cdot X_t + \varepsilon_
 
 $$r_{i,t} = \alpha + \beta^{rf} \cdot MKTRF_t + \beta^{cptl} \cdot CPTLT_t + \varepsilon_{i,t}$$
 
-**Output:** `b_cptlt`
+The output is `b_cptlt`.
 
 #### ILLIQ (Aggregate Illiquidity)
 
 $$r_{i,t} = \alpha + \beta^{b} \cdot MKTB_t + \beta^{illiq} \cdot ILLIQ_t + \varepsilon_{i,t}$$
 
-**Output:** `b_illiq`
+The output is `b_illiq`.
 
 #### DVIX_ASYM (Asymmetric VIX Innovation)
 
-Separates VIX innovations into positive and negative components:
+This model separates VIX innovations into positive and negative components.
 
 $$r_{i,t} = \alpha + \beta^{rf} \cdot MKTRF_t + \beta^{dn} \cdot \Delta VIX^-_t + \beta^{up} \cdot \Delta VIX^+_t + \varepsilon_{i,t}$$
 
-where:
-- $\Delta VIX^-_t = \min(\Delta VIX_t, 0)$ (volatility decreases)
-- $\Delta VIX^+_t = \max(\Delta VIX_t, 0)$ (volatility increases)
+where $\Delta VIX^-_t = \min(\Delta VIX_t, 0)$ (volatility decreases) and $\Delta VIX^+_t = \max(\Delta VIX_t, 0)$ (volatility increases).
 
-**Outputs:** `b_dvix_dn`, `b_dvix_up`
+The outputs are `b_dvix_dn` and `b_dvix_up`.
 
 #### COSKEW (Coskewness Model)
 
-Measures sensitivity to squared market returns (Harvey & Siddique, 2000):
+This model measures sensitivity to squared market returns (Harvey & Siddique, 2000).
 
 $$r_{i,t} = \alpha + \beta^{b} \cdot MKTB_t + \beta^{sq} \cdot MKTB^2_t + \varepsilon_{i,t}$$
 
-**Output:** `b_coskew` $= \beta^{sq}$
+The output is `b_coskew` $= \beta^{sq}$.
 
-**Idiosyncratic skewness** (`iskew`) is computed as the rolling skewness of residuals $\hat{\varepsilon}_{i,t}$ from this regression, using the same 36-month window:
+Idiosyncratic skewness (`iskew`) is the rolling skewness of the residuals $\hat{\varepsilon}_{i,t}$ from this regression, over the same 36-month window.
 
 $$\text{iskew}_{i,t} = \frac{\sqrt{n(n-1)}}{n-2} \cdot \frac{\frac{1}{n}\sum_{s}(\hat{\varepsilon}_{i,s} - \bar{\varepsilon})^3}{\left[\frac{1}{n}\sum_{s}(\hat{\varepsilon}_{i,s} - \bar{\varepsilon})^2\right]^{3/2}}$$
 
 #### Daily Within-Month VIX Betas
 
-Computed from daily returns within each bond-month using simple OLS:
+These are computed from daily returns within each bond-month by simple OLS.
 
 $$r_{i,t} = \alpha + \beta^{vix} \cdot VIX_t + \varepsilon_{i,t}$$
 $$r_{i,t} = \alpha + \beta^{dvix} \cdot \Delta VIX_t + \varepsilon_{i,t}$$
@@ -1097,17 +1076,17 @@ $$r_{i,t} = \alpha + \beta^{dvix} \cdot \Delta VIX_t + \varepsilon_{i,t}$$
 VIX enters divided by 100 and by $\sqrt{12}$. $\Delta VIX_t$ is the change since the bond's
 previous trade date, left out when the two are more than 5 days apart.
 
-**Outputs:** `b_vix`, `b_dvixd`
+The outputs are `b_vix` and `b_dvixd`.
 
-#### DEFTERM (Gebhardt, Hvidkjaer & Swaminathan, 2005; Fama & French, 1993)
+#### DEFTERM (Gebhardt, Hvidkjaer & Swaminathan, 2005, Fama & French, 1993)
 
-The default and term premia enter **one** two-factor regression, which yields both loadings:
+The default and term premia enter one two-factor regression, which yields both loadings.
 
 $$r_{i,t} = \alpha + \beta^{term} \cdot TERMB_t + \beta^{def} \cdot DEFB_t + \varepsilon_{i,t}$$
 
-**Outputs:** `b_defb`, `b_termb`
+The outputs are `b_defb` and `b_termb`.
 
-The two premia are constructed as in Fama and French (1993):
+The two premia are constructed as in Fama and French (1993).
 
 $$DEFB_t = r^{\text{LT corp}}_t - r^{\text{LT govt}}_t \qquad TERMB_t = r^{\text{LT govt}}_t - r^{f}_t$$
 
@@ -1117,11 +1096,11 @@ total return. Before 2002-08 both series are spliced from the published extended
 factor file, exactly as the other BBW factors are.
 
 The two premia are negatively correlated (−0.45 over the full extended history, −0.50 in the
-TRACE era), which is what makes them jointly estimable rather than two names for one series.
+TRACE era), so they can be estimated jointly and are not two names for one series.
 
 #### Univariate Factor Betas (Dickerson, Mueller & Robotti, 2023)
 
-Univariate regressions isolating individual factor exposures:
+Each beta comes from a univariate regression on one factor.
 
 $$r_{i,t} = \alpha + \beta \cdot F_t + \varepsilon_{i,t}$$
 
@@ -1134,34 +1113,34 @@ $$r_{i,t} = \alpha + \beta \cdot F_t + \varepsilon_{i,t}$$
 
 #### LVL / YSP (Koijen, Lustig & Van Nieuwerburgh, 2017)
 
-Bond return decomposition into level and yield spread components. Both are estimated
-**univariate**, with no market control:
+These betas come from the decomposition of bond returns into level and yield spread
+components. Both are estimated univariate, with no market control.
 
-**LVL Model:**
+The LVL model is
+
 $$r_{i,t} = \alpha + \beta^{lvl} \cdot LVL_t + \varepsilon_{i,t}$$
 
-**Output:** `b_lvl`
+The output is `b_lvl`.
 
-**YSP Model:**
+The YSP model is
+
 $$r_{i,t} = \alpha + \beta^{ysp} \cdot YSP_t + \varepsilon_{i,t}$$
 
-**Output:** `b_ysp`
+The output is `b_ysp`.
 
 #### MKTB_ASYM (Ang, Chen & Xing, 2006)
 
-Asymmetric market beta model separating upside and downside market movements:
+This is an asymmetric market beta model that separates upside and downside market movements.
 
 $$r_{i,t} = \alpha + \beta^{dn} \cdot MKTB^-_t + \beta^{up} \cdot MKTB^+_t + \varepsilon_{i,t}$$
 
-where:
-- $MKTB^-_t = \min(MKTB_t, 0)$ (market declines)
-- $MKTB^+_t = \max(MKTB_t, 0)$ (market advances)
+where $MKTB^-_t = \min(MKTB_t, 0)$ (market declines) and $MKTB^+_t = \max(MKTB_t, 0)$ (market advances).
 
-**Outputs:** `b_mktb_dn`, `b_mktb_up`
+The outputs are `b_mktb_dn` and `b_mktb_up`.
 
 #### EPU (Baker, Bloom & Davis, 2016)
 
-Economic Policy Uncertainty betas:
+These are the Economic Policy Uncertainty betas.
 
 $$r_{i,t} = \alpha + \beta^{b} \cdot MKTB_t + \beta^{epu} \cdot EPU_t + \varepsilon_{i,t}$$
 
@@ -1175,26 +1154,26 @@ $$r_{i,t} = \alpha + \beta^{b} \cdot MKTB_t + \beta^{epu} \cdot EPU_t + \varepsi
 
 ### Factor Definitions
 
-❗**A characteristic and a factor are different objects, and five of them share a name.**
-`lix`, `roll`, `rsj`, `rvol` and `vov` each appear **twice** in this document: once as a
-bond-level characteristic in the main panel, and once as a monthly factor series in the
+**A characteristic and a factor are different objects**, and five of them share a name.
+`lix`, `roll`, `rsj`, `rvol` and `vov` each appear twice in this document, once as a
+bond-level characteristic in the main panel and once as a monthly factor series in the
 table below. They are not the same number.
 
-| | characteristic (main panel) | factor (this table) |
+| | characteristic (main panel) | factor (the table below) |
 |---|---|---|
 | grain | one value per bond-month | one value per month |
-| construction | measured on the bond's own trades | equal-weighted mean across **USA-domiciled** bonds |
-| units | a **level** — e.g. on the 2026 build `roll` averages 0.96, `vov` 0.16, `spd_rel` 0.0083 | for ten of the twelve illiquidity factors, the monthly **CHANGE** in that mean — `ROLL` averages −0.011 and is positive only 42.5% of the time |
+| construction | measured on the bond's own trades | equal-weighted mean across USA-domiciled bonds |
+| units | a level. On the 2026 build, for example, `roll` averages 0.96, `vov` 0.16, `spd_rel` 0.0083 | for ten of the twelve illiquidity factors, the monthly change in that mean. `ROLL` averages −0.011 and is positive only 42.5% of the time |
 
 The differenced factors are `AMD`, `LIX`, `ILLIQ`, `ROLL`, `SPRD`, `CSS`, `ARS`, `FHTS`,
-`VOV` and `RVOL`. The two that are **not** differenced, and are levels of the mean, are
-`PSB` and `RSJ`. (Verified against the build: `max|factor − diff(level)| = 0` for the ten,
+`VOV` and `RVOL`. The two that are not differenced, and are levels of the mean, are
+`PSB` and `RSJ`. (Checked against the build, `max|factor − diff(level)| = 0` for the ten,
 and, for the two, `PSB` equals the level and `RSJ` the level divided by 100.) Every one of them
 averages the bonds' full-month measures (the form published as the `_mmn` twins), not the
 panel's gap-adjusted columns.
 
 Differencing is deliberate. An illiquidity level is highly persistent, so a beta estimated
-on the level would load mostly on the trend; the innovation is the priced quantity.
+on the level would load mostly on the trend. The innovation is the priced quantity.
 
 | Factor | Description | Source |
 |--------|-------------|--------|
@@ -1210,22 +1189,22 @@ on the level would load mostly on the trend; the innovation is the priced quanti
 | `drfx` | Downside risk factor, duration-adjusted | BBW |
 | `crfx` | Credit risk factor, duration-adjusted | BBW |
 | `lrfx` | Liquidity risk factor, duration-adjusted | BBW |
-| `term` | Duration-matched Treasury return: MKTB + `rf` - MKTBX (not an excess return) | Computed |
+| `term` | Duration-matched Treasury return, MKTB + `rf` - MKTBX (not an excess return) | Computed |
 | `mktb_bns` | Bond market excess return, on the `tret_bns` benchmark | BBW twin |
 | `drf_bns` | Downside risk factor, on the `tret_bns` benchmark | BBW twin |
 | `crf_bns` | Credit risk factor, on the `tret_bns` benchmark | BBW twin |
 | `lrf_bns` | Liquidity risk factor, on the `tret_bns` benchmark | BBW twin |
-| `term_bns` | As `term`, on the `tret_bns` benchmark: the raw market return minus its `tret_bns`-adjusted version, not an excess return | Computed |
+| `term_bns` | As `term`, on the `tret_bns` benchmark. The raw market return minus its `tret_bns`-adjusted version, not an excess return | Computed |
 | `mktb_cls` | Bond market excess return, on the `tret_cls` benchmark | BBW twin |
 | `drf_cls` | Downside risk factor, on the `tret_cls` benchmark | BBW twin |
 | `crf_cls` | Credit risk factor, on the `tret_cls` benchmark | BBW twin |
 | `lrf_cls` | Liquidity risk factor, on the `tret_cls` benchmark | BBW twin |
-| `term_cls` | As `term`, on the `tret_cls` benchmark: the raw market return minus its `tret_cls`-adjusted version, not an excess return | Computed |
-| `vix` | VIX level (scaled: /100/sqrt(12)) | CBOE |
+| `term_cls` | As `term`, on the `tret_cls` benchmark. The raw market return minus its `tret_cls`-adjusted version, not an excess return | Computed |
+| `vix` | VIX level, divided by 100 and by sqrt(12) | CBOE |
 | `dvix` | VIX first difference | Computed |
 | `dvixlag` | Lagged VIX first difference | Computed |
-| `dvix_down` | Negative VIX innovations: min(dvix, 0) | Computed |
-| `dvix_up` | Positive VIX innovations: max(dvix, 0) | Computed |
+| `dvix_down` | Negative VIX innovations, min(dvix, 0) | Computed |
+| `dvix_up` | Positive VIX innovations, max(dvix, 0) | Computed |
 | `cpi_vol6` | 6-month rolling standard deviation of `dcpi`, in CPI index points | Computed |
 | `dcpi` | One-month-lagged change in the CPI level (FRED CPIAUCSL), in index points, not an inflation rate | FRED |
 | `credit` | Credit spread (BAA - AAA) / 12 | FRED |
@@ -1236,43 +1215,43 @@ on the level would load mostly on the trend; the innovation is the priced quanti
 | `duncf` | Financial uncertainty change | JLN |
 | `uncr` | Real uncertainty index (level) | JLN |
 | `uncf` | Financial uncertainty index (level) | JLN |
-| `dunc3` | Macro uncertainty, 3-month change: `unc.diff(3)` | Computed |
-| `dunc6` | Macro uncertainty, 6-month change: `unc.diff(6)` | Computed |
-| `cptlt` | Intermediary capital: the value-weighted investment return, in excess of `rf` | HKM |
+| `dunc3` | Macro uncertainty, 3-month change, `unc.diff(3)` | Computed |
+| `dunc6` | Macro uncertainty, 6-month change, `unc.diff(6)` | Computed |
+| `cptlt` | Intermediary capital, the value-weighted investment return in excess of `rf` | HKM |
 | `cptl` | Intermediary capital risk factor (the non-traded HKM factor) | HKM |
 | `rvol` | Realized volatility | Computed |
-| `rsj` | Realized signed jump (scaled: /100) | Computed |
+| `rsj` | Realized signed jump, divided by 100 | Computed |
 | `psb` | Pastor-Stambaugh bond liquidity | Computed |
 | `amd` | Amihud illiquidity | Computed |
 | `illiq` | Aggregate illiquidity factor | Computed |
-| `ars` | Abdi-Ranaldo spread factor: monthly **change** in the equal-weighted mean of `ar_sprd` across USA-domiciled bonds | Computed |
-| `css` | Corwin-Schultz spread factor: monthly **change** in the equal-weighted mean of `cs_sprd` across USA-domiciled bonds | Computed |
-| `fhts` | FHT spread factor: monthly **change** in the equal-weighted mean of `p_fht` across USA-domiciled bonds | Computed |
-| `sprd` | Bid-ask spread factor: monthly **change** in the equal-weighted mean of `spd_rel` across USA-domiciled bonds | Computed |
-| `lix` | LIX factor: monthly **change** in the equal-weighted mean of `lix` across USA-domiciled bonds | Computed |
-| `roll` | Roll factor: monthly **change** in the equal-weighted mean of `roll` across USA-domiciled bonds | Computed |
-| `vov` | Volatility-over-volume factor: monthly **change** in the equal-weighted mean of `vov` across USA-domiciled bonds | Computed |
+| `ars` | Abdi-Ranaldo spread factor, the monthly change in the equal-weighted mean of `ar_sprd` across USA-domiciled bonds | Computed |
+| `css` | Corwin-Schultz spread factor, the monthly change in the equal-weighted mean of `cs_sprd` across USA-domiciled bonds | Computed |
+| `fhts` | FHT spread factor, the monthly change in the equal-weighted mean of `p_fht` across USA-domiciled bonds | Computed |
+| `sprd` | Bid-ask spread factor, the monthly change in the equal-weighted mean of `spd_rel` across USA-domiciled bonds | Computed |
+| `lix` | LIX factor, the monthly change in the equal-weighted mean of `lix` across USA-domiciled bonds | Computed |
+| `roll` | Roll factor, the monthly change in the equal-weighted mean of `roll` across USA-domiciled bonds | Computed |
+| `vov` | Volatility-over-volume factor, the monthly change in the equal-weighted mean of `vov` across USA-domiciled bonds | Computed |
 | `defb` | Default premium factor | GHS |
 | `termb` | Term premium factor | GHS |
 | `lvl` | Level factor (yield curve level) | KLN |
 | `ysp` | Yield spread factor | KLN |
 | `rf` | Risk-free rate, from the Ken French monthly factor file | Ken French |
-| `mktb_down` | Negative bond market return: min(mktb, 0) | Computed |
-| `mktb_up` | Positive bond market return: max(mktb, 0) | Computed |
+| `mktb_down` | Negative bond market return, min(mktb, 0) | Computed |
+| `mktb_up` | Positive bond market return, max(mktb, 0) | Computed |
 | `epu` | Economic policy uncertainty index level | BBD |
 | `epum` | Monetary policy uncertainty index level | BBD |
 | `eput` | Tax policy uncertainty index level | BBD |
 
-❗**The ten `_bns` / `_cls` series are OPTIONAL and only exist if you ran
-`stage2/make_excess_blocks.py --benchmark {bns,cls,all}`** (and reach `factors_merged.parquet`
+The ten `_bns` / `_cls` series are optional. They exist only if you ran
+`stage2/make_excess_blocks.py --benchmark {bns,cls,all}` (and reach `factors_merged.parquet`
 only if step 4 runs again afterwards). They are the BBW bond-market factors
 re-estimated on the alternative Treasury benchmark's excess return, and they exist because a
-benchmark's betas must regress on *that* benchmark's own factors. Pairing a `tret_bns` excess
-return with the `tret`-based factors produces `b_*` columns that look perfectly normal and mean
-nothing -- which is why `compute_all_betas` raises on a missing twin rather than falling back.
+benchmark's betas must regress on that benchmark's own factors. Pairing a `tret_bns` excess
+return with the `tret`-based factors produces `b_*` columns that look normal and mean
+nothing, so `compute_all_betas` raises an error on a missing twin and does not fall back.
 `term` is swapped alongside the four bond factors for the same reason. A default build does not
 write them and nothing downstream requires them. The published factor file (what
-`--factor-source pinned` downloads) does carry eight of them, MKTB, DRF, CRF and TERM on each
+`--factor-source pinned` downloads) does have eight of them, MKTB, DRF, CRF and TERM on each
 benchmark, as extended series ending 2023-01.
 
 ---
@@ -1283,7 +1262,7 @@ All momentum and reversal signals are computed from monthly bond returns. Signal
 
 #### Standard Momentum
 
-Cumulative past returns over various horizons (Gebhardt, Hvidkjaer & Swaminathan, 2005):
+Standard momentum is the cumulative past return over several horizons (Gebhardt, Hvidkjaer & Swaminathan, 2005).
 
 $$\text{mom}_{L,S} = \prod_{s=S}^{L-1} (1 + r_{i,t-s}) - 1$$
 
@@ -1296,7 +1275,7 @@ $$\text{mom}_{L,S} = \prod_{s=S}^{L-1} (1 + r_{i,t-s}) - 1$$
 
 #### Intermediate Momentum
 
-Momentum computed from months 7-12, excluding recent returns (Novy-Marx, 2012):
+Intermediate momentum is computed from months 7-12, which leaves out recent returns (Novy-Marx, 2012).
 
 $$\text{mom12-7}_{i,t} = \prod_{s=7}^{11} (1 + r_{i,t-s}) - 1$$
 
@@ -1306,15 +1285,15 @@ $$\text{mom12-7}_{i,t} = \prod_{s=7}^{11} (1 + r_{i,t-s}) - 1$$
 
 #### Systematic and Idiosyncratic Momentum
 
-Decomposes total momentum into market-driven and bond-specific components using residuals from a rolling factor model (Blitz, Huij & Martens, 2011):
+Total momentum is split into a market-driven and a bond-specific component, using the residuals from a rolling factor model (Blitz, Huij & Martens, 2011).
 
-**Methodology:** At each month $t$ with valid rolling OLS estimates ($\alpha_t$, $\beta_t$):
+At each month $t$ with valid rolling OLS estimates ($\alpha_t$, $\beta_t$), we compute the following.
 
-1. **Fitted values**: $\hat{r}_s = \alpha_t + \beta_t \cdot F_s$ for each $s$ in the rolling window
-2. **Systematic momentum**: $\sum_{s=S}^{L-1} \hat{r}_{t-s}$ (sum of fitted values)
-3. **Idiosyncratic momentum**: $\sum_{s=S}^{L-1} (r_{t-s} - \hat{r}_{t-s})$ (sum of residuals)
+1. The fitted values, $\hat{r}_s = \alpha_t + \beta_t \cdot F_s$ for each $s$ in the rolling window.
+2. Systematic momentum, $\sum_{s=S}^{L-1} \hat{r}_{t-s}$ (the sum of fitted values).
+3. Idiosyncratic momentum, $\sum_{s=S}^{L-1} (r_{t-s} - \hat{r}_{t-s})$ (the sum of residuals).
 
-Key: Uses **current** $\alpha_t$, $\beta_t$ to compute fitted values for all positions.
+The fitted values for all positions use the current $\alpha_t$, $\beta_t$.
 
 | Variable | Description |
 |----------|-------------|
@@ -1325,17 +1304,17 @@ Key: Uses **current** $\alpha_t$, $\beta_t$ to compute fitted values for all pos
 | `idimom6_1` | Idiosyncratic 6-1 momentum |
 | `idimom12_1` | Idiosyncratic 12-1 momentum |
 
-Default factor: `mktb` (bond market excess return). For duration-adjusted returns, uses `mktbx`.
+The default factor is `mktb` (bond market excess return). For duration-adjusted returns it is `mktbx`.
 
 #### Long-Term Reversal
 
-Cumulative past returns over longer horizons, excluding recent months:
+Long-term reversal is the cumulative past return over a longer horizon, excluding recent months.
 
-**Primary measure** (Bali, Subrahmanyam & Wen, 2021):
+The primary measure is that of Bali, Subrahmanyam & Wen (2021).
 
 $$\text{ltr48-12}_{i,t} = \prod_{s=12}^{47} (1 + r_{i,t-s}) - 1$$
 
-**Alternative windows** (Subrahmanyam, 2023):
+The alternative windows are from Subrahmanyam (2023).
 
 | Variable | Formula | Description |
 |----------|---------|-------------|
@@ -1345,7 +1324,7 @@ $$\text{ltr48-12}_{i,t} = \prod_{s=12}^{47} (1 + r_{i,t-s}) - 1$$
 
 #### Industry Momentum and Reversal
 
-Cross-bond momentum spillovers within the same industry (Wang, Wu & Yang, 2024). The industry is the bond's SIC code in FISD. Each month the industry return $\bar r_{k,t}$ is the equal-weighted return of every bond with SIC code $k$, the bond itself included, and the signal compounds it over the window:
+These signals measure cross-bond momentum spillovers within the same industry (Wang, Wu & Yang, 2024). The industry is the bond's SIC code in FISD. Each month the industry return $\bar r_{k,t}$ is the equal-weighted return of every bond with SIC code $k$, the bond itself included, and the signal compounds it over the window.
 
 $$\text{imom}^{L,S}_{i,t} = \prod_{s=S}^{L-1} \left(1 + \bar r_{\text{sic}(i),t-s}\right) - 1$$
 
@@ -1360,16 +1339,13 @@ $$\text{imom}^{L,S}_{i,t} = \prod_{s=S}^{L-1} \left(1 + \bar r_{\text{sic}(i),t-
 
 #### Short-Term Reversal and Risk Measures
 
-Downside risk measures computed from the bond's monthly returns over a rolling 36-month window,
-at least 12 months (Bai, Bali & Wen, 2019):
-
-**Short-Term Reversal:**
-
 | Variable | Description |
 |----------|-------------|
 | `str` | Short-term reversal (the month-$t$ return, measured with the signal gap) |
 
-**Value-at-Risk and Expected Shortfall:**
+The downside risk measures are computed from the bond's monthly returns over a rolling 36-month
+window, at least 12 months (Bai, Bali & Wen, 2019). Value-at-Risk and Expected Shortfall are
+defined as
 
 $$\text{VaR}_\alpha = -F^{-1}(\alpha)$$
 
@@ -1391,21 +1367,21 @@ Value signals measure the deviation of observed credit spreads from "fair" sprea
 
 #### Monthly Cross-Sectional Spread Regression
 
-For each month $t$, estimate:
+For each month $t$ we estimate
 
 $$\log(cs_{i,t}) = x_{i,t}^\top \beta_t + \varepsilon_{i,t}$$
 
-where $x_{i,t}$ includes rating controls, industry dummies and the model's own characteristics, listed under each model below. The fitted "fair" spread uses a lognormal retransformation:
+where $x_{i,t}$ includes rating controls, industry dummies and the model's own characteristics, listed under each model below. The fitted "fair" spread uses a lognormal retransformation.
 
 $$\widehat{cs}_{i,t} = \exp\left(x_{i,t}^\top \widehat{\beta}_t + \tfrac{1}{2}\widehat{\sigma}_t^2\right)$$
 
 #### Houweling & Van Zundert (2017) Value
 
-Percentage deviation from fitted spread:
+The signal is the percentage deviation from the fitted spread.
 
 $$\text{val-hz}_{i,t} = \frac{cs_{i,t} - \widehat{cs}_{i,t}}{\widehat{cs}_{i,t}}$$
 
-**Controls:** Rating dummies (`spc_rat`), FF17 industry dummies, 3-month spread change, call indicator. The regression carries no maturity control (`lib/value.py`, `x_cols=['dcs3', 'call']`).
+The controls are rating dummies (`spc_rat`), FF17 industry dummies, the 3-month spread change and the call indicator. The regression has no maturity control (`lib/value.py`, `x_cols=['dcs3', 'call']`).
 
 | Variable | Description |
 |----------|-------------|
@@ -1414,11 +1390,11 @@ $$\text{val-hz}_{i,t} = \frac{cs_{i,t} - \widehat{cs}_{i,t}}{\widehat{cs}_{i,t}}
 
 #### Israel, Palhares & Richardson (2018) Value
 
-Log-spread residual from fair-value regression:
+The signal is the log-spread residual from the fair-value regression.
 
 $$\text{val-ipr}_{i,t} = \log(cs_{i,t}) - x_{i,t}^\top \widehat{\beta}_t$$
 
-**Controls:** Numeric rating, FF17 industry dummies, log duration, return volatility (the standard deviation of `ret_vw - tret` over the bond's last 12 observations, at least 6, month $t$ included), call indicator.
+The controls are the numeric rating, FF17 industry dummies, log duration, return volatility (the standard deviation of `ret_vw - tret` over the bond's last 12 observations, at least 6, month $t$ included) and the call indicator.
 
 | Variable | Description |
 |----------|-------------|
@@ -1429,40 +1405,35 @@ $$\text{val-ipr}_{i,t} = \log(cs_{i,t}) - x_{i,t}^\top \widehat{\beta}_t$$
 
 The Duration-times-Spread (DtS) adjustment removes common variation among bonds with similar spread-duration exposure (Israel, Palhares & Richardson, 2018).
 
-**Step 1:** Compute duration-times-spread: $DtS_{i,t} = dur_{i,t} \times cs_{i,t}$
+Step 1 computes duration-times-spread, $DtS_{i,t} = dur_{i,t} \times cs_{i,t}$.
 
-**Step 2:** Assign to quintiles $Q_{i,t} \in \{1,\ldots,5\}$ based on cross-sectional DtS distribution.
+Step 2 assigns each bond to a quintile $Q_{i,t} \in \{1,\ldots,5\}$ of the cross-sectional DtS distribution.
 
-**Step 3:** Demean within (month, quintile):
+Step 3 demeans within (month, quintile).
 
 $$val^{dts}_{i,t} = val_{i,t} - \bar{val}_{t,Q_{i,t}}$$
 
-This isolates bond-specific value after controlling for systematic variation in spread-duration risk.
+This leaves bond-specific value, after controlling for systematic variation in spread-duration risk.
 
 ---
 
 ### Illiquidity Measures
 
-All illiquidity measures are computed at the bond-month level from daily TRACE data. Each measure has two versions:
-- **Full-sample**: Uses all trades in the month
-- **Adjusted**: Excludes the last trade of each month to avoid end-of-month effects
+All illiquidity measures are computed at the bond-month level from daily TRACE data. Each measure has two versions. The full-sample version uses every trading day in the month. The adjusted version leaves out the bond's last trading day in the month, to avoid end-of-month effects.
 
-Minimum observation requirement: 5 valid daily observations per bond-month (configurable) for most
-measures. The Signal Definitions table gives each one's own: `spd_abs` and `spd_rel` have none, and
+Most measures need at least 5 valid daily observations per bond-month (configurable). The Signal
+Definitions table gives each measure's own minimum. `spd_abs` and `spd_rel` have none, and
 `lix` counts daily Amihud ratios.
 
 #### Price Impact (PI)
 
-Pastor & Stambaugh (2003) liquidity measure based on return reversals. The coefficient $\gamma$ captures the price impact of signed order flow:
+This is the Pastor & Stambaugh (2003) liquidity measure, based on return reversals. The coefficient $\gamma$ is the price impact of signed order flow in the regression
 
-**Regression:**
 $$r^e_{i,t+1} = \theta + \psi \cdot r_{i,t} + \gamma \cdot \mathrm{sign}(r^e_{i,t}) \cdot Q_{i,t} + \varepsilon_{i,t}$$
 
-where:
-- $r^e_{i,t} = r_{i,t} - \bar{r}_t$ is the bond's excess return over the market index
-- $Q_{i,t}$ is trading volume at day $t$
+where $r^e_{i,t} = r_{i,t} - \bar{r}_t$ is the bond's excess return over the market index and $Q_{i,t}$ is trading volume at day $t$.
 
-**Output:** `pi` $= -\gamma$ (negated so higher values indicate more illiquidity)
+The output is `pi` $= -\gamma$ (negated so higher values indicate more illiquidity).
 
 #### Amihud Illiquidity (AMI)
 
@@ -1470,13 +1441,11 @@ Price impact per unit of trading volume (Amihud, 2002).
 
 $$\text{ami}_{i,m} = \frac{1}{N_m} \sum_{t=1}^{N_m} \frac{|r_{i,t}|}{\text{dvol}_{i,t}}$$
 
-**Outputs:**
-- `ami`: Monthly mean of daily Amihud ratios
-- `ami_v`: Monthly standard deviation of daily Amihud ratios
+`ami` is the monthly mean of the daily Amihud ratios, and `ami_v` is their monthly standard deviation.
 
 #### LIX (Liquidity Index)
 
-Combines trading volume and price range into a single liquidity measure (Danyliv, Bland & Nicholass, 2014).
+LIX combines trading volume and price range in a single liquidity measure (Danyliv, Bland & Nicholass, 2014).
 
 $$\text{lix}_{i,t} = -\log_{10}\left(\frac{V_{i,t} \cdot P^{close}_{i,t}}{P^{high}_{i,t} - P^{low}_{i,t}}\right)$$
 
@@ -1492,10 +1461,9 @@ $$\text{ilq}_{i,m} = -\text{Cov}(\ln(1+r_{i,t}), \ln(1+r_{i,t-1}))$$
 
 $$\text{roll}_{i,m} = \begin{cases} 2\sqrt{\text{ilq}_{i,m}} & \text{if } \text{ilq}_{i,m} > 0 \\ 0 & \text{otherwise} \end{cases}$$
 
-**Outputs:**
-- `ilq`: Negative autocovariance of the log returns, each taken in percent (x100), so 10,000
-  times the autocovariance of decimal returns
-- `roll`: Roll effective spread estimate, in percent of price
+`ilq` is the negative autocovariance of the log returns, each taken in percent (x100), so 10,000
+times the autocovariance of decimal returns. `roll` is the Roll effective spread estimate, in
+percent of price.
 
 #### Hong-Warga Spreads (SPD_ABS, SPD_REL)
 
@@ -1505,9 +1473,7 @@ $$P^{bid}_m = \frac{\sum_t w_t \cdot P^{bid}_t}{\sum_t w_t}, \quad P^{ask}_m = \
 
 where $w_t = \text{dvol}_t$ (dollar volume weights).
 
-**Outputs:**
-- `spd_abs`: Absolute spread $= P^{ask}_m - P^{bid}_m$
-- `spd_rel`: Relative spread $= (P^{ask}_m - P^{bid}_m) / \text{mid}_m$
+`spd_abs` is the absolute spread $= P^{ask}_m - P^{bid}_m$. `spd_rel` is the relative spread $= (P^{ask}_m - P^{bid}_m) / \text{mid}_m$.
 
 #### Corwin-Schultz Spread (CS_SPRD)
 
@@ -1543,7 +1509,7 @@ $$\text{p-zro}_{i,m} = \frac{B_m - N^{price}_{i,m}}{B_m}$$
 
 where $B_m$ is the number of NYSE business days in month $m$ and $N^{price}_{i,m}$ is the count of days with valid prices.
 In the main panel's gap-adjusted form the bond's last trading day in the month is left out of
-$N^{price}_{i,m}$, so `p_zro` is at least $1/B_m$; `p_zro_mmn` is the formula as written.
+$N^{price}_{i,m}$, so `p_zro` is at least $1/B_m$. `p_zro_mmn` is the formula as written.
 
 #### FHT Spread (P_FHT)
 
@@ -1565,43 +1531,43 @@ where $\sigma_{i,m}$ is the standard deviation of daily returns and $\bar{V}_{i,
 
 ### Within-Month Risk Statistics
 
-Computed from daily returns within each bond-month $m$. Uses the cross-sectional mean of daily bond returns as the market factor.
+These are computed from daily returns within each bond-month $m$. The market factor is the cross-sectional mean of daily bond returns.
 
-**Data Requirements:** All within-month statistics require:
+All within-month statistics have the following data requirements.
 
-1. **Minimum observations:** $N_{i,m} \geq 5$ valid daily returns
-2. **Valid return criterion:** A daily return $r_{i,t}$ is valid only if the business-day gap satisfies:
+1. A minimum of $N_{i,m} \geq 5$ valid daily returns.
+2. A daily return $r_{i,t}$ is valid only if the business-day gap satisfies
    $$\Delta_{i,t} = \text{BusDays}(t-1, t) \leq 5$$
-3. **Calendar:** NYSE trading calendar
+3. The calendar is the NYSE trading calendar.
 
-These requirements apply to all signals computed from daily data within the month (illiquidity measures, realized moments, within-month betas, etc.).
+These requirements apply to the realized moments and within-month betas below, and to the illiquidity measures built from daily returns. Each illiquidity measure states its own minimum in the Cluster IV table. The two bid-ask spreads (`spd_abs`, `spd_rel`) have none, and the Corwin-Schultz and Abdi-Ranaldo spreads count prices, not returns.
 
 #### Daily Volatility and Higher Moments
 
 | Variable | Description |
 |----------|-------------|
 | `dvol` | Standard deviation of daily returns within the month |
-| `dskew` | Central skewness: $\frac{1}{N}\sum(r_t - \bar{r})^3 / \sigma^3$ |
-| `dkurt` | Excess kurtosis: $\frac{1}{N}\sum(r_t - \bar{r})^4 / \sigma^4 - 3$ |
+| `dskew` | Central skewness, $\frac{1}{N}\sum(r_t - \bar{r})^3 / \sigma^3$ |
+| `dkurt` | Excess kurtosis, $\frac{1}{N}\sum(r_t - \bar{r})^4 / \sigma^4 - 3$ |
 
 #### Daily Market Beta and Volatility Decomposition
 
-From within-month regression: $r_{i,d} = \alpha + \beta \cdot \bar{r}_{d} + \varepsilon_{i,d}$
+These come from the within-month regression $r_{i,d} = \alpha + \beta \cdot \bar{r}_{d} + \varepsilon_{i,d}$.
 
 | Variable | Description |
 |----------|-------------|
-| `db_mkt` | Market beta: $\text{Cov}(r_i, \bar{r}) / \text{Var}(\bar{r})$ |
-| `dvol_sys` | Systematic volatility: $|\beta| \cdot \sigma_{\bar{r}}$ |
-| `dvol_idio` | Idiosyncratic volatility: $\sqrt{\sigma_r^2 - \beta^2 \sigma_{\bar{r}}^2}$ |
+| `db_mkt` | Market beta, $\text{Cov}(r_i, \bar{r}) / \text{Var}(\bar{r})$ |
+| `dvol_sys` | Systematic volatility, $|\beta| \cdot \sigma_{\bar{r}}$ |
+| `dvol_idio` | Idiosyncratic volatility, $\sqrt{\sigma_r^2 - \beta^2 \sigma_{\bar{r}}^2}$ |
 
 #### Realized Moments
 
-Based on squared returns (no mean adjustment).
+These are based on squared returns (no mean adjustment).
 
 | Variable | Formula | Description |
 |----------|---------|-------------|
 | `rvol` | $\sqrt{\sum r_t^2}$ | Realized volatility |
-| `rsj` | $(\sqrt{\sum_{r>0} r_t^2} - \sqrt{\sum_{r<0} r_t^2}) / \sum r_t^2$: up-minus-down volatility over the realized variance, so not bounded by 1 | Realized signed jump variation |
+| `rsj` | $(\sqrt{\sum_{r>0} r_t^2} - \sqrt{\sum_{r<0} r_t^2}) / \sum r_t^2$, the up-minus-down volatility over the realized variance, so not bounded by 1 | Realized signed jump variation |
 | `rsk` | $\sqrt{N} \sum r_t^3 / (\sum r_t^2)^{3/2}$ | Realized skewness |
 | `rkt` | $N \sum r_t^4 / (\sum r_t^2)^2$ | Realized kurtosis |
 
@@ -1609,27 +1575,27 @@ Based on squared returns (no mean adjustment).
 
 ### Collinearity Notes
 
-None of the 145 columns duplicates another: across all 9,045 numeric pairs, **no two are
-bit-identical**, and the test suite asserts that. But several are near-substitutes, and
+None of the 145 columns duplicates another. Across all 9,045 numeric pairs no two are
+bit-identical, and the test suite asserts that. Several are near-substitutes, though, and
 anyone forming clusters, running a horse race or building a factor zoo should know which.
-Measured on the 2026 panel (1.95 M bond-months):
+The correlations below are measured on the 2026 panel (1.95 M bond-months).
 
 | pair | \|corr\| | why they are close |
 |---|---|---|
-| `mcap_e` / `sze` | 0.9998 | both are market value; `sze` is the panel's size variable and `mcap_e` the end-of-month market cap |
+| `mcap_e` / `sze` | 0.9998 | both are market value. `sze` is the panel's size variable and `mcap_e` the end-of-month market cap |
 | `mcap_s` / `sze` | 0.9981 | as above, `mcap_s` being the previous month-end market cap |
 | `mcap_s` / `mcap_e` | 0.9979 | the same quantity a month apart |
-| `fce_val` / `mcap_e` | 0.9817 | face value against market value; they differ only through the price |
+| `fce_val` / `mcap_e` | 0.9817 | face value against market value, which differ only through the price |
 | `dvol` / `dvol_idio` | 0.9817 | total daily volatility is mostly idiosyncratic for corporate bonds |
-| `b_mktbx_dcapm` / `b_defb` | **0.9750** | see below |
+| `b_mktbx_dcapm` / `b_defb` | 0.9750 | see below |
 | `ivol_mkt` / `ivol_bbw` | 0.9708 | residual volatility from two nested market models |
 
-❗**`b_defb` and `b_mktbx_dcapm`.** These correlate 0.97, which is high enough to matter if you
-put both in the same regression or treat them as separate cluster members. This is economically
-sensible — bonds with high market betas are bonds with high default betas. For reference,
-`b_defb` correlates 0.87 with `b_mktb`.
+`b_defb` and `b_mktbx_dcapm` correlate 0.97, which is high enough to matter if you
+put both in the same regression or treat them as separate cluster members. The correlation
+makes economic sense, because bonds with high market betas are bonds with high default betas.
+For reference, `b_defb` correlates 0.87 with `b_mktb`.
 
-Within the Credit and Default Betas cluster the loadings are related but distinct:
+Within the Credit and Default Betas cluster the loadings are related but distinct.
 
 | | `b_drf` | `b_crf` | `b_lrf` | `b_defb` | `b_termb` |
 |---|---|---|---|---|---|
@@ -1644,25 +1610,25 @@ Within the Credit and Default Betas cluster the loadings are related but distinc
 ### The MMN Sidecar
 
 `mmn_price_based_signals_<YYYY>.parquet` is published alongside the main panel and holds the
-**unadjusted twin** of every price-based signal. Two keys (`cusip`, `date`) and 38 signals.
+unadjusted twin of every price-based signal. It has two keys (`cusip`, `date`) and 38 signals.
 
-The distinction matters and is easy to get wrong:
+The two files hold different versions of each signal and pair with different returns.
 
 | | main panel | `_mmn` sidecar |
 |---|---|---|
-| the signal | market-microstructure-noise **adjusted**: observed with at least a one-business-day gap before the month-end price used for the return | **unadjusted**: signal and return share the same closing print |
+| the signal | market-microstructure-noise adjusted, observed with at least a one-business-day gap before the month-end price used for the return | unadjusted, so signal and return share the same closing print |
 | the return to use with it | `ret_vw` | `ret_vw_bgn` |
 | in the three-approaches language | Approach 2, *Adjusted Signal* | Approach 3, *Adjusted Return* |
 
-❗**Do not mix them.** Pairing an unadjusted signal with `ret_vw` puts the same bid-ask bounce in
-both the signal and the return, and manufactures predictability that is not there. The effect is
-large, not marginal: for a short-term reversal signal built both ways, the bond-level AR(1) is
-−0.219 unadjusted against −0.046 adjusted — the gap removes about 79% of the apparent reversal.
+**Do not mix them.** Pairing an unadjusted signal with `ret_vw` puts the same bid-ask bounce in
+both the signal and the return, and creates predictability that is not there. The effect is
+large. For a short-term reversal signal built both ways, the bond-level AR(1) is
+−0.219 unadjusted against −0.046 adjusted, so the gap removes about 79% of the apparent reversal.
 
-`str` is the one column where the naming inverts: `main_panel.str` is the MMN-**adjusted**
+`str` is the one column where the naming inverts. `main_panel.str` is the MMN-adjusted
 reversal signal, while `str_mmn` in the sidecar equals `ret_vw`.
 
-To use the sidecar, merge it on `cusip` and `date` and switch the return column:
+To use the sidecar, merge it on `cusip` and `date` and switch the return column.
 
 ```python
 panel = pd.read_parquet("main_panel_<YYYY>.parquet")
@@ -1672,7 +1638,7 @@ df    = panel.merge(mmn, on=["cusip", "date"], how="left")
 ```
 
 Every mnemonic below is the panel column of the same name without the suffix, computed without
-the signal gap. The definitions are therefore the base signal's; see the tables above.
+the signal gap. So the definitions are the base signal's, in the tables above.
 
 | Mnemonic | Base signal | Name |
 |----------|-------------|------|
@@ -1719,40 +1685,41 @@ the signal gap. The definitions are therefore the base signal's; see the tables 
 
 ### Output Files
 
-Released artifacts carry the **vintage year** `<YYYY>` — the year the release is published
+Released artifacts are named with the vintage year `<YYYY>`, the year the release is published
 under, not the last month of data. A build in progress writes files named for its Stage 1 date
-stamp instead; the release step renames them.
+stamp, and the release step renames them.
 
 | File | Description |
 |------|-------------|
-| `main_panel_<YYYY>.parquet` | Main panel with MMN-adjusted price-based signals — the 145 columns defined in this document |
-| `mmn_price_based_signals_<YYYY>.parquet` | Unadjusted twins of the price-based signals, suffix `_mmn` (see below) |
+| `main_panel_<YYYY>.parquet` | Main panel with MMN-adjusted price-based signals, the 145 columns defined in this document |
+| `mmn_price_based_signals_<YYYY>.parquet` | Unadjusted twins of the price-based signals, suffix `_mmn` (see *The MMN Sidecar* above) |
 | `betas_x_<YYYY>.parquet` | Betas from duration-adjusted returns ($r^x = r - r^{Tsy}$) |
 | `mom_retx_<YYYY>.parquet` | Momentum/LTR signals, and VaR/ES, from duration-adjusted returns |
 | `returns_alt_<YYYY>.parquet` | Alternative return measures |
-| `factors_<YYYY>.parquet` | The monthly factors from outside sources that the rolling betas use. It also carries copies of the extended BBW bond factors, to 2023-01, which the build does not read: the betas take the bond factors from step 3 (and, before 2002-08, from the published extended series) and the factors made from the trade tape (PSB, AMD, ILLIQ, RVOL, RSJ) from step 2. So the betas cannot be re-estimated from this file alone |
+| `factors_<YYYY>.parquet` | The monthly factors from outside sources that the rolling betas use. It also holds copies of the extended BBW bond factors, to 2023-01, which the build does not read. The betas take the bond factors from step 3 (and, before 2002-08, from the published extended series) and the factors made from the TRACE trades (PSB, AMD, ILLIQ, RVOL, RSJ) from step 2. So the betas cannot be re-estimated from this file alone |
 
-**Why the factor panel is published.** Stage 2 assembles its factors from public sources at
-build time, and those sources revise: Ken French restates SMB/HML, FRED re-seasonally-adjusts
+The factor panel is published because Stage 2 assembles its factors from public sources at
+build time, and those sources revise. Ken French restates SMB/HML, FRED re-seasonally-adjusts
 CPI, and the Ludvigson uncertainty series is re-estimated each release. A panel built next month
-will not reproduce a panel published today. Shipping the exact factor file a release consumed is
-what lets a published number be checked — point Stage 2 at it with `FACTOR_SOURCE = "pinned"`.
+will not reproduce a panel published today. Publishing the exact factor file a release used
+lets a published number be checked. Point Stage 2 at it with `FACTOR_SOURCE = "pinned"`.
 
-❗In `factors_<YYYY>.parquet` the columns `mktb`, `mktbx`, `term`, `drf`, `crf`, `drfx`, `crfx`,
-`defb` and `termb`, and the eight `mktb_bns` ... `term_cls` twins, are the **published extended
-(pre-TRACE) series**, which end in 2023-01. They
-are not the bond-market factors the panel uses: Stage 2 drops them on read and rebuilds them from
-its own TRACE data, keeping the extended values only before 2002-08.
+In `factors_<YYYY>.parquet` the columns `mktb`, `mktbx`, `term`, `drf`, `crf`, `drfx`, `crfx`,
+`defb` and `termb`, and the eight `mktb_bns` ... `term_cls` twins, are the published extended
+(pre-TRACE) series, which end in 2023-01. They are
+**not the bond-market factors the panel uses**. Stage 2 drops them on read and rebuilds them
+from its own TRACE data, keeping the extended values only before 2002-08.
 
-The panel's column names **and their order** are frozen in `lib/contract.py` and asserted at the
-end of every build. Adding, removing or moving a column is a public API change and a CHANGELOG
-entry, never a silent edit.
+The panel's column names and their order are frozen in `lib/contract.py` and asserted at the
+end of every build. Adding, removing or moving a column is a public API change and must have a
+CHANGELOG entry.
 
 ---
 
 ## References
 
-**Factor Models:**
+Factor models
+
 - Bai, J., Bali, T. G., & Wen, Q. (2019). Common risk factors in the cross-section of corporate bond returns. *Journal of Financial Economics*.
 - Bai, J., Bali, T. G., & Wen, Q. (2021). Is there a risk-return tradeoff in the corporate bond market? Time-series and cross-sectional evidence. *Journal of Financial Economics*, 142(3), 1017-1037.
 - van Binsbergen, J. H., Nozawa, Y., & Schwert, M. (2025). Duration-based valuation of corporate bonds. *Review of Financial Studies*, 38(1), 158-191.
@@ -1761,7 +1728,8 @@ entry, never a silent edit.
 - He, Z., Kelly, B., & Manela, A. (2017). Intermediary asset pricing: New evidence from many asset classes. *Journal of Financial Economics*.
 - Harvey, C. R., & Siddique, A. (2000). Conditional skewness in asset pricing tests. *Journal of Finance*, 55(3), 1263-1295.
 
-**Risk Premia:**
+Risk premia
+
 - Bali, T. G., Subrahmanyam, A., & Wen, Q. (2021). The macroeconomic uncertainty premium in the corporate bond market. *Journal of Financial and Quantitative Analysis*, 56(5), 1653-1678.
 - Ceballos, L. (2021). Inflation volatility risk and the cross-section of corporate bond returns. Working paper.
 - Dickerson, A., Mueller, P., & Robotti, C. (2023). Priced risk in corporate bonds. *Journal of Financial Economics*, 150(2), 103707.
@@ -1770,7 +1738,8 @@ entry, never a silent edit.
 - Ang, A., Chen, J., & Xing, Y. (2006). Downside risk. *Review of Financial Studies*, 19(4), 1191-1239.
 - Baker, S. R., Bloom, N., & Davis, S. J. (2016). Measuring economic policy uncertainty. *Quarterly Journal of Economics*, 131(4), 1593-1636.
 
-**Illiquidity Measures:**
+Illiquidity measures
+
 - Pastor, L., & Stambaugh, R. F. (2003). Liquidity risk and expected stock returns. *Journal of Political Economy*, 111(3), 642-685.
 - Amihud, Y. (2002). Illiquidity and stock returns: Cross-section and time-series effects. *Journal of Financial Markets*.
 - Roll, R. (1984). A simple implicit measure of the effective bid-ask spread in an efficient market. *Journal of Finance*.
@@ -1781,7 +1750,8 @@ entry, never a silent edit.
 - Danyliv, O., Bland, B., & Nicholass, D. (2014). Convenient liquidity measure for financial markets. Working paper.
 - Tobek, O. (2016). Liquidity proxies using daily trading volume. Working paper.
 
-**Momentum and Reversal:**
+Momentum and reversal
+
 - Gebhardt, W. R., Hvidkjaer, S., & Swaminathan, B. (2005). Stock and bond market interaction: Does momentum spill over? *Journal of Financial Economics*, 75(3), 651-690.
 - Novy-Marx, R. (2012). Is momentum really momentum? *Journal of Financial Economics*, 103(3), 429-453.
 - Blitz, D., Huij, J., & Martens, M. (2011). Residual momentum. *Journal of Empirical Finance*, 18(3), 506-521.
@@ -1789,17 +1759,20 @@ entry, never a silent edit.
 - Subrahmanyam, A. (2023). Corporate bond data projects: Some clarifications. Working paper.
 - Wang, J., Wu, D., & Yang, L. (2024). Cross-bond momentum spillovers. Working paper.
 
-**Value Signals:**
+Value signals
+
 - Houweling, P., & Van Zundert, J. (2017). Factor investing in the corporate bond market. *Financial Analysts Journal*, 73(2), 100-115.
 - Israel, R., Palhares, D., & Richardson, S. (2018). Common factors in corporate bond returns. *Journal of Investment Management*, 16(2), 17-46.
 - Gilchrist, S., & Zakrajšek, E. (2012). Credit spreads and business cycle fluctuations. *American Economic Review*, 102(4), 1692-1720.
 
-**Duration-Adjusted Bond Returns and Treasury Benchmarks:**
+Duration-adjusted bond returns and Treasury benchmarks
+
 - Andreani, M., Palhares, D., & Richardson, S. (2024). Computing corporate bond returns: A word (or two) of caution. *Review of Accounting Studies*, 29(4), 3887-3906.
 - Bessembinder, H., Kahle, K. M., Maxwell, W. F., & Xu, D. (2009). Measuring abnormal bond performance. *Review of Financial Studies*, 22(10), 4219-4258.
 - Cui, L., Lu, X., & Song, Z. (2026). Understanding corporate bond excess returns. Working paper.
 - Ghaderi, M., Plante, S., Roussanov, N., & Seo, S. B. (2026). Reconstructing a century of U.S. corporate bonds: Credit risk in historical perspective. Working paper.
 - Gürkaynak, R. S., Sack, B., & Wright, J. H. (2007). The U.S. Treasury yield curve: 1961 to the present. *Journal of Monetary Economics*, 54(8), 2291-2304.
 
-**Equity Factors:**
+Equity factors
+
 - Fama, E. F., & French, K. R. (1993). Common risk factors in the returns on stocks and bonds. *Journal of Financial Economics*, 33(1), 3-56.

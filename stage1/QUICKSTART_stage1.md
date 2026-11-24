@@ -1,50 +1,47 @@
-# Quick Start (Stage 1) — Bond Analytics
+# Quick start (Stage 1): bond analytics
 
 ## Prerequisites
 
-- ✅ **Stage 0 completed** with outputs in `stage0/{enhanced,standard,144a}/`
-- ✅ **SSH access to WRDS Cloud** (or local Python environment)
-- ✅ **WRDS account** with FISD and ratings data access
-- ✅ **Python ≥ 3.10** (the 2026-09-21 run, which the 2026 vintage was built from, used 3.14.5 on the WRDS Cloud)
-- ✅ **No password file on WRDS**: jobs on the WRDS Cloud connect without one
+- Stage 0 has completed, with its outputs in `stage0/{enhanced,standard,144a}/`
+- SSH access to the WRDS Cloud (or a local Python environment)
+- A WRDS account with access to FISD and ratings data
+- Python 3.10 or later (the 2026-09-21 run, which the 2026 vintage was built from, used 3.14.5 on the WRDS Cloud)
+- No password file is needed on WRDS, because jobs on the WRDS Cloud connect without one
 
----
+## What Stage 1 does
 
-## What Stage 1 Does
+Stage 1 adds these to your cleaned TRACE data from Stage 0.
 
-Stage 1 enriches your cleaned TRACE data from Stage 0 with:
+- Bond characteristics from FISD (coupon, maturity, issuer, etc.)
+- Bond analytics from QuantLib (duration, convexity, YTM, credit spreads)
+- Credit ratings from S&P and Moody's
+- Equity identifiers (CRSP PERMNO/PERMCO and GVKEY)
+- Ultra-distressed filters that flag suspicious prices
+- Fama-French industry classifications
 
-- 📊 **Bond characteristics** from FISD (coupon, maturity, issuer, etc.)
-- 📈 **Bond analytics** via QuantLib (duration, convexity, YTM, credit spreads)
-- ⭐ **Credit ratings** from S&P and Moody's
-- 🔗 **Equity identifiers** (CRSP PERMNO/PERMCO and GVKEY)
-- 🚨 **Ultra-distressed filters** to flag suspicious prices
-- 🏭 **Fama-French industry classifications**
+The output is a dataset of 44 columns per bond-day.
 
-**Output:** A research-ready dataset of 44 columns per bond-day.
+The run takes about 2.4 to 2.7 hours on the WRDS Cloud with the 4 slots `run_stage1.sh` requests (2.4 h on the 2026-09-10 run, 2.7 h on 2026-09-21).
 
-**Runtime:** about 2.4-2.7 hours on the WRDS Cloud with the 4 slots `run_stage1.sh` requests (2.4 h on the 2026-09-10 run, 2.7 h on 2026-09-21).
+## Step-by-step instructions
 
----
+### 1. Install required packages
 
-## Step-by-Step Instructions
-
-### 1. Install Required Packages
-
-**On WRDS Cloud:**
+On the WRDS Cloud, log in and go to the repo root.
 
 ```bash
 ssh <your_wrds_id>@wrds-cloud.wharton.upenn.edu
 cd ~/trace-data-pipeline  # the repo root
 ```
 
-**Install packages** (recommended method):
+Install the packages. This is the recommended method.
 
 ```bash
 python -m pip install --user -r requirements.txt
 ```
 
-**Alternative — Virtual environment (optional):**
+A virtual environment is an optional alternative.
+
 ```bash
 # Create virtual environment in project root. --system-site-packages keeps the WRDS Cloud's own pandas 2.2 visible: pip has no build of it
 # for the Cloud's Python 3.14.
@@ -53,33 +50,33 @@ source venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
-❗Do **not** pin these to exact versions on the WRDS Cloud. `--user` installs shadow the
+**Do not pin these to exact versions** on the WRDS Cloud. `--user` installs shadow the
 system packages, and WRDS already ships newer ones than any pin here (numpy 2.4.6,
-pyarrow 24.0.0 on Python 3.14) — pinning downgrades a working environment. Use
+pyarrow 24.0.0 on Python 3.14), so pinning downgrades a working environment. Use
 `requirements.txt`, which states minimums.
 
----
+### 2. Configure settings (optional)
 
-### 2. Configure Settings (Optional)
+Most settings are already configured and need no change.
 
-**Most settings are pre-configured and work automatically:**
-- ✅ **WRDS_USERNAME** is set in `config.py` (root directory)
-- ✅ **STAGE0_DATE_STAMP** is auto-detected from your Stage 0 output files
-- ✅ **Data downloads** happen automatically via `run_pipeline.sh`
+- WRDS_USERNAME is set in `config.py` (root directory)
+- STAGE0_DATE_STAMP is auto-detected from your Stage 0 output files
+- Data downloads happen automatically via `run_pipeline.sh`
 
-**Only edit settings if you need to customize:**
+Edit the settings only if you need to customize them. First go to your root directory.
 
-**Navigate to your root directory:**
 ```bash
 cd ~/trace-data-pipeline  # the repo root directory
 ```
 
-**Edit root config file (if needed):**
+Edit the root config file if you need to.
+
 ```bash
 nano config.py
 ```
 
-**Optional customizations in `config.py`:**
+These are the optional customizations in `config.py`.
+
 ```python
 # Your WRDS username
 WRDS_USERNAME = os.getenv("WRDS_USERNAME", "your_wrds_username")
@@ -91,12 +88,14 @@ TRACE_MEMBERS = os.getenv("TRACE_MEMBERS", "enhanced 144a").split()  # add "stan
 OUTPUT_FORMAT = "parquet"  # The only supported value
 ```
 
-**Edit stage1 settings (if needed):**
+Edit the stage 1 settings if you need to.
+
 ```bash
 nano stage1/_stage1_settings.py
 ```
 
-**Optional customizations in `stage1/_stage1_settings.py`:**
+These are the optional customizations in `stage1/_stage1_settings.py`.
+
 ```python
 # Date cutoff. The default rolls with the data: "auto:complete" is the last month
 # every source covers through its final trading session. A literal date overrides it.
@@ -106,16 +105,15 @@ DATE_CUT_OFF = "auto:complete"
 N_CORES = None  # follows the slots the job was granted ($NSLOTS), else 4; or set STAGE1_N_CORES
 ```
 
-**Notes:**
+You do not set any of these by hand.
+
 - `ROOT_PATH` is auto-detected from your current working directory
 - `STAGE0_DATE_STAMP` is auto-detected from Stage 0 parquet files
 - Data files are automatically downloaded by `run_pipeline.sh`
 
----
+### 3. Run the pipeline
 
-### 3. Run the Pipeline
-
-**The easiest way is to use the automated pipeline wrapper:**
+The easiest way is the automated pipeline wrapper.
 
 ```bash
 # From your root directory
@@ -125,12 +123,13 @@ cd ~/trace-data-pipeline  # the repo root
 ./run_pipeline.sh
 ```
 
-**This automatically:**
-1. Downloads required data files (Liu-Wu yields, bond-firm linker, FF industries)
-2. Submits Stage 0 jobs (Enhanced and 144A by default; Standard is opt-in)
-3. Submits Stage 1 job (waits for Stage 0 to complete)
+The wrapper does these steps for you.
 
-**Manual Stage 1 execution (if you already ran Stage 0):**
+1. Downloads the required data files (Liu-Wu yields, bond-firm linker, FF industries)
+2. Submits the Stage 0 jobs (Enhanced and 144A by default, Standard only if you opt in)
+3. Submits the Stage 1 job, which waits for Stage 0 to complete
+
+If you already ran Stage 0, you can run Stage 1 by hand.
 
 ```bash
 # You should be in your root directory
@@ -145,12 +144,13 @@ qsub stage1/run_stage1.sh
 
 Stage 1 checks for those files before it starts and stops if one is missing.
 
-❗**Submit from the repo ROOT, never from `stage1/`.** `run_stage1.sh` declares
+Submit **from the repo root**, never from `stage1/`. `run_stage1.sh` declares
 `#$ -o stage1/logs/stage1.out` and then does `cd stage1`, all resolved against `-cwd`.
-Submitted from inside `stage1/`, the log path becomes `stage1/stage1/logs/` — which does
-not exist, so Grid Engine parks the job in `Eqw` — and the `cd` fails too.
+Submitted from inside `stage1/`, the log path becomes `stage1/stage1/logs/`, which does
+not exist, so Grid Engine parks the job in `Eqw`. The `cd` fails too.
 
-**What happens:**
+The job then runs these steps.
+
 1. Loads treasury yields (Liu-Wu zero-coupon curve)
 2. Loads TRACE data from Stage 0 outputs
 3. Reads the FISD bond characteristics Stage 0 saved
@@ -164,11 +164,9 @@ not exist, so Grid Engine parks the job in `Eqw` — and the `cd` fails too.
     winsorizes `ytm` and `credit_spread` within each date, saves the file and builds the
     data-quality report
 
----
+### 4. Monitor progress
 
-### 4. Monitor Progress
-
-**On WRDS Cloud:**
+On the WRDS Cloud, watch the job with these commands.
 
 ```bash
 # Check job status
@@ -186,22 +184,20 @@ tail -f stage1/logs/stage1.err  # from root
 tail -f logs/stage1.err  # from stage1
 ```
 
-**Job states:**
+A job is in one of these states.
+
 - `r` = running
 - `qw` = queued, waiting
 - `Eqw` = error (check logs/stage1.err)
 
-**Stop tail:** Press `Ctrl + C`
+Press `Ctrl + C` to stop following a log.
 
-**On local machine:**
+On a local machine, the output prints to your terminal as the job runs.
 
-Output will print to your terminal in real-time.
+### 5. Check output
 
----
+From the root directory, list the output file.
 
-### 5. Check Output
-
-**Output location (from root directory):**
 ```bash
 ls -lh stage1/data/stage1_*.parquet
 
@@ -210,7 +206,8 @@ cd stage1
 ls -lh data/stage1_*.parquet
 ```
 
-**Expected output:**
+Expect this layout.
+
 ```
 stage1/
 ├── data/
@@ -222,10 +219,8 @@ stage1/
     └── stage1_*.pdf              # its figures
 ```
 
-**Verify data:**
-
-This reads only the file's metadata, so it is safe on the WRDS login node, where heavy work
-is not allowed:
+To verify the data, run the lines below. They read only the file's metadata, so they are safe
+on the WRDS login node, where heavy work is not allowed.
 
 ```python
 import pyarrow.parquet as pq
@@ -243,13 +238,11 @@ print(f"- Bond analytics: ytm, mod_dur, convexity, credit_spread")
 print(f"- Ratings: sp_rating, mdy_rating, spc_rating, mdc_rating")
 ```
 
----
-
-### 6. Computing Returns
+### 6. Computing returns
 
 Once you have the Stage 1 output, you can compute bond returns for empirical analysis.
 
-#### Setup and Sorting
+#### Setup and sorting
 
 ```python
 import pandas as pd
@@ -262,7 +255,7 @@ df = pd.read_parquet('data/stage1_YYYYMMDD.parquet')
 df = df.sort_values(['cusip_id', 'trd_exctn_dt']).reset_index(drop=True)
 ```
 
-#### Clean Returns (Price Appreciation Only)
+#### Clean returns (price appreciation only)
 
 ```python
 # Compute lagged price
@@ -272,7 +265,7 @@ df['pr_lag'] = df.groupby('cusip_id', observed=True)['pr'].shift(1)
 df['ret_c'] = (df['pr'] - df['pr_lag']) / df['pr_lag']
 ```
 
-#### Total Returns (Including Accumulated Payments)
+#### Total returns (including accumulated payments)
 
 ```python
 # Full price = clean price + accumulated payments (numerator)
@@ -286,9 +279,9 @@ df['prfull_lag'] = df.groupby('cusip_id', observed=True)['prfull'].shift(1)
 df['ret_d'] = (df['fp'] - df['fp_lag']) / df['prfull_lag']
 ```
 
-#### Filtering by Trading Gap
+#### Filtering by trading gap
 
-**Important**: TRACE data is NOT contiguous—bonds may not trade daily. You should filter out returns with large gaps between observations.
+TRACE data is not contiguous, because a bond may not trade every day. Filter out returns with large gaps between observations.
 
 ```python
 # Compute lagged trade date
@@ -303,180 +296,155 @@ gap_mask = df['day_gap'] > max_gap
 df.loc[gap_mask, ['ret_c', 'ret_d']] = np.nan
 ```
 
-For **business-day gaps** (excluding weekends and holidays), count NYSE sessions between the two
+For business-day gaps (excluding weekends and holidays), count NYSE sessions between the two
 dates, for example with `numpy.busday_count` and a holiday list from `pandas_market_calendars`.
 
-#### Key Variables
+#### Key variables
 
 | Variable | Formula | Description |
 |----------|---------|-------------|
-| `pr` | — | Clean price (% of par) |
+| `pr` | | Clean price (% of par) |
 | `prfull` | `pr + acclast` | Dirty price (standardization base) |
 | `fp` | `pr + accall` | Full price with accumulated payments |
 | `ret_c` | `(pr_t - pr_{t-1}) / pr_{t-1}` | Clean return (price appreciation only) |
 | `ret_d` | `(fp_t - fp_{t-1}) / prfull_{t-1}` | Total return (includes cash flows) |
 
-**Key Distinction:**
-- `accall` = accumulated payments (includes cash flows) → **NUMERATOR**
-- `acclast` = accrued interest (time-accrued component) → **DENOMINATOR**
-- `prfull = pr + acclast` = dirty price (standardization base)
+Keep the two accrual variables apart.
 
-For detailed explanations of the accrued interest variables (`acclast`, `accpmt`, `accall`) and the return calculation methodology, see the **"Understanding Accrued Interest Variables"** section in [README_stage1.md](README_stage1.md).
+- `accall` is the accumulated payments (it includes cash flows) and goes in the numerator
+- `acclast` is the accrued interest (the time-accrued component) and goes in the denominator
+- `prfull = pr + acclast` is the dirty price (the standardization base)
 
----
+The "Understanding Accrued Interest Variables" section in [README_stage1.md](README_stage1.md) explains the accrued interest variables (`acclast`, `accpmt`, `accall`) and how the returns are calculated.
 
-### 7. Download Data (WRDS Cloud Users)
+### 7. Download data (WRDS Cloud users)
 
-Zip the whole repository folder on WRDS and copy the zip down, as
-[QUICKSTART: Download Results](../QUICKSTART.md#download-results-to-your-local-machine) writes
-it. Stage 2 reads `stage1/data/` and `stage0/enhanced/` from the same folder, so bring both, in
-the layout they were built in; the stage 1 parquet alone is not enough.
+Zip the whole repository folder on WRDS and copy the zip down, as the
+[Download Results](../QUICKSTART.md#download-results-to-your-local-machine) section of the
+root QUICKSTART describes. Stage 2 reads `stage1/data/` and `stage0/enhanced/` from the same
+folder, so bring both, in the layout they were built in. The stage 1 parquet alone is not
+enough.
 
----
+## Configuration quick reference
 
-## Configuration Quick Reference
+### Essential settings
 
-### Essential Settings
+Most settings are configured automatically. Customize only if you need to.
 
-Most settings are automatically configured. Only customize if needed.
-
-#### Root Configuration (`config.py`)
+#### Root configuration (`config.py`)
 
 | Setting | Description | Default | Auto? |
 |---------|-------------|---------|-------|
-| `WRDS_USERNAME` | Your WRDS username | `"your_wrds_username"` | ✅ Pre-set |
-| `TRACE_MEMBERS` | TRACE datasets to include | `["enhanced", "144a"]` | Customizable; `"standard"` is opt-in |
-| `OUTPUT_FORMAT` | Output file format | `"parquet"` | ✅ Pre-set |
+| `WRDS_USERNAME` | Your WRDS username | `"your_wrds_username"` | Pre-set |
+| `TRACE_MEMBERS` | TRACE datasets to include | `["enhanced", "144a"]` | Customizable, and `"standard"` is opt-in |
+| `OUTPUT_FORMAT` | Output file format | `"parquet"` | Pre-set |
 
-#### Stage 1 Configuration (`stage1/_stage1_settings.py`)
+#### Stage 1 configuration (`stage1/_stage1_settings.py`)
 
 | Setting | Description | Default | Auto? |
 |---------|-------------|---------|-------|
-| `ROOT_PATH` | Parent directory | `""` | ✅ Auto-detected |
-| `STAGE0_DATE_STAMP` | Stage 0 output date | Auto-detected | ✅ Auto-detected from files |
-| `DATE_CUT_OFF` | Latest date to include | `"auto:complete"` | ✅ Rolls with the data |
-| `N_CORES` | Worker processes | `None`: the slots granted, else 4 | ✅ Follows the job's slots |
-| ~~`GENERATE_REPORTS`~~ | does not exist -- reports always run | — | — |
-| ~~`OUTPUT_FIGURES`~~ | does not exist -- figures always run | — | — |
+| `ROOT_PATH` | Parent directory | `""` | Auto-detected |
+| `STAGE0_DATE_STAMP` | Stage 0 output date | Auto-detected | Auto-detected from files |
+| `DATE_CUT_OFF` | Latest date to include | `"auto:complete"` | Rolls with the data |
+| `N_CORES` | Worker processes | `None`, which means the slots granted, else 4 | Follows the job's slots |
+| ~~`GENERATE_REPORTS`~~ | does not exist. Reports always run | | |
+| ~~`OUTPUT_FIGURES`~~ | does not exist. Figures always run | | |
 
-**Notes:**
-- **WRDS_USERNAME**: Set in `config.py` (root directory)
-- **ROOT_PATH**: Auto-detected from current working directory
-- **STAGE0_DATE_STAMP**: Auto-detected from Stage 0 parquet filenames
-- **Data files**: Automatically downloaded by `run_pipeline.sh`
-
----
+- WRDS_USERNAME is set in `config.py` (root directory)
+- ROOT_PATH is auto-detected from the current working directory
+- STAGE0_DATE_STAMP is auto-detected from the Stage 0 parquet filenames
+- The data files are downloaded automatically by `run_pipeline.sh`
 
 ## Troubleshooting
 
 ### "Stage0 output files not found"
 
-**Problem:** Can't find `stage0/enhanced/trace_enhanced_YYYYMMDD.parquet`
+The run cannot find `stage0/enhanced/trace_enhanced_YYYYMMDD.parquet`.
 
-**Solution:**
-1. Verify Stage 0 outputs exist (from root directory):
+1. Check that the Stage 0 outputs exist (from the root directory).
    ```bash
    ls stage0/enhanced/trace_enhanced_*.parquet
    ls stage0/standard/trace_standard_*.parquet
    ls stage0/144a/trace_144a_*.parquet
    ```
-2. If files exist, the date stamp should auto-detect. If auto-detection fails, check the error message
-3. Ensure you're running from the correct root directory (where `stage0/` and `stage1/` exist)
-
----
+2. If the files exist, the date stamp should auto-detect. If auto-detection fails, check the error message.
+3. Check that you are running from the correct root directory (where `stage0/` and `stage1/` exist).
 
 ### "Unable to read script file"
 
-**Problem:** `qsub stage1/run_stage1.sh` says "No such file or directory"
+`qsub stage1/run_stage1.sh` says "No such file or directory" when you are in the wrong directory.
+Run it from the root directory.
 
-**Solution:** You're in the wrong directory. Either:
-
-**Option 1 - Run from root directory:**
 ```bash
 cd ~/trace-data-pipeline          # the repo ROOT
 qsub stage1/run_stage1.sh
 ```
 
-❗There is no "navigate into stage1" alternative. The script's `#$ -o stage1/logs/...`
+There is no "navigate into stage1" alternative. The script's `#$ -o stage1/logs/...`
 and its `cd stage1` are both resolved from the submit directory, so it only works from
 the root. `run_pipeline.sh` submits it exactly this way.
 
----
-
 ### "ModuleNotFoundError: No module named 'QuantLib'"
 
-**Problem:** QuantLib not installed
+QuantLib is not installed. Install it.
 
-**Solution:**
 ```bash
 python -m pip install --user QuantLib
 ```
 
-`requirements.txt` asks for `QuantLib>=1.36`; do not pin an exact version.
-
----
+`requirements.txt` asks for `QuantLib>=1.36`. Do not pin an exact version.
 
 ### "WRDS_USERNAME not set"
 
-**Problem:** WRDS username not configured
+Edit `config.py` (in the root directory).
 
-**Solution:** Edit `config.py` (in the root directory):
 ```python
 WRDS_USERNAME = os.getenv("WRDS_USERNAME", "your_wrds_username")  # Change to your username
 ```
 
-Or set environment variable:
+Or set the environment variable.
+
 ```bash
 export WRDS_USERNAME="your_wrds_username_here"
 echo 'export WRDS_USERNAME="your_wrds_username_here"' >> ~/.bashrc
 ```
 
----
-
 ### "Unable to connect to WRDS"
 
-**Problem:** WRDS connection failed
+On the WRDS Cloud no password file is needed, because jobs there connect without one. A
+failed connection is almost always the username. Either `WRDS_USERNAME` is unset, or it is
+still `your_wrds_username` in `config.py` (`python3 doctor.py --wrds` checks it). If the
+username is right, it is WRDS's limit of 7 connections held at once
+(`stage0/README_stage0.md`).
 
-**Solution:**
+On your own computer (stage 2's first run), the password must be saved where the `wrds`
+package looks. Connect once by hand. It asks for the password and offers to save it
+(`~/.pgpass`, or `%APPDATA%\postgresql\pgpass.conf` on Windows).
 
-**On the WRDS Cloud** no password file is needed: jobs there connect without one. A failed
-connection is almost always the username: `WRDS_USERNAME` unset, or still `your_wrds_username`
-in `config.py` (`python3 doctor.py --wrds` checks it). If the username is right, it is WRDS's
-limit of 7 connections held at once (`stage0/README_stage0.md`).
-
-**On your own computer** (stage 2's first run), the password must be saved where the `wrds`
-package looks. Connect once by hand; it asks for the password and offers to save it
-(`~/.pgpass`, or `%APPDATA%\postgresql\pgpass.conf` on Windows):
 ```bash
 python -c "import wrds; wrds.Connection()"
 ```
 
----
-
 ### Job is very slow
 
-**Problem:** Pipeline taking >8 hours
+The pipeline is taking more than 8 hours. Try these.
 
-**Solutions:**
-
-1. **Process fewer datasets** (in the root `config.py`, or `TRACE_MEMBERS="enhanced"` in the environment):
+1. Process fewer datasets (in the root `config.py`, or `TRACE_MEMBERS="enhanced"` in the environment).
    ```python
    TRACE_MEMBERS = ["enhanced"]  # Only Enhanced, not Standard/144A
    ```
 
-   There is no switch for Stage 1's reports; they always run.
+   There is no switch for Stage 1's reports. They always run.
 
-2. **On your own machine only, use more workers** (`export STAGE1_N_CORES=20`). On WRDS leave
-   `N_CORES = None`: it follows the 4 slots the job was granted, and a larger number starts more
+2. On your own machine only, use more workers (`export STAGE1_N_CORES=20`). On WRDS leave
+   `N_CORES = None`. It follows the 4 slots the job was granted, and a larger number starts more
    workers than the job has cores and memory for.
 
-3. **Check you're not in the middle of a WRDS outage:** submit the smoke test
-   (`qsub run_smoke_test.sh`, from the repository root). It connects inside a job, where every
-   WRDS connection belongs, rather than on the login node.
+3. Check that you are not in the middle of a WRDS outage. Submit the smoke test
+   (`qsub run_smoke_test.sh`, from the repository root). It connects inside a job and not on
+   the login node, because every WRDS connection belongs inside a job.
 
----
-
-## Quick Command Reference
+## Quick command reference
 
 ```bash
 # Configure settings (from root directory)
@@ -502,12 +470,11 @@ ls -lh stage1/data/stage1_*.parquet
 # Download from WRDS: zip the whole folder, then scp (QUICKSTART.md, "Download Results")
 ```
 
----
-
 ## Support
 
-Having trouble? Check:
-1. **Detailed README:** See [README_stage1.md](README_stage1.md)
-2. **Log files:** Check `stage1/logs/stage1.err` for error messages
-3. **Email:** alexander.dickerson1@unsw.edu.au
-4. **GitHub Issues:** [trace-data-pipeline/issues](https://github.com/Alexander-M-Dickerson/trace-data-pipeline/issues)
+If you are stuck, try these.
+
+1. Read the detailed guide, [README_stage1.md](README_stage1.md)
+2. Check `stage1/logs/stage1.err` for error messages
+3. Email alexander.dickerson1@unsw.edu.au
+4. Open a GitHub issue at [trace-data-pipeline/issues](https://github.com/Alexander-M-Dickerson/trace-data-pipeline/issues)
