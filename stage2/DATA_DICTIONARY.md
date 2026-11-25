@@ -201,9 +201,9 @@ For all signals requiring a rolling window (betas, VaR, ES), we use a 36-month r
 | Mnemonic | Name | Description |
 |----------|------|-------------|
 | `bbtm` | Bond Book-to-Market | Par price divided by market price of the bond. All bonds have a par value of \$1,000 (100%). |
-| `val_hz` | Value (HZ) | Percentage deviation of observed credit spread from fitted "fair" spread: $(cs - \widehat{cs}) / \widehat{cs}$. Controls: rating, industry, 3-month spread change, callable. Fitted spread is estimated each month via cross-sectional regression; because cs is used, this signal is also exposed to microstructure noise. |
+| `val_hz` | Value (HZ) | Percentage deviation of observed credit spread from fitted "fair" spread: $(cs - \widehat{cs}) / \widehat{cs}$. Controls: rating, industry, 3-month spread change, callable. Fitted spread is estimated each month via cross-sectional regression. |
 | `val_hz_dts` | Value (HZ, DtS-adjusted) | HZ value signal demeaned within duration-times-spread quintiles to control for systematic spread-duration risk. |
-| `val_ipr` | Value (IPR) | Log-spread residual from fair-value regression: $\log(cs) - X'\hat{\beta}$. Controls: rating, industry, log duration, volatility, callable. Fitted spread is estimated each month via cross-sectional regression; because cs is used, this signal is also exposed to microstructure noise. |
+| `val_ipr` | Value (IPR) | Log-spread residual from fair-value regression: $\log(cs) - X'\hat{\beta}$. Controls: rating, industry, log duration, volatility, callable. Fitted spread is estimated each month via cross-sectional regression. |
 | `val_ipr_dts` | Value (IPR, DtS-adjusted) | IPR value signal demeaned within duration-times-spread quintiles. |
 
 ---

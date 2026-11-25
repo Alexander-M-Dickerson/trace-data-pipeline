@@ -473,7 +473,7 @@
       "mnemonic": "val_hz",
       "group": "Cluster II: Value",
       "name": "Value (HZ)",
-      "description": "Percentage deviation of observed credit spread from fitted ``fair'' spread: $(cs - \\widehat{cs}) / \\widehat{cs}$. Controls: rating, industry, 3-month spread change, callable. Fitted spread is estimated each month via cross-sectional regression; because cs is used, this signal is also exposed to microstructure noise.",
+      "description": "Percentage deviation of observed credit spread from fitted ``fair'' spread: $(cs - \\widehat{cs}) / \\widehat{cs}$. Controls: rating, industry, 3-month spread change, callable. Fitted spread is estimated each month via cross-sectional regression.",
       "citation": "\\citet{houweling2017factor}",
       "citation_keys": [
         "houweling2017factor"
@@ -497,7 +497,7 @@
       "mnemonic": "val_ipr",
       "group": "Cluster II: Value",
       "name": "Value (IPR)",
-      "description": "Log-spread residual from fair-value regression: $\\log(cs) - X'\\hat{\\beta}$. Controls: rating, industry, log duration, volatility, callable. Fitted spread is estimated each month via cross-sectional regression; because cs is used, this signal is also exposed to microstructure noise.",
+      "description": "Log-spread residual from fair-value regression: $\\log(cs) - X'\\hat{\\beta}$. Controls: rating, industry, log duration, volatility, callable. Fitted spread is estimated each month via cross-sectional regression.",
       "citation": "\\citet{IPR2018}",
       "citation_keys": [
         "IPR2018"
